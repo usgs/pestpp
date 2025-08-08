@@ -79,12 +79,13 @@ public:
 	to the specified group
 	*/
 	void insert_parameter_link(const string &parameter_name, const string & group_name);
-	const ParameterGroupRec* get_group_rec_ptr(const string &par_name) const;
-	const ParameterGroupRec* get_group_by_groupname(const string &group_name) const { return groups.at(group_name); }
-	ParameterGroupRec* get_group_by_groupname_4_mod(const string &group_name) { return groups.at(group_name); }
-	ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
+	const ParameterGroupRec get_group_rec(const string &par_name) const;
+    ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
+	const ParameterGroupRec get_group_by_groupname(const string &group_name) const { return groups.at(group_name); }
+	ParameterGroupRec* get_group_ptr_by_groupname_4_mod(const string &group_name) { return &groups.at(group_name); }
+
 	string get_group_name(const string &par_name) const;
-	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
+	//const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
 	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
@@ -93,8 +94,8 @@ public:
 	void free_mem();
 	~ParameterGroupInfo();
 private:
-	unordered_map<string, ParameterGroupRec*> groups;
-	unordered_map<string, ParameterGroupRec*> parameter2group;
+	unordered_map<string, ParameterGroupRec> groups;
+	unordered_map<string, ParameterGroupRec> parameter2group;
 
 };
 
@@ -675,6 +676,8 @@ public:
     void set_panther_echo_interval_milliseconds(int _value) {panther_echo_interval_milliseconds = _value;}
     const int get_panther_echo_interval_milliseconds() const { return panther_echo_interval_milliseconds;}
     const int get_panther_timeout_milliseconds() const { return panther_timeout_milliseconds;}
+    void set_panther_persistent_workers(bool _flag) {panther_persistent_workers = _flag;}
+    const bool get_panther_persistent_workers() const {return panther_persistent_workers;}
 
 
 
@@ -926,6 +929,7 @@ private:
 	vector<string> panther_transfer_on_finish, panther_transfer_on_fail;
     int panther_timeout_milliseconds;
     int panther_echo_interval_milliseconds;
+    bool panther_persistent_workers;
 
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);

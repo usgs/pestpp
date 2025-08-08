@@ -105,7 +105,7 @@ public:
 	
 	PriorInformation get_pi_constraints() { return constraints_pi; }
 
-	//get maps of obs and pi constraints that are not satified - the value is the distance to cosntraint RHS
+	//get maps of obs and pi constraints that are not satisfied - the value is the distance to constraint RHS
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true, bool include_weight = false);
 	map<string, double> get_constraint_map(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift);
@@ -118,7 +118,7 @@ public:
 	//get the number of non-zero Prior info constraint elements
 	int get_num_nz_pi_constraint_elements();
 	
-	//update the chance offset calcs - doesnt make runs, mostly for FOSM calcs
+	//update the chance offset calcs - doesn't make runs, mostly for FOSM calcs
 	void update_chance_offsets();
 	
 	//get the max scale constraint change against upgrade_obs - used for convergence testing

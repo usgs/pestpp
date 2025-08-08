@@ -33,7 +33,7 @@ White, J.T., Hunt, R.J., Fienen, M.N., and Doherty, J.E., 2020, Approaches to Hi
 
 ## User's Manual
 
-The lastest PEST++ users manual is available [here](documentation/pestpp_users_manual.md) or as a [word document](https://github.com/usgs/pestpp/tree/develop/documentation).
+The latest PEST++ users manual is available [here](documentation/pestpp_users_manual.md) or as a [word document](https://github.com/usgs/pestpp/tree/develop/documentation).
 
 <br>
 

@@ -663,7 +663,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	}
 
 	//now add the infeasible members
-	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
+	//if there is at least one feasible nondom solution, then add the infeasible ones to dom solutions
 	bool all_infeas = true;
 	if (infeas.size() < op.shape().first - duplicates.size())
 	{
@@ -1270,7 +1270,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitne
 		dom = 0;
 		for (auto& sol : sol_map.second)
 			dom = dom + num_dominating_map[sol];
-		_unconstrained_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
+		_unconstrained_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distance to density
 		_fitness_map[sol_map.first] = _unconstrained_fitness_map[sol_map.first];
 
 		//include scaled infeasibility sum in fitness...
@@ -2157,7 +2157,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 
     }
     else {
-        //check that members of _op arent in the archive already
+        //check that members of _op aren't in the archive already
         vector<string> keep, temp = op_archive.get_real_names();
         set<string> archive_members(temp.begin(), temp.end());
         for (auto &member : _op.get_real_names()) {
@@ -2238,7 +2238,7 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
         return;
     }
 
-    //check that members of _op arent in the archive already
+    //check that members of _op aren't in the archive already
     vector<string> keep, temp = op_archive.get_real_names();
     set<string> archive_members(temp.begin(), temp.end());
     for (auto &member : _op.get_real_names()) {
@@ -2313,7 +2313,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		if (chancepoints == chancePoints::SINGLE)
 		{
 			//dont use the _dp, use the class attr dp and op here
-			//because they are in sync. _dp hasnt been run yet...
+			//because they are in sync. _dp hasn't been run yet...
 			string opt_member;
 			Parameters::iterator end = pars.end();
 			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
@@ -2794,7 +2794,7 @@ void MOEA::initialize()
 	{
 		set<string> snames(act_par_names.begin(), act_par_names.end());
 		if (snames.find(RISK_NAME) == snames.end())
-			throw_moea_error("couldnt find '" + RISK_NAME + "' in adj par names for risk objective");
+			throw_moea_error("couldn't find '" + RISK_NAME + "' in adj par names for risk objective");
 		if (find(dv_names.begin(), dv_names.end(), RISK_NAME) == dv_names.end())
 		{
 			//throw_moea_error(RISK_NAME + " not found in decision variable names");
@@ -3527,7 +3527,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 			}
 		}
 		if (idx_min == -1)
-			throw_moea_error("couldnt find nearest mean point");
+			throw_moea_error("couldn't find nearest mean point");
 		string min_member = _dp.get_real_names()[idx_min];
 		if (dist_min > 0.0) dist_min = sqrt(dist_min);
 		ss.str("");
@@ -3543,7 +3543,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 	else
 	{
 		//calculate the optimal tradeoff point from the current op
-		//dont worry about pi-based obj since they arent chance-based
+		//dont worry about pi-based obj since they aren't chance-based
 		message(2, "seeking optimal trade-off point for single 'optimal' chance point runs");
 		vector<double> obj_extrema;
 		Eigen::VectorXd obj_vec; 
@@ -3574,7 +3574,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 			}
 		}
 		if (opt_idx == -1)
-			throw_moea_error("couldnt find nearest optimal point");
+			throw_moea_error("couldn't find nearest optimal point");
 		string opt_member = _op.get_real_names()[opt_idx];
 		if (opt_dist > 0.0) opt_dist = sqrt(opt_dist);
 		ss.str("");
@@ -4606,14 +4606,14 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 
 
 	//TODO get npt from s.
-	int nopt = 30; //number of variables in the model, in an ideal situaion s has nopt realizations, handle size of s in generate_simplex_population
+	int nopt = 30; //number of variables in the model, in an ideal situations has nopt realizations, handle size of s in generate_simplex_population
 	int nps = nopt + 1; // number of members in a simplex
 
 	//TODO get parameters and fitness from s
 	Eigen::MatrixXd svals(nps, nopt); //PARAMETERS 
 	Eigen::VectorXd sfvals(nps);     //OBJECTIVE FUNCTION for members of the simplex
 
-	//TOERASE, FILL WTH RANDOM NUMBERS FOR NOW
+	//TOERASE, FILL WITH RANDOM NUMBERS FOR NOW
 	for (int i = 0; i < nps; i++)
 	{
 		for (int j = 0; j < nopt; j++)
@@ -4633,8 +4633,8 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 	//Create vector with n steps from reflection [1, 1-1/n, 1-2/n, ...1-(n-1)/n]
 	//Examples:                             n=1, [1]
 	//                                      n=4, [1, 1-1/4, 1-2/4, 1-3/4]
-	//TODO DECIDE TO INCLUDE one or more contraction points right the way or under some circustance
-	//A contraction point cound use -1+2/n or something similar.
+	//TODO DECIDE TO INCLUDE one or more contraction points right the way or under some circumstance
+	//A contraction point could use -1+2/n or something similar.
 	vector<double> alpha_d_vec = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
 	int nsteps = alpha_d_vec.size();
 
@@ -4654,7 +4654,7 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 	int inew = 0;
 	for (int ik = 0; ik < k; ik++)
 	{
-		// Compute the centroid of the simplex excluding the seleted kth worst point
+		// Compute the centroid of the simplex excluding the selected kth worst point
 		Eigen::MatrixXd svalsek(nps - 1, nopt);
 		int j = 0;
 		for (int ikk = 0; ikk < nps; ikk++)
@@ -4695,10 +4695,10 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 				switch (optbounds){
 					case 1:
 						//RANDOM, ORIGINAL SCE
-						ce_delta_a = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
+						ce_delta_a = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECIPE
 						break;
 					case 2:
-						//INFORCE BOUNDS CODE
+						//ENFORCE BOUNDS CODE
 						for (int j = 0; j < ce_delta_a.size();j++ )
 						{
 							if (ce_delta_a(j) > bu(j))
@@ -4838,7 +4838,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	vector<string> new_member_names;
 	
-	//since _dp migth contain both dev vars and pars, we want to 
+	//since _dp might contain both dev vars and pars, we want to 
 	//make sure we are only fooling with dec vars
 	//the var_map lets us map between dv name and col index
 	ofstream& lin = file_manager.get_ofstream(lineage_tag);
@@ -4891,9 +4891,9 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		if (i < _dp.shape().first)
 			x = _dp.get_eigen_ptr()->row(i);
 		else
-			//this risks "inbreeding" but maybe thats good?!
+			//this risks "inbreeding" but maybe that's good?!
 			x = _dp.get_eigen_ptr()->row(selected[3]);
-		//copy to perserve non-dec var values;
+		//copy to preserve non-dec var values;
 		y = x; 
 		//random cross over probs - one per decision variable
 		cr_vals = uniform_draws(_dp.shape().second, 0.0, 1.0, rand_gen);
@@ -5185,6 +5185,63 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
+Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinames)
+{
+	//check if there are prior info equations
+	//if (constraints.num_pi_constraints() > 0)
+	//	{
+		// get the parameter and realization names
+		vector<string> parnames;
+		parnames = _dp.get_var_names();
+		vector<string> realnames;
+		realnames = _dp.get_real_names();
+
+		// empty Parameters and parvals vector for populating later
+		Parameters pars;
+		Eigen::VectorXd parvals;
+
+		// pi obj for later
+		PriorInformation constraints_pi = pest_scenario.get_prior_info();
+
+		//Instantiate an empty Ensemble class with reserved row and col names
+		Ensemble pioe(&pest_scenario);
+		pioe.reserve(realnames,pinames);
+		//pioe.update_var_map();
+		Eigen::MatrixXd piX(realnames.size(),pinames.size());
+
+		//piX.resize(realnames.size(),pinames.size());
+
+		int i = 0;
+		for (auto &real : realnames)
+			{
+			// get Parameters for each realization
+			parvals = _dp.get_real_vector(real);
+			pars.update_without_clear(parnames,parvals);
+
+			Eigen::VectorXd pivals;
+			pivals.resize(pinames.size());
+			int j = 0;
+			//loop over pi_constraint_names
+			for (auto &piname : pinames)
+				{
+				PriorInformationRec pi_rec = constraints_pi.get_pi_rec(piname);
+
+				pair<double,double> pi_sim_resid = pi_rec.calc_sim_and_resid(pars);
+				// update the matrix
+				piX(i,j) = pi_sim_resid.first;
+				j++;
+				}
+			i++;
+			}
+	pioe.update_var_map();
+	pioe.from_eigen_mat(piX,realnames,pinames);
+
+	//}
+	pioe.update_var_map();
+	return pioe;
+}
+
+
 void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag, bool force_save)
 {
 	
@@ -5246,7 +5303,76 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		ss << "saved generation-specific decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 	}
-	
+
+	// record prior information constraint obs names
+	vector<string> pinames;
+	pinames = constraints.get_pi_constraint_names();
+	// remove __risk__ from pinames
+	pinames.erase(std::remove(pinames.begin(), pinames.end(), "_RISK_"), pinames.end());
+
+	if (pinames.size() >0)
+	{
+		Ensemble _dpi= save_pi_constraints(_dp, pinames);
+
+		ss.str("");
+		ss << file_manager.get_base_filename();
+		if (tag.size() > 0)
+		{
+			ss << "." << tag;
+		}
+
+		ss << "." << pi_pop_file_tag;
+		if (pest_scenario.get_pestpp_options().get_save_binary())
+		{
+			if (pest_scenario.get_pestpp_options().get_save_dense())
+			{
+				ss << ".bin";
+				_dpi.to_dense(ss.str());
+			}
+			else {
+				ss << ".jcb";
+				_dpi.to_binary(ss.str());
+			}
+		}
+		else
+		{
+			ss << ".csv";
+			_dpi.to_csv(ss.str());
+		}
+		string name = ss.str();
+		ss.str("");
+		ss << "saved prior information population of size " << _dpi.shape().first << " X " << _dpi.shape().second << " to '" << name << "'";
+		message(1, ss.str());
+		ss.str("");
+		if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
+		{
+			ss << file_manager.get_base_filename() << "." << iter;
+			if (tag.size() > 0)
+			{
+				ss << "." << tag;
+			}
+			ss << "." << pi_pop_file_tag;
+			if (pest_scenario.get_pestpp_options().get_save_binary()) {
+				if (pest_scenario.get_pestpp_options().get_save_dense()) {
+					ss << ".bin";
+					_dpi.to_dense(ss.str());
+				} else {
+					ss << ".jcb";
+					_dpi.to_binary(ss.str());
+				}
+			}
+			else
+			{
+				ss << ".csv";
+				_dpi.to_csv(ss.str());
+			}
+			string name = ss.str();
+			ss.str("");
+			ss << "saved generation-specific prior information population of size " << _dpi.shape().first << " X " << _dpi.shape().second << " to '" << name << "'";
+			message(1, ss.str());
+		}
+	}
+
 
 	ss.str("");
 	ss << file_manager.get_base_filename();

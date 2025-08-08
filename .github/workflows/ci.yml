@@ -29,22 +29,22 @@ jobs:
         
         env:
           - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "basic_tests.py"}
-          - { test_dir: "pestpp-opt_benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "opt_test.py"}
-          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_base.py"}
-          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part1.py"}
-          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part2.py"}
-          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part3.py"}
-          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part4.py"}
-          - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp-glm_benchmarks", test_script: "glm_test_base.py"}
-          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests.py"}
-          #- { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
-          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "henry_test.py"}
-          - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "da_tests.py"}
-          - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "lorenz96_tests.py"}
-          - { test_dir: "pestpp-sqp_benchmarks", test_repo: "https://github.com/pestpp/pestpp-sqp_benchmarks", test_script: "sqp_tests.py"}
+          - { test_dir: "pestpp-opt_benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "../benchmarks/opt_test.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_base.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part1.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part2.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part3.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part4.py"}
+          - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp-glm_benchmarks", test_script: "../benchmarks/glm_test_base.py"}
+          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests.py"}
+          #- { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests_2.py"}
+          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/henry_test.py"}
+          - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "../benchmarks/da_tests.py"}
+          - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "../benchmarks/lorenz96_tests.py"}
+          - { test_dir: "pestpp-sqp_benchmarks", test_repo: "https://github.com/pestpp/pestpp-sqp_benchmarks", test_script: "../benchmarks/sqp_tests.py"}
         include: 
             - os: ubuntu-latest
-              env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
+              env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests_2.py"}
     env: ${{ matrix.env }}
 
     steps:

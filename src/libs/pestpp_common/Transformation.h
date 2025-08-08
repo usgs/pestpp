@@ -77,7 +77,7 @@ public:
 	This is used primarily for debugging purposes
 	 */
 	virtual void print(ostream &os) const = 0;
-	/** If very memeber of a transformed dataset maps to single and independent memeber
+	/** If very member of a transformed dataset maps to single and independent member
 	under both the forward and reverse transformation this method will return true.  Otherwise
 	it returns false.
 	 */
@@ -102,7 +102,7 @@ public:
 	virtual ~TranMapBase(){};
 	virtual void forward(Transformable &data)=0;
 	virtual void reverse(Transformable &data)=0;
-	/** Adds a transformation item to the items memmber map.  _name is the name of
+	/** Adds a transformation item to the items member map.  _name is the name of
 	   the parameter to be transformed and _value is the value to be applied in the forward
 	   transformtion.  How _value is applied in the transformation is determined in the
 	   child classes
@@ -220,7 +220,7 @@ public:
 /**
  @brief Fixed Value Transformation Class
 
- This class provides tansformation that adds an additiona transformable items with a fixed
+ This class provides transformation that adds an additional transformable items with a fixed
  value in the forward transformation and removes the item in the reverse transformation.
 */
 class TranFixed: public TranMapBase {
@@ -255,7 +255,7 @@ private:
 /**
  @brief Tied Transformation Class
 
- This class provides tansformation that ties a transformable item to another transformable
+ This class provides transformation that ties a transformable item to another transformable
  item.  In the forard direction this transformation will add a new Tied transformable item.
  This item is assigned the scaled value of the items that it is tied to.  In the reverse direction
  the tied parameters are simple removed from the transformable set.
@@ -285,7 +285,7 @@ protected:
  @brief Super Parameter or SVD Assist (SVDA) Transformation
 
  This class provides a transformation for super parameters.  In the forward direction base parameters
- are transformed to super parameters and in the reverse direction super paraeters are transformed to
+ are transformed to super parameters and in the reverse direction super parameters are transformed to
  base parameters
 */
 class TranSVD: public Transformation {

@@ -1829,7 +1829,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 	if ((missing_val.size() > 0) && (tset.find(missing_val) != tset.end()))
 		throw_externalctrlfile_error("missing_value '"+missing_val+"' found in header row");
 	
-	//if these arent the same size, there must be duplicates...
+	//if these aren't the same size, there must be duplicates...
 	if (tset.size() != col_names.size())
 	{
 		vector<string> dups;
@@ -1976,7 +1976,7 @@ void ExternalCtlFile::parse_control_record()
 	tokenize(tmp_line, tokens, "\t ");
 	if (tokens.size() < 1)
 	{
-		throw_externalctrlfile_error("too few tokens on 'external' line '" + line + "', need atleast 1 (e.g. 'filename.csv')");
+		throw_externalctrlfile_error("too few tokens on 'external' line '" + line + "', need at least 1 (e.g. 'filename.csv')");
 	}
 	filename = tokens[0];
 
@@ -2056,7 +2056,7 @@ int ExternalCtlFile::get_row_idx(string key, string col_name)
 	if (cnames.find(col_name) == cnames.end())
 		throw_externalctrlfile_error("get_row_idx() error: col_name '" + col_name + "' not found in col_names");
 	if (isduplicated(col_name))
-		throw_externalctrlfile_error("get_row_idx() error: cant use key-col_name retrieval for duplicated column '" + col_name + "'");
+		throw_externalctrlfile_error("get_row_idx() error: can't use key-col_name retrieval for duplicated column '" + col_name + "'");
 	vector<string> col_vector;
 	fill_col_vector(col_name, col_vector);
 	vector<string>::iterator it = find(col_vector.begin(), col_vector.end(), key);
@@ -2070,13 +2070,15 @@ int ExternalCtlFile::get_row_idx(string key, string col_name)
 string get_time_string()
 {
 	time_t rawtime;
-	struct tm* timeinfo;
+	//struct tm* timeinfo;
 	char buffer[80];
 
 	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+	//timeinfo = localtime(&rawtime);
+	//strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+    strftime(buffer, 80, "%m/%d/%y %H:%M:%S",localtime(&rawtime));
 	string t_str(buffer);
+    //delete timeinfo;
 	return t_str;
 }
 

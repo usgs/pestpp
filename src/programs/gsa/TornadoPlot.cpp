@@ -35,7 +35,7 @@ void TornadoPlot::assemble_runs(RunManagerAbstract &run_manager)
 	Parameters pars = fixed_ctl_pars;
 	pars.insert(init_pars);
 
-	// Assemble run Based on the inital Parameter values
+	// Assemble run Based on the initial Parameter values
 	Parameters tmp_pars;
 	tmp_pars = pars;
 	base_partran_seq_ptr->ctl2model_ip(tmp_pars);
