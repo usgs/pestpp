@@ -48,7 +48,8 @@ public:
 	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
 
 	//this must be called at least once before the diversity metrixs can be called...
-	void set_pointers(vector<string>& _obj_names, vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, vector<string>& _pi_obj_sd_names, map<string, double>& _obj_dir_mult)
+	void set_pointers(vector<string>& _obj_names, vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names,
+                      vector<string>& _pi_obj_sd_names, map<string, double>& _obj_dir_mult,map<string,string>& _ppd_obj_to_sd)
 	{
 		obj_names_ptr = &_obj_names;
 		obs_obj_names_ptr = &_obs_obj_names; 
@@ -59,6 +60,7 @@ public:
 		prep_pareto_summary_file(POP_SUM_TAG);
 		prep_pareto_summary_file(ARC_SUM_TAG);
 		prep_pareto_summary_file(ARC_TRIM_SUM_TAG);
+        ppd_obj_to_sd_ptr = &_ppd_obj_to_sd;
 	}
 	
 	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
@@ -131,6 +133,7 @@ private:
 	vector<string>* pi_obj_names_ptr;
 	vector<string>* pi_obj_sd_names_ptr;
 	map<string, double>* obj_dir_mult_ptr;
+    map<string,string>* ppd_obj_to_sd_ptr;
 	set<string> duplicates;
 
 	map<string, map<string, double>> feas_member_struct;
@@ -196,6 +199,7 @@ private:
 	std::mt19937 rand_gen;
 	vector<string> obj_names, obs_obj_names, pi_obj_names, obs_obj_sd_names, pi_obj_sd_names;
 	vector<string> dv_names;
+    map<string,string> ppd_obj_to_sd;
 	map<string, double> obj_dir_mult;
 	int n_adaptive_dvs;
 	map<string, map<string, double>> previous_obj_summary, previous_dv_summary;

@@ -948,9 +948,11 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 
 	if (prob_pareto)
 	{
-		for (auto& obj : *obs_obj_names_ptr)
-			euclidean_dist.at(1) += 4 * pow(first.at(obj) - second.at(obj), 2) * (pow(first.at(obj + "_SD"), 2) + pow(second.at(obj + "_SD"), 2));
-		for (auto& objsd : *obs_obj_sd_names_ptr)
+		for (auto& obj : *obs_obj_names_ptr) {
+            euclidean_dist.at(1) += 4 * pow(first.at(obj) - second.at(obj), 2) *
+                                    (pow(first.at(ppd_obj_to_sd_ptr->at(obj)), 2) + pow(second.at(ppd_obj_to_sd_ptr->at(obj)), 2));
+        }
+            for (auto& objsd : *obs_obj_sd_names_ptr)
 		{
 			euclidean_dist.at(0) += pow(first.at(objsd), 2) + pow(second.at(objsd), 2);
 			euclidean_dist.at(1) += 2 * pow(pow(first.at(objsd), 2) + pow(second.at(objsd), 2), 2);
@@ -1044,10 +1046,11 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 		for (auto m : members)
 		{
-			if (_member_struct[m][obj_map.first + "_SD"] < min_sd[obj_map.first] - FLOAT_EPSILON)
-				_member_struct[m][obj_map.first + "_SD_SYN"] = min_sd[obj_map.first];
-			else
-				_member_struct[m][obj_map.first + "_SD_SYN"] = _member_struct[m][obj_map.first + "_SD"];
+
+            if (_member_struct.at(m).at(ppd_obj_to_sd_ptr->at(obj_map.first)) < min_sd.at(obj_map.first) - FLOAT_EPSILON)
+                _member_struct[m][ppd_obj_to_sd_ptr->at(obj_map.first)+"_SYN"] = min_sd.at(obj_map.first);
+            else
+                _member_struct[m][ppd_obj_to_sd_ptr->at(obj_map.first)+"_SYN"] = _member_struct.at(m).at(ppd_obj_to_sd_ptr->at(obj_map.first));
 		}
 
 		nonuniq_obj.clear();
@@ -1208,10 +1211,6 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	if (prob_pareto)
 	{
 		fit_map = get_mopso_fitness(members, _member_struct);
-		/*euclidean_maps = get_cluster_crowding_fitness(members, _member_struct);
-		expected_dist_map = euclidean_maps.first;
-		var_dist_map = euclidean_maps.second;*/
-		//prob_not_dom = get_prob_non_dominance(members, _member_struct);
 	}
 	else
 		fit_map = get_cuboid_crowding_distance(members, _member_struct);
@@ -1423,8 +1422,7 @@ double ParetoObjectives::dominance_probability(map<string, double>& first, map<s
 
 	for (auto obj_name : *obj_names_ptr)
 	{
-		//prob_dom[obj_name] = std_norm_df(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
-		prob_dom *= (std_norm_df(0, first.at(obj_name) - second.at(obj_name), sqrt(pow(first.at(obj_name + "_SD"),2) + pow(second.at(obj_name + "_SD"),2)), true));
+		prob_dom *= (std_norm_df(0, first.at(obj_name) - second.at(obj_name), sqrt(pow(first.at(ppd_obj_to_sd_ptr->at(obj_name)),2) + pow(second.at(ppd_obj_to_sd_ptr->at(obj_name)),2)), true));
 	}
 
 	return prob_dom;
@@ -1435,11 +1433,13 @@ double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<st
 	map<string, double> f = first, s = second;
 	for (auto obj_name : *obj_names_ptr)
 	{
-		if (f.at(obj_name + "_SD") < min_sd[obj_name] - FLOAT_EPSILON)
-			f.at(obj_name + "_SD") = min_sd[obj_name];
 
-		if (s.at(obj_name + "_SD") < min_sd[obj_name] - FLOAT_EPSILON)
-			s.at(obj_name + "_SD") = min_sd[obj_name];
+        if (f.at(ppd_obj_to_sd_ptr->at(obj_name)) < min_sd.at(obj_name) - FLOAT_EPSILON)
+            f.at(ppd_obj_to_sd_ptr->at(obj_name)) = min_sd.at(obj_name);
+
+
+        if (s.at(ppd_obj_to_sd_ptr->at(obj_name)) < min_sd.at(obj_name) - FLOAT_EPSILON)
+            s.at(ppd_obj_to_sd_ptr->at(obj_name)) = min_sd.at(obj_name);
 	}
 
 	double pd = dominance_probability(f, s);
@@ -1595,8 +1595,8 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 
 double ParetoObjectives::get_ei(map<string, double> phi, string obj, double curr_opt)
 {
-    double stdnorm = std_norm_df(curr_opt, phi.at(obj), phi.at(obj + "_SD"),false);
-	double ei = (curr_opt - phi[obj]) * std_norm_df(curr_opt, phi.at(obj), phi.at(obj + "_SD"), true) + phi.at(obj + "_SD") * stdnorm;
+    double stdnorm = std_norm_df(curr_opt, phi.at(obj), phi.at(ppd_obj_to_sd_ptr->at(obj)),false);
+    double ei = (curr_opt - phi[obj]) * std_norm_df(curr_opt, phi.at(obj), phi.at(ppd_obj_to_sd_ptr->at(obj)), true) + phi.at(ppd_obj_to_sd_ptr->at(obj)) * stdnorm;
 	return ei;
 }
 
@@ -1623,10 +1623,10 @@ double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double
 
 	obj.clear();
 	obj_sd.clear();
-	for (auto obj_map : *obj_names_ptr)
+	for (auto& obj_map : *obj_names_ptr)
 	{
-		obj.push_back(_member_struct[member][obj_map]);
-		obj_sd.push_back(_member_struct[member][obj_map + "_SD"]);
+		obj.push_back(_member_struct.at(member).at(obj_map));
+		obj_sd.push_back(_member_struct.at(member).at(ppd_obj_to_sd_ptr->at(obj_map)));
 	}
 
 	t1 = 0;
@@ -2693,6 +2693,13 @@ void MOEA::initialize()
                     message(1,"found PPD standard deviation observation: '"+sdobs+"' for objective: '"+obj_name+"'");
 
                     keep_obs_sd.push_back(sdobs);
+                    if (ppd_obj_to_sd.find(obj_name) != ppd_obj_to_sd.end())
+                    {
+                        ss.str("");
+                        ss << "objective '" << obj_name << "' already in ppd_obj_to_sd map";
+                        throw_moea_error(ss.str());
+                    }
+                    ppd_obj_to_sd[obj_name] = sdobs;
                 }
 			}
 			//else if (oset.find(obj_name+"_sd") != oset.end()) //find the corresponding sd observations
@@ -2720,7 +2727,10 @@ void MOEA::initialize()
 					}
 					pi_obj_names.push_back(obj_name);
 				}
-				if (prob_pareto) keep_pi_sd.push_back(obj_name + "_SD");
+				if (prob_pareto)
+                {
+                    keep_pi_sd.push_back(obj_name + "_SD");
+                }
 			}
 		}
 		if (err_sense.size() > 0)
@@ -3266,7 +3276,7 @@ void MOEA::initialize()
 
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
-	objectives.set_pointers(obj_names, obs_obj_names, obs_obj_sd_names, pi_obj_names, pi_obj_sd_names, obj_dir_mult);
+	objectives.set_pointers(obj_names, obs_obj_names, obs_obj_sd_names, pi_obj_names, pi_obj_sd_names, obj_dir_mult,ppd_obj_to_sd);
 	archive_size = ppo->get_mou_max_archive_size();
 	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
@@ -3703,24 +3713,6 @@ void MOEA::iterate_to_solution()
 		save_populations(new_dp, new_op);
         //update_sim_maps(new_dp,new_op);
 
-		//compute ehvi of each solution
-		//if (prob_pareto)
-		//{
-		//	message(1, "computing the expected hypervolume improvement of members in current population");
-		//	objectives.get_ehvi(new_op, new_dp);
-
-		//	/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
-		//	{
-		//		message(1, "updating overlap criteria for probabilistic dominance sorting");
-		//		objectives.update_ppd_criteria(new_op, new_dp);
-		//	}*/
-		//	
-		//}
-
-        //if we are using chances, then we need to make sure to update the archive as well as the current population
-        // from the full history of available members since uncertainty estimates could be changing as we evolve
-        // e.g. Rui's problem...
-        // this same conditional is used in the update archive functions
 
         if (pest_scenario.get_pestpp_options().get_mou_use_multigen())
         {
