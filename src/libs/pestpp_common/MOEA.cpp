@@ -734,7 +734,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 			}
 			for (auto objsd : *obs_obj_sd_names_ptr)
 			{
-				sum << "," << member_struct[member][objsd + "_syn"];
+				sum << "," << member_struct[member].at(objsd + "_SYN");
 			}
 		}
 		sum << "," << member_front_map[member];
@@ -773,7 +773,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
 		for (auto objsd : *obs_obj_sd_names_ptr)
-			sum << "," << pest_utils::lower_cp(objsd + "_syn");
+			sum << "," << pest_utils::lower_cp(objsd + "_SYN");
 		sum << ",nsga2_front,nsga2_crowding_distance,nn_count,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
@@ -943,17 +943,17 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 {
 	vector<double> euclidean_dist{ 0, 0 };
 
-	for (auto obj : *obs_obj_names_ptr)
-		euclidean_dist.at(0) += pow(first[obj] - second[obj], 2);
+	for (auto& obj : *obs_obj_names_ptr)
+		euclidean_dist.at(0) += pow(first.at(obj) - second.at(obj), 2);
 
 	if (prob_pareto)
 	{
-		for (auto obj : *obs_obj_names_ptr)
-			euclidean_dist.at(1) += 4 * pow(first[obj] - second[obj], 2) * (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2));
-		for (auto objsd : *obs_obj_sd_names_ptr)
+		for (auto& obj : *obs_obj_names_ptr)
+			euclidean_dist.at(1) += 4 * pow(first.at(obj) - second.at(obj), 2) * (pow(first.at(obj + "_SD"), 2) + pow(second.at(obj + "_SD"), 2));
+		for (auto& objsd : *obs_obj_sd_names_ptr)
 		{
-			euclidean_dist.at(0) += pow(first[objsd], 2) + pow(second[objsd], 2);
-			euclidean_dist.at(1) += 2 * pow(pow(first[objsd], 2) + pow(second[objsd], 2), 2);
+			euclidean_dist.at(0) += pow(first.at(objsd), 2) + pow(second.at(objsd), 2);
+			euclidean_dist.at(1) += 2 * pow(pow(first.at(objsd), 2) + pow(second.at(objsd), 2), 2);
 		}
 
 	}
@@ -980,14 +980,15 @@ void ParetoObjectives::prep_expected_distance_lookup_table(ObservationEnsemble& 
 	vector<double> eucd;
 	expdist_lookup.clear();
 
-	for (auto m : _member_struct)
+	for (auto& m : _member_struct)
 	{
-		for (auto n : _member_struct)
+		for (auto& n : _member_struct)
 		{
 			if (m.first == n.first)
 				continue;
 
-			eucd = get_euclidean_distance(_member_struct[m.first], _member_struct[n.first]);
+			eucd = get_euclidean_distance(_member_struct.at(m.first), _member_struct.at(n.first));
+            //dont use .at here since we are filling this container
 			expdist_lookup[m.first][n.first] = eucd.at(0);
 		}
 	}
@@ -1044,9 +1045,9 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 		for (auto m : members)
 		{
 			if (_member_struct[m][obj_map.first + "_SD"] < min_sd[obj_map.first] - FLOAT_EPSILON)
-				_member_struct[m][obj_map.first + "_SD_syn"] = min_sd[obj_map.first];
+				_member_struct[m][obj_map.first + "_SD_SYN"] = min_sd[obj_map.first];
 			else
-				_member_struct[m][obj_map.first + "_SD_syn"] = _member_struct[m][obj_map.first + "_SD"];
+				_member_struct[m][obj_map.first + "_SD_SYN"] = _member_struct[m][obj_map.first + "_SD"];
 		}
 
 		nonuniq_obj.clear();
@@ -1434,11 +1435,11 @@ double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<st
 	map<string, double> f = first, s = second;
 	for (auto obj_name : *obj_names_ptr)
 	{
-		if (f[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
-			f[obj_name + "_SD"] = min_sd[obj_name];
+		if (f.at(obj_name + "_SD") < min_sd[obj_name] - FLOAT_EPSILON)
+			f.at(obj_name + "_SD") = min_sd[obj_name];
 
-		if (s[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
-			s[obj_name + "_SD"] = min_sd[obj_name];
+		if (s.at(obj_name + "_SD") < min_sd[obj_name] - FLOAT_EPSILON)
+			s.at(obj_name + "_SD") = min_sd[obj_name];
 	}
 
 	double pd = dominance_probability(f, s);
@@ -1594,7 +1595,8 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 
 double ParetoObjectives::get_ei(map<string, double> phi, string obj, double curr_opt)
 {
-	double ei = (curr_opt - phi[obj]) * std_norm_df(curr_opt, phi[obj], phi[obj + "_SD"], true) + phi[obj + "_SD"] * std_norm_df(curr_opt, phi[obj], phi[obj + "_SD"], false);
+    double stdnorm = std_norm_df(curr_opt, phi.at(obj), phi.at(obj + "_SD"),false);
+	double ei = (curr_opt - phi[obj]) * std_norm_df(curr_opt, phi.at(obj), phi.at(obj + "_SD"), true) + phi.at(obj + "_SD") * stdnorm;
 	return ei;
 }
 
@@ -1652,8 +1654,9 @@ double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double
 	if (ehvi < -FLOAT_EPSILON) //Sometimes the value is only a little bit negative. Perhaps, due to the approximation of std normal. This happened only few times, though, but when it does, temporarily set the value to 0. Will revisit this later.
 	{
 		ss.str("");
-		ss << "WARNING: EHVI of " << member << " is negative = " << ehvi << ".Setting to 0.0.";
+		ss << "WARNING: EHVI of " << member << " is negative = " << ehvi << ". Resetting to 0.0.";
 		performance_log->log_event(ss.str());
+        cout << ss.str() << endl;
 		ehvi = 0;
 	}
 
@@ -2678,7 +2681,19 @@ void MOEA::initialize()
 					}
 					obs_obj_names.push_back(obj_name);
 				}
-				if (prob_pareto) keep_obs_sd.push_back(obj_name + "_SD");
+				if (prob_pareto)
+                {
+                    string sdobs = obj_name + "_SD";
+                    if (oset.find(sdobs) == oset.end())
+                    {
+                        ss.str("");
+                        ss << "PPD is active but objective '" << obj_name << "' needs the corresponding standard deviation observation: '" << sdobs << "'";
+                        throw_moea_error(ss.str());
+                    }
+                    message(1,"found PPD standard deviation observation: '"+sdobs+"' for objective: '"+obj_name+"'");
+
+                    keep_obs_sd.push_back(sdobs);
+                }
 			}
 			//else if (oset.find(obj_name+"_sd") != oset.end()) //find the corresponding sd observations
 			//{

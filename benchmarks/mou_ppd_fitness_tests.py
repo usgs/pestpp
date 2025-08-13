@@ -52,7 +52,7 @@ def ppd_fitness(ppd_beta = 0.5, master_dir = "master"):
     sys.path.insert(0, t_d)
     from forward_gprun import ppw_worker as ppw_function 
     pyemu.os_utils.start_workers(t_d, exe_path, "pest_ppd_fitness.pst", master_dir=m_d,
-                                worker_root='.', port=port, num_workers=num_workers, 
+                                worker_root=t_d, port=port, num_workers=num_workers, 
                                 ppw_function = ppw_function)
     sys.path.remove(t_d)
 
@@ -72,6 +72,9 @@ def ppd_part1_test():
 
     #minimium artificial variance value check
     sd_syn = (pcloud1['obj_1'].max() - pcloud1['obj_1'].min())/pcloud1.shape[0]
+    print(sd_syn)
+    print(pcloud1['obj_1_sd_syn'].max())
+    print(pcloud1['obj_1_sd_syn'].min())
     assert abs(pcloud1['obj_1_sd_syn'].max() - sd_syn) < 1e-6
     assert abs(pcloud1['obj_1_sd_syn'].min() - sd_syn) < 1e-6
 
