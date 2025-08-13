@@ -956,14 +956,6 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 			euclidean_dist.at(1) += 2 * pow(pow(first[objsd], 2) + pow(second[objsd], 2), 2);
 		}
 
-		/*for (auto obj : *obs_obj_names_ptr)
-		{
-			euclidean_dist.at(1) += 4 * pow((first[obj] - second[obj]) / sf[obj], 2) * (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2)) / pow(sf[obj], 2);
-
-			euclidean_dist.at(0) += (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2)) / pow(sf[obj], 2);
-			euclidean_dist.at(1) += 2 * pow((pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2)) / pow(sf[obj], 2), 2);
-		}*/
-
 	}
 
 	return euclidean_dist;
@@ -1453,26 +1445,6 @@ double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<st
 
 	return pd;
 }
-
-double ParetoObjectives::nondominance_probability(map<string, double>& first, map<string, double>& second)
-{
-	map<string, double> f = first, s = second;
-	for (auto obj_name : *obj_names_ptr)
-	{
-		if (f[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
-			f[obj_name + "_SD"] = min_sd[obj_name];
-
-		if (s[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
-			s[obj_name + "_SD"] = min_sd[obj_name];
-	}
-
-	double pd = 1 - dominance_probability(f, s) - dominance_probability(s, f);
-
-	//double pd = 1 - dominance_probability(s, f);
-
-	return pd;
-}
-
 
 bool ParetoObjectives::first_equals_second(map<string, double>& first, map<string, double>& second)
 {

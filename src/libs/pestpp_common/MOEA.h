@@ -147,7 +147,6 @@ private:
 	//PPD-related stuff
 	double dominance_probability(map<string, double>& first, map<string, double>& second);
 	double dominance_prob_adhoc(map<string, double>& first, map<string, double>& second);
-	double nondominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
 	double ppd_beta;
 	vector<double> ppd_range;
