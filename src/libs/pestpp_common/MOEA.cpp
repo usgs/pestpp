@@ -611,8 +611,6 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	crowd_map.clear();
-	expected_crowd_map.clear();
-	var_crowd_map.clear();
 	member_front_map.clear();
 	for (auto front : front_map)
 	{	
@@ -624,11 +622,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 		{
 			crowd_ordered_front = front.second;
 			crowd_map[front.second[0]] = -999.0;
-			expected_crowd_map[front.second[0]] = -999;
-			var_crowd_map[front.second[0]] = -999;
 			fitness_map[front.second[0]] = -999;
-			probnondom_map[front.second[0]] = -999;
-
 		}
 
 		else
@@ -958,29 +952,6 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	return val;
 }
 
-void ParetoObjectives::prep_expected_distance_lookup_table(ObservationEnsemble& op, ParameterEnsemble& dp)
-{
-	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
-	vector<double> eucd;
-	expdist_lookup.clear();
-
-	for (auto& m : _member_struct)
-	{
-		for (auto& n : _member_struct)
-		{
-			if (m.first == n.first)
-				continue;
-
-			eucd = get_euclidean_distance(_member_struct.at(m.first), _member_struct.at(n.first));
-            //dont use .at here since we are filling this container
-			expdist_lookup[m.first][n.first] = eucd.at(0);
-		}
-	}
-
-	//debug: lookup table check
-	//int i = 0;
-}
-
 map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string>& members)
 {
 	return get_cluster_crowding_fitness(members, member_struct);
@@ -1156,7 +1127,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 	}
 
 	double gamma2 = pow (gamma1, 2);
-	double pd, PD, nn_count;
+	double pd, dp, nn_count;
 	for (auto m : members)
 	{		
 		nn_count = 0;
@@ -1165,8 +1136,8 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			if (m != n)
 			{
 				pd = dominance_prob_adhoc(_member_struct[n], _member_struct[m]);
-				PD = dominance_prob_adhoc(_member_struct[m], _member_struct[n]);
-				if ((pd > gamma1) && (PD > gamma2))
+				dp = dominance_prob_adhoc(_member_struct[m], _member_struct[n]);
+				if ((pd > gamma1) && (dp > gamma2))
 					nn_count += 1.0;
 			}
 		}
@@ -3277,8 +3248,7 @@ void MOEA::initialize()
 	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
-		if (prob_pareto)
-			objectives.prep_expected_distance_lookup_table(op, dp);
+
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
 
 		//drop any duplicates
@@ -3752,8 +3722,6 @@ void MOEA::iterate_to_solution()
             }
             new_op.append_other_rows(op);
         }
-
-		objectives.prep_expected_distance_lookup_table(new_op, new_dp);
 
         if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
             update_pso_pbest(new_dp, new_op);

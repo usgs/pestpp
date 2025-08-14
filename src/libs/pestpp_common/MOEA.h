@@ -80,7 +80,6 @@ public:
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
 	map<string, double> get_cluster_crowding_fitness(vector<string>& members);
-	void prep_expected_distance_lookup_table(ObservationEnsemble& op, ParameterEnsemble& dp);
 	map<string, double> get_ehvi(vector<string>& members);
 	map<string, double> get_mopso_fitness(vector<string> members, ObservationEnsemble& op, ParameterEnsemble& dp);
 
@@ -138,7 +137,7 @@ private:
 
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;
-	map<string, double> crowd_map, expected_crowd_map, var_crowd_map, fitness_map, probnondom_map, min_sd, nn_map;
+	map<string, double> crowd_map, fitness_map,  min_sd, nn_map;
 	map<string, int> member_front_map;
 	map<string, double> member_cvar;
 	map<string, double> infeas;
@@ -158,7 +157,7 @@ private:
 	double std_norm_df(double x, double mu, double sd, bool cumdf);
 	double psi_function(double aa, double bb, double mu, double sd);
 	map<string, double> ehvi_member_map;
-	map<string, map<string, double>> incumbent_front_extreme, expdist_lookup, fit_lookup;
+	map<string, map<string, double>> incumbent_front_extreme, fit_lookup;
 	map<int, vector<double>> hypervolume_partitions;
 	double EHVI;
 	int iter;
