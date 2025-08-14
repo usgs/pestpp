@@ -1,5 +1,5 @@
 // pestpp-mou.cpp : Defines the entry point for the console application.
-//
+// 
 
 #include "RunManagerPanther.h" //needs to be first because it includes winsock2.h
 //#include <vld.h> // Memory Leak Detection using "Visual Leak Detector"
@@ -28,6 +28,7 @@
 #include "logger.h"
 #include "Ensemble.h"
 #include "MOEA.h"
+
 
 using namespace std;
 using namespace pest_utils;
@@ -155,7 +156,7 @@ int main(int argc, char* argv[])
 		if (!restart_flag || save_restart_rec_header)
 		{
 			fout_rec << "              pestpp-mou: multi-objective optimization under uncertainty" << endl;
-			fout_rec << "                         by the PEST++ developement team" << endl << endl << endl;
+			fout_rec << "                         by the PEST++ development team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
@@ -193,7 +194,7 @@ int main(int argc, char* argv[])
 		}
 		pest_scenario.check_inputs(fout_rec);
 		
-		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
+		//Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
@@ -244,7 +245,11 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
-				pest_scenario.get_pestpp_options().get_panther_echo());
+				pest_scenario.get_pestpp_options().get_panther_echo(),
+                vector<string>{}, vector<string>{},
+                pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 		}
 		else
 		{

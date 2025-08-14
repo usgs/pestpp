@@ -508,7 +508,7 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	map<int, double> center_on_map;
 	if (on_real.size() > 0)
 	{
-		//cheap median approx - doesnt deal with mean of the two middle elements if even 
+		//cheap median approx - doesn't deal with mean of the two middle elements if even 
 		if (pest_utils::upper_cp(on_real) == MEDIAN_CENTER_ON_NAME)
 		{
 			int half_size = _reals.rows() / 2;
@@ -1057,7 +1057,7 @@ void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 	}
 	//assume real is in order with reals along columns (var names)
 	if (real.rows() != reals.cols())
-		throw runtime_error("Ensemble::update_real_ip() real has wrong number of entires compared to reals");
+		throw runtime_error("Ensemble::update_real_ip() real has wrong number of entries compared to reals");
 	int i = idx - real_names.begin();
 	reals.row(i) = real;
 
@@ -2055,7 +2055,7 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 			vars_in_group.clear();
 			for (auto name : var_names)
 			{
-				if (pgi.get_group_rec_ptr(name)->name == group)
+				if (pgi.get_group_rec(name).name == group)
 					vars_in_group.push_back(name);
 			}
 			if (vars_in_group.size() == 0)
@@ -2444,7 +2444,7 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 //    }
 //	if (problems.size())
 //    {
-//        throw_ensemble_error("the follwing fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
+//        throw_ensemble_error("the following fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
 //    }
 	pfinfo.set_fixed_names(fixed_names);
 	fill_fixed(header_info, fixed_names);
@@ -4182,7 +4182,7 @@ void FixedParInfo::add_realizations(map<string,map<string,double>>& other_fixed_
         }
         for (auto& ori : ofi.second)
         {
-            //probably should error check this also to make sure other_fixed_info isnt replacing things...
+            //probably should error check this also to make sure other_fixed_info isn't replacing things...
             fixed_info.at(ofi.first)[ori.first] = ori.second;
         }
     }

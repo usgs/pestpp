@@ -354,7 +354,7 @@ void OutputFileWriter::scenario_io_report(std::ostream &os)
 
 void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 {
-	const ParameterGroupRec *grp_rec;
+	ParameterGroupRec grp_rec;
 	int grp_len = 12;
 	for (auto& par_name : pest_scenario.get_ctl_ordered_par_group_names())
 		grp_len = max((int)par_name.size(), grp_len);
@@ -365,8 +365,8 @@ void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 	for (auto &grp_name : pest_scenario.get_ctl_ordered_par_group_names())
 	{
 		grp_rec = pest_scenario.get_base_group_info().get_group_by_groupname(grp_name);
-		os << left << setw(grp_len) << lower_cp(grp_rec->name) << right << setw(15) << grp_rec->inctyp << setw(25) << grp_rec->derinc;
-		os << setw(25) << grp_rec->derinclb << setw(15) << grp_rec->forcen << setw(25) << grp_rec->derincmul << endl;
+		os << left << setw(grp_len) << lower_cp(grp_rec.name) << right << setw(15) << grp_rec.inctyp << setw(25) << grp_rec.derinc;
+		os << setw(25) << grp_rec.derinclb << setw(15) << grp_rec.forcen << setw(25) << grp_rec.derincmul << endl;
 	}
 	os << endl << endl;
 }
@@ -513,20 +513,30 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
 	string max_rel_par = "N/A";
 
 	os << "    Iteration "<<iter<<" Parameter Upgrades (" << par_type << " Parameters) " << endl;
-	os << "      Parameter     Current       Previous       Factor       Relative" << endl;
-	os << "        Name         Value         Value         Change        Change" << endl;
-	os << "      ----------  ------------  ------------  ------------  ------------" << endl;
+//	os << "      Parameter     Current       Previous       Factor       Relative" << endl;
+//	os << "        Name         Value         Value         Change        Change" << endl;
+//	os << "      ----------  ------------  ------------  ------------  ------------" << endl;
 	vector<string> par_names;
 	if (lower_cp(par_type) == "control file")
-		par_names = pest_scenario.get_ctl_ordered_par_names();
+		par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 	else
 	{
 		par_names = new_pars.get_keys();
 		sort(par_names.begin(), par_names.end());
 	}
+    const ParameterInfo* pinfo = pest_scenario.get_ctl_parameter_info_ptr_4_mod();
+
 	//for (const auto &ipar : new_ctl_pars)
-	for (auto &p_name : par_names)
-	{
+    int name_len = 20;
+	for (auto &p_name : par_names) {
+
+        name_len = max((int) p_name.size(), name_len);
+    }
+
+    os << setw(name_len) << left << "name" << setw(19) << right << " current value" << setw(19) << " previous value";
+    os << setw(19) << " factor change" << setw(19) << " relative change" << endl;
+    for (auto &p_name : par_names) {
+
 		Parameters::const_iterator pi = new_pars.find(p_name);
 		if (pi == new_pars.end()) continue;
 		p_new = new_pars.get_rec(p_name);
@@ -542,19 +552,18 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
 			max_rel_change = rel_change;
 			max_rel_par = p_name;
 		}
-		os << right;
-		os << "    " << setw(12) << lower_cp(p_name);
-		os << right;
-		os << "  " << setw(12) << p_new;
-		os << "  " << setw(12) << p_old;
-		if (have_fac)
-			os << "  " << setw(12) << fac_change;
+		os << setw(name_len) << left << p_name;
+        os << " " << setw(19) << right << p_new;
+        os << " " << setw(19) << right << p_old;
+
+        if (have_fac)
+			os << " " << setw(19) << right << fac_change;
 		else
-			os << "  " << setw(12) << "N/A";
+			os << " " << setw(19) << right << "N/A";
 		if (have_rel)
-			os << "  " << setw(12) << rel_change;
+			os << " " << setw(19) << right << rel_change;
 		else
-			os << "  " << setw(12) << "N/A";
+			os << " " << setw(19) << right << "N/A";
 		os << endl;
 	}
 	os << "       Maximum changes in \"" << par_type << "\" parameters:" << endl;
@@ -843,7 +852,7 @@ void OutputFileWriter::append_sen(std::ostream &fout, int iter_no, const Jacobia
 	Parameters ctl_pars = par_transform.numeric2ctl_cp(pars);
 	if (pars.size() == 0)
 	{
-		fout << "parameter values are not avaialble to compute CSS" << endl;
+		fout << "parameter values are not available to compute CSS" << endl;
 		fout << endl << endl;
 	}
 	else
@@ -979,7 +988,7 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 	if (jco.get_matrix_ptr()->nonZeros() == 0)
 	{
 		stringstream ss;
-		ss << "WARNING: jacobian matrix has no non-zeros - the parameter pertubations " << endl;
+		ss << "WARNING: jacobian matrix has no non-zeros - the parameter perturbations " << endl;
 		ss << "         have no effect on the control file observations." << endl;
 		ss << "         This usually means something is not setup correctly." << endl;
 		cout << ss.str();

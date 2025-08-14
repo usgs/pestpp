@@ -597,7 +597,7 @@ void TranSVD::calc_svd()
 	VectorXd Sigma_trunc;
 	//tran_svd_pack->solve_ip(SqrtQ_J, Sigma, U, Vt, Sigma_trunc);
 	tran_svd_pack->solve_ip(jtqj, Sigma, U, Vt, Sigma_trunc);
-	// calculate the number of singluar values above the threshold
+	// calculate the number of singular values above the threshold
 
 	debug_print(Sigma);
 	debug_print(U);
@@ -917,7 +917,7 @@ ParameterGroupInfo TranSVD::build_par_group_info(const ParameterGroupInfo &base_
 	for (int i_sup=0, n_sup=super_parameter_names.size(); i_sup < n_sup; ++i_sup)
 	{
 		get_MatrixXd_row_abs_max(Vt, i_sup, &max_col, &max_val);
-		derinc_par = base_pg_info.get_group_rec_ptr(base_parameter_names[max_col])->derinc;
+		derinc_par = base_pg_info.get_group_rec(base_parameter_names[max_col]).derinc;
 		derinc_sup = .01;
 		grp_name.str("");
 		grp_name << "g_" << super_parameter_names[i_sup];

@@ -567,7 +567,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (line_upper.substr(0, 2) == "++")
 			{
 				if (sections_found.find("CONTROL DATA KEYWORD") != sections_found.end())
-					throw_control_file_error(f_rec, "'* control data keyword' cant be used with '++' args");
+					throw_control_file_error(f_rec, "'* control data keyword' can't be used with '++' args");
 				sections_found.insert("PLUSPLUS");
 				pestpp_input.push_back(line);
 				section = "PLUSPLUS";
@@ -703,7 +703,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else if (sec_lnum == 6)
 				{
-					// remove text arguements from the line as these can be specified out of order
+					// remove text arguments from the line as these can be specified out of order
 					// and PEST++ does not use them
 					set<string> remove_tags = { "aui", "auid", "noaui", "senreuse", "nsenreuse", "boundscale", "noboundscale" };
 					auto end_iter = std::remove_if(tokens.begin(), tokens.end(),
@@ -759,7 +759,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* parameter group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* parameter group' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -795,7 +795,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					tokens_to_par_rec(f_rec, tokens, t_fixed, t_log, t_scale, t_offset);
 				}
-				// Get rest of information for tied paramters
+				// Get rest of information for tied parameters
 				else 
 				{
 					name = tokens[0];
@@ -839,7 +839,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						if (cnames.find(nn) == cnames.end())
 						{
 							ss.str("");
-							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing reqiured column '";
+							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing required column '";
 							ss << n << "' (alias '" + nn + "' also not found";
 							throw_control_file_error(f_rec, ss.str());
 						}
@@ -876,7 +876,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					{
 						ss.str("");
 						ss << "external '* parameter data' file '" << efile.get_filename() << "' included 'tied' parameters";
-						ss << "but doesnt have 'PARTIED' column";
+						ss << "but doesn't have 'PARTIED' column";
 						throw_control_file_error(f_rec, ss.str());
 					}
 
@@ -913,7 +913,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* observation group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* observation group' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -955,7 +955,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						if (cnames.find(nn) == cnames.end())
 						{
 							ss.str("");
-							ss << "external '* observation data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							ss << "external '* observation data' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 							throw_control_file_error(f_rec, ss.str());
 						}
 						else
@@ -1004,7 +1004,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* prior information' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* prior information' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -1048,7 +1048,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* model input' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* model input' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -1088,7 +1088,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* model output' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* model output' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -1507,8 +1507,9 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	double rpm = control_info.relparmax;
 	double orig_val, last_val, fac_lb, fac_ub, rel_lb, rel_ub, eff_ub, eff_lb,chg_lb, chg_ub;
 	double chg_fac, chg_rel;
-	double scaling_factor = 1.0;
 	string parchglim;
+	double scaling_factor = 1.0;
+	double temp = 1.0;
 	double bnd_tol = 0.001;
 	double scaled_bnd_val;
 	string controlling_par = "";
@@ -1518,211 +1519,318 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	Parameters upgrade_ctl_pars;
 	Parameters last_ctl_pars;
 
+	// if tied parameters exist, use the old scaling_factor code
+	// this ensures compliance with tied parameters.
 	if (pestpp_options.get_enforce_tied_bounds())
 	{
 		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
-	}
-	else
-	{
-		upgrade_ctl_pars = upgrade_active_ctl_pars;
-		last_ctl_pars = last_active_ctl_pars;
+		for (auto& p : upgrade_ctl_pars)
+		{
+			/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
+				cout << p.first << endl;*/
+			last_val = last_ctl_pars.get_rec(p.first);
+            
+			p_rec = p_info.get_parameter_rec_ptr(p.first);
+			parchglim = p_rec->chglim;
 
-	}
-	for (auto p : upgrade_ctl_pars)
-	{
-		/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
-			cout << p.first << endl;*/
-		last_val = last_ctl_pars.get_rec(p.first);
+			if (p.second == 0.0)
+				p.second = p_rec->ubnd / 4.0;
+			orig_val = ctl_parameters.get_rec(p.first);
+			if (orig_val == 0.0)
+				orig_val = p_rec->ubnd / 4.0;
+
+			//apply facorig correction if needed
+			if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+			{
+				if (abs(p.second) < abs(orig_val) * facorig)
+					p.second = orig_val * facorig;
+				if (abs(last_val) < abs(orig_val * facorig))
+					last_val = orig_val * facorig;
+			}
+				
+			//calc fac lims
+			if (abs(last_val) > abs(p.second))
+				chg_fac = last_val / p.second;
+			else
+				chg_fac = p.second / last_val;
+			//if (p.second > 0.0)
+			if (last_val > 0.0)
+			{
+				fac_lb = last_val / fpm;
+				fac_ub = last_val * fpm;
+			}
 		
-		p_rec = p_info.get_parameter_rec_ptr(p.first);
-		parchglim = p_rec->chglim;
-
-		if (p.second == 0.0)
-			p.second = p_rec->ubnd / 4.0;
-		orig_val = ctl_parameters.get_rec(p.first);
-		if (orig_val == 0.0)
-			orig_val = p_rec->ubnd / 4.0;
-
-		//apply facorig correction if needed
-		if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
-		{
-			if (abs(p.second) < abs(orig_val) * facorig)
-				p.second = orig_val * facorig;
-			if (abs(last_val) < abs(orig_val * facorig))
-				last_val = orig_val * facorig;
-		}
-			
-
-
-		//calc fac lims
-		if (abs(last_val) > abs(p.second))
-			chg_fac = last_val / p.second;
-		else
-			chg_fac = p.second / last_val;
-		//if (p.second > 0.0)
-		if (last_val > 0.0)
-		{
-			fac_lb = last_val / fpm;
-			fac_ub = last_val * fpm;
-		}
-	
-		else
-		{
-			fac_lb = last_val * fpm;
-			fac_ub = last_val / fpm;
-			
-		}
-
-		//calc rel lims
-		rel_lb = last_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
-		rel_ub = last_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
-		chg_rel = (last_val - p.second) / last_val;
-
-		if (parchglim == "FACTOR")
-		{
-			chg_lb = fac_lb;
-			chg_ub = fac_ub;
-		}
-		else if (parchglim == "RELATIVE")
-		{
-			chg_lb = rel_lb;
-			chg_ub = rel_ub;
-		}
-		else
-		{
-			throw runtime_error("Pest::enforce_par_limits() error: unrecognized 'parchglim': " + parchglim);
-		}
-
-
-		double temp = 1.0;
-		if (enforce_chglim)
-		{		
-			if (p.second > chg_ub)
+			else
 			{
-				temp = abs((chg_ub - last_val) / (p.second - last_val));
+				fac_lb = last_val * fpm;
+				fac_ub = last_val / fpm;
+				
+			}
+
+			//calc rel lims
+			rel_lb = last_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
+			rel_ub = last_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
+			chg_rel = (last_val - p.second) / last_val;
+
+			if (parchglim == "FACTOR")
+			{
+				chg_lb = fac_lb;
+				chg_ub = fac_ub;
+			}
+			else if (parchglim == "RELATIVE")
+			{
+				chg_lb = rel_lb;
+				chg_ub = rel_ub;
+			}
+			else
+			{
+				throw runtime_error("Pest::enforce_par_limits() error: unrecognized 'parchglim': " + parchglim);
+			}
+
+
+
+			double temp = 1.0;
+			if (enforce_chglim)
+			{		
+				if (p.second > chg_ub)
+				{
+					temp = abs((chg_ub - last_val) / (p.second - last_val));
+					if ((temp > 1.0) || (temp < 0.0))
+					{
+						ss.str("");
+						ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
+						ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+						throw runtime_error(ss.str());
+					}
+
+					if (temp < scaling_factor)
+					{
+						scaling_factor = temp;
+						controlling_par = p.first;
+						control_type = "upper change limit";
+					}
+				}
+
+				else if (p.second < chg_lb)
+					temp = abs((last_val - chg_lb) / (last_val - p.second));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
 					ss.str("");
-					ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
-					ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-					throw runtime_error(ss.str());
-				}
-
-				if (temp < scaling_factor)
-				{
-					scaling_factor = temp;
-					controlling_par = p.first;
-					control_type = "upper change limit";
-				}
-			}
-
-			else if (p.second < chg_lb)
-				temp = abs((last_val - chg_lb) / (last_val - p.second));
-			if ((temp > 1.0) || (temp < 0.0))
-			{
-				ss.str("");
-				ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
-				ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-				throw runtime_error(ss.str());
-			}
-			if (temp < scaling_factor)
-			{
-				scaling_factor = temp;
-				controlling_par = p.first;
-				control_type = "lower change limit";
-			}
-		}
-
-		if (enforce_bounds)
-		{
-			/*if (last_val >= p_rec->ubnd)
-			{
-				ss.str("");
-				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at upper bound";
-				throw runtime_error(ss.str());
-			}
-
-			else if (last_val <= p_rec->lbnd)
-			{
-				ss.str("");
-				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
-				throw runtime_error(ss.str());
-			}*/
-			scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
-			if (p.second > scaled_bnd_val)
-			{
-				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
-				if ((temp > 1.0) || (temp < 0.0))
-				{
-					
-					ss << "Pest::enforce_par_limts() error: invalid upper bound scaling factor " << temp << " for par " << p.first << endl;
-					ss << " ubnd:" << p_rec->ubnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
+					ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
 				}
 				if (temp < scaling_factor)
 				{
 					scaling_factor = temp;
 					controlling_par = p.first;
-					control_type = "upper bound";
+					control_type = "lower change limit";
 				}
 			}
-			scaled_bnd_val = p_rec->lbnd - abs(p_rec->lbnd * bnd_tol);
-			if (p.second < p_rec->lbnd)
+
+			if (enforce_bounds)
 			{
-				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
-				if ((temp > 1.0) || (temp < 0.0))
+				/*if (last_val >= p_rec->ubnd)
 				{
 					ss.str("");
-					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
-					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at upper bound";
 					throw runtime_error(ss.str());
 				}
-				if (temp < scaling_factor)
-				{
-					scaling_factor = temp;
-					controlling_par = p.first;
-					control_type = "lower bound";
-				}
-			}
-		}	
-	}
-	ss.str("");
-	ss << "change enforcement controlling par:" << controlling_par << ", control_type: " << control_type << ", scaling_factor: " << scaling_factor << endl;
 
-	if (scaling_factor == 0.0)
-	{
+				else if (last_val <= p_rec->lbnd)
+				{
+					ss.str("");
+					ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
+					throw runtime_error(ss.str());
+				}*/
+				scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
+				if (p.second > scaled_bnd_val)
+				{
+					temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
+					if ((temp > 1.0) || (temp < 0.0))
+					{
+						
+						ss << "Pest::enforce_par_limts() error: invalid upper bound scaling factor " << temp << " for par " << p.first << endl;
+						ss << " ubnd:" << p_rec->ubnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+						throw runtime_error(ss.str());
+					}
+					if (temp < scaling_factor)
+					{
+						scaling_factor = temp;
+						controlling_par = p.first;
+						control_type = "upper bound";
+					}
+				}
+				scaled_bnd_val = p_rec->lbnd - abs(p_rec->lbnd * bnd_tol);
+				if (p.second < p_rec->lbnd)
+				{
+					temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
+					if ((temp > 1.0) || (temp < 0.0))
+					{
+						ss.str("");
+						ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
+						ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+						throw runtime_error(ss.str());
+					}
+					if (temp < scaling_factor)
+					{
+						scaling_factor = temp;
+						controlling_par = p.first;
+						control_type = "lower bound";
+					}
+				}
+			}	
+		}
 		ss.str("");
-		ss << "Pest::enforce_par_change_limits error : zero length parameter vector" << endl;
-		ss << "parameter: " << controlling_par << ", control type: " << control_type;
-		throw runtime_error(ss.str());
-	}
+		ss << "change enforcement controlling par:" << controlling_par << ", control_type: " << control_type << ", scaling_factor: " << scaling_factor << endl;
 
-	if (scaling_factor != 1.0)
+		if (scaling_factor == 0.0)
+		{
+			ss.str("");
+			ss << "Pest::enforce_par_change_limits error : zero length parameter vector" << endl;
+			ss << "parameter: " << controlling_par << ", control type: " << control_type;
+			throw runtime_error(ss.str());
+		}
+
+		if (scaling_factor != 1.0)
+		{
+			for (auto &p : upgrade_active_ctl_pars)
+			{
+				
+				last_val = last_ctl_pars.get_rec(p.first);
+				p.second =last_val + (p.second - last_val) *  scaling_factor;
+			}
+		}
+		
+		//check for slightly out of bounds
+		for (auto &p : upgrade_ctl_pars)
+		{
+			p_rec = p_info.get_parameter_rec_ptr(p.first);
+			if (p.second < p_rec->lbnd)
+				p.second = p_rec->lbnd;
+			else if (p.second > p_rec->ubnd)
+				p.second = p_rec->ubnd;
+
+		}
+	}
+	// if we don't have tied parameters, use clamping logic instead.
+	else
 	{
 		for (auto &p : upgrade_active_ctl_pars)
 		{
 			
-			last_val = last_ctl_pars.get_rec(p.first);
-			p.second =last_val + (p.second - last_val) *  scaling_factor;
+			last_val = last_active_ctl_pars.get_rec(p.first);
+			p_rec = p_info.get_parameter_rec_ptr(p.first);
+			parchglim = p_rec->chglim;
+			if (parchglim == "RELATIVE" && last_val == 0.0)
+			{
+				throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
+			}
+
+			
+
+			if (p.second == 0.0)
+				p.second = p_rec->ubnd / 4.0;
+			orig_val = ctl_parameters.get_rec(p.first);
+			if (orig_val == 0.0)
+				orig_val = p_rec->ubnd / 4.0;
+
+			//calc fac lims
+			if (last_val > 0.0)
+			{
+				fac_lb = last_val / fpm;
+				fac_ub = last_val * fpm;
+			}
+		
+			else
+			{
+				fac_lb = last_val * fpm;
+				fac_ub = last_val / fpm;
+				
+			}
+
+			//calc rel lims
+			rel_lb = last_active_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
+			rel_ub = last_active_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
+
+			if (parchglim == "FACTOR")
+			{
+				chg_lb = fac_lb;
+				chg_ub = fac_ub;
+			}
+			else if (parchglim == "RELATIVE")
+			{
+				chg_lb = rel_lb;
+				chg_ub = rel_ub;
+			}
+			else
+			{
+				throw runtime_error("Pest::enforce_par_limits() error: unrecognized 'parchglim': " + parchglim);
+			}
+
+
+			// double temp = 1.0;
+
+			// New logic for enforcing chglim and bounds
+			// First, we'll check the change limits.
+			// Next, we'll check parameter bounds.
+			// If anything violates, clamp to the offending bound.
+
+			if (enforce_chglim)
+			// similar to below, clamp rather than shrink every parameter if a parameter violates change limits
+			{ 
+				if (p.second > chg_ub)
+				{
+					temp = abs((chg_ub - last_val) / (p.second - last_val));
+					if ((temp > 1.0) || (temp < 0.0))
+					{
+						ss.str("");
+						ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
+						ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+						throw runtime_error(ss.str());
+					}
+					p.second = chg_ub;
+				}
+				else if (p.second < chg_lb)
+				{
+					temp = abs((last_val - chg_lb) / (last_val - p.second));
+					if ((temp > 1.0) || (temp < 0.0))
+					{
+						ss.str("");
+						ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
+						ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+						throw runtime_error(ss.str());
+					}
+					p.second = chg_lb;
+				}
+
+				//apply facorig correction if needed
+				if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+				{
+					if (abs(p.second) < abs(orig_val) * facorig)
+						p.second = orig_val * facorig;
+					if (abs(last_val) < abs(orig_val * facorig))
+						last_val = orig_val * facorig;
+				}
+			}
+
+			if (enforce_bounds)
+			{
+				if (p.second > p_rec->ubnd)
+				{
+					p.second = p_rec->ubnd;
+				}
+				else if (p.second < p_rec->lbnd)
+				{
+					p.second = p_rec->lbnd;
+				}
+			}	
 		}
 	}
-	
-	//check for slightly out of bounds
-	for (auto &p : upgrade_ctl_pars)
-	{
-		p_rec = p_info.get_parameter_rec_ptr(p.first);
-		if (p.second < p_rec->lbnd)
-			p.second = p_rec->lbnd;
-		else if (p.second > p_rec->ubnd)
-			p.second = p_rec->ubnd;
 
-	}
-	ss.str("");
-	ss << control_type << "," << controlling_par;
 	pair<string, double> _control_info(ss.str(), scaling_factor);
 	return _control_info;
-
 }
 
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
@@ -1909,7 +2017,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 			
 //			for (auto tpl : mi_cycle_map)
 //			{
-//				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change.
+//				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that because row order does not change.
 //
 //			}
 			for (auto& tpl : mi_cycle_dci_map)
@@ -1947,7 +2055,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		{		
 //			for (auto ins : mi_cycle_map)
 //			{
-//				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change.
+//				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that because row order does not change.
 //			}
 			for (auto& ins : mi_cycle_dci_map)
             {
@@ -2461,8 +2569,8 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
 
     if (stop_cycle < 0) {
         ss.str("");
-        ss << "WARNING: didnt find any explicit 'stop' cycle values in control file info, assuming smoother formulation" << endl;
-        ss << "         assinging a generic 'stop' value of " << start_cycle + 1 << " which is 'start' cycle plus 1" << endl;
+        ss << "WARNING: didn't find any explicit 'stop' cycle values in control file info, assuming smoother formulation" << endl;
+        ss << "         assigning a generic 'stop' value of " << start_cycle + 1 << " which is 'start' cycle plus 1" << endl;
         cout << ss.str();
         f_rec << ss.str();
         stop_cycle = start_cycle + 1;
@@ -2599,6 +2707,7 @@ Pest::~Pest() {
 		{
 		}
 	}
+    base_group_info.free_mem();
 }
 
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
@@ -2623,7 +2732,7 @@ pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &lin
 	tokenize(tmp_line,tokens,"\t ");
 	if (tokens.size() < 2)
 	{
-		throw_control_file_error(f_rec, "Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need atleast 2");
+		throw_control_file_error(f_rec, "Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need at least 2");
 	}
 	key = tokens[0];
 	upper_ip(key);
@@ -2906,6 +3015,7 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 	if (s_obgnme.find(pi_name_group.second) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+        s_obgnme.emplace(pi_name_group.second);
 	}
 	
 }
@@ -3001,6 +3111,9 @@ void Pest::release_unused_for_agent()
     ctl_ordered_par_group_names.clear();
     //base_group_info.clear();
     prior_info.clear();
+    base_group_info.free_mem();
+    regul_scheme_ptr = NULL;
+
 }
 
 

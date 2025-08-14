@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
         int flag = remove(rns_file.c_str());
         //w_sleep(2000);
         //by default use the serial run manager.  This will be changed later if another
-        //run manger is specified on the command line.
+        //run manager is specified on the command line.
 
         if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER) {
             try {
@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
         if (!restart_flag || save_restart_rec_header) {
             fout_rec << "             pestpp-ies - a GLM iterative Ensemble Smoother" << endl
                      << "                      for PEST(++) datasets " << endl << endl;
-            fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
+            fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
             fout_rec << endl;
             fout_rec << endl << endl << "version: " << version << endl;
             fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
         //pest_scenario.clear_ext_files();
         pest_scenario.check_inputs(fout_rec);
 
-        //Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
+        //Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
         //bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
         pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
         OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
@@ -231,7 +231,11 @@ int main(int argc, char* argv[])
                     pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
                     pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
                     pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
-                    pest_scenario.get_pestpp_options().get_panther_echo());
+                    pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
         } else {
             performance_log.log_event("starting basic model IO error checking");
             cout << "checking model IO files...";

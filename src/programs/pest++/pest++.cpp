@@ -195,15 +195,15 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_default_dynreg();
-#ifndef _DEBUG
+        pest_scenario.set_default_dynreg();
+#ifndef _NDEBUG
 		try {
 #endif
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
-#ifndef _DEBUG
+#ifndef _NDEBUG
 		}
 		catch (exception &e)
 		{
@@ -244,7 +244,7 @@ int main(int argc, char* argv[])
 
         }
 
-		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
+		//Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		
@@ -302,7 +302,11 @@ int main(int argc, char* argv[])
 					pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 					pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
 					pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
-					pest_scenario.get_pestpp_options().get_panther_echo());
+					pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 			}
 		}
 		
@@ -363,7 +367,7 @@ int main(int argc, char* argv[])
 		// method must be involked as pointer as the transformation sequence it is added to will
 		// take responsibility for destroying it
 		TranSVD *tran_svd = new TranSVD(pest_scenario.get_pestpp_options().get_max_n_super(),
-			pest_scenario.get_pestpp_options().get_super_eigthres(), "SVD Super Parameter Tranformation");
+			pest_scenario.get_pestpp_options().get_super_eigthres(), "SVD Super Parameter Transformation");
 
 		if (pest_scenario.get_pestpp_options().get_svd_pack() != PestppOptions::SVD_PACK::REDSVD)
 		{
@@ -403,7 +407,7 @@ int main(int argc, char* argv[])
 		ModelRun optimum_run(&obj_func, pest_scenario.get_ctl_observations());
 		//for tracking the initial model simulated equivalents
 		//vector<double> init_sim;
-		// if noptmax=0 make one run with the intital parameters
+		// if noptmax=0 make one run with the initial parameters
 		if (pest_scenario.get_control_info().noptmax == 0) {
 			Parameters init_model_pars = base_trans_seq.ctl2model_cp(cur_ctl_parameters);
 			optimum_run.set_ctl_parameters(init_model_pars);
@@ -476,7 +480,7 @@ int main(int argc, char* argv[])
 		}
 
 
-		//Define model Run for Base Parameters (uses base parameter tranformations)
+		//Define model Run for Base Parameters (uses base parameter transformations)
 		ModelRun cur_run(&obj_func, pest_scenario.get_ctl_observations());
 
 		cur_run.set_ctl_parameters(cur_ctl_parameters);
@@ -493,6 +497,7 @@ int main(int argc, char* argv[])
 		{
 			fout_rec << "   -----    Starting pestpp-glm Iterations    ----    " << endl << endl;
 		}
+
 		while (!termination_ctl.terminate())
 		{
             int q = pest_utils::quit_file_found();
@@ -747,15 +752,17 @@ int main(int argc, char* argv[])
 		cout << endl;
 		termination_ctl.termination_summary(fout_rec);
 		fout_rec << endl;
-		cout << "FINAL OPTIMISATION RESULTS" << endl << endl;
-		fout_rec << "FINAL OPTIMISATION RESULTS" << endl << endl;
+        if ((pest_scenario.get_ctl_ordered_par_names().size() < 1000) && (pest_scenario.get_ctl_ordered_obs_names().size() < 1000)) {
+            cout << "FINAL OPTIMISATION RESULTS" << endl << endl;
+            fout_rec << "FINAL OPTIMISATION RESULTS" << endl << endl;
 
-		fout_rec << "  Optimal parameter values  " << endl;
-		output_file_writer.par_report(fout_rec, optimum_run.get_ctl_pars());
+            fout_rec << "  Optimal parameter values  " << endl;
+            output_file_writer.par_report(fout_rec, optimum_run.get_ctl_pars());
 
-		fout_rec << endl << "  Observations with optimal model-simulated equivalents and residuals" << endl;
-		ObservationInfo oi = pest_scenario.get_ctl_observation_info();
-		output_file_writer.obs_report(fout_rec, *obj_func.get_obs_ptr(), optimum_run.get_obs(),oi);
+            fout_rec << endl << "  Observations with optimal model-simulated equivalents and residuals" << endl;
+            ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+            output_file_writer.obs_report(fout_rec, *obj_func.get_obs_ptr(), optimum_run.get_obs(), oi);
+        }
 
 		fout_rec << endl << "Final composite objective function " << endl;
 		PhiData phi_data = obj_func.phi_report(optimum_run.get_obs(), optimum_run.get_ctl_pars(), *(pest_scenario.get_regul_scheme_ptr()));
@@ -788,7 +795,7 @@ int main(int argc, char* argv[])
 			fout_rec << "      starting with 'regul' are dropped from the Jacobian and observation" << endl;
 			fout_rec << "      covariance matrices before uncertainty calculations.  Please" << endl;
 			fout_rec << "      make sure that all expert knowledge is expressed in the prior " << endl;
-			fout_rec << "      parameter bounds or through a covariance matix, which can be " << endl;
+			fout_rec << "      parameter bounds or through a covariance matrix, which can be " << endl;
 			fout_rec << "      supplied as a ++ option as '++parcov(<matrix_file_name>)'," << endl;
 			fout_rec << "      where <matrix_file_name> can be an ASCII PEST-compatible matrix file (.mat) or" << endl;
 			fout_rec << "      a PEST-compatible uncertainty file (.unc)." << endl << endl;

@@ -328,6 +328,7 @@ void prep_sweep_output_file(Pest &pest_scenario, ofstream &out, bool& is_binary)
 	//ofstream out(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
     vector<string> obs_names = pest_scenario.get_ctl_ordered_obs_names();
     string filename = pest_scenario.get_pestpp_options().get_sweep_output_csv_file();
+
     string obs_ext = filename.substr(filename.size() - 3, filename.size());
     pest_utils::lower_ip(obs_ext);
     if (obs_ext.compare("bin") == 0)
@@ -365,7 +366,7 @@ void prep_sweep_output_file(Pest &pest_scenario, ofstream &out, bool& is_binary)
 }
 
 void process_sweep_runs(ofstream &out, Pest &pest_scenario, RunManagerAbstract* run_manager_ptr, vector<int> run_ids, vector<string> listed_run_ids,
-                        ObjectiveFunc obj_func,int total_runs_done,bool is_binary_output)
+                        ObjectiveFunc obj_func,int total_runs_done,bool is_binary_output, PerformanceLog& performance_log)
 {
 	Parameters pars;
 	Observations obs;
@@ -379,9 +380,13 @@ void process_sweep_runs(ofstream &out, Pest &pest_scenario, RunManagerAbstract* 
     vector<string> obs_group_names = pest_scenario.get_ctl_ordered_obs_group_names();
     Eigen::VectorXd vec(obs_names.size());
     vec.setConstant(fail_val);
+    stringstream ss;
 	for (int i = 0;i <run_ids.size();++i)
 	{
 		run_id = run_ids[i];
+        ss.str("");
+        ss << "processing run_id:" << run_id;
+        performance_log.log_event(ss.str());
 		listed_run_id = listed_run_ids[i];
         success = run_manager_ptr->get_run(run_id, pars, obs);
         if (is_binary_output)
@@ -398,6 +403,7 @@ void process_sweep_runs(ofstream &out, Pest &pest_scenario, RunManagerAbstract* 
             out << ',' << listed_run_id;
             // if the run was successful
             if (success) {
+                performance_log.log_event("calculating phi info");
                 PhiData phi_data = obj_func.phi_report(obs, pars, *(pest_scenario.get_regul_scheme_ptr()));
 
                 out << ",0";
@@ -438,7 +444,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-swp - a parameteric sweep utility, version " << version << endl;
+		cout << "             pestpp-swp - a parametric sweep utility, version " << version << endl;
 		cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                 by the PEST++ development team" << endl << endl << endl;
 
@@ -462,7 +468,7 @@ int main(int argc, char* argv[])
 		int flag = remove(rns_file.c_str());
 		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
-		//run manger is specified on the command line.
+		//run manager is specified on the command line.
 		
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
@@ -540,7 +546,7 @@ int main(int argc, char* argv[])
         string start_string = get_time_string();
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
+			fout_rec << "             pestpp-swp.exe - a parametric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
 			fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
@@ -589,9 +595,31 @@ int main(int argc, char* argv[])
 		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
 		ofw.scenario_report(fout_rec, false);
 		PestppOptions ppopt = pest_scenario.get_pestpp_options();
+        set<string> passed = ppopt.get_passed_args();
+        if (passed.find("SWEEP_OUTPUT_FILE")==passed.end())
+        {
+            if (ppopt.get_save_dense())
+            {
+                fout_rec << "'save_dense' is true, resetting 'sweep_output_file' to 'sweep_output.bin'" << endl;
+                pest_scenario.get_pestpp_options_ptr()->set_sweep_output_csv_file("sweep_output.bin");
+            }
+        }
+        //get a fresh copy
+        ppopt = pest_scenario.get_pestpp_options();
+        // process the parameter csv file
+        string par_csv_file;
+        if (pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file().empty())
+        {
+            //throw runtime_error("control file pest++ type argument 'SWEEP_PARAMETER_CSV_FILE' is required for sweep");
+            cout << "pest++ arg SWEEP_PARAMETER_CSV_FILE not set, using 'SWEEP_IN.CSV'" << endl;
+            par_csv_file = "sweep_in.csv";
+        }
+        else
+            par_csv_file = pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file();
 
-		fout_rec << "    sweep parameter csv file = " << left << setw(50) << ppopt.get_sweep_parameter_csv_file() << endl;
-		fout_rec << "    sweep output csv file = " << left << setw(50) << ppopt.get_sweep_output_csv_file() << endl;
+
+		fout_rec << "    sweep parameter file = " << left << setw(50) << par_csv_file << endl;
+		fout_rec << "    sweep output file = " << left << setw(50) << ppopt.get_sweep_output_csv_file() << endl;
 		fout_rec << "    sweep chunk size = " << left << setw(10) << ppopt.get_sweep_chunk() << endl;
 		//fout_rec << "    sweep base run = " << left << setw(10) << ppopt.get_sweep_base_run() << endl;
 		fout_rec << "    sweep forgive failed runs = " << left << setw(10) << ppopt.get_sweep_forgive() << endl;
@@ -603,16 +631,7 @@ int main(int argc, char* argv[])
 			exit(0);
 		}
 
-		// process the parameter csv file
-		string par_csv_file;
-		if (pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file().empty())
-		{
-			//throw runtime_error("control file pest++ type argument 'SWEEP_PARAMETER_CSV_FILE' is required for sweep");
-			cout << "pest++ arg SWEEP_PARAMETER_CSV_FILE not set, using 'SWEEP_IN.CSV'" << endl;
-			par_csv_file = "sweep_in.csv";
-		}
-		else
-			par_csv_file = pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file();
+
 
 		ifstream par_stream(par_csv_file);
 		if (!par_stream.good())
@@ -624,14 +643,18 @@ int main(int argc, char* argv[])
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
 		{
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerPanther(
-				file_manager.build_filename("rns"), cmdline.panther_port,
-				file_manager.open_ofile_ext("rmr"),
-				pest_scenario.get_pestpp_options().get_max_run_fail(),
-				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
-				pest_scenario.get_pestpp_options().get_panther_echo());
+            run_manager_ptr = new RunManagerPanther(
+                    rns_file, cmdline.panther_port,
+                    file_manager.open_ofile_ext("rmr"),
+                    pest_scenario.get_pestpp_options().get_max_run_fail(),
+                    pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
+                    pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
+                    pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+                    pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 		}
 		else
 		{
@@ -737,6 +760,7 @@ int main(int argc, char* argv[])
 		// prepare the output file
 		ofstream obs_stream;
         bool is_binary_output = false;
+
 		prep_sweep_output_file(pest_scenario,obs_stream,is_binary_output);
 
 		int chunk = pest_scenario.get_pestpp_options().get_sweep_chunk();
@@ -833,22 +857,25 @@ int main(int argc, char* argv[])
 
 			cout << "starting runs " << total_runs_done << " --> " << total_runs_done + run_ids.size() << endl;
 
+            performance_log.log_event("queuing runs");
 			// queue up some runs
 			irun_ids.clear();
 			for (auto &par : sweep_pars)
 			{
 				//Parameters temp = base_trans_seq.active_ctl2model_cp(par);
 		        irun_ids.push_back(run_manager_ptr->add_run(base_trans_seq.active_ctl2model_cp(par)));
+
 			}
 
 			//make some runs
-
+            performance_log.log_event("calling run mgr");
 			run_manager_ptr->run();
 
 			//process the runs
 			cout << "processing runs...";
+            performance_log.log_event("processing runs");
 			//process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr, run_ids, obj_func,total_runs_done);
-			process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr,irun_ids, run_ids, obj_func, total_runs_done,is_binary_output);
+			process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr,irun_ids, run_ids, obj_func, total_runs_done,is_binary_output, performance_log);
 
 			cout << "done" << endl;
 			total_runs_done += run_ids.size();

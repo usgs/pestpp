@@ -287,7 +287,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 		tmp_str.str("");
 		tmp_str << "completed iteration " << global_iter_num;
 		performance_log->log_event(tmp_str.str());
-		// write files that get wrtten at the end of each iteration
+		// write files that get written at the end of each iteration
 		stringstream filename;
 		string complete_filename;
 
@@ -331,7 +331,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 				output_file_writer.write_jco(false, "jco", jacobian);
 			//jacobian.save();
 			// jacobian calculated next iteration will be at the current parameters and
-			// will be more accurate than the one caluculated at the begining of this iteration
+			// will be more accurate than the one calculated at the beginning of this iteration
 			save_nextjac = true;
             // par file for this iteration
             output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
@@ -403,7 +403,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	VectorXd Sigma_trunc;
 	Eigen::SparseMatrix<double> U;
 	Eigen::SparseMatrix<double> Vt;
-	// the last boolean arguement is an instruction to compute the square weights
+	// the last boolean argument is an instruction to compute the square weights
 	Eigen::SparseMatrix<double> q_mat = Q_sqrt.get_sparse_matrix(obs_name_vec, regul, true);
 	// removed this line when true added to end of the previous call to get_sparce_matrix
 	//q_mat = (q_mat * q_mat).eval();
@@ -442,7 +442,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
 		performance_log->log_event(info_str.str());
 
-		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
+		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimmed off
 		performance_log->log_event("commencing SVD factorization of lambda-scaled JtQJ");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
@@ -450,7 +450,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 
 		VectorXd Sigma_inv = Sigma.array().inverse();
-		performance_log->log_event("commencing linear algebra multiplication to compute ugrade");
+		performance_log->log_event("commencing linear algebra multiplication to compute upgrade");
 
 		info_str << "Vt info: " << "rows = " << Vt.rows() << ": cols = " << Vt.cols() << ": size = " << Vt.size() << ": nonzeros = " << Vt.nonZeros();
 		performance_log->log_event(info_str.str());
@@ -508,12 +508,12 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event("commencing SVD factorization - using identity lambda scaling");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
-		//Only add lambda to singular values above the threshhold
+		//Only add lambda to singular values above the threshold
 		Sigma = Sigma.array() + (Sigma.cwiseProduct(Sigma).array() * lambda).sqrt();
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 		VectorXd Sigma_inv = Sigma.array().inverse();
 
-		performance_log->log_event("commencing linear algebra multiplication to compute ugrade");
+		performance_log->log_event("commencing linear algebra multiplication to compute upgrade");
 		stringstream info_str;
 		info_str << "Vt info: " << "rows = " << Vt.rows() << ": cols = " << Vt.cols() << ": size = " << Vt.size() << ": nonzeros = " << Vt.nonZeros();
 		performance_log->log_event(info_str.str());
@@ -552,9 +552,9 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 
 	Eigen::VectorXd grad_vec;
 	grad_vec = -2.0 * (jac.transpose() * (q_mat * Residuals));
-	performance_log->log_event("linear algebra multiplication to compute ugrade complete");
+	performance_log->log_event("linear algebra multiplication to compute upgrade complete");
 
-	//tranfer newly computed components of the upgrade vector to upgrade.svd_uvec
+	//transfer newly computed components of the upgrade vector to upgrade.svd_uvec
 	upgrade_active_ctl_del_pars.clear();
 	grad_active_ctl_del_pars.clear();
 
@@ -578,7 +578,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	tmp_pars = base_numeric_pars;
 	par_transform.del_numeric_2_del_active_ctl_ip(grad_active_ctl_del_pars, tmp_pars);
 
-	//tranfere previously frozen componets of the ugrade vector to upgrade.svd_uvec
+	//tranfere previously frozen components of the upgrade vector to upgrade.svd_uvec
 	for (auto &ipar : prev_frozen_active_ctl_pars)
 	{
 		active_ctl_upgrade_pars[ipar.first] = ipar.second;
@@ -1075,11 +1075,12 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		num_lamb_runs++; 
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 		//Marquardt Lambda Update Vector
-		vector<double> lambda_vec = base_lambda_vec;
+		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
 		
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
 		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
 		int i_update_vec = 0;
 		stringstream message;
 		stringstream prf_message;
@@ -1137,12 +1138,16 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
 			for (double i_scale : lambda_scale_vec)
 			{
-				if (i_scale >= 1.0)
+				if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				
-				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
-				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
+
+				Parameters scaled_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
+                pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_par,false,true);
+				scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+                //now flip back to all ctl pars not just active...
+                scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+                output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
@@ -1169,7 +1174,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		}
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
+
 	}
+
+	
+	
 	//instance of a Mat for the jco
     Mat j;
     LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
@@ -1232,7 +1241,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		Observations tmp_obs;
 		string lambda_type; 
 		double i_lambda;
-		//This must be outside the loop to insure all parrameter sets are read in order
+		//This must be outside the loop to insure all parameter sets are read in order
 		bool success = run_manager.get_run(i, tmp_pars, tmp_obs, lambda_type, i_lambda);
 		if ((pest_scenario.get_pestpp_options().get_glm_debug_lamb_fail()) && (i == 1))
 		{
@@ -1338,6 +1347,45 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		throw runtime_error("all upgrade runs failed.");
 	}
 
+	// Check if best_lambda is at the edge of lambda_vec
+
+	// regrab lambda_vec
+	vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
+	std::sort(lambda_vec.begin(), lambda_vec.end());
+	auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+	lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+	auto last_lambda = lambda_vec.back();
+	auto first_lambda = lambda_vec.front();
+	file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
+	double lambda_spacing_factor = 10.0; // doing powers of 10 for now
+	bool extended = false;
+
+	if (best_lambda == last_lambda)
+	{
+		// Add a new larger lambda
+		double new_lambda = last_lambda * lambda_spacing_factor;
+		if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+		{
+			lambda_vec.push_back(new_lambda);
+			extended = true;
+			file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
+		}
+	}
+	else if (best_lambda == first_lambda)
+	{
+		// Add a new smaller lambda
+		double new_lambda = first_lambda / lambda_spacing_factor;
+		if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+		{
+			lambda_vec.push_back(new_lambda);
+			extended = true;
+			file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
+		}
+	}
+	std::sort(lambda_vec.begin(), lambda_vec.end());
+	pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
+
 	return best_upgrade_run;
 }
 
@@ -1371,7 +1419,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 //				b_facorg_lim = p_init;
 //			}
 //
-//			// Check Relative Chanage Limit
+//			// Check Relative Change Limit
 //			if (p_info->chglim == "RELATIVE" && abs((p_upgrade - p_init) / b_facorg_lim) > ctl_info->relparmax)
 //			{
 //				par_limit.first = true;
@@ -1487,7 +1535,7 @@ Parameters SVDSolver::limit_parameters_freeze_all_ip(const Parameters &init_acti
 	//	}
 	//}
 
-	////Transform parameters back their ative control state and freeze any that violate their bounds
+	////Transform parameters back their active control state and freeze any that violate their bounds
 	//upgrade_active_ctl_pars = par_transform.numeric2active_ctl_cp(upgrade_numeric_pars);
 
 	//check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
@@ -1578,7 +1626,7 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 	const Parameters new_numeric_pars = par_transform.ctl2numeric_cp(upgrade.get_ctl_pars());
 	output_file_writer.par_report(os, termination_ctl.get_iteration_number()+1, new_numeric_pars, old_numeric_pars, "Transformed Numeric");
 
-	//Need to pass defualt regularization weights so this comparision is consistent across iterations
+	//Need to pass default regularization weights so this comparison is consistent across iterations
 	termination_ctl.process_iteration(upgrade.get_phi_comp(DynamicRegularization::get_unit_reg_instance()), max_rel_change);
 }
 
@@ -1691,7 +1739,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 //
 //	check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_active_ctl_parameters);
 //
-//	////delete any limits cooresponding to ignored types
+//	////delete any limits corresponding to ignored types
 //	//for (auto it = limited_active_ctl_parameters.begin(); it != limited_active_ctl_parameters.end();)
 //	//{
 //	//	const string &name = (*it).first;
@@ -1771,9 +1819,15 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
+    double meas = base_run.get_obj_func_ptr()->get_phi_comp(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr).meas;
+    double lam_val = pow(10.0, (floor(log10(meas))));
+    if (lam_val < 1.0e-10) {
+        lam_val = 10000;
+    }
+    //double lam_val = 0.0;
 
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
-		base_run_active_ctl_par, freeze_active_ctl_pars, 0, new_pars, upgrade_ctl_del_pars,
+		base_run_active_ctl_par, freeze_active_ctl_pars, lam_val, new_pars, upgrade_ctl_del_pars,
 		grad_ctl_del_pars);
 
 	//Don't limit parameters as this is just an estimate
@@ -1913,7 +1967,8 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 			//mu_vec[0].print(cout);
 			//cout << endl;
 		}
-		if (mu_vec[0].mu <= wfmin) break;
+		if (mu_vec[0].mu <= wfmin)
+            break;
 	}
 
 	for (; i < max_iter; ++i)
@@ -1935,7 +1990,8 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 			//cout << endl;
 			cout << "    ...solving for optimal weight factor : " << setw(6) << mu_vec[3].mu << endl << flush;
 		}
-		if (mu_vec[3].mu >= wfmax) break;
+		if (mu_vec[3].mu >= wfmax)
+            break;
 	}
 
 	double tau = (sqrt(5.0) - 1.0) / 2.0;

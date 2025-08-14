@@ -18,6 +18,7 @@ vector<string> get_common(vector<string> v1, vector<string> v2)
 {
 	vector<string> common;
 	for (auto e1 : v1)
+	for (auto e1 : v1)
 		if (find(v2.begin(), v2.end(), e1) != v2.end()) common.push_back(e1);
 	return common;
 }
@@ -363,7 +364,7 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 			{
 				//cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
 				// << "WARNING: initial simulation results not available for FOSM calcs, falling back to optimum run outputs for prior forecast mean" << endl;
-				pfm.log_event("no initial sim results, using curernt run instead: " + pred_name);
+				pfm.log_event("no initial sim results, using current run instead: " + pred_name);
 				ival = fval;
 			}
 
@@ -876,7 +877,7 @@ double LinearAnalysis::prior_prediction_variance(string &pred_name)
 	pest_utils::upper_ip(pred_name);
 	map<string, Mat>::iterator p_iter = predictions.find(pred_name);
 	if (p_iter == predictions.end())
-		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predicitons");
+		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predictions");
 
 	if (p_iter->second.e_ptr()->nonZeros() == 0)
 		return 0.0;
@@ -910,7 +911,7 @@ double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 	pest_utils::upper_ip(pred_name);
 	map<string, Mat>::iterator p_iter = predictions.find(pred_name);
 	if (p_iter == predictions.end())
-		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predicitons");
+		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predictions");
 	if (p_iter->second.e_ptr()->nonZeros() == 0)
 		return 0.0;
 	if (posterior.nrow() == 0) calc_posterior();
@@ -1119,9 +1120,12 @@ map<string, double> LinearAnalysis::like_preds(double val)
 void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filename, ParameterInfo parinfo,
 	Parameters init_pars, Parameters opt_pars, vector<string> ordered_names)
 {
+    int name_len = 20;
+    for (auto &pname : ordered_names)
+        name_len = max((int)pname.size(),name_len);
 	
 	fout << "current parameter uncertainty summary: " << endl << endl;
-	fout << setw(20) << "name" << setw(20) << "prior_mean" << setw(20) << "prior_stdev" ;
+	fout << setw(name_len) << left << " name" << setw(20) << right << "prior_mean" << setw(20) << "prior_stdev" ;
 	fout << setw(20) << "prior_lower_bound" << setw(20) << "prior_upper_bound";
 	fout << setw(20) << "post_mean" << setw(20) << "post_stdev";
 	fout << setw(20) << "post_lower_bound" << setw(20) << "post_upper_bound" << endl;
@@ -1149,7 +1153,7 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 			//range = get_range(value, prior_vars[pname], parinfo.get_parameter_rec_ptr(pname)->tranform_type);
 			stdev = sqrt(prior_vars.at(pname));
 
-			fout << setw(20) << pest_utils::lower_cp(pname) << setw(20) << value << setw(20) << stdev << setw(20) <<
+			fout << setw(name_len+1) << left << pest_utils::lower_cp(pname) << setw(20) << right << value << setw(20) << stdev << setw(20) <<
 				value - (2.0*stdev) << setw(20) << value + (2.0*stdev);
 			sout << pest_utils::lower_cp(pname) << "," << value << "," << stdev << "," <<
 				value - (2.0*stdev) << "," << value + (2.0*stdev);
@@ -1197,9 +1201,12 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filename,
 	map<string,pair<double,double>> init_final_pred_values)
 {
+    int name_len = 20;
+    for (auto &pred : predictions)
+        name_len = max((int)pred.first.size(),name_len);
 	//fout << endl << "----------------------------------------" << endl;
 	fout << "current forecast uncertainty summary: " << endl << endl;
-	fout << setw(20) << "name" << setw(20) << "prior_mean";
+	fout << setw(name_len) << left << " name" << setw(20) << right << "prior_mean";
 	fout << setw(20) << "prior_stdev" << setw(20) << "prior_lower_bound";
 	fout << setw(20) << "prior_upper_bound" << setw(20) << "post_mean";
 	fout << setw(20) << "post_stdev" << setw(20) << "post_lower_bound";
@@ -1218,7 +1225,7 @@ void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filena
 		stdev = sqrt(prior_vars[pred.first]);
 		lower = val - (2.0 * stdev);
 		upper = val + (2.0 * stdev);
-		fout << setw(20) << pest_utils::lower_cp(pred.first) << setw(20) << val << setw(20) << stdev;
+		fout << setw(name_len+1) << left << pest_utils::lower_cp(pred.first) << setw(20) << right << val << setw(20) << stdev;
 		fout << setw(20) << lower << setw(20) << upper;
 		sout << pest_utils::lower_cp(pred.first) << "," << val << "," << stdev;
 		sout << "," << lower << "," << upper;

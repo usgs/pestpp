@@ -101,7 +101,7 @@ class RunManagerPanther : public RunManagerAbstract
 public:
 	RunManagerPanther(const std::string &stor_filename, const std::string &port, std::ofstream &_f_rmr, int _max_n_failure,
 		double overdue_reched_fac, double overdue_giveup_fac, double overdue_giveup_minutes, bool _should_echo = true, const vector<string>& par_names=vector<string>(),
-		const vector<string>& obs_names=vector<string>());
+		const vector<string>& obs_names=vector<string>(),int _timeout_milliseconds=10,int _echo_interval_milliseconds=10, bool _persistent_workers=true);
 
 	virtual void initialize(const Parameters &model_pars, const Observations &obs, const std::string &_filename = std::string(""));
 	virtual void initialize_restart(const std::string &_filename);
@@ -116,7 +116,6 @@ public:
 	~RunManagerPanther(void);
 	int get_n_waiting_runs() { return waiting_runs.size(); }
 	void close_agents();
-	
 
 private:
 	std::string port;
@@ -128,7 +127,10 @@ private:
 	static const int MAX_CONCURRENT_RUNS_LOWER_LIMIT;
 	static const int IDLE_THREAD_SIGNAL_TIMEOUT_SECS;
     static const double MIN_AVGRUNMINS_FOR_KILL;
-    static const int SECONDS_BETWEEN_ECHOS;
+    //static const int MILLISECONDS_BETWEEN_ECHOS;
+    //static const int TIMEOUT_MILLISECONDS;
+    int echo_interval_milliseconds;
+    int timeout_milliseconds;
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
@@ -158,6 +160,7 @@ private:
 	map<string,ofstream*> open_file_trans_streams;
 	map<int,string> open_file_socket_map;
 	//pest_utils::thread_RAII* idle_thread_raii;
+    bool persistent_workers;
 
 	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
 	void unschedule_run(list<AgentInfoRec>::iterator agent_info_iter);
@@ -172,15 +175,16 @@ private:
 	void end_run_idle_async();
 	void pause_idle();
 	void resume_idle();
+    int get_current_sleep_timeout_milliseconds(const int org_timeout_milliseconds);
 
-	std::ofstream &f_rmr;
+    std::ofstream &f_rmr;
 	bool listen(pest_utils::thread_flag* terminate = nullptr);
 	bool process_model_run(int sock_id, NetPackage &net_pack);
 	void process_message(int i);
 	void schedule_runs();
 	void init_agents(pest_utils::thread_flag* terminate = nullptr);
 	list<AgentInfoRec>::iterator add_agent(int sock_id);
-	void erase_agent(int sock_id);
+	//void erase_agent(int sock_id);
 	bool ping(int i_sock);
 	bool ping(pest_utils::thread_flag* terminate = nullptr);
 	void report(std::string message,bool to_cout);
