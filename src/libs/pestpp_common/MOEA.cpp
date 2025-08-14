@@ -390,24 +390,6 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 	ss << "ParetoObjectives::update() for  " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
-
-    map<string,string> obs_link_map = pest_scenario.get_ext_file_string_map("observation data external","link_to");
-    map<string,string> reversed_obs_link_map;
-    if (obs_link_map.size() > 0)
-    {
-        ss.str("");
-        ss << "'link_to' detected in 'observation data external' columns, using probabilistic pareto dominance, size:" << obs_link_map.size();
-        performance_log->log_event(ss.str());
-        for (auto& link : obs_link_map)
-        {
-            if (reversed_obs_link_map.find(link.second) != reversed_obs_link_map.end())
-            {
-                throw runtime_error("'link_to' obs "+link.second+" listed more than once");
-            }
-            reversed_obs_link_map[link.second] = link.first;
-        }
-    }
-
 	ofstream& frec = file_manager.rec_ofstream();
 
 	//update the member struct container
@@ -2656,6 +2638,7 @@ void MOEA::initialize()
 		set<string> pinames(onames.begin(), onames.end());
 		onames.clear();
 		vector<string> missing,keep_obs, keep_pi,err_sense,keep_obs_sd, keep_pi_sd;
+        map<string,string> obslink = pest_scenario.get_ext_file_string_map("observation data external","link_to");
 		for (auto obj_name : passed_obj_names)
 		{
 			if ((oset.find(obj_name) == oset.end()) && (pinames.find(obj_name) == pinames.end()))
@@ -2684,11 +2667,24 @@ void MOEA::initialize()
 				if (prob_pareto)
                 {
                     string sdobs = obj_name + "_SD";
+                    bool found = true;
                     if (oset.find(sdobs) == oset.end())
                     {
-                        ss.str("");
-                        ss << "PPD is active but objective '" << obj_name << "' needs the corresponding standard deviation observation: '" << sdobs << "'";
-                        throw_moea_error(ss.str());
+                        found = false;
+                        if (obslink.find(obj_name) != obslink.end())
+                        {
+                            sdobs = obslink.at(obj_name);
+                            if (oset.find(sdobs) != oset.end())
+                            {
+                                found = true;
+                            }
+                        }
+                        if (!found) {
+                            ss.str("");
+                            ss << "PPD is active but objective '" << obj_name
+                               << "' needs the corresponding standard deviation observation: '" << sdobs << "'";
+                            throw_moea_error(ss.str());
+                        }
                     }
                     message(1,"found PPD standard deviation observation: '"+sdobs+"' for objective: '"+obj_name+"'");
 
