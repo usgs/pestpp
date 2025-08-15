@@ -54,7 +54,7 @@ def basic_test(model_d="ies_10par_xsec"):
     pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
     cmd = pst.model_command[0].split()
     print(cmd)
-    cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
+    #cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
     print(cmd)
     pst.model_command = cmd
     
