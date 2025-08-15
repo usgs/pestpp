@@ -587,6 +587,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives::get_nsga2_pareto_dominance() error: member_struct is empty");
+	
 
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
@@ -618,11 +619,23 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 			member_front_map[m] = front.first;
 		//TODO: Deb says we only need to worry about crowding sort if not all
 		//members of the front are going to be retained.  For now, just sorting all fronts...
+		
 		if (front.second.size() == 1)
 		{
 			crowd_ordered_front = front.second;
 			crowd_map[front.second[0]] = -999.0;
 			fitness_map[front.second[0]] = -999;
+			if (sort_ppd)
+			{
+				for (auto& obj_name : *obs_obj_names_ptr)
+				{
+					if (member_struct[front.second[0]].at(ppd_obj_to_sd_ptr->at(obj_name)) < min_sd.at(obj_name) - FLOAT_EPSILON)
+						member_struct[front.second[0]][ppd_obj_to_sd_ptr->at(obj_name) + "_SYN"] = min_sd.at(obj_name);
+					else
+						member_struct[front.second[0]][ppd_obj_to_sd_ptr->at(obj_name) + "_SYN"] = member_struct[front.second[0]].at(ppd_obj_to_sd_ptr->at(obj_name));
+					//member_struct[front.second[0]][ppd_obj_to_sd_ptr->at(obj_name) + "_SYN"] = min_sd.at(obj_name);
+				}
+			}
 		}
 
 		else
@@ -706,7 +719,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		{
 			for (auto objsd : *obs_obj_sd_names_ptr)
 			{
-				sum << "," << member_struct[member][objsd];
+				sum << "," << member_struct[member].at(objsd);
 			}
 			for (auto objsd : *obs_obj_sd_names_ptr)
 			{

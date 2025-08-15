@@ -214,7 +214,7 @@ def ppd_part_2_3_test():
     
 
 if __name__ == "__main__":
-    ppd_part1_test()
+    #ppd_part1_test()
     ppd_part_2_3_test()
 
 
