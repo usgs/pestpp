@@ -2035,7 +2035,7 @@ def mf6_v5_ies_nonpersistent_test():
 
 if __name__ == "__main__":
     basic_test()
-    exit()
+
     #mf6_v5_ies_nonpersistent_test()
     #large_fake_test()
     #exit()
