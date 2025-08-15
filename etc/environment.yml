@@ -24,6 +24,7 @@ dependencies:
   - pip
   - git
   - imp
+  - scikit-learn
   - pip:
     - git+https://github.com/pypest/pyemu.git@develop
     - git+https://github.com/modflowpy/flopy.git
