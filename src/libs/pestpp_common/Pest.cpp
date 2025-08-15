@@ -1041,11 +1041,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
                     ss << "WARNING: single and/or double quote char(s) found in model command line :" << line << endl;
                     string temp_line = line;
                     temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
-                    pest_utils::strip_ip(temp_line);
+                    //pest_utils::strip_ip(temp_line);
+
                     ss << "         new model command line: " << temp_line << endl;
                     cout << ss.str();
                     f_rec << ss.str();
-                    model_exec_info.comline_vec.push_back(temp_line);
+                    model_exec_info.comline_vec.push_back(string(temp_line));
                 }
                 else
                 {
