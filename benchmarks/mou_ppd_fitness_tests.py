@@ -201,7 +201,7 @@ def ppd_part3():
 
 def ppd_part_2_3_test():
     ppd_part2()
-    ppd_part3()
+    #ppd_part3()
 
     # arc2 = pd.read_csv(os.path.join("ppd_fitness_test_sklearn","master1","pest_ppd_fitness.pareto.archive.summary.csv"))
     # arc3 = pd.read_csv(os.path.join("ppd_fitness_test_obslink","master1","pest_ppd_fitness.pareto.archive.summary.csv"))
