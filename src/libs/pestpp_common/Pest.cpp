@@ -469,7 +469,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 	return process_ctl_file(fin, _pst_filename, f_out);
 }
 
-
+bool IsQuote(char c)
+{
+    switch(c)
+    {
+        case '\"':
+        case '\'':
+            return true;
+        default:
+            return false;
+    }
+}
 
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
@@ -1025,7 +1035,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		
 			else if (section == "MODEL COMMAND LINE")
 			{
-				model_exec_info.comline_vec.push_back(line);
+                if ((line.find('\"') != std::string::npos) || (line.find('\'') != std::string::npos))
+                {
+                    ss.str("");
+                    ss << "WARNING: single and/or double quote char(s) found in model command line :" << line << endl;
+                    string temp_line = line;
+                    temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                    //pest_utils::strip_ip(temp_line);
+
+                    ss << "         new model command line: " << temp_line << endl;
+                    cout << ss.str();
+                    f_rec << ss.str();
+                    model_exec_info.comline_vec.push_back(string(temp_line));
+                }
+                else
+                {
+                    model_exec_info.comline_vec.push_back(line);
+                }
 			}
 
 			else if (section == "MODEL INPUT")
