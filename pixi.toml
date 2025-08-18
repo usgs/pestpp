@@ -14,7 +14,6 @@ pyemu = "*"
 
 [tasks]
 # install
-install-modflow = "get-modflow --repo modflow6 $CONDA_PREFIX/bin"
 install-modflow = "get-modflow --repo executables $CONDA_PREFIX/bin"
 
 # debug build
