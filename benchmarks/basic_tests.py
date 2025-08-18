@@ -51,7 +51,7 @@ def basic_test(model_d="ies_10par_xsec"):
         shutil.rmtree(new_d)
     shutil.copytree(base_d, new_d)
     print(platform.platform().lower())
-    # pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
     # cmd = pst.model_command[0].split()
     # print(cmd)
     # cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
