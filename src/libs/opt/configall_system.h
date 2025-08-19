@@ -6,7 +6,7 @@
  * file defining macros that depend on what compiler is used.
  */
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 # include "configall_system_msc.h"
 #else
 # error "Trying to use configall_system for unknown compiler."
