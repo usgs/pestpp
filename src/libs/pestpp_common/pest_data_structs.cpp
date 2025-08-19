@@ -1427,6 +1427,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
         return true;
 
     }
+    else if (key == "PANTHER_PERSISTENT_WORKERS")
+    {
+        panther_persistent_workers = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 
 	
 	return false;
@@ -1530,14 +1535,113 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	}
 	else if (key == "MOU_PSO_SOCIAL_CONST")
 	{
-		convert_ip(value, mou_pso_social_const);
+		mou_pso_social_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_social_const.push_back(v);
+		}
 		return true;
 	}
 	else if (key == "MOU_PSO_COGNITIVE_CONST")
 	{
-		convert_ip(value, mou_pso_cognitive_const);
+		mou_pso_cognitive_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_cognitive_const.push_back(v);
+		}
+		return true;
+		}
+	else if (key == "MOU_PSO_ALPHA")
+	{
+		convert_ip(value, mou_pso_alpha);
+		return true;
+		}
+	else if (key == "MOU_PSO_RRAMP")
+	{
+		convert_ip(value, mou_pso_rramp);
+		return true;
+		}
+	else if (key == "MOU_PSO_RFIT")
+	{
+		convert_ip(value, mou_pso_rfit);
+		return true;
+		}
+	else if (key == "MOU_PSO_INERTIA")
+	{
+		mou_pso_inertia.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_inertia.push_back(v);
+		}
 		return true;
 	}
+	else if (key == "MOU_PSO_VMAX_FACTOR")
+	{
+		convert_ip(value, mou_pso_vmax_factor);
+		return true;
+		}
+	if (key == "MOU_PSO_DV_BOUND_HANDLING")
+	{
+		mou_pso_dv_bound_handling = upper_cp(strip_cp(value));
+		return true;
+	}
+	else if (key == "MOU_OUTER_REPO_OBS_FILE")
+	{
+		mou_outer_repo_obs_file = org_value;
+		return true;
+		}
+	else if (key == "MOU_MAX_NN_SEARCH")
+	{
+		convert_ip(value, mou_max_nn_search);
+		return true;
+		}
+	else if (key == "MOU_HYPERVOLUME_EXTREME")
+	{
+		convert_ip(value, mou_hypervolume_extreme);
+		return true;
+		}
+	else if (key == "MOU_INFILL_SIZE")
+	{
+		convert_ip(value, mou_infill_size);
+		return true;
+		}
+	else if (key == "MOU_RESAMPLE_EVERY")
+	{
+		convert_ip(value, mou_resample_every);
+		return true;
+		}
+	else if (key == "MOU_RESAMPLE_COMMAND")
+	{
+		mou_resample_command = value;
+		return true;
+		}
+	else if (key == "MOU_PPD_BETA")
+	{
+		convert_ip(value, mou_ppd_beta);
+		return true;
+	}
+	else if (key == "MOU_FIT_GAMMA")
+	{
+		convert_ip(value, mou_fit_gamma);
+		return true;
+		}
+	else if (key == "MOU_FIT_EPSILON")
+	{
+		convert_ip(value, mou_fit_epsilon);
+		return true;
+		}
 	else if (key == "MOU_POPULATION_SCHEDULE")
     {
 	    mou_population_schedule = org_value;
@@ -1682,6 +1786,7 @@ void PestppOptions::summary(ostream& os) const
         os << file << endl;
     os << "panther_timeout_milliseconds: " << panther_timeout_milliseconds << endl;
     os << "panther_echo_interval_milliseconds: " << panther_echo_interval_milliseconds << endl;
+    os << "panther_persistent_workers: " << panther_persistent_workers << endl;
 
     os << endl;
 
@@ -1809,8 +1914,30 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_de_f: " << mou_de_f << endl;
 	os << "mou_save_population_every: " << mou_save_population_every << endl;
 	os << "mou_pso_omega: " << mou_pso_omega << endl;
-	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
-	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
+	os << "mou_pso_inertia (IINER, FINERT, INITER): " << endl;
+	for (auto& f : mou_pso_inertia)
+	{
+		os << " " << f << " ";
+	}
+	os << endl;
+	os << "mou_pso_social_const: " << endl;
+	for (auto& f : mou_pso_social_const)
+	{
+		os << " " << f << endl;
+	}
+	os << "mou_pso_cognitive: " << endl;
+	for (auto& f : mou_pso_cognitive_const)
+	{
+		os << " " << f << endl;
+	}
+	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
+	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
+	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
+	os << "mou_pso_vmax_factor: " << mou_pso_vmax_factor << endl;
+	os << "mou_pso_dv_bound_handling: " << mou_pso_dv_bound_handling << endl;
+	os << "mou_ppd_beta: " << mou_ppd_beta << endl;
+	os << "mou_fit_gamma: " << mou_fit_gamma << endl;
+	os << "mou_fit_epsilon: " << mou_fit_epsilon << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
 	os << "mou_simplex_factors: " << endl;
@@ -2013,8 +2140,23 @@ void PestppOptions::set_defaults()
 	set_mou_de_f(0.8);
 	set_mou_save_population_every(-1);
 	set_mou_pso_omega(0.7);
-	set_mou_pso_cognitive_const(2.0);
-	set_mou_pso_social_const(2.0);
+	set_mou_pso_cognitive_const(vector<double>{2.0});
+	set_mou_pso_social_const(vector<double>{2.0});
+	set_mou_pso_alpha(1.0);
+	set_mou_pso_rramp(-5e+02);
+	set_mou_pso_rfit(2.0);
+	set_mou_pso_inertia(vector<double>{0.7, 0.4, 0});
+	set_mou_pso_vmax_factor(0.8);
+	set_mou_pso_dv_bound_handling("HYBRID");
+	set_mou_outer_repo_obs_file("");
+	set_mou_max_nn_search(get_mou_population_size());
+	set_mou_hypervolume_extreme(1e+10);
+	set_mou_infill_size(100);
+	set_mou_ppd_beta(0.5);
+	set_mou_fit_epsilon(0.05);
+	set_mou_fit_gamma(0.25);
+	set_mou_resample_every(-1);
+	set_mou_resample_command("");
 	set_mou_population_schedule("");
 	set_mou_simplex_reflections(10);
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
@@ -2132,6 +2274,7 @@ void PestppOptions::set_defaults()
     set_panther_transfer_on_fail(vector<string>{});
     set_panther_timeout_milliseconds(-999);
     set_panther_echo_interval_milliseconds(1000);
+    set_panther_persistent_workers(true);
 
 }
 

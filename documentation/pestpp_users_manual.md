@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.21
+# <a id='s1' />Version 5.2.22
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-July 2025
+August 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -41,7 +41,13 @@ On a personal note, thanks are also due to the following people who have contrib
 
 - Ayman Alzraiee (USGS)
 
-- Zak Stanko (USGS)
+- Joe Hughes (INTERA)
+
+- Rui Hugman (INTERA)
+
+- Katie Markovich (INTERA)
+
+- Reygie Macasieb (INTERA)
 
 # <a id='s3' />Preface
 
@@ -317,15 +323,15 @@ For all members of the PEST++ suite, parallelization of model runs follows the �
 
 One of the original design specifications of PESTPP-GLM was that its parallel run manager be modular, and separate from PESTPP-GLM, so that it could be used by any program that conducts non-intrusive, parallelized model runs for any purpose. It is this facet of its design that has spawned the development of other members of the PEST++ suite. At the time of writing, the composition of the PEST++ suite is listed in table 1.1.
 
-| Program Name | Function |
-|----|----|
-| PESTPP | Highly parameterized inversion, and global optimization using differential evolution |
-| PESTPP-SEN | Global sensitivity analysis using the methods of Morris and Saltelli |
-| PESTPP-OPT | Decision optimization under uncertainty using sequential linear programming and linearized chance constraints |
-| PESTPP-IES | Iterative ensemble smoother for production of a suite of calibration-constrained parameter fields |
-| PESTPP-SWP | Undertakes a suite of parallelized model runs for any reason |
-| PESTPP-DA | Iterative ensemble filter and smoother data assimilation |
-| PESTPP-MOU | Single and multiple constrained optimization under uncertainty using evolutionary heuristics |
+| Program Name | Function                                                                                                  |
+|------------------|---------------------------------------------------------------------------------------------------------------|
+| PESTPP           | Highly parameterized inversion, and global optimization using differential evolution                          |
+| PESTPP-SEN       | Global sensitivity analysis using the methods of Morris and Saltelli                                          |
+| PESTPP-OPT       | Decision optimization under uncertainty using sequential linear programming and linearized chance constraints |
+| PESTPP-IES       | Iterative ensemble smoother for production of a suite of calibration-constrained parameter fields             |
+| PESTPP-SWP       | Undertakes a suite of parallelized model runs for any reason                                                  |
+| PESTPP-DA        | Iterative ensemble filter and smoother data assimilation                                                      |
+| PESTPP-MOU       | Single and multiple constrained optimization under uncertainty using evolutionary heuristics                  |
 
 Table 1.1 Programs comprising of the PEST++ suite.
 
@@ -444,13 +450,12 @@ A template file receives its name from the fact that it is simply a replica of a
 Consider the model input file shown in figure 2.1; this file supplies data to a program which computes the “apparent resistivity” on the surface of a layered half-space for different surface electrode configurations. Suppose that we wish to use this program (i.e., model) in an inversion process through which properties of each of three half-space layers are estimated from apparent resistivity data collected on the surface of the half-space. The parameters for which we want estimates are the resistivity and thickness of the upper two layers and the resistivity of the third (its thickness is infinite). A suitable template file appears in figure 2.2.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.1 A model input file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 MODEL INPUT FILE<br>
 3, 19 no. of layers, no. of spacings<br>
 1.0, 1.0 resistivity, thickness: layer 1<br>
@@ -482,14 +487,15 @@ MODEL INPUT FILE<br>
 </tbody>
 </table>
 
+Figure 2.1 A model input file.
+
 <div style="text-align: left"><table>
-</div><caption>Figure 2.2 A template file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 ptf ~<br>
 MODEL INPUT FILE<br>
 3, 19 no. of layers, no. of spacings<br>
@@ -522,6 +528,8 @@ MODEL INPUT FILE<br>
 </tbody>
 </table>
 
+Figure 2.2 A template file.
+
 ### <a id='s6-3-3' />2.3.3 The Parameter Delimiter
 
 As figure 2.2 shows, the first line of a template file must contain the letters “ptf” followed by a space, followed by a single character (“ptf” stands for “<u>P</u>EST <u>t</u>emplate <u>f</u>ile”). The character following the space is the “parameter delimiter”. In a template file, a “parameter space” is identified as the set of characters between and including a pair of parameter delimiters. When a PEST or PEST++ program writes a model input file based on a template file, it replaces all characters between and including these parameter delimiters by a number representing the current value of the parameter that owns the space; that parameter is identified by name within the parameter space, between the parameter delimiters.
@@ -545,13 +553,12 @@ Generally, a model reads numbers from an input file in either of two ways, namel
 The FORTRAN code of figure 2.3 directs a program to read five real numbers. The first three are read using a format specifier, whereas the last two are read in free field fashion.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.3 Formatted and free field input.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">READ(20,100) A,B,C<br>
+<tr class="header">
+<th>READ(20,100) A,B,C<br>
 
 100 FORMAT(3F10.0)<br>
 
@@ -562,16 +569,17 @@ READ(20,*) D,E<br></th>
 </tbody>
 </table>
 
+Figure 2.3 Formatted and free field input.
+
 The relevant part of the model input file may be as illustrated in figure 2.4.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.4 Numbers read using the code of figure 2.3.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 6.32 1.42E-05123.456789<br>
 
 34.567, 1.2E17<br></th>
@@ -581,18 +589,19 @@ The relevant part of the model input file may be as illustrated in figure 2.4.
 </tbody>
 </table>
 
+Figure 2.4 Numbers read using the code of figure 2.3.
+
 Notice how no whitespace or comma is needed between numbers which are read using a field specifier. The format statement labelled “100” in figure 2.3 directs that variable *A* be read from the first 10 positions on the line, that variable *B* be read from the next 10 positions, and that variable *C* be read from the 10 positions thereafter. When the program reads any of these numbers it is unconcerned as to what characters lie outside of the field on which its attention is currently focussed. However, the numbers to be read into variables *D* and *E* must be separated by whitespace or a comma in order that the program knows where one number ends and the next number begins.
 
 Suppose all of variables *A* to *E* are model parameters, and that a PEST++ program has been assigned the task of estimating them. For convenience we provide the same names for these parameters as those that are used by the model code (this, of course, will not normally be the case). The template fragment corresponding to figure 2.4 may then be as set out in figure 2.5. Notice how the parameter space for each of parameters *A*, *B* and *C* is 10 characters wide, and that the parameter spaces abut each other in accordance with the expectations of the model as defined through the format specifier of figure 2.3. If the parameter space for any of these parameters is greater than 10 characters in width, then the PEST++ program, when it replaces each parameter space by the current parameter value, would construct a model input file which would be incorrectly read by the model. (You could have designed parameter spaces to be less than 10 characters wide if you wished, as long as you placed enough whitespace between each parameter space in order that the number which will replace each such space when the PEST++ program writes the model input file falls within the field expected by the model. However, defining the parameter spaces in this way would achieve nothing, as there would be no advantage in using less than the full 10 characters allowed by the model.)
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.5 Fragment of a template file corresponding to parameters represented in figure 2.4.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 ~ A ~~ B ~~ C ~<br>
 ~ D ~, ~ E ~<br>
 </th>
@@ -601,6 +610,8 @@ Suppose all of variables *A* to *E* are model parameters, and that a PEST++ prog
 <tbody>
 </tbody>
 </table>
+
+Figure 2.5 Fragment of a template file corresponding to parameters represented in figure 2.4.
 
 Parameters *D* and *E* are treated very differently to parameters *A*, *B* and *C*. As figure 2.3 shows, the model simply expects two numbers in succession. If the spaces for parameters *D* and *E* appearing in figure 2.5 are replaced by two numbers (each will be 13 characters long) the model’s requirement for two numbers in succession separated by whitespace or a comma will have been satisfied, as will the preference for maximum precision.
 
@@ -661,13 +672,12 @@ Markers can be of either primary or secondary type. PEST++ programs use a primar
 Figure 2.6 shows an output file written by the model whose input file appears in figure 2.1. Suppose that we wish to estimate the parameters appearing in the template file of figure 2.2 (i.e., the resistivities of the three half-space layers and the thicknesses of the upper two) by comparing apparent resistivities generated by the model with a set of apparent resistivities provided by field measurements. Then we need to provide instructions which teach PEST++ programs how to read each of the apparent resistivities appearing in figure 2.6. An appropriate instruction file is shown in figure 2.7.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.6 A model output file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 SCHLUMBERGER ELECTRIC SOUNDING<br>
 Apparent resistivities calculated using the linear filter method<br>
 electrode spacing apparent resistivity<br>
@@ -697,14 +707,15 @@ electrode spacing apparent resistivity<br>
 </tbody>
 </table>
 
+Figure 2.6 A model output file.
+
 <div style="text-align: left"><table>
-</div><caption>Figure 2.7 A PEST instruction file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 pif @<br>
 @electrode@<br>
 l1 [ar1]21:27<br>
@@ -732,6 +743,8 @@ l1 [ar19]21:27<br></th>
 <tbody>
 </tbody>
 </table>
+
+Figure 2.7 A PEST instruction file.
 
 ### <a id='s6-4-4' />2.4.4 The Marker Delimiter
 
@@ -767,13 +780,12 @@ A primary marker may be the only item on an instruction line, or it may precede 
 Primary markers can provide a useful means of navigating a model output file. Consider the extract from a model output file shown in figure 2.8 (the dots replace one or a number of lines not shown in the example in order to conserve space). The instruction file extract shown in figure 2.9 provides a means to read the numbers comprising the third solution vector. Notice how the “SOLUTION VECTOR” primary marker is preceded by the “PERIOD NO. 3” primary marker. The latter marker is used purely to establish a reference point from which a search can be made for the “SOLUTION VECTOR” marker; if this reference point were not established (using either a primary marker or line advance item) the program which is perusing the file would read the solution vector pertaining to a previous time period.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.8 Extract from a model output file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 TIME PERIOD NO. 1 ---&gt;<br>
 .<br>
 .<br>
@@ -800,14 +812,15 @@ SOLUTION VECTOR<br>
 </tbody>
 </table>
 
+Figure 2.8 Extract from a model output file.
+
 <div style="text-align: left"><table>
-</div><caption>Figure 2.9 Extract from an instruction file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 pif *<br>
 .<br>
 .<br>
@@ -824,6 +837,8 @@ l1 (obs1)5:10 (obs2)12:17 (obs3)21:28 (obs4)32:37 (obs5)41:45<br>
 </tbody>
 </table>
 
+Figure 2.9 Extract from an instruction file.
+
 **Line**
 The syntax for the line advance item is “l*n*” where *n* is the number of lines to advance; note that “l” is “el”, the twelfth letter of the alphabet, not “one”. The line advance item must be the first item of an instruction line; it and the primary marker are the only two instruction items which can occupy this initial spot. As was explained above, the initial item in an instruction line is always a directive to move at least one line further in perusal of a model output file (unless it is a continuation character). In contrast to the use of a primary marker, however, a PEST++ program does not need to examine the entirety of each model output file line as it advances forward in the file. It simply moves forward *n* lines, placing the processing cursor just before the beginning of this new line, this point becoming the new reference point for further processing of the model output file.
 
@@ -839,13 +854,12 @@ A secondary marker is a marker which does not occupy the first position of a PES
 Figure 2.10 shows an extract from a model output file while figure 2.11 shows the instructions necessary to read the potassium concentration from this output file. A primary marker is used to place the cursor on the line above that on which the calculated concentrations are recorded for the distance in which we are interested. Then the program which reads the file is directed to advance one line and read the number following the “K:” string in order to find an observation named “kc”; the exclamation marks surrounding “kc” will be discussed shortly.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.10 Extract from a model output file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">.<br>
+<tr class="header">
+<th>.<br>
 
 .<br>
 DISTANCE = 20.0: CATION CONCENTRATIONS:-<br>
@@ -859,14 +873,15 @@ Na: 3.49868E-2 Mg: 5.987638E-2 K: 9.987362E-3<br>
 </tbody>
 </table>
 
+Figure 2.10 Extract from a model output file.
+
 <div style="text-align: left"><table>
-</div><caption>Figure 2.11 Extract from an instruction file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 pif ~<br>
 .<br>
 .<br>
@@ -881,16 +896,17 @@ l1 ~K:~ !kc!<br>
 </tbody>
 </table>
 
+Figure 2.11 Extract from an instruction file.
+
 A useful feature of secondary marker functionality is illustrated in figures 2.12 and 2.13 which represent a model output file extract and a corresponding instruction file extract, respectively. If a particular secondary marker is preceded only by other markers (including, perhaps, one or a number of secondary markers and certainly a primary marker), and the text string corresponding to that secondary marker is not found on a model output file line on which the previous markers’ strings have been located, a PEST++ program will assume that it has not yet found the correct model output line and resume its search for a line which holds the text pertaining to all three markers. Thus, the instruction “%TIME STEP 10%” will cause this program to pause on its downward journey through the model output file at the first line illustrated in figure 2.12. However, when it does not find the string “STRAIN” on the same line, it re-commences its perusal of the model output file, looking for the string “TIME STEP 10” again. Eventually it finds a line containing both the primary and secondary markers and, having done so, commences execution of the next instruction line.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.12 Extract from a model output file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 .<br>
 .<br>
 TIME STEP 10 (13 ITERATIONS REQUIRED) STRESS ---&gt;<br>
@@ -910,16 +926,17 @@ X = 1.10 STRAIN = 2.34564E-03<br>
 </tbody>
 </table>
 
+Figure 2.12 Extract from a model output file.
+
 It is important to note that if any instruction items other than markers precede an unmatched secondary marker, it will be assumed that the mismatch is an error condition; an appropriate error message will then be generated. Note also that secondary markers may be used sequentially. For example, if the STRAIN variable is always in position 2, then the pertinent line in the instruction file of figure 2.13 could be replaced by "l1 %=% %=% !str1!".  This is handy for comma-delimited output files.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.13 Extract from an instruction file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 pif %<br>
 .<br>
 .<br>
@@ -934,6 +951,8 @@ l1 %STRAIN =% !str2!<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 2.13 Extract from an instruction file.
 
 **Whitespace**
 The whitespace instruction is similar to the secondary marker in that it allows the user to navigate through a model output file line prior to reading a non-fixed observation (see below). It directs a PEST++ program to move its cursor forwards from its current position until it encounters the next blank character. The cursor is then moved forward again until it finds a nonblank character, with the cursor finally placed on the blank character preceding this nonblank character (i.e., on the last blank character in a sequence of blank characters) ready for the next instruction. The whitespace instruction is a simple “w”, separated from its neighbouring instructions by at least one blank space.
@@ -967,13 +986,12 @@ Observations can be identified in one of three ways. The first way is to tell th
 Figure 2.14 shows how the numbers listed in the third solution vector of figure 2.8 can be read as fixed observations. The instruction item informing the PEST++ program how to read a fixed observation consists of two parts. The first part consists of the observation name enclosed in square brackets, while the second part consists of the first and last columns from which to read the observation. Note that no space must separate these two parts of the observation instruction; a space in an instruction file is always construed as marking the end of one instruction item and the beginning of another (unless the space lies between marker delimiters).
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.14 Extract from an instruction file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 pif *<br>
 .<br>
 .<br>
@@ -990,6 +1008,8 @@ l1 [obs1]1:9 [obs2]10:18 [obs3]19:27 [obs4]28:36 [obs5]37:45<br>
 </tbody>
 </table>
 
+Figure 2.14 Extract from an instruction file.
+
 Reading numbers as fixed observations is useful when the model writes its output in tabular form using fixed field width specifiers. However, you must be very careful when specifying the column numbers from which to read the number. The space defined by these column numbers must be wide enough to accommodate the maximum length that the number will occupy over the many model runs for which the PEST++ program will read the model’s output file; if it is not wide enough, the program which is reading the file may read only a truncated part of the number or omit a negative sign preceding the number. However, the space must not be so wide that it includes part of another number; in this case a run-time error will occur and the PEST++ program which is reading the file will terminate execution with an appropriate error message.
 
 Where a model writes its results as an array of numbers, it is not an uncommon occurrence for these numbers to abut each other. Consider, for example, the following FORTRAN code fragment.
@@ -999,7 +1019,7 @@ Where a model writes its results as an array of numbers, it is not an uncommon o
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>A=1236.567<br>
 B=8495.0<br>
 C=-900.0<br>
@@ -1040,13 +1060,12 @@ When a PEST++ program encounters a non-fixed observation instruction it first se
 Consider the output file fragment shown in figure 2.15. The species populations at different times cannot be read as either fixed or semi-fixed observations because the numbers representing these populations cannot be guaranteed to fall within a certain range of column numbers on the model output file because “iterative adjustment” may be required in the calculation of any such population. Hence we must find our way to the number using another method; one such method is illustrated in figure 2.16.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 2.15 Extract from a model output file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 .<br>
 .<br>
 SPECIES POPULATION AFTER 1 YEAR = 1.23498E5<br>
@@ -1062,14 +1081,15 @@ SPECIES POPULATION AFTER 4 YEARS = 2.34563E5<br>
 </tbody>
 </table>
 
+Figure 2.15 Extract from a model output file.
+
 <div style="text-align: left"><table>
-</div><caption>Figure 2.16 Extract from an instruction file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">
+<tr class="header">
+<th>
 pif *<br>
 .<br>
 .<br>
@@ -1085,6 +1105,8 @@ l1 *=* !sp4!<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 2.16 Extract from an instruction file.
 
 A primary marker is used to move the processing cursor to the first of the lines shown in figure 2.15. Then, noting that the number representing the species population always follows a “=” character, the “=” character is used as a secondary marker. After it processes a secondary marker, the processing cursor always resides on the last character of that marker, in this case on the “=” character itself. Hence after reading the “=” character, a PEST++ program is able to process the !sp1! instruction by isolating the string “1.23498E5” in the manner described above.
 
@@ -1347,26 +1369,26 @@ As they run, programs of the PEST++ suite produce many files. The number and typ
 
 The PEST control file is subdivided into sections. Each section begins with a header. A header is easily recognized because it begins with the “\*” character followed by a space. Table 4.1 shows sections that can appear in a PEST control file. For PEST, some of these sections are optional and can be omitted. Those that are present must be provided in the order shown in this table. Programs of the PEST++ suite ignore many of these sections.
 
-| Section | Status for PEST programs | Status for PEST++ programs | Contents |
-|:---|:---|:---|:---|
-| control data | mandatory | mandatory | Problem dimensions, mode of PEST operation, termination criteria, change limits and other control variables. |
-| automatic user intervention | optional | ignored | Variables which govern operation of PEST’s automatic user intervention functionality. Not used by PEST++ |
-| singular value decomposition | optional | optional | Variables which govern operation of singular value decomposition when used as an inverse problem solution device. |
-| lsqr | optional | ignored | Variables which govern operation of the LSQR algorithm when used as an inverse problem solution device. Not used by PEST++ |
-| sensitivity reuse | optional | ignored | Variables which determine whether and how PEST re-uses some parameter sensitivities in consecutive iterations. Not used by PEST++ |
-| svd assist | optional | ignored | Variables which specify the manner in which the SVD-assist methodology is implemented in solving an inverse problem. |
-| parameter groups | mandatory | mandatory | Variables which govern the way in which finite-difference derivatives are calculated. |
-| parameter data | mandatory | mandatory | Parameter initial values, transformation status, bounds, groups, scales and offsets. |
-| observation groups | mandatory | mandatory | Lists observation groups, and provides the names of files which hold observation covariance matrices. |
-| observation data | mandatory | mandatory | Lists observations, weights and groups to which observations belong. |
-| derivatives command line | optional | ignored | Provides the command used to run the model if the model calculates some or all of its own derivatives, and the file from which these derivatives are read. Not used by PEST++ |
-| model command line | mandatory | mandatory | Provides one or a number of commands used to run the model. |
-| model input | mandatory | mandatory | Lists template and corresponding model input files. |
-| model output | mandatory | mandatory | Lists instruction and corresponding model output files. |
-| prior information | optional | optional | Provides linear prior information equations employed in the inversion process. |
-| predictive analysis | optional | ignored | Contains variables which govern implementation of PEST’s “predictive analysis” functionality. Not used by PEST++ |
-| regularization | optional | optional | Contains variables which govern implementation of PEST’s “regularization” functionality. |
-| pareto | optional | ignored | Contains variables which govern implementation of PEST’s “pareto” functionality. Not used by PEST++ |
+| Section                  | Status for PEST programs | Status for PEST++ programs | Contents                                                                                                                                                                  |
+|------------------------------|------------------------------|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| control data                 | mandatory                    | mandatory                      | Problem dimensions, mode of PEST operation, termination criteria, change limits and other control variables.                                                                  |
+| automatic user intervention  | optional                     | ignored                        | Variables which govern operation of PEST’s automatic user intervention functionality. Not used by PEST++                                                                      |
+| singular value decomposition | optional                     | optional                       | Variables which govern operation of singular value decomposition when used as an inverse problem solution device.                                                             |
+| lsqr                         | optional                     | ignored                        | Variables which govern operation of the LSQR algorithm when used as an inverse problem solution device. Not used by PEST++                                                    |
+| sensitivity reuse            | optional                     | ignored                        | Variables which determine whether and how PEST re-uses some parameter sensitivities in consecutive iterations. Not used by PEST++                                             |
+| svd assist                   | optional                     | ignored                        | Variables which specify the manner in which the SVD-assist methodology is implemented in solving an inverse problem.                                                          |
+| parameter groups             | mandatory                    | mandatory                      | Variables which govern the way in which finite-difference derivatives are calculated.                                                                                         |
+| parameter data               | mandatory                    | mandatory                      | Parameter initial values, transformation status, bounds, groups, scales and offsets.                                                                                          |
+| observation groups           | mandatory                    | mandatory                      | Lists observation groups, and provides the names of files which hold observation covariance matrices.                                                                         |
+| observation data             | mandatory                    | mandatory                      | Lists observations, weights and groups to which observations belong.                                                                                                          |
+| derivatives command line     | optional                     | ignored                        | Provides the command used to run the model if the model calculates some or all of its own derivatives, and the file from which these derivatives are read. Not used by PEST++ |
+| model command line           | mandatory                    | mandatory                      | Provides one or a number of commands used to run the model.                                                                                                                   |
+| model input                  | mandatory                    | mandatory                      | Lists template and corresponding model input files.                                                                                                                           |
+| model output                 | mandatory                    | mandatory                      | Lists instruction and corresponding model output files.                                                                                                                       |
+| prior information            | optional                     | optional                       | Provides linear prior information equations employed in the inversion process.                                                                                                |
+| predictive analysis          | optional                     | ignored                        | Contains variables which govern implementation of PEST’s “predictive analysis” functionality. Not used by PEST++                                                              |
+| regularization               | optional                     | optional                       | Contains variables which govern implementation of PEST’s “regularization” functionality.                                                                                      |
+| pareto                       | optional                     | ignored                        | Contains variables which govern implementation of PEST’s “pareto” functionality. Not used by PEST++                                                                           |
 
 Table 4.1 Sections of a PEST control file.
 
@@ -1381,12 +1403,11 @@ In figure 4.1, variables whose values are actually used by a program of the PEST
 It is also important to note that not all programs of the PEST++ suite use all of the variables that are shaded in figure 4.1. Furthermore, any particular PEST++ program may use a particular PEST control variable under certain circumstances.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.1 Variables comprising a minimalist PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>pcf<br>
 * control data<br>
 RSTFLE <mark>PESTMODE</mark><br>
@@ -1437,15 +1458,16 @@ EIGWRITE<br>
 </tbody>
 </table>
 
+Figure 4.1 Variables comprising a minimalist PEST control file.
+
 Figure 4.2 provides an example of a simple PEST control file.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.2 Example of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>pcf<br>
 * control data<br>
 restart regularization<br>
@@ -1512,6 +1534,8 @@ pi2 1.0 * log(ro2) + 1.0 * log(h2) = 2.6026 2.0 prgp1<br>
 </tbody>
 </table>
 
+Figure 4.2 Example of a PEST control file.
+
 ## <a id='s8-5' />4.5 The PESTCHEK Utility
 
 PESTCHEK is a utility program that is supplied with the PEST suite. It reads an entire PEST input dataset, this being comprised of a PEST control file and all template and instruction files cited therein. It checks all of these files for correctness and consistency. In doing so, it performs all of the tasks performed by the TEMPCHEK and INSCHEK utilities that were mentioned in chapter 2 of this manual. However, it goes further than this. It ensures that any parameter that is cited in a template file is also cited in a PEST control file (and vice versa), and that any observation that is cited in an instruction file is also cited in the PEST control file (and vice versa). The benefits of such checking are obvious.
@@ -1535,12 +1559,11 @@ Note that all of the PEST++ tools will check that the parameters and observation
 Variables appearing in the “control data” section of a minimalist PEST control file are shown in figure 4.3 (which is reproduced from figure 4.1).
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.3 Variables appearing in the “control data” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* control data<br>
 RSTFLE PESTMODE<br>
 <mark>NPAR</mark> NOBS NPARGP NPRIOR NOBSGP<br>
@@ -1555,6 +1578,8 @@ ICOV ICOR IEIG<br></th>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.3 Variables appearing in the “control data” section of a PEST control file.
 
 ### <a id='s8-6-2' />4.6.2 First Line
 
@@ -1572,7 +1597,7 @@ NPAR is the number of parameters featured in the “parameter data” section of
 
 ### <a id='s8-6-5' />4.6.5 Fourth Line 
 
-The two leading variables on this line are NTPFLE and NINSFLE. Both of these are integers. Both must be greater than 1. Even though these variables are not read by programs of the PEST++ suite, both should be given correct values to ensure that a PEST control file is PESTCHEK-friendly. NTPFLE is the number of template files featured in the “model input” section of the PEST control file, while NINSFLE is the number of instruction files featured in the “model output” section of the PEST control file.
+The two leading variables on this line are NTPFLE and NINSFLE. Both of these are integers. Both must be greater than 0. Even though these variables are not read by programs of the PEST++ suite, both should be given correct values to ensure that a PEST control file is PESTCHEK-friendly. NTPFLE is the number of template files featured in the “model input” section of the PEST control file, while NINSFLE is the number of instruction files featured in the “model output” section of the PEST control file.
 
 PRECIS and DPOINT are text variables which guide PEST in the writing of parameter values on model input files. Programs of the PEST++ suite do not use these variables. Set them to “single” and “point” respectively to render a PEST control file PESTCHEK-friendly.
 
@@ -1651,12 +1676,11 @@ The many options available for finite-difference derivatives calculation are dis
 Minimalist specifications (i.e., specifications which pertain only to functionality offered by members of the PEST++ suite) of the “parameter groups” section of a PEST control file are provided in figure 4.4.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.4 Minimalist specifications for the “parameter groups” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* parameter groups<br>
 PARGPNME INCTYP DERINC DERINCLB FORCEN DERINCMUL DERMTHD<br>
 (<em>one such line for each parameter group</em>)<br></th>
@@ -1665,6 +1689,8 @@ PARGPNME INCTYP DERINC DERINCLB FORCEN DERINCMUL DERMTHD<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.4 Minimalist specifications for the “parameter groups” section of a PEST control file.
 
 ### <a id='s8-8-2' />4.8.2 Parameter Group Variables
 
@@ -1734,12 +1760,11 @@ The “parameter data” section of a PEST control file is divided into two part
 Each item of parameter data is now discussed in detail. Specifications of the “parameter data” section of a PEST control file are provided in figure 4.5.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.5 Specifications of the “parameter data” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* parameter data<br>
 PARNME PARTRANS PARCHGLIM PARVAL1 PARLBND PARUBND PARGP SCALE OFFSET DERCOM<br>
 (<em>one such line for each parameter</em>)<br>
@@ -1750,6 +1775,8 @@ PARNME PARTIED<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.5 Specifications of the “parameter data” section of a PEST control file.
 
 ### <a id='s8-9-2' />4.9.2 First Part
 
@@ -1826,12 +1853,11 @@ Programs of the PEST++ suite support a protocol for tying parameters together th
 Specifications for the “observation groups” section of a PEST control file are provided in figure 4.6.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.6 Specifications of the “observation groups” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* observation groups<br>
 OBGNME<br>
 (<em>one such line for each observation group</em>)<br></th>
@@ -1841,7 +1867,9 @@ OBGNME<br>
 </tbody>
 </table>
 
-In the <span class="indexref" entry="Observation groups"></span>“observation groups” section of a PEST control file, a name is supplied for every observation group. These names must be provided one to a line. Observation group names must be 12 characters or less in length for PEST-suite programs. In contrast, for programs of the PEST++ suite, observation group names can extend to 200 characters in length. In both cases these names are case insensitive. A name assigned to one observation group must not be assigned to any other observation group.
+Figure 4.6 Specifications of the “observation groups” section of a PEST control file.
+
+In the “observation groups” section of a PEST control file, a name is supplied for every observation group. These names must be provided one to a line. Observation group names must be 12 characters or less in length for PEST-suite programs. In contrast, for programs of the PEST++ suite, observation group names can extend to 200 characters in length. In both cases these names are case insensitive. A name assigned to one observation group must not be assigned to any other observation group.
 
 Note that prior information equations are also collected into groups; these groups are also referred to as “observation groups” as they perform an identical role to the groups that represent collected observations.
 
@@ -1854,12 +1882,11 @@ Observation groups whose name begins with “regul” are special. Observations 
 The “observation data” section of a PEST control file is particularly simple. Its specifications are provided in figure 4.7.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.7 Specifications of the “observation data” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* observation data<br>
 OBSNME OBSVAL WEIGHT OBGNME<br>
 (<em>one such line for each observation</em>)<br></th>
@@ -1868,6 +1895,8 @@ OBSNME OBSVAL WEIGHT OBGNME<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.7 Specifications of the “observation data” section of a PEST control file.
 
 For every observation cited in a PEST instruction file, there must be one line of data in the “observation data” section of the PEST control file. Conversely, every observation for which data is supplied in the PEST control file must be represented in an instruction file.
 
@@ -1883,7 +1912,7 @@ OBSVAL, a real variable, is the field or laboratory measurement corresponding to
 WEIGHT, a real variable, is the weight attached to each residual in calculation of an objective function. The manner in which weights are used in objective function formulation is discussed in section 3.5 of this manual. See also chapter 6.
 
 **OBGNME**
-<span class="indexref" entry="OBGNME"></span>OBGNME is the name of the observation group to which an observation is assigned. When recording objective functions in their respective output files, programs of the PEST++ suite list the contribution made to the total objective function by all observation groups. It is good practice to assign observations of different types to different observation groups. This gives you the ability to choose observation weights in a way that ensures that one observation type does not dominate others in the inversion process by virtue of a vastly greater contribution to the objective function, or that one observation group is not dominated by others because of a diminutive contribution to the objective function.
+OBGNME is the name of the observation group to which an observation is assigned. When recording objective functions in their respective output files, programs of the PEST++ suite list the contribution made to the total objective function by all observation groups. It is good practice to assign observations of different types to different observation groups. This gives you the ability to choose observation weights in a way that ensures that one observation type does not dominate others in the inversion process by virtue of a vastly greater contribution to the objective function, or that one observation group is not dominated by others because of a diminutive contribution to the objective function.
 
 The observation group name supplied through OBGNME must also be listed in the “observation groups” section of a PEST control file. As has been previously stated, observation group names must be 12 characters or less in length if PEST compatibility is sought. However, PEST++ allows an observation group name to extend to 200 characters in length.
 
@@ -1896,12 +1925,11 @@ PESTPP-GLM (like PEST) supports the use of different commands for running a mode
 Figure 4.8 shows specifications for the “model command line” section of a PEST control file.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.8 Specifications of the “model command line” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* model command line<br>
 COMLINE<br>
 (<em>one such line for each model command line</em>)<br></th>
@@ -1911,6 +1939,8 @@ COMLINE<br>
 </tbody>
 </table>
 
+Figure 4.8 Specifications of the “model command line” section of a PEST control file.
+
 The model command line may be simply the name of an executable file, or it may be the name of a batch or script file containing a complex sequence of steps. You may include the path name in a model command if you wish. If a program of the PEST++ suite is to be successful in running the model, then the model batch or script file, and all executable programs cited therein, must reside in the working folder (i.e., directory) of that program. Alternatively, full paths must be provided for all of these, or it must be ensured that the model batch or script file, and all executable programs cited therein, reside in a folder that is cited in the PATH environment variable. The safest option when parallelizing model runs over many computers is to include the batch/script file, and all executable programs cited therein, in the folder of each PEST++ agent.
 
 ## <a id='s8-13' />4.13 Model Input Section
@@ -1918,12 +1948,11 @@ The model command line may be simply the name of an executable file, or it may b
 The “model input” section of a PEST control file relates PEST template files to model input files Its specifications are provided in figure 4.9.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.9 Specifications of the “model input” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* model input<br>
 TEMPFLE INFLE<br>
 (<em>one such line for each template file</em>)<br></th>
@@ -1932,6 +1961,8 @@ TEMPFLE INFLE<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.9 Specifications of the “model input” section of a PEST control file.
 
 For each template file - model input file pair, there should be a line within the “model input” section of the PEST control file containing two entries, namely the character variables TEMPFLE and INFLE. The first of these is the name of a PEST template file while the second is the name of the model input file to which the template file is matched. Filenames which contain a space should be enclosed in quotes. Pathnames should be provided for both the template file and the model input file if they do not reside in the current working folder. Construction details for template files are provided in chapter 2 of this manual.
 
@@ -1944,12 +1975,11 @@ The “model output” section of a PEST control file relates PEST instruction f
 Specifications of the “model output” section of a PEST control file are provided in figure 4.10.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.10 Specifications of the “model output” section of a PEST control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* model output<br>
 INSFLE OUTFLE<br>
 (<em>one such line for each instruction file</em>)<br></th>
@@ -1958,6 +1988,8 @@ INSFLE OUTFLE<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.10 Specifications of the “model output” section of a PEST control file.
 
 The “model output” section of the PEST control file contains instruction file - model output file pairs. If a filename contains a space, its name must be enclosed in quotes. Pathnames must be provided for both instruction files and model output files if they do not reside in the current working folder. Construction details for instruction files are provided in chapter 2 of this manual.
 
@@ -1974,12 +2006,11 @@ Each item on a prior information line must be separated from its neighbouring it
 Prior information lines must adhere to the syntax set out in figure 4.11.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.11. The syntax of a prior information line.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>PILBL PIFAC * PARNME + PIFAC * log(PARNME) ... = PIVAL WEIGHT OBGNME<br>
 (one such line for each article of prior information)<br></th>
 </tr>
@@ -1987,6 +2018,8 @@ Prior information lines must adhere to the syntax set out in figure 4.11.
 <tbody>
 </tbody>
 </table>
+
+Figure 4.11. The syntax of a prior information line.
 
 Each prior information article must begin with a prior information label; this is the character variable PILBL depicted in figure 4.11. Like observation names, this label must be no more than 20 characters in length if PEST-compatibility is required. However, programs of the PEST++ suite will permit a 200-character length for prior information labels. Prior information labels must be unique to each prior information equation.
 
@@ -2014,7 +2047,7 @@ Note that logs are taken to base 10.
 The left side of a prior information equation can be comprised of the sum and/or difference of a number of factor-parameter pairs of the type already illustrated; these pairs must be separated from each other by a “+” or “-” sign, with a space to either side of the sign. For example
 
 | pi2 1.0 \* par2 + 3.43435 \* par4 - 2.389834 \* par3 = 1.09e3 3.00 group_pr |
-|----|
+|-----------------------------------------------------------------------------|
 
 Prior information equations which include log-transformed parameters must express a relationship between the logs of those parameters. For example, if you would like the ratio between the estimated values of parameters “par1” and “par2” to be about 40.0, the prior information equation may be written as
 
@@ -2032,7 +2065,7 @@ When adding prior information to a PEST control file, you should note that no tw
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>pi1 2.0 * log(par1) + 2.5 * log(par2) - 3.5 * log(par3) = 1.342 1.00 obgp1<br>
 pi2 4.0 * log(par1) + 5.0 * log(par2) - 7.0 * log(par3) = 2.684 1.00 obgp2<br></th>
 </tr>
@@ -2048,7 +2081,7 @@ If you wish to break a single prior information equation into more than one line
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>pi1<br>
 &amp; 2.0<br>
 &amp; *<br>
@@ -2078,7 +2111,7 @@ However, the following article of prior information is illegal because of the br
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>pi1 2.0 * log(par1) + 2.5 * log<br>
 &amp; (par2) - 3.5 * log(par3) = 1.342 1.00 obgp1<br></th>
 </tr>
@@ -2092,29 +2125,29 @@ However, the following article of prior information is illegal because of the br
 The regularization section of a PEST control file is optional. If PESTMODE is not set to “regularization”, it is redundant. If it is set to “regularization” and a “regularization” section is not provided, the PESTPP-GLM program (the only program of the PEST++ suite which uses this section) provides default values for the control variables that are featured in it. These variables are now described. To clarify the meanings of some of the terms that appear in the following explanation, see the description of PESTPP-GLM in chapter 6 of this manual. For more general information on regularization, see Doherty (2015).
 
 **PHIMLIM**
-<span class="indexref" entry="PHIMLIM"></span>PHILIM is the target measurement objective function; it is the measurement objective function that PESTPP-GLM “aims for” while keeping the regularization objective function as low as possible. During every iteration of the inversion process, PESTPP-GLM calculates a regularization weight factor that attempts to achieves this balance.
+PHILIM is the target measurement objective function; it is the measurement objective function that PESTPP-GLM “aims for” while keeping the regularization objective function as low as possible. During every iteration of the inversion process, PESTPP-GLM calculates a regularization weight factor that attempts to achieves this balance.
 
 If you do not know how good a fit can be achieved between model outputs and the calibration dataset, set PHIMLIM very low (for example 1.0E-10) just to see how good a fit you can get between model outputs and field measurements. Meanwhile, the FRACPHIM control variable (see below) can be set to a value such as 0.1; this prevents regularization constraints on parameter values from being totally ignored on the way to achieving the best possible fit with the data. If it turns out that the fit between model outcomes and the calibration dataset is poor, this may indicate that the model needs refinement; by seeking the best possible fit with the calibration dataset you get to find this out early in the calibration process. However, if the fit is good, then PHIMLIM can be set to a value 5 percent to 10 percent higher than the best measurement objective function attained during this PESTPP-GLM run, before running PESTPP-GLM again. Parameter values achieved during the next PESTPP-GLM run should be far more pleasing than those achieved during the first run; it is normally in achieving the last 5 percent to 10 percent reduction in the measurement objective function that parameters are assigned values that violate sensibility constraints as over-fitting occurs.
 
 **PHIMACCEPT**
-During <span class="indexref" entry="PHIMACCEPT"></span>PHIMACCEPT each iteration, just after it has linearized the inverse problem through calculating the Jacobian matrix, and just before it begins calculation of the parameter upgrade vector, PESTPP-GLM calculates the optimal value of the regularization weight factor for that iteration. This is the value which, under the linearity assumption encapsulated in the Jacobian matrix, results in a parameter upgrade vector for which the measurement objective function is equal to PHIMLIM. However, due to the approximate nature of the linearity assumption, PESTPP-GLM may not be able to lower the measurement objective function to PHIMLIM in spite of the fact that it uses a number of different values for the Marquardt lambda in attempting to do so. If it cannot lower the measurement objective function to an acceptable level, it simply accepts the upgraded parameters, proceeds to the next iteration and tries again. However, if it does succeed in lowering PHIMLIM to an acceptable level, or if it has succeeded in doing this on previous iterations, then PESTPP-GLM slightly alters its philosophy of choosing new Marquardt lambdas, in that it now attempts to lower the regularization objective function while maintaining the measurement objective below this acceptable level. This acceptable level is PHIMACCEPT; it should be set slightly higher than PHIMLIM in order to give PESTPP-GLM some “room to move” in its attempts to lower the regularization objective function while keeping the measurement objective function below, or close to, PHIMLIM. It needs this “room to move” because of the fact that it bases its calculations on a linearity assumption that is only approximately satisfied.
+During PHIMACCEPT each iteration, just after it has linearized the inverse problem through calculating the Jacobian matrix, and just before it begins calculation of the parameter upgrade vector, PESTPP-GLM calculates the optimal value of the regularization weight factor for that iteration. This is the value which, under the linearity assumption encapsulated in the Jacobian matrix, results in a parameter upgrade vector for which the measurement objective function is equal to PHIMLIM. However, due to the approximate nature of the linearity assumption, PESTPP-GLM may not be able to lower the measurement objective function to PHIMLIM in spite of the fact that it uses a number of different values for the Marquardt lambda in attempting to do so. If it cannot lower the measurement objective function to an acceptable level, it simply accepts the upgraded parameters, proceeds to the next iteration and tries again. However, if it does succeed in lowering PHIMLIM to an acceptable level, or if it has succeeded in doing this on previous iterations, then PESTPP-GLM slightly alters its philosophy of choosing new Marquardt lambdas, in that it now attempts to lower the regularization objective function while maintaining the measurement objective below this acceptable level. This acceptable level is PHIMACCEPT; it should be set slightly higher than PHIMLIM in order to give PESTPP-GLM some “room to move” in its attempts to lower the regularization objective function while keeping the measurement objective function below, or close to, PHIMLIM. It needs this “room to move” because of the fact that it bases its calculations on a linearity assumption that is only approximately satisfied.
 
 Normally PHIMACCEPT should be set between 2 percent and 5 percent greater than PHIMLIM.
 
 **FRACPHIM**
 The FRACPHIM variable allows you to set PHIMLIM very low (possibly lower than is achievable), but still retain the benefits of regularization.
 
-If <span class="indexref" entry="FRACPHIM"></span>FRACPHIM is provided with a value of zero or less (or if this variable is omitted from the PEST control file), then it has no effect on the inversion process. However, if FRACPHIM is provided with a value of between 0.0 and 1.0 (values of 1.0 or greater are illegal), then PESTPP-GLM calculates a new value for PHIMLIM at the beginning of each iteration of the inversion process. This value is calculated as the current value of the measurement objective function times FRACPHIM, or the user-supplied value of PHIMLIM, whichever is higher. Thus, PESTPP-GLM always “aims for” a measurement objective function that is lower than the current one. However, it does not pursue a target that is so low as to require the complete abandonment of regularization.
+If FRACPHIM is provided with a value of zero or less (or if this variable is omitted from the PEST control file), then it has no effect on the inversion process. However, if FRACPHIM is provided with a value of between 0.0 and 1.0 (values of 1.0 or greater are illegal), then PESTPP-GLM calculates a new value for PHIMLIM at the beginning of each iteration of the inversion process. This value is calculated as the current value of the measurement objective function times FRACPHIM, or the user-supplied value of PHIMLIM, whichever is higher. Thus, PESTPP-GLM always “aims for” a measurement objective function that is lower than the current one. However, it does not pursue a target that is so low as to require the complete abandonment of regularization.
 
 As well as adjusting the value of PHIMLIM during every iteration, PESTPP-GLM also adjusts the value of PHIMACCEPT. This adjustment is made such that, during every iteration, the ratio of PHIMACCEPT to PHIMLIM is the same as that supplied in the PEST control file.
 
 The recommended value for FRACPHIM is 0.1.
 
 **WFINIT**
-WFINIT<span class="indexref" entry="WFINIT"></span> is the initial regularization weight factor. During every iteration of the inversion process PESTPP-GLM calculates a suitable regularization weight factor to employ during that iteration using an iterative, numerical solution procedure; its initial value when implementing this procedure for the first iteration is WFINIT. If there are many adjustable parameters, calculation of the regularization weight factor for the first iteration can be time-consuming if WFINIT is far from optimal. Hence if you have any idea of what the weight factor should be (for example from a previous PESTPP-GLM run), then you should provide WFINIT with this value. Otherwise simply set it to 1.0.
+WFINIT is the initial regularization weight factor. During every iteration of the inversion process PESTPP-GLM calculates a suitable regularization weight factor to employ during that iteration using an iterative, numerical solution procedure; its initial value when implementing this procedure for the first iteration is WFINIT. If there are many adjustable parameters, calculation of the regularization weight factor for the first iteration can be time-consuming if WFINIT is far from optimal. Hence if you have any idea of what the weight factor should be (for example from a previous PESTPP-GLM run), then you should provide WFINIT with this value. Otherwise simply set it to 1.0.
 
 **WFMIN,**
-<span class="indexref" entry="WFMIN"></span>WFMIN and <span class="indexref" entry="WFMAX"></span> WFMAX are the minimum and maximum permissible values that the regularization weight factor is allowed to take. Normally settings of 1.0E-10 and 1.0E10 are suitable; settings of 1.0E-15 and 1.0E15 are normally fine as well. If PESTPP-GLM wishes to transgress these limits it will notify you of this. This normally indicates that regularization constraints are too weak to ensure inverse problem uniqueness (if the upper weight factor limit is encountered), or that measurement weights are too low (if the lower weight factor limit is encountered).
+WFMIN and WFMAX are the minimum and maximum permissible values that the regularization weight factor is allowed to take. Normally settings of 1.0E-10 and 1.0E10 are suitable; settings of 1.0E-15 and 1.0E15 are normally fine as well. If PESTPP-GLM wishes to transgress these limits it will notify you of this. This normally indicates that regularization constraints are too weak to ensure inverse problem uniqueness (if the upper weight factor limit is encountered), or that measurement weights are too low (if the lower weight factor limit is encountered).
 
 **WFFAC,**
 In order to calculate an appropriate regularization weight factor to use during any iteration of the inversion process, PESTPP-GLM uses an iterative procedure which begins at the value of the regularization weight factor calculated during the previous iteration; for the first iteration it uses WFINIT to start the procedure. In the process of finding the weight factor which, under the linearity assumption used in its calculation, will result in a measurement objective function of PHIMLIM, PESTPP-GLM first travels along a path of progressively increasing or decreasing weight factor (it decides which one of these alternatives to explore on the basis of the value of the current measurement objective function with respect to PHIMLIM). In undertaking this exploration, it either multiplies or divides the weight factor by WFFAC; it continues to do this until it has found two successive weight factors which lie on either side of the optimal weight factor for that iteration. Once it has done this, it uses Newton’s method to calculate the optimal weight factor, through a series of successive approximations. When two subsequent weight factors calculated in this way differ from each other by no more than a relative amount of WFTOL, the optimal weight factor is deemed to have been calculated.
@@ -2133,12 +2166,11 @@ Any line in a PEST control file that begins with the character string “++” i
 Figure 4.12 shows a PEST control file that includes the values of some PEST++ control variables (and a comment line). Wherever a PEST++ keyword is supplied, one or more values for the control variable that is associated with that keyword must follow it in brackets. Where more than one value is associated with a keyword, these values must be comma-delimited within the brackets. More than one keyword can be supplied on a “++” line. If so, they must be separated by one or more whitespace characters.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 4.12 A PEST control file which includes PEST++ control variables.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>pcf<br>
 * control data<br>
 restart estimation<br>
@@ -2207,6 +2239,8 @@ pi2 1.0 * log(ro2) + 1.0 * log(h2) = 2.6026 2.0 prgp1<br>
 <tbody>
 </tbody>
 </table>
+
+Figure 4.12 A PEST control file which includes PEST++ control variables.
 
 Values that are supplied with a keyword can be integer, real or text (for example filenames), this depending on the keyword. Text can be optionally surrounded by single or double quotes; this option becomes a necessity if a filename provided with a keyword includes blanks.
 
@@ -2313,8 +2347,8 @@ Note that not all external files or even every row in an external file must have
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">~ comment line<br>
+<tr class="header">
+<th>~ comment line<br>
 pcf<br>
 * control data keyword ~ more comments here:<br>
 pestmode estimation<br>
@@ -2486,12 +2520,18 @@ Alternatively, users may want to the run manager to stop waiting on one or more 
 In some cases, users may want to retrieve one or more model output files from the agent working directories and collect those files in the master directory. For example, users may want an entire model output binary file for further processing after a successful model run. Or, if a model run fails to complete, users may wish to see certain model input/output files to diagnose issues. In a parallel run setting, both of these tasks can be difficult to complete. To support these use cases, the PEST++ tools allow transferring files from the agent directories to the master directory through the *panther_transfer_on_finish* and *panther_transfer_on_fail* options. Both of these options can be supplied as comma-separated lists of files or single file names. After successful completion or run failure, respectively, the panther run manager will transfer the nominated files found in the agent control file to the master working directory. This is worth saying again – the values of *panther_transfer_on_finish* and *panther_transfer_on_fail* listed in the agent’s control file are transferred to the master. This approach allows users to potentially transfer different files from each agent. To avoid naming conflicts in the master directory, the name of the file saved in the master directory is prepended with a unique tag staring with “ftx\_” and a counter. Additional metadata information including agent hostname, agent working directory, run manager run id value, run manager group id value and run manager information text (this information text usually includes information like realization name from pestpp-ies/pestpp-da and parameter name for Jacobian filling and global sensitivity analysis) are added to the run management record file along with the unique “ftx\_” tag, to that users can piece together which agent and in what context a file originated. Users are encouraged to study the .rmr file because it lists several valuable pieces of information regarding any file transfers.
 
 **panther_poll_interval**
-Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an interger value of seconds to sleep. By default, this value is 1 second.
+Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an integer value of seconds to sleep. By default, this value is 1 second.
+
+**panther_persistent_workers**
+Part of the run management design for panther is that workers persist for the duration of any long-term PESTPP run. All PESTPP-XXX programs have iterative steps involved that can result in idle workers at some times. With long and potentially variable runtimes the worker idle time can be significant. As users start to pay for cloud resources, for example, that idle time can be wasteful. *panther_persistent_workers* is a Boolean parameter (default value is True) that, if False, will shut down workers when no more forward runs are requested. This decreases idle time of workers but also requires users to manually restart workers for the next batch of forward runs as, at completion of a batch, all workers will be shut down. It is recommended to set *panther_master_timeout_milliseconds* to a higher value (\>=1000) if setting *panther_persistent_workers* to False to prevent overloading the master.
+
 
 **panther_master_timeout_milliseconds**
-**In**
+In situations where the forward model runtime is very short, it is advantageous to have the panther master be as responsive as possible. But in other situations, where network traffic is heavy and latency is high, it is important for the panther master to be patience when communicating with workers. The *panther_master_timeout_milliseconds* option controls how quickly the panther master responds to requests. The default is 500 milliseconds. If users are experiencing “deadlock” on the master, you may need to increase the value.
+
 **panther_master_echo_interval_milliseconds**
-**In**
+In situations where the forward model runtime is very short, allowing the master to echo as quickly as workers communicate can slow down responsiveness of physical host machine. The panther_master_echo_interval\_*milliseconds* option controls how often the panther master reports to the terminal screen. Default is 500 milliseconds.
+
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
 After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run – if PESTPP-XXX exits gracefully, these files are removed. These run storage files can be read and processed using pyEMU.
@@ -2526,7 +2566,7 @@ Tikhonov regularization may be introduced to an inverse problem to promulgate pa
 
 If regularization constraints are referenced explicitly in equation 6.1, it becomes
 
-$`\begin{bmatrix}
+$\begin{bmatrix}
 \mathbf{h} \\
 \mathbf{h}_{r}
 \end{bmatrix} = \ \begin{bmatrix}
@@ -2535,7 +2575,7 @@ $`\begin{bmatrix}
 \end{bmatrix}\mathbf{k} + \ \begin{bmatrix}
 \mathbf{\varepsilon} \\
 \mathbf{\varepsilon}_{\mathbf{r}}
-\end{bmatrix}\ `$ (6.2)
+\end{bmatrix}\ $ (6.2)
 
 In equation 6.2, the elements of h<sub>r</sub> are “regularization observations” (which can include the “observed” values of prior information equations). They normally penalize departure from a preferred parameter condition. This condition may be comprised of a set of values that parameters should adopt unless there is information to the contrary in the calibration dataset. ε<sub>r</sub> is the “noise” associated with this condition; it reflects the tolerance of a modeller for departures from this condition incurred by the necessity for model outputs to fit a calibration dataset. Generally a modeller does not know this tolerance ahead of the calibration process. Instead, he/she knows his/her tolerance for model-to-measurement misfit, and is prepared to adjust his/her tolerance for parameter departures from preferred values (at least to some extent) on that basis.
 
@@ -2545,8 +2585,8 @@ We employ the symbol <u>k</u> to designate the parameter set (hopefully of minim
 
 In equation 6.3 Q is a weight matrix ascribed to measurement noise while Q<sub>r</sub> is a weight matrix ascribed to “regularization noise”. Ideally
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`\mathbf{Q} \propto C(\mathbf{\varepsilon})` " title="\Large `\mathbf{Q} \propto C(\mathbf{\varepsilon})`" />  (6.4a)  <br>
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`\mathbf{Q}_{r}\mathbf{\propto}C\left( \mathbf{\varepsilon}_{r} \right)` " title="\Large `\mathbf{Q}_{r}\mathbf{\propto}C\left( \mathbf{\varepsilon}_{r} \right)`" />  (6.4b)  <br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathbf{Q} \propto C(\mathbf{\varepsilon}) " title="\Large \mathbf{Q} \propto C(\mathbf{\varepsilon})" />  (6.4a)  <br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathbf{Q}_{r}\mathbf{\propto}C\left( \mathbf{\varepsilon}_{r} \right) " title="\Large \mathbf{Q}_{r}\mathbf{\propto}C\left( \mathbf{\varepsilon}_{r} \right)" />  (6.4b)  <br>
 where C() signifies a covariance matrix. The *μ*<sup>2</sup> term in equation 6.3 accommodates flexibility in the strength with which regularization constraints are enforced. Like PEST, PESTPP-GLM is given permission to calculate the value of *μ*<sup>2</sup> itself. It is referred to herein as the “regularization weight factor”.
 
 In practice, the Jacobian matrix J replaces the Z matrix of equation (6.3). This is the matrix of partial derivatives of model outputs with respect to parameter values. As such, it constitutes a local linearization of the action of the model. As was discussed in previous chapters of this manual, the Jacobian matrix is filled through finite parameter differencing. Where parameters are large in number, this can be by far the most laborious component of the inversion process.
@@ -2781,38 +2821,38 @@ See section 5 of this manual for how to run PESTPP-GLM. As is described in that 
 
 The following table summarizes the contents of files that are recorded by PESTPP-GLM when it is asked to undertake highly-parameterized inversion. Most of these have been discussed above. It is assumed that the PEST control file on which the inversion process is based is named *case.pst*.
 
-| File | Contents |
-|----|----|
-| *case.rec* | Run record file. This file records a complete history of the inversion process. It is available for user-inspection at any time during that process. |
-| *case.rmr* | Parallel run management record file. |
-| *case.par* | Parameter value file. This is compatible with a file of the same name written by PEST. It records the best parameter values obtained up until any point of the inversion process, and at its end. |
-| *case.parN* | Parameter value file for iteration *N*. This file contains best parameters calculated during iteration *N* of the inversion process. |
-| *case.bpa* | Same as *case.par*. This file records base parameter values (which are actual parameter values) when PESTPP-GLM conducts SVD-assisted inversion. It is included in the set of PESTPP-GLM output files for compatibility with PEST. |
-| *case.parb* | Same as *case.bpa*. |
-| *case.res* | Residuals file. This file lists model outputs, observations, residuals and related data calculated using best parameters achieved through the inversion process. The latter are listed in file *case.par*. |
-| *case.reiN* | An intermediate residuals file. This file lists model outputs, observations, residuals and related data calculated using best parameters achieved during iteration *N* of the inversion process. The latter are listed in file *case.parN*. |
-| *case.rei* | The latest incidence of *case.reiN*. |
-| *case.sen* | Parameter sensitivity file. This file contains composite parameter sensitivities; it is updated during every iteration of the inversion process. |
-| *case.ipar* | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file listing best parameters attained at all iterations of the inversion process. |
-| *case.iobj* | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file listing objective function components attained at the end of all iterations of the inversion process. |
-| *case.isen* | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file containing composite parameter sensitivities calculated during all iterations of the inversion process. |
-| *case.upg.csv* | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file containing upgraded parameter values calculated for each Marquardt lambda and each scale factor employed for all iterations of the inversion process. |
-| *case.rid* | Links model runs undertaken for calculating finite-difference derivatives with respect to each parameter to model run indices recorded in file *case.rmr*. |
-| *case.svd* | Information is appended to this file every time a parameter upgrade direction is calculated using a new Marquardt lambda. It lists the singular values of the (J<sup>t</sup>QJ + λI) matrix. |
-| *case.log* | PESTPP-GLM performance record. This file records the times at which PESTPP-GLM commenced and completed various processing tasks. |
-| *case.fpr* | Records a history of when parameters were frozen at their bounds, and when they were subsequently released. |
-| *case.jco* | A PEST-compatible Jacobian matrix file that is refreshed during every iteration of the inversion process. This is a binary file. On iterations that are dedicated to estimation of super parameter parameters, it contains super parameter sensitivities. On other iterations it contains base parameter sensitivities. |
-| *case.jcb* | A PEST-compatible Jacobian matrix file that contains base parameter sensitivities. It is refreshed on every occasion that base parameter sensitivities are re-calculated. |
-| *case.post.cov* | Contains the posterior parameter covariance matrix if linear uncertainty (i.e., FOSM) analysis is requested. |
-| *case.N.par.usum.csv* | Summarizes linear uncertainty analysis as it pertains to parameters. |
-| *case.N.pred.usum.csv* | Summarizes linear uncertainty analysis as it pertains to user-specified predictions. |
-| *caseN.post.paren.csv* | (Optional) posterior parameter ensemble CSV file. |
-| *case.N.post.obsen.csv* | (Optional) posterior model output ensemble CSV file. |
-| *case.N.post.paren.jcb* | (Optional) posterior parameter ensemble CSV file. |
-| *case.N.post.obsen.jcb* | (Optional) posterior model output ensemble CSV file. |
-| *caseN.fosm_reweight.rei* | Scaled final weights used in FOSM calculations. |
-| *case.rst* | A binary file containing restart information. |
-| *case.rns, case.rnj, case.rnu* | Binary files used by the run manager. |
+| File                       | Contents                                                                                                                                                                                                                                                                                                            |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *case.rec*                     | Run record file. This file records a complete history of the inversion process. It is available for user-inspection at any time during that process.                                                                                                                                                                    |
+| *case.rmr*                     | Parallel run management record file.                                                                                                                                                                                                                                                                                    |
+| *case.par*                     | Parameter value file. This is compatible with a file of the same name written by PEST. It records the best parameter values obtained up until any point of the inversion process, and at its end.                                                                                                                       |
+| *case.parN*                    | Parameter value file for iteration *N*. This file contains best parameters calculated during iteration *N* of the inversion process.                                                                                                                                                                                    |
+| *case.bpa*                     | Same as *case.par*. This file records base parameter values (which are actual parameter values) when PESTPP-GLM conducts SVD-assisted inversion. It is included in the set of PESTPP-GLM output files for compatibility with PEST.                                                                                      |
+| *case.parb*                    | Same as *case.bpa*.                                                                                                                                                                                                                                                                                                     |
+| *case.res*                     | Residuals file. This file lists model outputs, observations, residuals and related data calculated using best parameters achieved through the inversion process. The latter are listed in file *case.par*.                                                                                                              |
+| *case.reiN*                    | An intermediate residuals file. This file lists model outputs, observations, residuals and related data calculated using best parameters achieved during iteration *N* of the inversion process. The latter are listed in file *case.parN*.                                                                             |
+| *case.rei*                     | The latest incidence of *case.reiN*.                                                                                                                                                                                                                                                                                    |
+| *case.sen*                     | Parameter sensitivity file. This file contains composite parameter sensitivities; it is updated during every iteration of the inversion process.                                                                                                                                                                        |
+| *case.ipar*                    | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file listing best parameters attained at all iterations of the inversion process.                                                                                                                                |
+| *case.iobj*                    | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file listing objective function components attained at the end of all iterations of the inversion process.                                                                                                       |
+| *case.isen*                    | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file containing composite parameter sensitivities calculated during all iterations of the inversion process.                                                                                                     |
+| *case.upg.csv*                 | This file is recorded unless the *iteration_summary()* control variable is set to *false*. It is a CSV file containing upgraded parameter values calculated for each Marquardt lambda and each scale factor employed for all iterations of the inversion process.                                                       |
+| *case.rid*                     | Links model runs undertaken for calculating finite-difference derivatives with respect to each parameter to model run indices recorded in file *case.rmr*.                                                                                                                                                              |
+| *case.svd*                     | Information is appended to this file every time a parameter upgrade direction is calculated using a new Marquardt lambda. It lists the singular values of the (J<sup>t</sup>QJ + λI) matrix.                                                                                                                |
+| *case.log*                     | PESTPP-GLM performance record. This file records the times at which PESTPP-GLM commenced and completed various processing tasks.                                                                                                                                                                                        |
+| *case.fpr*                     | Records a history of when parameters were frozen at their bounds, and when they were subsequently released.                                                                                                                                                                                                             |
+| *case.jco*                     | A PEST-compatible Jacobian matrix file that is refreshed during every iteration of the inversion process. This is a binary file. On iterations that are dedicated to estimation of super parameter parameters, it contains super parameter sensitivities. On other iterations it contains base parameter sensitivities. |
+| *case.jcb*                     | A PEST-compatible Jacobian matrix file that contains base parameter sensitivities. It is refreshed on every occasion that base parameter sensitivities are re-calculated.                                                                                                                                               |
+| *case.post.cov*                | Contains the posterior parameter covariance matrix if linear uncertainty (i.e., FOSM) analysis is requested.                                                                                                                                                                                                            |
+| *case.N.par.usum.csv*          | Summarizes linear uncertainty analysis as it pertains to parameters.                                                                                                                                                                                                                                                    |
+| *case.N.pred.usum.csv*         | Summarizes linear uncertainty analysis as it pertains to user-specified predictions.                                                                                                                                                                                                                                    |
+| *caseN.post.paren.csv*         | (Optional) posterior parameter ensemble CSV file.                                                                                                                                                                                                                                                                       |
+| *case.N.post.obsen.csv*        | (Optional) posterior model output ensemble CSV file.                                                                                                                                                                                                                                                                    |
+| *case.N.post.paren.jcb*        | (Optional) posterior parameter ensemble CSV file.                                                                                                                                                                                                                                                                       |
+| *case.N.post.obsen.jcb*        | (Optional) posterior model output ensemble CSV file.                                                                                                                                                                                                                                                                    |
+| *caseN.fosm_reweight.rei*      | Scaled final weights used in FOSM calculations.                                                                                                                                                                                                                                                                         |
+| *case.rst*                     | A binary file containing restart information.                                                                                                                                                                                                                                                                           |
+| *case.rns, case.rnj, case.rnu* | Binary files used by the run manager.                                                                                                                                                                                                                                                                                   |
 
 Table 6.1. Files recorded by PESTPP-GLM.
 
@@ -2824,11 +2864,11 @@ See chapter 5 of this manual for how to run PESTPP-GLM, with model runs undertak
 
 When run in order to implement differential evolution optimization, a number of the output files recorded by PESTPP-GLM are actually empty as they pertain to gradient-based inversion. Other output files pertain to run management; these are discussed in section 6.2.13. The only output files that are relevant to DE-based optimization are those listed in the following table. In this table it is assumed that the PEST control file on which DE optimization is based is named *case.pst*.
 
-| File | Contents |
-|----|----|
+| File   | Contents                                                                                                                                                          |
+|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | *case.par* | This file (referred to as a “parameter value file”) is available at any stage of the optimization process. It records best parameters that have been achieved so far. |
-| *case.rec* | The run record file. This file records a history of the DE optimization process. It is available for inspection at any stage of that process. |
-| *case.de1* | A binary file to assist in storage of model run outcomes. |
+| *case.rec* | The run record file. This file records a history of the DE optimization process. It is available for inspection at any stage of that process.                         |
+| *case.de1* | A binary file to assist in storage of model run outcomes.                                                                                                             |
 
 Table 6.2 PESTPP-GLM output files that are pertinent to DE optimization. It is assumed that the name of the PEST control file is *case.pst*.
 
@@ -2854,34 +2894,34 @@ Variables discussed in section 5.3.6 that control parallel run management are no
 
 Note also that the number of control variables may change with time. Refer to the PEST++ web site for variables used by the latest version of PESTPP-GLM.
 
-| Variable | Type | Role |
-|----|----|----|
-| *max_n_super(100000)* | integer | The maximum number of super parameters to use when conducting SVD-assisted inversion. The default is the number of adjustable parameters, in which case the number of super parameters is effectively set by *super_eigthresh()*. |
-| *super_eigthresh(1.0E-6)* | real | The ratio to maximum singular value of J<sup>t</sup>QJ at which truncation takes place to form super parameters. Note, however, that if the number of super parameters calculated in this way exceeds *max_n_super()* then the value of the latter variable takes precedence. |
-| *n_iter_base(100000)* | integer | Where super parameters are estimated in some iterations and base parameters are estimated in other iterations, this variable sets the number of sequential base parameter iterations to undertake before commencing an iteration in which super parameters are adjusted. If *n_iter_base()* is set to -1, this instructs PESTPP-GLM to emulate PEST behaviour; a base parameter Jacobian matrix is calculated; then super parameters are estimated as soon as they are defined on the basis of this matrix. Super parameters are estimated in all succeeding iterations. |
-| *n_iter_super(0)* | integer | Where super parameters are estimated in some iterations and base parameters are estimated in other iterations, this variable sets the number of sequential super parameter iterations to undertake before commencing an iteration in which a base parameter Jacobian matrix is recalculated and base parameters are adjusted. |
-| *jac_scale(true)* | Boolean | Scale parameters by their sensitivities when calculating parameter upgrades. This can increase numerical precision; however, it may incur a numerical cost. |
-| *svd_pack(redsvd)* | text | This informs PESTPP-GLM of the package that it must employ to undertake singular value decomposition of the J<sup>t</sup>QJ matrix (appropriately modified to include the Marquardt lambda and regularization). Options are “eigen” and “redsvd”. |
-| *lambdas(0.1,1,10,100,1000)* | set of real numbers | Values for the Marquardt lambda used in calculation of parameter upgrades. Note that this base list is augmented with values bracketing the previous iteration’s best lambda. However, if a single value is specified, only that lambda (and no other lambda) is used in all iterations. |
-| *lambda_scale_fac(.75,1.0,1.1)* | set of real numbers | These values are used to scale each parameter upgrade vector calculated using different values of lambda. This results in a line search along each upgrade vector direction. The number of tested parameter upgrades (and hence model runs) is equal to the number of lambdas times the number of scaling factors. Set *lambda_scale_fac()* to 1.0 to disable an upgrade direction line search. |
-| *base_jacobian()* | text | Provide the name of a JCO file. The Jacobian matrix contained in this file will be used for the first iteration of the inversion process. |
-| *hotstart_resfile()* | text | Specify the name of a residuals file from a previous PESTPP-GLM run. PESTPP-GLM will assume that these are model outputs corresponding to initial parameter values. It will use these instead of undertaking the initial model run. |
-| *uncertainty(true)* | Boolean | Flag to active or deactivate FOSM-based parameter and (optionally) forecast uncertainty estimation. |
-| *parcov()* | text | Provide the name of a JCO, JCB, UNC or COV file from which the prior parameter covariance matrix used in FOSM analysis is read. |
-| *par_sigma_range(4.0)* | real | The difference between a parameter’s upper and lower bounds expressed as standard deviations. |
-| *forecasts()* | series of text strings | Provide the names of one or more observations featured in the “observation data” section of the PEST control file; these are treated as predictions in FOSM predictive uncertainty analysis. |
-| *glm_num_reals(100)* | integer | Number of parameter realizations to draw from the posterior parameter distribution (using final, estimated parameter values as the parameter mean vector, and the FOSM-based posterior covariance matrix). Following generation of the realizations, the model is run once for each realization. The resulting observation ensemble is saved in a CSV file named *case.obs.csv*; the parameter ensemble is saved in a CSV file named *case.par.csv.* |
-| *save_binary(false)* | Boolean | A flag to save parameter and observation ensembles in binary format. If this is set to *true*, parameter and observation ensembles are saved in files named *case.par.jcb* and *case.obs.jcb*. |
-| *tie_by_group(false)* | Boolean | Flag to tie all adjustable parameters by group designation; however, all user-supplied parameter tied-parent relationships are preserved. The effective number of adjustable parameters thus becomes the number of parameter groups (which contain at least one adjustable parameter) plus the number of parameters that are listed as having others tied to it. |
-| *iteration_summary(true)* | Boolean | This flag activates or deactivates the writing of CSV files summarizing parameters (*case.ipar*), objective functions (*case.iobj*), sensitivities (*case.isen*), trial parameter upgrades (*case.upg.csv*) and parameter-to-run-id mapping (*case.rid*). |
-| *der_forgive(true)* | Boolean | If set to *true*, then if model run failure occurs when calculating finite-difference derivatives with respect to a certain parameter, that parameter is frozen at its current value for the remainder of the iteration. If set to *false*, PESTPP-GLM terminates execution with an appropriate message if this occurs. |
-| *Enforce_tied_bounds(false)* | Boolean | Flag to enforce parameter bounds on any tied parameters |
-| *glm_accept_mc_phi(false)* | Boolean | Flag to accept FOSM-based realization phi each base iteration if the phi is lower than the lambda-testing phi. Default is false. |
-| *rand_seed(358183147)* | unsigned integer | Seed for the random number generator. Used for FOSM-basd Monte Carlo |
-| *glm_rebase_super(true)* | boolean | A flag to run the super-parameter truncated values once at the start of the first super parameter iteration to provide a more accurate “base” run for calculating sensitivity numerators. Only applies if *n_iter_base* = -1 and *base_jacobian* is supplied. Default is False, which indicates use either the *hotstart_resfile* residuals or use the base run previously completed |
-| *glm_iter_mc(false)* | Boolean | Flag to undertake FOSM-based posterior Monte Carlo during each iteration of PESTPP-GLM. Default is False, which will result in Monte Carlo only after iterations are done (depending on the *glm_num_reals* and *uncertainty* flags) |
-| *ensemble_output_precision* | int | Number of significant digits to use in ASCII format ensemble files. Default is 6 |
-| *glm_norm_form(diag)* | string | The form of the normal matrix to use. Can be “ident” (identity matrix lambda scaling), “diag” (use the diagonal of X<sup>t</sup>QX for lambda scaling) or “prior” (scale with the inverse of the prior parameter covariance matrix. Default is diag.s |
+| Variable                    | Type               | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+|---------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *max_n_super(100000)*           | integer                | The maximum number of super parameters to use when conducting SVD-assisted inversion. The default is the number of adjustable parameters, in which case the number of super parameters is effectively set by *super_eigthresh()*.                                                                                                                                                                                                                                                                                                                                        |
+| *super_eigthresh(1.0E-6)*       | real                   | The ratio to maximum singular value of J<sup>t</sup>QJ at which truncation takes place to form super parameters. Note, however, that if the number of super parameters calculated in this way exceeds *max_n_super()* then the value of the latter variable takes precedence.                                                                                                                                                                                                                                                                                    |
+| *n_iter_base(100000)*           | integer                | Where super parameters are estimated in some iterations and base parameters are estimated in other iterations, this variable sets the number of sequential base parameter iterations to undertake before commencing an iteration in which super parameters are adjusted. If *n_iter_base()* is set to -1, this instructs PESTPP-GLM to emulate PEST behaviour; a base parameter Jacobian matrix is calculated; then super parameters are estimated as soon as they are defined on the basis of this matrix. Super parameters are estimated in all succeeding iterations. |
+| *n_iter_super(0)*               | integer                | Where super parameters are estimated in some iterations and base parameters are estimated in other iterations, this variable sets the number of sequential super parameter iterations to undertake before commencing an iteration in which a base parameter Jacobian matrix is recalculated and base parameters are adjusted.                                                                                                                                                                                                                                            |
+| *jac_scale(true)*               | Boolean                | Scale parameters by their sensitivities when calculating parameter upgrades. This can increase numerical precision; however, it may incur a numerical cost.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| *svd_pack(redsvd)*              | text                   | This informs PESTPP-GLM of the package that it must employ to undertake singular value decomposition of the J<sup>t</sup>QJ matrix (appropriately modified to include the Marquardt lambda and regularization). Options are “eigen” and “redsvd”.                                                                                                                                                                                                                                                                                                                |
+| *lambdas(0.1,1,10,100,1000)*    | set of real numbers    | Values for the Marquardt lambda used in calculation of parameter upgrades. Note that this base list is augmented with values bracketing the previous iteration’s best lambda. However, if a single value is specified, only that lambda (and no other lambda) is used in all iterations.                                                                                                                                                                                                                                                                                 |
+| *lambda_scale_fac(.75,1.0,1.1)* | set of real numbers    | These values are used to scale each parameter upgrade vector calculated using different values of lambda. This results in a line search along each upgrade vector direction. The number of tested parameter upgrades (and hence model runs) is equal to the number of lambdas times the number of scaling factors. Set *lambda_scale_fac()* to 1.0 to disable an upgrade direction line search.                                                                                                                                                                          |
+| *base_jacobian()*               | text                   | Provide the name of a JCO file. The Jacobian matrix contained in this file will be used for the first iteration of the inversion process.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| *hotstart_resfile()*            | text                   | Specify the name of a residuals file from a previous PESTPP-GLM run. PESTPP-GLM will assume that these are model outputs corresponding to initial parameter values. It will use these instead of undertaking the initial model run.                                                                                                                                                                                                                                                                                                                                      |
+| *uncertainty(true)*             | Boolean                | Flag to active or deactivate FOSM-based parameter and (optionally) forecast uncertainty estimation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| *parcov()*                      | text                   | Provide the name of a JCO, JCB, UNC or COV file from which the prior parameter covariance matrix used in FOSM analysis is read.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| *par_sigma_range(4.0)*          | real                   | The difference between a parameter’s upper and lower bounds expressed as standard deviations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| *forecasts()*                   | series of text strings | Provide the names of one or more observations featured in the “observation data” section of the PEST control file; these are treated as predictions in FOSM predictive uncertainty analysis.                                                                                                                                                                                                                                                                                                                                                                             |
+| *glm_num_reals(100)*            | integer                | Number of parameter realizations to draw from the posterior parameter distribution (using final, estimated parameter values as the parameter mean vector, and the FOSM-based posterior covariance matrix). Following generation of the realizations, the model is run once for each realization. The resulting observation ensemble is saved in a CSV file named *case.obs.csv*; the parameter ensemble is saved in a CSV file named *case.par.csv.*                                                                                                                     |
+| *save_binary(false)*            | Boolean                | A flag to save parameter and observation ensembles in binary format. If this is set to *true*, parameter and observation ensembles are saved in files named *case.par.jcb* and *case.obs.jcb*.                                                                                                                                                                                                                                                                                                                                                                           |
+| *tie_by_group(false)*           | Boolean                | Flag to tie all adjustable parameters by group designation; however, all user-supplied parameter tied-parent relationships are preserved. The effective number of adjustable parameters thus becomes the number of parameter groups (which contain at least one adjustable parameter) plus the number of parameters that are listed as having others tied to it.                                                                                                                                                                                                         |
+| *iteration_summary(true)*       | Boolean                | This flag activates or deactivates the writing of CSV files summarizing parameters (*case.ipar*), objective functions (*case.iobj*), sensitivities (*case.isen*), trial parameter upgrades (*case.upg.csv*) and parameter-to-run-id mapping (*case.rid*).                                                                                                                                                                                                                                                                                                                |
+| *der_forgive(true)*             | Boolean                | If set to *true*, then if model run failure occurs when calculating finite-difference derivatives with respect to a certain parameter, that parameter is frozen at its current value for the remainder of the iteration. If set to *false*, PESTPP-GLM terminates execution with an appropriate message if this occurs.                                                                                                                                                                                                                                                  |
+| *Enforce_tied_bounds(false)*    | Boolean                | Flag to enforce parameter bounds on any tied parameters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| *glm_accept_mc_phi(false)*      | Boolean                | Flag to accept FOSM-based realization phi each base iteration if the phi is lower than the lambda-testing phi. Default is false.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| *rand_seed(358183147)*          | unsigned integer       | Seed for the random number generator. Used for FOSM-basd Monte Carlo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| *glm_rebase_super(true)*        | boolean                | A flag to run the super-parameter truncated values once at the start of the first super parameter iteration to provide a more accurate “base” run for calculating sensitivity numerators. Only applies if *n_iter_base* = -1 and *base_jacobian* is supplied. Default is False, which indicates use either the *hotstart_resfile* residuals or use the base run previously completed                                                                                                                                                                                     |
+| *glm_iter_mc(false)*            | Boolean                | Flag to undertake FOSM-based posterior Monte Carlo during each iteration of PESTPP-GLM. Default is False, which will result in Monte Carlo only after iterations are done (depending on the *glm_num_reals* and *uncertainty* flags)                                                                                                                                                                                                                                                                                                                                     |
+| *ensemble_output_precision*     | int                    | Number of significant digits to use in ASCII format ensemble files. Default is 6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| *glm_norm_form(diag)*           | string                 | The form of the normal matrix to use. Can be “ident” (identity matrix lambda scaling), “diag” (use the diagonal of X<sup>t</sup>QX for lambda scaling) or “prior” (scale with the inverse of the prior parameter covariance matrix. Default is diag.s                                                                                                                                                                                                                                                                                                                    |
 
 Table 6.3 PESTPP-GLM control variables. Variables which control parallel run management can be supplied in addition to these. See section 5.3.6.
 
@@ -2955,16 +2995,16 @@ In common with other programs comprising the PEST++ suite, PESTPP-SEN obtains ca
 
 PEST++ variables which control the operation of the Method of Morris are listed in the following table. Default values are provided with each variable in this table. Note that if no GSA-pertinent variables are provided in a PEST control file used by PESTPP-SEN, it implements the Method of Morris.
 
-| Control variable | Type | Role |
-|----|----|----|
-| *gsa_method(morris)* | text | Methods are “morris” and “sobol”. |
-| *rand_seed(358183147)* | unsigned integer | Seed for the random number generator. |
-| *gsa_morris_r(4)* | integer | Sample size. The number of times that an elementary effect is computed for each parameter. That is, the number of sequences of *m* model runs undertaken by PESTPP-SEN, where *m* is the number of adjustable parameters featured in the PEST control file. |
-| *gsa_morris_p(4)* | integer | The number of levels employed to grid the interval \[0,1\] associated with each transformed parameter. The number of intervals into which \[0, 1\] is therefore subdivided is *p*-1. |
-| *gsa_morris_delta()* | real | The default value for *morris_delta()* is *p*/2\[(*p*-1)\]. The value supplied for this variable must be a multiple of 1/2\[(*p*-1)\]. No check is made to assure this is the case so users must take if specifying this argument |
-| *gsa_morris_obs_sen(true)* | Boolean | If supplied as *false*, PESTPP-SEN computes parameter sensitivities for the objective function only. If supplied as *true*, PESTPP-SEN computes parameter sensitivities for the objective function, as well as for each model output corresponding to observations featured in the “observation data” section of the PEST control file. |
-| *tie_by_group(false)* | Boolean | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected. |
-| *enforce_tied_bounds(false)* | Boolean | Flag to enforce parameter bounds on any tied parameters |
+| Control variable         | Type         | Role                                                                                                                                                                                                                                                                                                                                |
+|------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *gsa_method(morris)*         | text             | Methods are “morris” and “sobol”.                                                                                                                                                                                                                                                                                                       |
+| *rand_seed(358183147)*       | unsigned integer | Seed for the random number generator.                                                                                                                                                                                                                                                                                                   |
+| *gsa_morris_r(4)*            | integer          | Sample size. The number of times that an elementary effect is computed for each parameter. That is, the number of sequences of *m* model runs undertaken by PESTPP-SEN, where *m* is the number of adjustable parameters featured in the PEST control file.                                                                             |
+| *gsa_morris_p(4)*            | integer          | The number of levels employed to grid the interval \[0,1\] associated with each transformed parameter. The number of intervals into which \[0, 1\] is therefore subdivided is *p*-1.                                                                                                                                                    |
+| *gsa_morris_delta()*         | real             | The default value for *morris_delta()* is *p*/2\[(*p*-1)\]. The value supplied for this variable must be a multiple of 1/2\[(*p*-1)\]. No check is made to assure this is the case so users must take if specifying this argument                                                                                                       |
+| *gsa_morris_obs_sen(true)*   | Boolean          | If supplied as *false*, PESTPP-SEN computes parameter sensitivities for the objective function only. If supplied as *true*, PESTPP-SEN computes parameter sensitivities for the objective function, as well as for each model output corresponding to observations featured in the “observation data” section of the PEST control file. |
+| *tie_by_group(false)*        | Boolean          | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected.                                                                                 |
+| *enforce_tied_bounds(false)* | Boolean          | Flag to enforce parameter bounds on any tied parameters                                                                                                                                                                                                                                                                                 |
 
 Table 7.1 Variables used by PESTPP-SEN to control the operation of the Method of Morris.
 
@@ -2988,12 +3028,12 @@ V<sub>T</sub> = V<sub>T</sub>(y) = sum<sub>i</sub>(V<sub>i</sub>) + sum<sub>i</s
 
 where
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`V_{i} = V\left( E\left( y|x_{i} \right) \right)` " title="\Large `V_{i} = V\left( E\left( y|x_{i} \right) \right)`" />  (7.4)  <br>
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`V_{ij} = V\left( E\left( y|x_{i},x_{j} \right) \right) - V_{i} - V_{j}\ ` " title="\Large `V_{ij} = V\left( E\left( y|x_{i},x_{j} \right) \right) - V_{i} - V_{j}\ `" />  (7.5)  <br>
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`V_{ijk} = V\left( E\left( y|x_{i},x_{j},x_{k} \right) \right) - V_{i} - V_{j} - V_{k} - V_{ij} - V_{ik} - V_{jk}\ ` " title="\Large `V_{ijk} = V\left( E\left( y|x_{i},x_{j},x_{k} \right) \right) - V_{i} - V_{j} - V_{k} - V_{ij} - V_{ik} - V_{jk}\ `" />  (7.6)  <br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{i} = V\left( E\left( y|x_{i} \right) \right) " title="\Large V_{i} = V\left( E\left( y|x_{i} \right) \right)" />  (7.4)  <br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{ij} = V\left( E\left( y|x_{i},x_{j} \right) \right) - V_{i} - V_{j}\  " title="\Large V_{ij} = V\left( E\left( y|x_{i},x_{j} \right) \right) - V_{i} - V_{j}\ " />  (7.5)  <br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{ijk} = V\left( E\left( y|x_{i},x_{j},x_{k} \right) \right) - V_{i} - V_{j} - V_{k} - V_{ij} - V_{ik} - V_{jk}\  " title="\Large V_{ijk} = V\left( E\left( y|x_{i},x_{j},x_{k} \right) \right) - V_{i} - V_{j} - V_{k} - V_{ij} - V_{ik} - V_{jk}\ " />  (7.6)  <br>
 etc.
 
-In the above equations, the expression $`V\left( E\left( y|x_{i} \right) \right)`$ should be interpreted as “the variance with respect to *x<sub>i</sub>* of the expected value of *y*, with the latter calculated at multiple values at which *x<sub>i</sub>* is fixed while every other parameter is varied”. Similar interpretations apply to higher order terms in the above equations. *V<sub>i</sub>* expresses the so-called “first order” dependence of *y* on *x<sub>i</sub>*. Meanwhile, *V<sub>ij</sub>* expresses the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* together; note that the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* individually is subtracted from the first term on the right of this equation in order to obtain the collective variance.
+In the above equations, the expression $V\left( E\left( y|x_{i} \right) \right)$ should be interpreted as “the variance with respect to *x<sub>i</sub>* of the expected value of *y*, with the latter calculated at multiple values at which *x<sub>i</sub>* is fixed while every other parameter is varied”. Similar interpretations apply to higher order terms in the above equations. *V<sub>i</sub>* expresses the so-called “first order” dependence of *y* on *x<sub>i</sub>*. Meanwhile, *V<sub>ij</sub>* expresses the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* together; note that the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* individually is subtracted from the first term on the right of this equation in order to obtain the collective variance.
 
 Application of the Method of Sobol culminates in the calculation of so-called “sensitiv­ity indices”. The first order sensitivity index for parameter *i*, (i.e., *S<sub>i</sub>*), is defined as the ratio of its first order variance to the total variance of *y*. That is
 
@@ -3021,13 +3061,13 @@ Notwithstanding its ability to provide a comprehensive characterization of the r
 
 PEST++ variables which control the operation of the Method of Sobol are listed in the following table. As for variables which control PESTPP-SEN’s implementation of the Method of Morris, these must be provided on “++” lines within a PEST control file.
 
-| Control variable | Type | Role |
-|----|----|----|
-| *gsa_method(sobol)* | text | Select “sobol” to implement Method of Sobol. |
-| *rand_seed(358183147)* | unsigned integer | Seed for the random number generator. |
-| *gsa_sobol_samples()* | integer | The number of samples to use in computing variances. The number of model runs is actually twice this number because of the need to employ two series of parameter samples. See Saltelli et al (2008) for details. |
-| *gsa_sobol_par_dist()* | text | Specifies whether parameter samples should be drawn from a uniform or normal distribution. Values are “unif” or “norm” respectively. In the latter case, samples are centered on parameter values provided in the PEST control file, while the standard deviation is a quarter of the difference between a parameter’s upper and lower bounds. Log-uniform and log-normal distributions are employed for parameters which are denoted as log-transformed in the PEST control file. |
-| *tie_by_group(false)* | Boolean | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected. |
+| Control variable   | Type         | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|------------------------|------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *gsa_method(sobol)*    | text             | Select “sobol” to implement Method of Sobol.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| *rand_seed(358183147)* | unsigned integer | Seed for the random number generator.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| *gsa_sobol_samples()*  | integer          | The number of samples to use in computing variances. The number of model runs is actually twice this number because of the need to employ two series of parameter samples. See Saltelli et al (2008) for details.                                                                                                                                                                                                                                                                  |
+| *gsa_sobol_par_dist()* | text             | Specifies whether parameter samples should be drawn from a uniform or normal distribution. Values are “unif” or “norm” respectively. In the latter case, samples are centered on parameter values provided in the PEST control file, while the standard deviation is a quarter of the difference between a parameter’s upper and lower bounds. Log-uniform and log-normal distributions are employed for parameters which are denoted as log-transformed in the PEST control file. |
+| *tie_by_group(false)*  | Boolean          | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected.                                                                                                                                                                                                                            |
 
 Table 7.2 Variables used by PESTPP-SEN to control the operation of the Method of Sobol.
 
@@ -3035,21 +3075,21 @@ Table 7.2 Variables used by PESTPP-SEN to control the operation of the Method of
 
 PESTPP-SEN writes the following output files. It is assumed that the filename base of the PEST control file on which global sensitivity analysis is based is named *case.pst*.
 
-| File | Contents |
-|----|----|
-| *case.msn* | Method of Morris only. Lists method of Morris outputs (*μ*, *μ*\* and *σ*) for each adjustable parameter. The model-generated quantity for which these provide sensitivity measures is the objective function. This is calculated using equation 3.3 and relies on weights. |
-| *case.group.msn* | Method of Morris only. Lists method of Morris outputs (*μ*, *μ*\* and *σ*) for each adjustable parameter to each observation group’s objective function contribution. This metric relies on weights. . |
-| *case.mio* | Method of Morris only. This CSV-format file is recorded if the *morris_obs_sen()* control variable is set to *true* (the default). It records *μ*, *μ*\* and *σ* for all model outputs (i.e., observations) featured in the “observation data” section of the PEST control file. |
-| *case.raw.csv* | Method of Morris only. Lists parameter values and objective functions for all model runs. |
-| *case.group.raw.csv* | Method of Morris only. Lists parameter values and observation group objective function contributions for all model runs. This objective function value relies on weights. |
-| *case.sobol.si,csv* | Sobol only. Listing of first-order sensitivity indices for each observation-parameter pair |
-| *case.sobol.sti.csv* | Sobol only. Listing of total sensitivity indices for each observation-parameter pair |
-| *Case.sobol.obs.csv* | Sobol only. Listing of all observations from running the model through the sobol sequence |
-| *Case.sobol.par.csv* | Sobol only. Listing of all parameter sets used to run the sobol sequence |
-| *case.sbl* | Method of Sobol only. Lists first order and total sensitivity indices for all model outputs listed in the “observation data” section of the PEST control file with respect to all adjustable parameters listed in the “parameter data” section of the PEST control file. |
-| *case.rmr* | Parallel run management record. This file is written if model runs are conducted in parallel. |
-| *Case.sen.par.csv* | Morris only. Lists the parameter sets used to run the model. |
-| *case.rns* | Binary file used for model run management. |
+| File             | Contents                                                                                                                                                                                                                                                                     |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *case.msn*           | Method of Morris only. Lists method of Morris outputs (*μ*, *μ*\* and *σ*) for each adjustable parameter. The model-generated quantity for which these provide sensitivity measures is the objective function. This is calculated using equation 3.3 and relies on weights.      |
+| *case.group.msn*     | Method of Morris only. Lists method of Morris outputs (*μ*, *μ*\* and *σ*) for each adjustable parameter to each observation group’s objective function contribution. This metric relies on weights. .                                                                           |
+| *case.mio*           | Method of Morris only. This CSV-format file is recorded if the *morris_obs_sen()* control variable is set to *true* (the default). It records *μ*, *μ*\* and *σ* for all model outputs (i.e., observations) featured in the “observation data” section of the PEST control file. |
+| *case.raw.csv*       | Method of Morris only. Lists parameter values and objective functions for all model runs.                                                                                                                                                                                        |
+| *case.group.raw.csv* | Method of Morris only. Lists parameter values and observation group objective function contributions for all model runs. This objective function value relies on weights.                                                                                                        |
+| *case.sobol.si,csv*  | Sobol only. Listing of first-order sensitivity indices for each observation-parameter pair                                                                                                                                                                                       |
+| *case.sobol.sti.csv* | Sobol only. Listing of total sensitivity indices for each observation-parameter pair                                                                                                                                                                                             |
+| *Case.sobol.obs.csv* | Sobol only. Listing of all observations from running the model through the sobol sequence                                                                                                                                                                                        |
+| *Case.sobol.par.csv* | Sobol only. Listing of all parameter sets used to run the sobol sequence                                                                                                                                                                                                         |
+| *case.sbl*           | Method of Sobol only. Lists first order and total sensitivity indices for all model outputs listed in the “observation data” section of the PEST control file with respect to all adjustable parameters listed in the “parameter data” section of the PEST control file.         |
+| *case.rmr*           | Parallel run management record. This file is written if model runs are conducted in parallel.                                                                                                                                                                                    |
+| *Case.sen.par.csv*   | Morris only. Lists the parameter sets used to run the model.                                                                                                                                                                                                                     |
+| *case.rns*           | Binary file used for model run management.                                                                                                                                                                                                                                       |
 
 Table 7.3 Files written by PESTPP-SEN. It is assumed that the name of the PEST control file is *case.pst*. Data elements in all of the above files are comma delimited.
 
@@ -3208,12 +3248,11 @@ The coefficients which are employed in formulating the objective function of equ
 The *opt_obj_func()* control variable provides three options for defining the objective function. The first is to supply the name of a prior information equation. This equation must feature all decision variables; the coefficients of these variables in the prior information equation become the coefficients *c<sub>i</sub>* of equation 8.4b. Alternatively, the name of a file can be provided. In this case PESTPP-OPT reads the coefficient associated with each decision variable from that file. The file must have two columns; entries on each line must be space, tab or comma-delimited. The first entry on each line must be the name of a decision variable while the second must be the coefficient associated with that variable. All decision variables featured in the PEST control file must appear in this external file. Any line that begins with the “#” character is treated as a comment and is therefore ignored. Figure 8.1 exemplifies such a file. The third option for the *opt_obj_func* input is to name an observation. This results in the objective function coefficients for the each of the decision variables to be taken from a row in the Jacobian matrix – that is, the objective coefficients are the sensitivities of each of the decision variables to the named observation.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 8.1 An external file whose name is supplied with the <em>opt_obj_func()</em> variable.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>~ decision_variable coefficient<br>
 pump_rate1 3.345<br>
 pump_rate2 3.034<br>
@@ -3225,6 +3264,8 @@ etc.<br></th>
 <tbody>
 </tbody>
 </table>
+
+Figure 8.1 An external file whose name is supplied with the *opt_obj_func()* variable.
 
 If the *opt_obj_func()* control variable is not provided in the PEST control file that is featured on the PESTPP-OPT command line, PESTPP-OPT assigns coefficients to decision variables itself; each is assigned a coefficient of 1.0.
 
@@ -3310,23 +3351,23 @@ PESTPP-OPT offers functionality for solving the chance-constrained SLP problem w
 
 Files recorded by PESTPP-OPT are listed in the following table. The contents of this table are based on the assumption that the PEST control file on which constrained optimization is based is named *case.pst*.
 
-| File | Contents |
-|----|----|
-| *case.rec* | The run record file. This file begins by echoing information provided in the PEST control file. It then records the history of the constrained optimization process undertaken by PESTPP-OPT. Optimization results are recorded at the end of this file. |
-| *case.par* | A parameter value file. This file records best parameters that have been calculated up to any stage in the constrained optimization process. Note that only the values of parameters which are identified as decision variables change from iteration to iteration. |
-| *case.N.par* | A parameter value file listing parameters calculated at the end of iteration *N* of the constrained optimization process. |
-| *case.res* | A residuals file, recorded at the end of the PESTPP-OPT constrained optimization process. This is identical to the file of the same named recorded by PESTPP-GLM at the end of an inversion process. Note that calibration-pertinent model outputs do not change from the beginning to the end of the constrained optimization process, as parameters that are not decision variables are not altered by PESTPP-OPT. However, model outputs to which constraints are applied change as decision variables are updated. |
-| *case.N.jcb.rei* | A residuals file calculated using the values for decision variables used when evaluating the response/Jacobian matrix at the start of iteration N. |
-| *case.N.sim.rei* | A residuals file containing the modelled constraint values calculated using the optimal decision variables at the end of iteration N. Not written if solution is infeasible. |
-| *case.N.est.rei* | A residuals file containing the estimated constraint (from the linear program) using the optimal decision variables at the end of iteration N . Not written if solution is infeasible. |
-| *case.N.sim+fosm.rei* | A residuals value containing the modelled constraint values plus the chance constraint (FOSM) offset values at the end of iteration N. Only written if chance constraints are used. Not written if solution is infeasible. |
-| *case.N.est+fosm.rei* | A residuals value containing estimated constraint values plus the chance constraint (FOSM) offset values at the end of iteration N. Only written if the chance constraints are used. Not written if solution is infeasible. |
-| *case.log* | Performance log. This file is similar to those recorded by other members of the PEST++ suite. It records the times at which PESTPP-OPT began and ended various processing tasks. |
-| *case.coin_log* | Log of operations performed by the public domain SLP optimization algorithm. |
-| *case.rmr* | Parallel run management record file. This is recorded if PESTPP-OPT undertakes model runs in parallel. |
-| *case.rnj* | A binary file used for run management. |
-| *case.N.par_stack.csv* | Optional parameter stack saved each iteration |
-| *case.N.obs_stack.csv* | Optional observation stack saved each iteration |
+| File               | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *case.rec*             | The run record file. This file begins by echoing information provided in the PEST control file. It then records the history of the constrained optimization process undertaken by PESTPP-OPT. Optimization results are recorded at the end of this file.                                                                                                                                                                                                                                                               |
+| *case.par*             | A parameter value file. This file records best parameters that have been calculated up to any stage in the constrained optimization process. Note that only the values of parameters which are identified as decision variables change from iteration to iteration.                                                                                                                                                                                                                                                    |
+| *case.N.par*           | A parameter value file listing parameters calculated at the end of iteration *N* of the constrained optimization process.                                                                                                                                                                                                                                                                                                                                                                                              |
+| *case.res*             | A residuals file, recorded at the end of the PESTPP-OPT constrained optimization process. This is identical to the file of the same named recorded by PESTPP-GLM at the end of an inversion process. Note that calibration-pertinent model outputs do not change from the beginning to the end of the constrained optimization process, as parameters that are not decision variables are not altered by PESTPP-OPT. However, model outputs to which constraints are applied change as decision variables are updated. |
+| *case.N.jcb.rei*       | A residuals file calculated using the values for decision variables used when evaluating the response/Jacobian matrix at the start of iteration N.                                                                                                                                                                                                                                                                                                                                                                     |
+| *case.N.sim.rei*       | A residuals file containing the modelled constraint values calculated using the optimal decision variables at the end of iteration N. Not written if solution is infeasible.                                                                                                                                                                                                                                                                                                                                           |
+| *case.N.est.rei*       | A residuals file containing the estimated constraint (from the linear program) using the optimal decision variables at the end of iteration N . Not written if solution is infeasible.                                                                                                                                                                                                                                                                                                                                 |
+| *case.N.sim+fosm.rei*  | A residuals value containing the modelled constraint values plus the chance constraint (FOSM) offset values at the end of iteration N. Only written if chance constraints are used. Not written if solution is infeasible.                                                                                                                                                                                                                                                                                             |
+| *case.N.est+fosm.rei*  | A residuals value containing estimated constraint values plus the chance constraint (FOSM) offset values at the end of iteration N. Only written if the chance constraints are used. Not written if solution is infeasible.                                                                                                                                                                                                                                                                                            |
+| *case.log*             | Performance log. This file is similar to those recorded by other members of the PEST++ suite. It records the times at which PESTPP-OPT began and ended various processing tasks.                                                                                                                                                                                                                                                                                                                                       |
+| *case.coin_log*        | Log of operations performed by the public domain SLP optimization algorithm.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| *case.rmr*             | Parallel run management record file. This is recorded if PESTPP-OPT undertakes model runs in parallel.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| *case.rnj*             | A binary file used for run management.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| *case.N.par_stack.csv* | Optional parameter stack saved each iteration                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| *case.N.obs_stack.csv* | Optional observation stack saved each iteration                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 Table 8.1 PESTPP-OPT output files. It is assumed that the name of the PEST control file is *case.pst*.
 
@@ -3336,28 +3377,28 @@ Table 8.2 tabulates PEST++ control variables used by PESTPP-OPT. All of these ar
 
 Note also that the number of control variables may change with time. Refer to the PEST++ web site for variables used by the latest version of PESTPP-OPT.
 
-| Variable | Type | Role |
-|----|----|----|
-| *opt_dec_var_groups()* | text | Comma-delimited string identifying which parameter groups are to be treated as decision variables. If not supplied, all adjustable parameters are treated as decision variables. |
-| *opt_external_dec_var_groups()* | text | Comma-delimited string identifying which parameter groups are to be treated as "external" decision variables, that is decision variables that do not influence model outputs and that therefore do not require a finite-difference run of the model to fill the pertinent column of the response matrix. |
-| *opt_constraint_groups()* | text | Comma- delimited string identifying which observation and prior information groups are to be treated as constraints. Group names for "less than" constraints must start with "l\_" or “less\_”; group names for "greater than" constraints must start with "g\_" or “greater\_”. If this control variable is omitted, all observation and prior information groups that meet these naming conventions are treated as constraints. |
-| *opt_obj_func()* | text | String identifying the prior information equation or two-column ASCII file that contains coefficients used in formulation of the objective function (see equation 8.4). If this control variable is not supplied, then each decision variable is given a coefficient of 1.0 in formulation of the objective function. |
-| *opt_direction(min)* | text | Either "min" or "max". “min” specifies that the objective function be minimized, while “max” specifies that it be maximized. |
-| *opt_risk(0.5)* | real | A number between 0.0 and 1.0. A value of 0.5 signifies risk neutrality. A value of 0.95 seeks a 95% risk averse application of optimization constraints, while a value of 0.05 seeks a 5% risk tolerant application of optimization constraints. |
-| *opt_recalc_chance_every(1)* | integer | Number of iterations of the SLP process over which chance constraints are re-used. If set to 1, a calibration Jacobian matrix is calculated during every iteration of the SLP constrained optimization process if fosm-based chance constraints are used or the stack is re-evaluated if stack-based chance constraints are being used |
-| *parcov()* | text | Provide the name of a JCO, JCB, UNC or COV file from which the prior covariance matrix used in FOSM analysis is read. |
-| *par_sigma_range(4.0)* | real | The difference between a parameter’s upper and lower bounds expressed as standard deviations. |
-| *opt_iter_toll(0.001)* | real | Solution closure criterion applied to objective function and decision variables. |
-| *base_jacobian()* | text | Provide the name of a Jacobian matrix file (with extension *.jco* or *.jcb*). Sensitivities read from this file are used for the first iteration of the constrained optimization process. |
-| *hotstart_resfile()* | text | The name of a residuals file produced by PESTPP-GLM or PESTPP-OPT. PESTPP-OPT assumes that model output values contained in this file correspond to the values of parameters (including decision variables) listed in the PEST control file. Hence it does not carry out the initial model run. |
-| *opt_coin_log(1)* | integer | Level of verbosity of solution information recorded by optimization library functions. |
-| *opt_std_weights(false)* | Boolean | Flag that identifies constraint weights as standard deviations. If set to *true*, PESTPP-OPT skips FOSM-based constraint uncertainty calculation and uses observation weights directly as standard deviations in the calculation of risk. These standard deviations can be calculated externally via PREDUNC or pyEMU, or can be derived empirically from an ensemble. Setting this flag to true will override all other chance constraint flags and options. |
-| *opt_skip_final(false)* | Boolean | Flag to skip the final model run. |
-| *tie_by_group(false)* | Boolean | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected. |
-| *enforce_tied_bounds(false)* | Boolean | Flag to enforce parameter bounds on any tied parameters |
-| *opt_stack_size(0)* | integer | Number of realizations to use in the stack. If positive, stack-based chance constraints are used. If *opt_par_stack* is not supplied, *opt_stack_size* realizations are drawn from the Prior. If *opt_par_stack* is supplied and the stack in that file is larger than *opt_stack_size*, the stack is truncated to *opt_stack_size*. |
-| *opt_par_stack()* | string | File containing a parameter stack. The file extension is used to determining CSV for binary (JCB) format. The stack in this file must constrain all adjustable parameters. |
-| *opt_obs_stack()* | string | File containing an observation stack. The file extension is used to determining CSV for binary (JCB) format. Supplying this file will forego evaluating the stack for the first iteration and possibly subsequent iterations depending on the value if *opt_recalc_chance_every* |
+| Variable                    | Type | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+|---------------------------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *opt_dec_var_groups()*          | text     | Comma-delimited string identifying which parameter groups are to be treated as decision variables. If not supplied, all adjustable parameters are treated as decision variables.                                                                                                                                                                                                                                                                              |
+| *opt_external_dec_var_groups()* | text     | Comma-delimited string identifying which parameter groups are to be treated as "external" decision variables, that is decision variables that do not influence model outputs and that therefore do not require a finite-difference run of the model to fill the pertinent column of the response matrix.                                                                                                                                                      |
+| *opt_constraint_groups()*       | text     | Comma- delimited string identifying which observation and prior information groups are to be treated as constraints. Group names for "less than" constraints must start with "l\_" or “less\_”; group names for "greater than" constraints must start with "g\_" or “greater\_”. If this control variable is omitted, all observation and prior information groups that meet these naming conventions are treated as constraints.                             |
+| *opt_obj_func()*                | text     | String identifying the prior information equation or two-column ASCII file that contains coefficients used in formulation of the objective function (see equation 8.4). If this control variable is not supplied, then each decision variable is given a coefficient of 1.0 in formulation of the objective function.                                                                                                                                         |
+| *opt_direction(min)*            | text     | Either "min" or "max". “min” specifies that the objective function be minimized, while “max” specifies that it be maximized.                                                                                                                                                                                                                                                                                                                                  |
+| *opt_risk(0.5)*                 | real     | A number between 0.0 and 1.0. A value of 0.5 signifies risk neutrality. A value of 0.95 seeks a 95% risk averse application of optimization constraints, while a value of 0.05 seeks a 5% risk tolerant application of optimization constraints.                                                                                                                                                                                                              |
+| *opt_recalc_chance_every(1)*    | integer  | Number of iterations of the SLP process over which chance constraints are re-used. If set to 1, a calibration Jacobian matrix is calculated during every iteration of the SLP constrained optimization process if fosm-based chance constraints are used or the stack is re-evaluated if stack-based chance constraints are being used                                                                                                                        |
+| *parcov()*                      | text     | Provide the name of a JCO, JCB, UNC or COV file from which the prior covariance matrix used in FOSM analysis is read.                                                                                                                                                                                                                                                                                                                                         |
+| *par_sigma_range(4.0)*          | real     | The difference between a parameter’s upper and lower bounds expressed as standard deviations.                                                                                                                                                                                                                                                                                                                                                                 |
+| *opt_iter_toll(0.001)*          | real     | Solution closure criterion applied to objective function and decision variables.                                                                                                                                                                                                                                                                                                                                                                              |
+| *base_jacobian()*               | text     | Provide the name of a Jacobian matrix file (with extension *.jco* or *.jcb*). Sensitivities read from this file are used for the first iteration of the constrained optimization process.                                                                                                                                                                                                                                                                     |
+| *hotstart_resfile()*            | text     | The name of a residuals file produced by PESTPP-GLM or PESTPP-OPT. PESTPP-OPT assumes that model output values contained in this file correspond to the values of parameters (including decision variables) listed in the PEST control file. Hence it does not carry out the initial model run.                                                                                                                                                               |
+| *opt_coin_log(1)*               | integer  | Level of verbosity of solution information recorded by optimization library functions.                                                                                                                                                                                                                                                                                                                                                                        |
+| *opt_std_weights(false)*        | Boolean  | Flag that identifies constraint weights as standard deviations. If set to *true*, PESTPP-OPT skips FOSM-based constraint uncertainty calculation and uses observation weights directly as standard deviations in the calculation of risk. These standard deviations can be calculated externally via PREDUNC or pyEMU, or can be derived empirically from an ensemble. Setting this flag to true will override all other chance constraint flags and options. |
+| *opt_skip_final(false)*         | Boolean  | Flag to skip the final model run.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| *tie_by_group(false)*           | Boolean  | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected.                                                                                                                                                                                                       |
+| *enforce_tied_bounds(false)*    | Boolean  | Flag to enforce parameter bounds on any tied parameters                                                                                                                                                                                                                                                                                                                                                                                                       |
+| *opt_stack_size(0)*             | integer  | Number of realizations to use in the stack. If positive, stack-based chance constraints are used. If *opt_par_stack* is not supplied, *opt_stack_size* realizations are drawn from the Prior. If *opt_par_stack* is supplied and the stack in that file is larger than *opt_stack_size*, the stack is truncated to *opt_stack_size*.                                                                                                                          |
+| *opt_par_stack()*               | string   | File containing a parameter stack. The file extension is used to determining CSV for binary (JCB) format. The stack in this file must constrain all adjustable parameters.                                                                                                                                                                                                                                                                                    |
+| *opt_obs_stack()*               | string   | File containing an observation stack. The file extension is used to determining CSV for binary (JCB) format. Supplying this file will forego evaluating the stack for the first iteration and possibly subsequent iterations depending on the value if *opt_recalc_chance_every*                                                                                                                                                                              |
 
 Table 8.2 PESTPP-OPT control variables. Parallel run management variables can be supplied in addition to these. See section 5.3.6.
 
@@ -3500,12 +3541,11 @@ Calculating an empirical cross-covariance between large numbers of parameters an
 PESTPP-IES supports localization through use of a localization matrix. This matrix has rows that are observation names and/or observation group names, and columns that are parameter names and/or parameter group names. Elements of the matrix should range between 0.0 and 1.0. Figure 9.1 shows an example localization matrix. In this example, a mixture of observation names and an observation group (“flx_river”) are used for row names while parameter group names are used for column names. Parameter groups “r1” and “w1” represent future recharge and pumping, respectively. In this example, the localization matrix “zeros out” any spurious sensitivity between historical observations and future recharge and pumping. If a localization matrix is specified, PESTPP-IES builds up the upgrade matrices for each lambda value sequentially by each row of the localization matrix.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 9.1. An example localization matrix.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>4 5 2<br>
 1.0 1.0 0.0 1.0 0.0<br>
 1.0 1.0 0.0 1.0 0.0<br>
@@ -3527,6 +3567,8 @@ w1<br></th>
 <tbody>
 </tbody>
 </table>
+
+Figure 9.1. An example localization matrix.
 
 When applying localization in a history-matching problem involving large numbers of parameters and observations, a user may wish to define a “local” neighbourhood around each observation location wherein parameters are expected to influence the simulated counterparts to observations. This, in effect, creates a series of “local” history-matching problems using subsets of adjustable parameters and observations. The number of degrees of freedom featured in each local problem can be relatively high, this allowing a small ensemble size to better reproduce large numbers of independent observations. Localization also provides protection against “spurious” (non-plausible) correlations between parameters and observations arising from the limited size of parameter ensembles. For example, standard methods of covariance calculation may suggest a correlation between a pumping rate parameter and a head that precedes it in time. Spurious correlations of this type can lead to parameter compensation and predictive bias. See Chen and Oliver (2016) for a good description of the theory and practice of localization.
 
@@ -3574,19 +3616,17 @@ The theory that underpins PEST, PESTPP-GLM and PESTPP-IES is designed to seek a 
 
 To that end, and following the work of Zhang and others (2018), PESTPP-IES implements a multi-modal solution process. In essence, this solution process calculates the upgrade vector for each realization sequentially, using only realizations that are in the neighborhood of the current realization. The neighborhood is defined by two metrics: relative Euclidean distance in parameter space and relative objective function value. In this way, each realization uses an upgrade direction based on the approximate Jacobian matrix informed only by nearby realizations that have a relatively low objective function value. This allows each realization to move in a different upgrade direction, compared to the standard ies solution process that calculates upgrade magnitude and direction from the approximate Jacobian using all realizations simultaneously. This is depicted on Figure 9.1, where the posterior is a circle yielding an infinite number of posterior modes.
 
-<figure>
 <img src="./media/image4.png" style="width:6in;height:3in" alt="Chart, scatter chart Description automatically generated" />
-<figcaption>Figure 9.1 – A demonstration of the multi-modal upgrade process (B) using the example problem from Zhang and others (2018) compared to the standard solution (A). During the first iteration upgrade process, the upgrade for red-dot realization uses only realizations in the local parameter space/low objective function neighborhood (cyan dots) out of the entire ensemble (grey dots). This upgrade yields the magenta location, very near the target circle, compared to the nearly no movement from the standard solution (A).<br></figcaption>
-</figure>
+
+Figure 9.1 – A demonstration of the multi-modal upgrade process (B) using the example problem from Zhang and others (2018) compared to the standard solution (A). During the first iteration upgrade process, the upgrade for red-dot realization uses only realizations in the local parameter space/low objective function neighborhood (cyan dots) out of the entire ensemble (grey dots). This upgrade yields the magenta location, very near the target circle, compared to the nearly no movement from the standard solution (A).
 
 It is important to note that more realizations will be required in the PESTPP-IES solution process when using multi-modal upgrades. This is so an effectively local group of realizations can be found for each realizations upgrade that a) capture the local objective function behavior and b) the local group has enough realizations to resolve the important relations between pars and obs. The size of the local group of realizations is controlled by the *ies_multimodal_alpha* argument, which ranges between 0 and 1 and is the fraction of the total ensemble to use for the local group of realizations. Smaller values of *ies_multimodal_alpha* will result in more local groups of realizations but at the expense of these groups being smaller in number. A value between 0.1 and0.25 seems to work well for a limited number of test cases. Note that as of version 5.2.0, the multi-modal solution process is multithreaded and uses the *ies_num_threads* option; some early testing indicates that 10-15 threads on a high performance laptop is reasonable.
 
 Closely related to the multimodal solution process is the use of a “weights” ensemble with PESTPP-IES. Through the *ies_weight_ensemble* argument, users can specify unique weight vectors for each realization. This argument can only be used with the multimodal solution process and allows the upgrade of each realization use a unique weighting scheme. In this way, PESTP-IES can be used to explore how different weighting scheme impact the posterior results. This functionality is demonstrated on the ZDT1 bi-objective optimization benchmark in Figure 9.2
 
-<figure>
 <img src="./media/image5.png" style="width:5in;height:5in" alt="Chart, scatter chart Description automatically generated" />
-<figcaption>Figure 9.2 – A demonstration of the multi-modal solution process using a weight ensemble on the ZDT1 benchmark problem. The standard solution process using single weight vector drives the posterior towards a single point, while the multi-modal upgrade process uses unique weights on each of the two objectives (observations in the control file) such that each realization targets a different point on the trade-off between the two objectives.<br></figcaption>
-</figure>
+
+Figure 9.2 – A demonstration of the multi-modal solution process using a weight ensemble on the ZDT1 benchmark problem. The standard solution process using single weight vector drives the posterior towards a single point, while the multi-modal upgrade process uses unique weights on each of the two objectives (observations in the control file) such that each realization targets a different point on the trade-off between the two objectives.
 
 ### <a id='s13-1-15' />9.1.15 Covariance Reinflation
 
@@ -3608,10 +3648,9 @@ This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. 
 
 Figure 9.3 shows how the reinflation cycles can mitigate variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
 
-<figure>
 <img src="./media/image6.emf" style="width:6.28022in;height:3.83791in" />
-<figcaption>Figure 9.3 – A contrived example showing how standard and reinflation iterations compare. Standard iterations (A/D) quickly collapse, (B/E) using a reinflation with 1 polish iteration yields a high parameter posterior variance, especially for hydraulic conductivity. (C/F) A reinflation at iteration 4 followed by several additional iterations yields nearly the same posterior as standard iterations for this simple mildly nonlinear problem.<br></figcaption>
-</figure>
+
+Figure 9.3 – A contrived example showing how standard and reinflation iterations compare. Standard iterations (A/D) quickly collapse, (B/E) using a reinflation with 1 polish iteration yields a high parameter posterior variance, especially for hydraulic conductivity. (C/F) A reinflation at iteration 4 followed by several additional iterations yields nearly the same posterior as standard iterations for this simple mildly nonlinear problem.
 
 ## <a id='s13-2' />9.2 Using PESTPP-IES
 
@@ -3711,17 +3750,16 @@ The situation is different, however, when many parameter fields comprising an en
 
 The number of realizations that comprise the ensemble subset used for lambda testing is set by the value of the *ies_subset_size()* control variable, which is given a default value of -10, which indicates to use 10% of the current number of realizations for subset testing; experience has shown this is a pretty good default value in most cases. During each iteration of the ensemble smoother process, values of the Marquardt lambda used for testing realization upgrades are determined by applying a set of multipliers to the best lambda found during the previous iteration. These multipliers are provided through the *ies_lambda_mults()* control variable. A comma separated list of multipliers should be supplied by the user as arguments to this keyword; at least one of these multipliers should be less than 1.0 while, or course, one of them should be greater than 1.0. Line search factors (otherwise known as scale factors) that are applied to each of these lambdas can also be supplied. If so, this is done through the *lambda_scale_fac()* control variable, the same variable that is used by PESTPP-GLM. As for *ies_lambda_mults()*, scale factors should be supplied as a comma-separated list of numbers spanning a range from below 1.0 to greater than 1.0. The total number of model runs required to test parameter upgrades during a given iteration is thus *ies_subset_size()* times the number of multipliers supplied with the *ies_lambda_mults()* control variable times the number of factors supplied with the *lambda_scale_fac()* control variable.
 
-The value of the Marquardt lambda to use during the first iteration of the ensemble smoother process can be supplied through the *ies_initial_lambda()* control variable. Lambda multipliers supplied through *ies_lambda_mults()* are applied to this value during the first iteration of this process. The PESTPP-IES default value for *ies_initial_lambda()* is $`10^{floor\left( \log_{10}\frac{\mu_{Փ}}{2n} \right)}`$ where *μ*<sub>Փ</sub> is the mean of objective functions achieved using realizations comprising the initial ensemble, and *n* is the number of non-zero-weighted observations featured in the “observation data” section of the PEST control file.
+The value of the Marquardt lambda to use during the first iteration of the ensemble smoother process can be supplied through the *ies_initial_lambda()* control variable. Lambda multipliers supplied through *ies_lambda_mults()* are applied to this value during the first iteration of this process. The PESTPP-IES default value for *ies_initial_lambda()* is $10^{floor\left( \log_{10}\frac{\mu_{Փ}}{2n} \right)}$ where *μ*<sub>Փ</sub> is the mean of objective functions achieved using realizations comprising the initial ensemble, and *n* is the number of non-zero-weighted observations featured in the “observation data” section of the PEST control file.
 
 Suppose for example that the following lines appear in a PESTPP-IES control file.
 
 <div style="text-align: left"><table>
-</div><caption>Figure 9.2 Part of a PESTPP-IES control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>++ ies_initial_lambda(100)<br>
 ++ ies_subset_size(4)<br>
 ++ ies_lambda_mults(0.1,1.0,10.0)<br>
@@ -3731,6 +3769,8 @@ Suppose for example that the following lines appear in a PESTPP-IES control file
 <tbody>
 </tbody>
 </table>
+
+Figure 9.2 Part of a PESTPP-IES control file.
 
 From figure 9.1, the initial value of the Marquardt lambda is 100.0. During each iteration of the ensemble smoother process, PESTPP-IES employs three values of the Marquardt lambda, these being equal to 0.1, 1.0 and 10 times the value of the best Marquardt lambda from the previous iteration (or the initial Marquardt lambda in the first iteration). PESTPP-IES selects the first 4 realizations from the parameter ensemble and calculates updated parameter fields using these 3 Marquardt lambdas. It also calculates parameter upgrades corresponding to lengths along these lambda upgrade directions of 0.9 and 1.1 times that which is calculated using the Marquardt lambda alone (this corresponding to a line search factor of 1.0). Hence PESTPP‑IES commits a total 36 model runs to establishing the best value of lambda and the best line search factor.
 
@@ -3792,7 +3832,9 @@ The “actual” objective function is calculated using the current simulated ou
 
 The importance of designing a composite objective function that emphasizes various components of multiple types of observations is a key to success in predictive environmental simulation. Typically, when using PESTPP-IES, this action requires users to run the prior parameter ensemble, stop PESTPP-IES, do some calculations/scripting to “balance” the objective function using the observed data, current weights in the control file, and the simulated results for the prior parameter ensemble. This step can be burdensome and potentially error prone. Therefore, PESTPP-IES allows users to option to have the objective function “balancing” done internally at runtime – isn’t that nice!
 
-The internal weight adjustment process is activated with the *ies_phi_factor_file* option. This option is string which should identify a filename. This filename should have two column and no header – the columns can be comma and/or whitespace delimited. The first column is “tag” – a group of letters and numbers that is used to identify observation groups that have non-zero weighted observations. These groups are identified by the tag if they contain the tag in a sub-string sense. In this way users can “regroup” multiple observation groups into a single “weighting group”. The second column of the *ies_phi_factor_file* is a strictly positive floating point number, which is the phi factor, which represent the portion (or factor) of the existing/current mean measurement phi (that is, the noisy observation phi) that the weighting group should occupy. Note that each non-zero weighted observation group must be identified by one and only one tag and PESTPP-IES will exit with an error message is this condition is not met.
+The internal weight adjustment process is activated with the *ies_phi_factor_file* option. This option is a string which should identify a filename. This filename should identify a file that has two column and no header – the columns can be comma and/or whitespace delimited. The first column is “tag” – a group of letters and numbers that is used to identify observation groups that have non-zero weighted observations. These groups are identified by the tag if they contain the tag in a sub-string sense. In this way users can “regroup” multiple observation groups into a single “weighting group”. The second column of the *ies_phi_factor_file* is a strictly positive floating point number, which is the phi factor, which represent the portion (or factor) of the existing/current mean measurement phi (that is, the noisy observation phi) that the weighting group should occupy. Note that each non-zero weighted observation group must be identified by one and only one tag and PESTPP-IES will exit with an error message is this condition is not met.
+
+By default, the residuals from the mean of the ensemble are used to calculate the weight adjustments. If a user has provided the *ies_center_on()* parameter, then the residuals for the realization (often the “base”) identified by *ies_center_on()* are used for rebalancing the weights.
 
 For example, let’s assume there are two primary observation types: heads and flows. There likely multiple observation groups that contain head observations (maybe one group per monitoring well) and multiple observation groups that contain flows (one group per gauge station). Furthermore, let’s assume that we want to balance the objective function so that it 75% heads and 25% flows. Let’s also assume that every observation group for heads contains the string “hds” (e.g. “hds_site1”, “hds_site2”) and for flows, “flowout” (e.g. “flowout_g1”,”flowout_g2). In this case, users need to make a simple ASCII file with two rows and two columns:
 
@@ -3824,22 +3866,22 @@ The *ies_csv_by_reals()* flag can be used to control how parameter and observati
 
 As always, it is assumed that the filename base of the PEST control file on which history-matching is based is named *case.pst*. *N* is used to signify iteration number in the following filenames. An iteration number of 0 corresponds to initial parameter fields and corresponding model outputs.
 
-| File | Contents |
-|----|----|
-| *case.N.par.csv/jcb* | Values of all parameters in all realizations comprising an ensemble. For N=0, this is the initial ensemble, sampled from the prior parameter probability distribution. Otherwise, it is the parameter realizations at the end of iteration N |
-| *case.N.obs.csv/jcb* | The ensemble of model outputs values which correspond to observations listed in the “observation data” section of the PEST control file. These are calculated using all realizations comprising the parameter ensemble. |
-| *case.obs+noise.csv/jcb* | Base observation values. These are calculated by generating realizations of measurement noise and adding this noise to measured values listed in the “observation data” section of the PEST control file. |
-| *case.N.L.lambda.F.scale.csv/jcb* | These files are produced if the *save_lambda_ensembles()* control variable is set to *true*. They record parameter values used in testing the effects of different Marquardt lambdas and line search factors. *L* is the value of the Marquardt lambda; *F* is the value of the line search factor. |
-| *case.phi.actual.csv* | Objective functions calculated during all iterations of the ensemble smoother process for all members of the ensemble. Objective functions are computed from differences between model outputs and measurements recorded in the “observation data” section of the PEST control file using weights that are also provided in this section. |
-| *case.phi.group.csv* | Objective function components pertaining to different observation groups calculated for all iterations of the ensemble smoother process. Progression of the regularization objective function is also recorded; this measures discrepancies between current and initial parameter values. Contributions by different parameter groups to the regularization objective function are also listed. |
-| *case.phi.meas.csv* | Objective functions calculated during all iterations of the ensemble smoother process for all members of the ensemble. Objective functions recorded in this file are computed from differences between model outputs calculated using different parameter realizations and corresponding observation realizations, i.e., measurements recorded in the “observation data” section of the PEST control file supplemented with realizations of measurement noise. |
-| *case.phi.regul.csv* | Regularization objective functions calculated during each iteration of the ensemble smoother process for all members of the ensemble. For a particular realization this is calculated using differences between current and initial parameter values. The weight applied to a particular difference is the inverse of the prior standard deviation of the parameter. |
-| *case.phi.composite.csv* | The composite objective function is the measurement objective function plus the regularization objective function multiplied by the value of the *regul_frac()* control variable. |
-| *case.N.autoadaloc.csv* | The (optional) automatic adaptive localization summary for each iteration |
-| *case.pdc.csv* | A summary of prior-data conflict information |
-| *case.N.pcs.csv* | A summary of parameter changes by group compared to the initial parameter ensemble. Note that these changes implicitly include changes in summary statistics resulting from realizations that are dropped or that fail to run. |
-| *case.rejected.N.obs.csv/jcb* | The ensemble of model output values which correspond to observations listed in the “observation data” section of the PEST control file from a “rejected”/failed upgrade solution iteration. |
-| *case.rejected.N.par.csv/jcb* | The ensemble of parameter values which correspond to parameters listed in the “parameterdata” section of the PEST control file from a “rejected”/failed upgrade solution iteration. |
+| File                          | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *case.N.par.csv/jcb*              | Values of all parameters in all realizations comprising an ensemble. For N=0, this is the initial ensemble, sampled from the prior parameter probability distribution. Otherwise, it is the parameter realizations at the end of iteration N                                                                                                                                                                                                                   |
+| *case.N.obs.csv/jcb*              | The ensemble of model outputs values which correspond to observations listed in the “observation data” section of the PEST control file. These are calculated using all realizations comprising the parameter ensemble.                                                                                                                                                                                                                                        |
+| *case.obs+noise.csv/jcb*          | Base observation values. These are calculated by generating realizations of measurement noise and adding this noise to measured values listed in the “observation data” section of the PEST control file.                                                                                                                                                                                                                                                      |
+| *case.N.L.lambda.F.scale.csv/jcb* | These files are produced if the *save_lambda_ensembles()* control variable is set to *true*. They record parameter values used in testing the effects of different Marquardt lambdas and line search factors. *L* is the value of the Marquardt lambda; *F* is the value of the line search factor.                                                                                                                                                            |
+| *case.phi.actual.csv*             | Objective functions calculated during all iterations of the ensemble smoother process for all members of the ensemble. Objective functions are computed from differences between model outputs and measurements recorded in the “observation data” section of the PEST control file using weights that are also provided in this section.                                                                                                                      |
+| *case.phi.group.csv*              | Objective function components pertaining to different observation groups calculated for all iterations of the ensemble smoother process. Progression of the regularization objective function is also recorded; this measures discrepancies between current and initial parameter values. Contributions by different parameter groups to the regularization objective function are also listed.                                                                |
+| *case.phi.meas.csv*               | Objective functions calculated during all iterations of the ensemble smoother process for all members of the ensemble. Objective functions recorded in this file are computed from differences between model outputs calculated using different parameter realizations and corresponding observation realizations, i.e., measurements recorded in the “observation data” section of the PEST control file supplemented with realizations of measurement noise. |
+| *case.phi.regul.csv*              | Regularization objective functions calculated during each iteration of the ensemble smoother process for all members of the ensemble. For a particular realization this is calculated using differences between current and initial parameter values. The weight applied to a particular difference is the inverse of the prior standard deviation of the parameter.                                                                                           |
+| *case.phi.composite.csv*          | The composite objective function is the measurement objective function plus the regularization objective function multiplied by the value of the *regul_frac()* control variable.                                                                                                                                                                                                                                                                              |
+| *case.N.autoadaloc.csv*           | The (optional) automatic adaptive localization summary for each iteration                                                                                                                                                                                                                                                                                                                                                                                      |
+| *case.pdc.csv*                    | A summary of prior-data conflict information                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| *case.N.pcs.csv*                  | A summary of parameter changes by group compared to the initial parameter ensemble. Note that these changes implicitly include changes in summary statistics resulting from realizations that are dropped or that fail to run.                                                                                                                                                                                                                                 |
+| *case.rejected.N.obs.csv/jcb*     | The ensemble of model output values which correspond to observations listed in the “observation data” section of the PEST control file from a “rejected”/failed upgrade solution iteration.                                                                                                                                                                                                                                                                    |
+| *case.rejected.N.par.csv/jcb*     | The ensemble of parameter values which correspond to parameters listed in the “parameterdata” section of the PEST control file from a “rejected”/failed upgrade solution iteration.                                                                                                                                                                                                                                                                            |
 
 Table 9.2 CSV and JCB files written by PESTPP-IES. It is assumed that the name of the PEST control file is *case.pst*.
 
@@ -3847,16 +3889,16 @@ Table 9.2 CSV and JCB files written by PESTPP-IES. It is assumed that the name o
 
 Non-CSV output files written by PESTPP-IES are listed in the following table.
 
-| File | Contents |
-|----|----|
-| *case.rec* | The run record file. This echoes information in the PEST control file, and then records a history of the ensemble smoother process. Note that parallel agents write “panther_worker.rec”. |
-| *case.rmr* | Parallel run management record. This file is written if model runs are conducted in parallel. |
-| *case.log* | Performance log. This file records the times at which various processing steps begin and end. |
-| *case.rns* | Binary file used for model run management. This file is typically removed after a successful PESTPP-IES run. |
-| *case.N.res.cov/.jcb* | (optional) residual covariance matrix saved each iteration. |
-| *case.N.autoadaloc.mat* | The (optional) localization matrix yielded by the automatic adaptive localization process |
-| *case.N.base.par* | The “base” realization parameter values for the Nth iteration in a PEST-style par file. Only written if the “base” realization is available. |
-| *case.N.base.rei* | The “base” realization simulated values for the Nth iteration in a PEST-style residuals file. Only written if the “base” realization is available. |
+| File                | Contents                                                                                                                                                                              |
+|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *case.rec*              | The run record file. This echoes information in the PEST control file, and then records a history of the ensemble smoother process. Note that parallel agents write “panther_worker.rec”. |
+| *case.rmr*              | Parallel run management record. This file is written if model runs are conducted in parallel.                                                                                             |
+| *case.log*              | Performance log. This file records the times at which various processing steps begin and end.                                                                                             |
+| *case.rns*              | Binary file used for model run management. This file is typically removed after a successful PESTPP-IES run.                                                                              |
+| *case.N.res.cov/.jcb*   | (optional) residual covariance matrix saved each iteration.                                                                                                                               |
+| *case.N.autoadaloc.mat* | The (optional) localization matrix yielded by the automatic adaptive localization process                                                                                                 |
+| *case.N.base.par*       | The “base” realization parameter values for the Nth iteration in a PEST-style par file. Only written if the “base” realization is available.                                              |
+| *case.N.base.rei*       | The “base” realization simulated values for the Nth iteration in a PEST-style residuals file. Only written if the “base” realization is available.                                        |
 
 Table 9.3 Non-CSV/JCB files written by PESTPP-IES. It is assumed that the name of the PEST control file is *case.pst*.
 
@@ -3867,314 +3909,315 @@ Table 9.4 lists PESTPP-IES control variables. All of these are optional. If a va
 Note also that the number of control variables may change with time. Refer to the PEST++ web site for variables used by the latest version of PESTPP-IES.
 
 <div style="text-align: left"><table>
-</div><caption>Table 9.4 PESTPP-IES control variables with default values. Parallel run management variables can be supplied in addition to these. See section 5.3.6.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 33%" />
 <col style="width: 14%" />
 <col style="width: 52%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th><strong>Variable</strong></th>
 <th><strong>Type</strong></th>
 <th><strong>Role</strong></th>
 </tr>
 </thead>
 <tbody>
-<tr>
+<tr class="odd">
 <td><em>ies_num_reals(50)</em></td>
 <td>integer</td>
 <td>The number of realizations to draw in order to form parameter and observation ensembles.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>parcov()</em></td>
 <td>text</td>
 <td>The name of a file containing the prior parameter covariance matrix. This can be a parameter uncertainty file (extension <em>.unc</em>), a covariance matrix file (extension <em>.cov</em>) or a binary JCO or JCB file (extension <em>.jco</em> or <em>.jcb</em>).</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>par_sigma_range(4.0)</em></td>
 <td>real</td>
 <td>The difference between a parameter’s upper and lower bounds expressed as standard deviations.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_parameter_ensemble()</em></td>
 <td>text</td>
 <td>The name of a CSV or JCO/JCB file (recognized by its extension) containing user-supplied parameter realizations comprising the initial (prior) parameter ensemble. If this keyword is omitted, PESTPP-IES generates the initial parameter ensemble itself.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_observation_ensemble()</em></td>
 <td>text</td>
 <td>The name of a CSV or JCO/JCB file (recognized by its extension) containing user-supplied observation plus noise realizations comprising the observation plus noise ensemble. If this keyword is omitted, PESTPP-IES generates the observation plus noise ensemble itself.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_add_base(true)</em></td>
 <td>Boolean</td>
 <td>If set to true, instructs PESTPP-IES to include a “realization” in the initial parameter ensemble comprised of parameter values read from the “parameter data” section of the PEST control file. The corresponding observation ensemble is comprised of measurements read from the “observation data” section of the PEST control file.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_restart_observation_ensemble()</em></td>
 <td>text</td>
 <td>The name of a CSV or JCO/JCB file (recognized by its extension) containing model outputs calculated using a parameter ensemble. If it reads this file, PESTPP-IES does not calculate these itself, proceeding to upgrade calculations instead.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_restart_parameter_ensemble()</em></td>
 <td>text</td>
 <td>The name of a CSV or JCO/JCB file (recognized by its extension) containing a parameter ensemble that corresponds to the <em>ies_restart_observation_ensemble()</em>. This option requires that the <em>ies_restart_observation_ensemble(</em>) control variable also be supplied. This ensemble is only used in the calculation of the regularization component of the objective function for a restarted PESTPP-IES analysis.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_enforce_bounds(true)</em></td>
 <td>Boolean</td>
 <td>If set to <em>true</em> PESTPP-IES will not transgress bounds supplied in the PEST control file when generating or accepting parameter realizations, and when adjusting these realizations.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_initial_lambda()</em></td>
 <td>real</td>
 <td>The initial Marquardt lambda. The default value is <span class="math inline">\(10^{floor\left( \log_{10}\frac{\mu_{Փ}}{2n} \right)}.\ \ \)</span>If supplied as a negative value, then the abs(ies_initial_lambda) is used as multiplier of the default initial-phi-based value.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_lambda_mults(0.1,1.0,10.0)</em></td>
 <td>comma-separated reals</td>
 <td>Factors by which to multiply the best lambda from the previous iteration to yield values for testing parameter upgrades during the current iteration.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>lambda_scale_fac(0.75,1.0,1.1)</em></td>
 <td>comma-separated reals</td>
 <td>Line search factors along parameter upgrade directions computed using different Marquardt lambdas.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_subset_size(4)</em></td>
 <td>integer</td>
 <td>Number of realizations used in testing and evaluation of different Marquardt lambdas. If supplied as a negative value, then abs(<em>ies_subset_size</em>) is treated as a percentage of the current ensemble size – this allows the subset size to fluctuate with the size of the ensemble</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_use_approx(true)</em></td>
 <td>Boolean</td>
 <td>Use complex or simple formula provided by Chen and Oliver (2013) for calculation of parameter upgrades. The more complex formula includes a function which constrains parameter realizations to respect prior means and probabilities.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_reg_factor(0.0)</em></td>
 <td>real</td>
 <td>Regularization objective function as a fraction of measurement objective function when constraining parameter realizations to respect initial values.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_bad_phi(1.0E300)</em></td>
 <td>real</td>
 <td>If the objective function calculated as an outcome of a model run is greater than this value, the model run is deemed to have failed.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_bad_phi_sigma(1.0E300)</em></td>
 <td>real</td>
 <td>If the objective function calculated for a given realization is greater than the current mean objective function of the ensemble plus the objective function standard deviation of the ensemble times <em>ies_bad_phi_sigma()</em>, that realization is treated as failed. If negative, its absolute value is treated as the upper quantile for identifying “bad” realizations.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_use_prior_scaling(false)</em></td>
 <td>Boolean</td>
 <td>Use a scaling factor based on the prior parameter distribution when evaluating parameter-to-model-output covariance used in calculation of the randomized Jacobian matrix.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_use_empirical_prior(false)</em></td>
 <td>Boolean</td>
 <td>Use an empirical, diagonal parameter covariance matrix for certain calculations. This matrix is contained in a file whose name is provided with the <em>ies_parameter_ensemble()</em> keyword.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>Ies_save_lambda_ensembles(false)</em></td>
 <td>Boolean</td>
 <td>Save a set of CSV or JCB files that record parameter realizations used when testing different Marquardt lambdas.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_verbose_level(1)</em></td>
 <td>0, 1 or 2</td>
 <td>The level of diagnostic output provided by PESTPP-IES. If set to 2, all intermediate matrices are saved to ASCII files. This can require a considerable amount of storage.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_accept_phi_fac(1.05)</em></td>
 <td>real &gt; 1.0</td>
 <td>The factor applied to the previous best mean objective function to determine if the current mean objective function is acceptable.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_lambda_dec_fac(0.75)</em></td>
 <td>real &lt; 1.0</td>
 <td>The factor by which to decrease the value of the Marquardt lambda during the next IES iteration if the current iteration of the ensemble smoother process was successful in lowering the mean objective function.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_lambda_inc_fac(10.0)</em></td>
 <td>real &gt; 1.0</td>
 <td>The factor by which to increase the current value of the Marquardt lambda for further lambda testing if the current lambda testing cycle was unsuccessful.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_subset_how(random)</em></td>
 <td>“first”,”last”,<br>
 ”random”,<br>
 ”phi_based<br></td>
 <td>How to select the subset of realizations for objective function evaluation during upgrade testing. Default is “random”.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_num_threads(-1)</em></td>
 <td>integer &gt; 1</td>
 <td>The number of threads to use during the localized upgrade solution process, the automatic adaptive localization process. If the localizer contains many (&gt;10K) rows, then multithreading can substantially speed up the upgrade calculation process. <em>ies_num_threads()</em> should not be greater than the number of physical cores on the host machine.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_localizer()</em></td>
 <td>text</td>
 <td>The name of a matrix to use for localization. The extension of the file is used to determine the type: <em>.mat</em> is an ASCII matrix file, <em>.jcb</em>/<em>.jco</em> signifies use of (enhanced) Jacobian matrix format (a binary format), while <em>.csv</em> signifies a comma-delimited file. Note that adjustable parameters not listed in localization matrix columns are implicitly treated as “fixed” while non-zero weighted observations not listed in rows of this matrix are implicitly treated as zero-weighted.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_group_draws(true)</em></td>
 <td>Boolean</td>
 <td>A flag to draw from the (multivariate) Gaussian prior by parameter/observation groups. This is usually a good idea since groups of parameters/observations are likely to have prior correlation.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_save_binary(false)</em></td>
 <td>Boolean</td>
 <td>A flag to save parameter and observation ensembles in binary (i.e., JCB) format instead of CSV format.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_csv_by_reals(true)</em></td>
 <td>Boolean</td>
 <td>A flag to save parameter and observation ensemble CSV files by realization instead of by variable name. If true, each row of the CSV file is a realization. If false, each column of the CSV file is a realization.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_autoadaloc(false)</em></td>
 <td>Boolean</td>
 <td>Flag to activate automatic adaptive localization.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_autoadaloc_sigma_dist(1.0)</em></td>
 <td>Real</td>
 <td>Real number representing the factor by which a correlation coefficient must exceed the standard deviation of background correlation coefficients to be considered significant. Default is 1.0</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>tie_by_group(false)</em></td>
 <td>Boolean</td>
 <td>Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_enforce_chglim(false)</em></td>
 <td>Boolean</td>
 <td>Flag to enforce parameter change limits (via FACPARMAX and RELPARMAX) in a way similar to PEST and PESTPP-GLM (by scaling the entire realization). Default is false.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_center_on()</em></td>
 <td>String</td>
 <td>A realization name that should be used for the ensemble center in calculating the approximate Jacobian matrix. The realization name must be in both the parameter and observation ensembles. If not passed, the mean vector is used as the center. The value “_MEDIAN_” can also be used, which instructs PESTPP-IES to use the median vector for calculating anomalies.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>enforce_tied_bounds(false)</em></td>
 <td>Boolean</td>
 <td>Flag to enforce parameter bounds on any tied parameters. Depending on the ration between the tied and free parameters, this option can greatly limit parameter changes.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_no_noise(false)</em></td>
 <td>Boolean</td>
 <td>Flag to not generate and use realizations of measurement noise. Default is False (that is, to use measurement noise).</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_drop_conflicts(false)</em></td>
 <td>Boolean</td>
 <td>Flag to remove non-zero weighted observations that are in a prior-data conflict state from the upgrade calculations. Default is False.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_pdc_sigma_distance()</em></td>
 <td>Real &gt; 0.0</td>
 <td>The number of standard deviations from the mean used in checking for prior-data conflict.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_save_rescov(False)</em></td>
 <td>Boolean</td>
 <td>Flag to save the iteration-level residual covariance matrix. If <em>ies_save_binary</em> is True, then a binary format file is written, otherwise an ASCII format (.cov) file is written. The file name is case.N.res.cov/.jcb. Note that this functionality does not scale beyond about 20,000 non-zero-weighted observations</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>obscov()</em></td>
 <td>text</td>
 <td>The name of a file containing the observation noise covariance matrix. This can be a parameter uncertainty file (extension <em>.unc</em>), a covariance matrix file (extension <em>.cov</em>) or a binary JCO or JCB file (extension <em>.jco</em> or <em>.jcb</em>). Please see the section on this matrix above to understand the implications of using this matrix</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>rand_seed(358183147)</em></td>
 <td>unsigned integer</td>
 <td>Seed for the random number generator.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>Ies_use_mda(false)</em></td>
 <td>Boolean</td>
 <td>Flag to use the (optionally iterative) Kalman update equation – the number of data assimilation iterations is controlled by NOPTMAX; NOPTMAX = 1 and <em>ies_use_mda(true)</em> results in the standard ensemble smoother Kalman update. If False, the GLM iterative ensemble smoother equation is used. Default is False</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>Ies_mda_init_fac(10.0)</em></td>
 <td>double</td>
 <td>The initial MDA covariance inflation factor. Only used if <em>ies_use_mda</em> is true. Default is 10.0</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>Ies_mda_decl_fac(0.5)</em></td>
 <td>double</td>
 <td>The final MDA covariance inflation factor. Only used in <em>ies_use_mda</em> is true. Default is 0.5</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>Ies_upgrades_in_memory(true)</em></td>
 <td>Boolean</td>
 <td>Flag to hold parameter upgrade ensembles in memory during testing. If False, parameter ensembles are saved to disk during testing and the best-phi ensemble is loaded from disk after testing – this can reduce memory pressure for very high dimensional problems. Default is True but is only activated if number of parameters &gt; 100K.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>Ies_ordered_binary(true)</em></td>
 <td>Boolean</td>
 <td>Flag to write control-file-ordered binary ensemble files. Only used if <em>save_binary</em> is true. If false, hash-ordered binary files are written – for very high dimensional problems, writing unordered binary can save lots of time. If not passed and number of parameters &gt; 100K, then <em>ies_ordered_binary</em> is set to false.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ensemble_output_precision(6)</em></td>
 <td>int</td>
 <td>Number of significant digits to use in ASCII format ensemble files. Default is 6</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_multimodal_alpha(1.0)</em></td>
 <td>double</td>
 <td>The fraction of the total ensemble size to use as the local neighborhood realizations in the multimodal solution process. Must be greater than zero and less than 1. Values of 0.1 to 0.25 seem to work well. Default is 1.0 (disable multi-modal solution process)</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_weight_ensemble()</em></td>
 <td>text</td>
 <td>The name of a CSV or JCO/JCB file (recognized by its extension) containing user-supplied weight vectors for each realization. If this keyword is omitted, PESTPP-IES uses the weight vector in the control file for all realizations. Only used with <em>ies_multimodal_alpha</em></td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_phi_factor_file</em></td>
 <td>text</td>
-<td>A two-column ASCII file that contains observation group “tags” and phi factors. Used to internally adjust weights to implement a balanced objective function using the mean residuals from the initial ensemble.</td>
+<td>A two-column ASCII file that contains observation group “tags” and phi factors. Used to internally adjust weights to implement a balanced objective function using the mean residuals from the initial ensemble. If <em>ies_center_on()</em> identifies a different realization to center the ensemble on for upgrades, that residuals of the identified realization are used instead of the mean to adjust weights.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_phi_factors_by_real</em></td>
 <td>Bool</td>
 <td>A flag to use internal weight balancing for each realization. This option should be used in conjunction with the multi-modal solution process.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_n_iter_reinflate</em></td>
-<td style="text-align: left;">Int or sequence of ints</td>
+<td>Int or sequence of ints</td>
 <td>The number of between covariance re-inflation. Default is 0, which is indicates not re-inflate parameter covariance. This argument can also be a sequence of integers, indicating the number of iterations between each reinflation cycle</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>Ies_reinflate_factor</em></td>
-<td style="text-align: left;">Float or sequence of floats</td>
+<td>Float or sequence of floats</td>
 <td>A scaling factor between 0 and 1 to reduce the variance of the prior parameter ensemble anomalies before translating them to the current parameter ensemble mean vector.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>ies_update_by_reals</em></td>
 <td>bool</td>
 <td>Flag to indicate whether or not to update each realization according to its phi reduction. Default is False.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>Ies_autoadaloc_indicator_pars</em></td>
 <td>Text</td>
 <td>The name of 1 or more parameters to treat as indicator parameters in the automatic adaptive localization process to help define the level of spurious correlation.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>save_dense</em></td>
 <td>bool</td>
 <td>Flag to save ensembles in a “dense” binary format, which in constrast to the sparse binary format of jcb/jco. Ensemble files will be given a “.bin” extension. These files can be read by PESTPP-IES (for restarting) and by pyEMU. This option only applies of <em>save_</em>binary is True. Default is False</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>ies_run_realname</em></td>
 <td>Text</td>
 <td>The name of a parameter realization in an external parameter ensemble file to run. Only used if noptmax = -2.</td>
 </tr>
 </tbody>
 </table>
+
+Table 9.4 PESTPP-IES control variables with default values. Parallel run management variables can be supplied in addition to these. See section 5.3.6.
 
 # <a id='s14' />10. PESTPP-SWP
 
@@ -4218,17 +4261,17 @@ Table 10.1 tabulates PESTPP-SWP control variables. As usual, all of these variab
 
 The number of control variables may change with time. Refer to the PEST++ web site for variables used by the latest version of PESTPP-SWP.
 
-| Variable | Type | Role |
-|----|----|----|
-| *sweep_parameter_csv_file(sweep_in.csv)* | text | A user-provided CSV file that lists the parameter values employed for model runs. If this filename ends with *.jcb* or *.jco*, then the ensemble is read from a binary JCB or JCO file instead. |
-| *Ies_csv_by_reals()* | Boolean | A flag to save parameter and observation ensemble CSV files by realization instead of by variable name. If true, each row of the CSV file is a realization. If false, each column of the CSV file is a realization. |
-| *sweep_forgive(false)* | Boolean | If set to *true*, PESTPP-SWP provides values for missing variables in the user-supplied *sweep_parameter_csv_file()* file. |
-| *sweep_output_csv_file(sweep_out.csv)* | text | The CSV file written by PESTPP-SWP. |
-| *sweep_chunk(500)* | text | The number of runs to batch queue for the run manager. Each chunk is read, run and written as a single batch. |
-| *enforce_tied_bounds(false)* | Boolean | Flag to enforce parameter bounds on any tied parameters |
-| *tie_by_group(false)* | Boolean | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected. |
-| *ensemble_output_precision* | int | Number of significant digits to use in ASCII format ensemble files. Default is 6 |
-| *Sweep_include_regul_phi* | Boolean | Flag to include the contribution of prior information equations in the total objective function information reported in the sweep output file, Default is false. |
+| Variable                             | Type | Role                                                                                                                                                                                                                                                |
+|------------------------------------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *sweep_parameter_csv_file(sweep_in.csv)* | text     | A user-provided CSV file that lists the parameter values employed for model runs. If this filename ends with *.jcb* or *.jco*, then the ensemble is read from a binary JCB or JCO file instead.                                                         |
+| *Ies_csv_by_reals()*                     | Boolean  | A flag to save parameter and observation ensemble CSV files by realization instead of by variable name. If true, each row of the CSV file is a realization. If false, each column of the CSV file is a realization.                                     |
+| *sweep_forgive(false)*                   | Boolean  | If set to *true*, PESTPP-SWP provides values for missing variables in the user-supplied *sweep_parameter_csv_file()* file.                                                                                                                              |
+| *sweep_output_csv_file(sweep_out.csv)*   | text     | The CSV file written by PESTPP-SWP.                                                                                                                                                                                                                     |
+| *sweep_chunk(500)*                       | text     | The number of runs to batch queue for the run manager. Each chunk is read, run and written as a single batch.                                                                                                                                           |
+| *enforce_tied_bounds(false)*             | Boolean  | Flag to enforce parameter bounds on any tied parameters                                                                                                                                                                                                 |
+| *tie_by_group(false)*                    | Boolean  | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected. |
+| *ensemble_output_precision*              | int      | Number of significant digits to use in ASCII format ensemble files. Default is 6                                                                                                                                                                        |
+| *Sweep_include_regul_phi*                | Boolean  | Flag to include the contribution of prior information equations in the total objective function information reported in the sweep output file, Default is false.                                                                                        |
 
 Table 10.1 PESTPP-SWP control variables. Parallel run management variables can be supplied in addition to these; see section 5.3.6
 
@@ -4244,7 +4287,7 @@ PSO, in its most basic form, i.e., as a single-objective optimization algorithm,
 
 minimize *f<sub>0</sub>(x),* subject to *fi(x)* less than or equal to *b<sub>i,</sub> i* = 1,…,m (11.1)
 
-where, $`\mathbf{x}`$ is a vector of decision variables (which could be model parameters as part of a calibration exercise, or the groundwater extraction rates for management optimization, or etc.), $`f_{0}`$ is a scalar objective function, and $`f_{i}`$ is a scalar constraint function.
+where, $\mathbf{x}$ is a vector of decision variables (which could be model parameters as part of a calibration exercise, or the groundwater extraction rates for management optimization, or etc.), $f_{0}$ is a scalar objective function, and $f_{i}$ is a scalar constraint function.
 
 While PSO is effective for solving single-objective nonlinear programming problems as in Equation (11.1), its true power actually lies mainly in its ability to handle multi-objective optimization problems, integer programming problems, and potentially many other applications like posterior predictive uncertainty quantification. This document will focus on the use of PSO for multi-objective optimization. Multi-objective optimization involves the evaluation of a Preto front, which graphically illustrates the trade-off in one objective function over another objective function(s). This can be useful to decision-makers as real-world management problems rarely consist of only a single objective, and furthermore, multi-objective optimization can be used as a hypothesis testing mechanism or as means of incorporating prior knowledge about parameter values into the model calibration process.
 
@@ -4252,17 +4295,17 @@ The multi-objective optimization version of PSO (MOPSO) is included in PESTPP-PS
 
 minimize {*f*i(x),…,*f<sub>n</sub>*(x)}, subject to *fi(x) i* = n+1,…,m (11.2)
 
-where, $`n`$ is the number of objective functions for which a Pareto front is evaluated (currently PESTPP-PSO is limited to two objective functions, but future developments are under way to increase this number), $`m`$ is the total number of objectives (that is, there are $`m - n`$ constraints).
+where, $n$ is the number of objective functions for which a Pareto front is evaluated (currently PESTPP-PSO is limited to two objective functions, but future developments are under way to increase this number), $m$ is the total number of objectives (that is, there are $m - n$ constraints).
 
 When filling a Pareto front with a discrete set of non-dominated solutions, PSO becomes very efficient due its ability to “swarm” across the Pareto front, along with the memory-like properties of the swarm itself, which are maintained within a *repository*. In contrast to the single-objective basic form of PSO, which requires numerous simulation-model runs for convergence relative to other gradient-based algorithms, MOPSO on the other hand, is likely to be more efficient than other multi-objective optimization algorithms available.
 
 The use of PSO for integer programming can be seen throughout the clinical trials literature with applications in experimental design. Integer programming via PSO is not yet included in this version of PESTPP-PSO, but remains a topic of future development. Additionally, the use of PSO in a Monte Carlo context for predictive uncertainty quantification also remains a topic of future development.
 
 **Basic**
-PSO is an evolutionary algorithm that operates on the socio-cognitive behavior of individuals within a swarm. Individuals, or particles, “move” within decision space based on three components, (1) the momentum of the movement from the previous iteration, (2) the location in decision space that has had the best performance for that particle so far, in terms of the objective function as defined by Equation (11.1) (cognitive component), and (3) the location in decision space associated with the best performance observed by the entire swarm thus far (social component). A particle’s position in decision space is simply defined as the vector of values for the decision variables currently assigned to that particle. The term “decision variables” is used here to indicate that PSO is applicable to any form of optimization problem, e.g., calibration, management, design, etc., and therefore “parameters” are considered decision variables as well. The movement (or velocity) of a particle at a particular iteration, $`t + 1`$, is defined as,
+PSO is an evolutionary algorithm that operates on the socio-cognitive behavior of individuals within a swarm. Individuals, or particles, “move” within decision space based on three components, (1) the momentum of the movement from the previous iteration, (2) the location in decision space that has had the best performance for that particle so far, in terms of the objective function as defined by Equation (11.1) (cognitive component), and (3) the location in decision space associated with the best performance observed by the entire swarm thus far (social component). A particle’s position in decision space is simply defined as the vector of values for the decision variables currently assigned to that particle. The term “decision variables” is used here to indicate that PSO is applicable to any form of optimization problem, e.g., calibration, management, design, etc., and therefore “parameters” are considered decision variables as well. The movement (or velocity) of a particle at a particular iteration, $t + 1$, is defined as,
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`v_{ij}^{(t + 1)} = \omega^{(t)}v_{ij}^{(t)} + c_{1}r_{1}\left( z_{ij}^{(t)} - p_{ij}^{(t)} \right) + c_{2}r_{2}\left( z_{ig}^{(t)} - p_{ij}^{(t)} \right)` " title="\Large `v_{ij}^{(t + 1)} = \omega^{(t)}v_{ij}^{(t)} + c_{1}r_{1}\left( z_{ij}^{(t)} - p_{ij}^{(t)} \right) + c_{2}r_{2}\left( z_{ig}^{(t)} - p_{ij}^{(t)} \right)`" />  (X.3)  <br>
-where, subscript $`i`$ denotes the decision variable index, subscript $`j`$ denotes the particle index, $`v`$ is the velocity, $`\omega`$ is the inertia, $`c_{1}`$ is the cognitive constant, $`c_{2}`$ is the social constant, $`r`$ is a random value taken from the interval \[0,1\], $`z_{ij}`$ is the best position observed by particle $`j`$ for parameter $`i`$ (often referred to as the personal best or “*p*-best” position for particle $`j`$), $`g`$ is the index of the best *p*-best position in the swarm or neighbourhood (often referred to as the global best, or “*g*-best” position), and $`p`$ represents the current position of the particle in decision space.
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;v_{ij}^{(t + 1)} = \omega^{(t)}v_{ij}^{(t)} + c_{1}r_{1}\left( z_{ij}^{(t)} - p_{ij}^{(t)} \right) + c_{2}r_{2}\left( z_{ig}^{(t)} - p_{ij}^{(t)} \right) " title="\Large v_{ij}^{(t + 1)} = \omega^{(t)}v_{ij}^{(t)} + c_{1}r_{1}\left( z_{ij}^{(t)} - p_{ij}^{(t)} \right) + c_{2}r_{2}\left( z_{ig}^{(t)} - p_{ij}^{(t)} \right)" />  (X.3)  <br>
+where, subscript $i$ denotes the decision variable index, subscript $j$ denotes the particle index, $v$ is the velocity, $\omega$ is the inertia, $c_{1}$ is the cognitive constant, $c_{2}$ is the social constant, $r$ is a random value taken from the interval \[0,1\], $z_{ij}$ is the best position observed by particle $j$ for parameter $i$ (often referred to as the personal best or “*p*-best” position for particle $j$), $g$ is the index of the best *p*-best position in the swarm or neighbourhood (often referred to as the global best, or “*g*-best” position), and $p$ represents the current position of the particle in decision space.
 
 The basic single-objective PSO algorithm proceeds by updating each particle’s position by adding the velocity according to Equation (11.3) to each particle’s position iteratively until the particles have “stopped moving”, or a specified number of iterations have commenced. Defining the point where particles stop moving can be based on multiple criteria – the reader is referred to the definitions of the control variables for PESTPP-PSO for more details. Additionally, the swarm must be initialized (iteration 0), which can be done automatically via PESTPP-PSO or externally as the user desires (see the INITP control variable and Section 11.2.3)
 
@@ -4270,9 +4313,9 @@ While basic PSO can approach such a problem, like all other optimization methods
 
 ### <a id='s14-4-1' />11.1.2 Multi-Objective Particle Swarm optimization
 
-Multi-objective optimization studies often have numerous factors to consider, and some of these factors may be considered objectives (a Pareto front is desired for their trade-offs), or they may be considered as constraints (they are given a limit for which they cannot exceed). Generally, one could consider constraints as objectives in this context, as they can be mixed and matched depending on the perspective of the optimization problem (Equation 11.2). Additionally, the upper limit of the constraints may be perturbed slightly to examine its effects on the Pareto front; such constraints are often referred to as epsilon ($`\varepsilon`$) constraints.
+Multi-objective optimization studies often have numerous factors to consider, and some of these factors may be considered objectives (a Pareto front is desired for their trade-offs), or they may be considered as constraints (they are given a limit for which they cannot exceed). Generally, one could consider constraints as objectives in this context, as they can be mixed and matched depending on the perspective of the optimization problem (Equation 11.2). Additionally, the upper limit of the constraints may be perturbed slightly to examine its effects on the Pareto front; such constraints are often referred to as epsilon ($\varepsilon$) constraints.
 
-Most multi-objective optimization problems in practice generally do not consider more than three objective functions when mapping a Pareto front. This is because higher-dimensional problems suffer from the “curse of dimensionality”, which often requires an infeasible number of model simulations in order to adequately span the front. Additionally, Pareto fronts with a dimension higher than three are difficult to visualize and hence, difficult to use for decision-support. Arguably, most studies can get by with just a two-dimensional Pareto front, with the remaining factors, or objectives, being handled as $`\varepsilon`$-constraints (see *Siade et al*, (2019) for a real-world example of this process).
+Most multi-objective optimization problems in practice generally do not consider more than three objective functions when mapping a Pareto front. This is because higher-dimensional problems suffer from the “curse of dimensionality”, which often requires an infeasible number of model simulations in order to adequately span the front. Additionally, Pareto fronts with a dimension higher than three are difficult to visualize and hence, difficult to use for decision-support. Arguably, most studies can get by with just a two-dimensional Pareto front, with the remaining factors, or objectives, being handled as $\varepsilon$-constraints (see *Siade et al*, (2019) for a real-world example of this process).
 
 MOPSO, like most multi-objective optimization algorithms in use today, approximates the Pareto front using a discrete set of *non-dominated* decision-variable vectors (or decision vectors). A non-dominated decision vector is a position in decision space that is not dominated by any other position in decision space. That is, there is no other feasible decision vector that performs better than a non-dominated decision vector for all objective functions. In other words, a non-dominated solution will perform better than all other positions in decision space for at least one of its objective functions. The set of all non-dominated decision vectors therefore forms the weakly Pareto optimal set, and their associated objective function values form the Pareto front.
 
@@ -4298,13 +4341,12 @@ PESTPP-PSO must use another PEST++ calling program to initiate the “agents”.
 ++PSO(*case*.pso)
 
 <div style="text-align: left"><table>
-</div><caption>Figure 11.1. Variables comprising a minimalist PEST control file (see Figure 4.1), where the control variables used by PESTPP-PSO are shaded in grey. Note that the very last line designates the PSO control file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
-<th style="text-align: left;">pcf<br>
+<tr class="header">
+<th>pcf<br>
 * control data<br>
 <mark>RSTFLE PESTMODE</mark><br>
 <mark>NPAR NOBS NPARGP NPRIOR NOBSGP</mark><br>
@@ -4356,6 +4398,8 @@ WFFAC WFTOL [IREGADJ]<br>
 </tbody>
 </table>
 
+Figure 11.1. Variables comprising a minimalist PEST control file (see Figure 4.1), where the control variables used by PESTPP-PSO are shaded in grey. Note that the very last line designates the PSO control file.
+
 ### <a id='s14-5-2' />11.1.2 Estimation Mode
 
 The algorithm employed in *estimation* mode is equivalent to the very basic form of PSO originally introduced by *Eberhart and Kennedy* (1995). Much of the basic mechanics of the algorithm can be summarized by Equation (11.3). The PSO control file for estimation mode will have a format as follows (“\*” sections can be in any order),
@@ -4365,7 +4409,7 @@ The algorithm employed in *estimation* mode is equivalent to the very basic form
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* control data<br>
 RSTPSO NOBJGP NCON NFORG VERBOSE<br>
 NPOP C1 C2 ISEED<br>
@@ -4428,9 +4472,9 @@ This real variable sets the maximum velocity allowed for the decision variables.
 
 *IINERT, FINERT,* and *INITER*
 
-The first two real variables are the initial (IINERT, $`\omega^{(0)}`$) and final (FINERT, $`\omega^{(\text{INITER})}`$) inertia values of the PSO algorithm (Equation 11.1). The third variable is an integer value representing the iteration upon which the inertia should be set to FINERT. The inertia is therefore varied linearly over the course of the PSO algorithm as follows (at iteration $`t`$),
+The first two real variables are the initial (IINERT, $\omega^{(0)}$) and final (FINERT, $\omega^{(\text{INITER})}$) inertia values of the PSO algorithm (Equation 11.1). The third variable is an integer value representing the iteration upon which the inertia should be set to FINERT. The inertia is therefore varied linearly over the course of the PSO algorithm as follows (at iteration $t$),
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`\omega^{(t)} = \omega^{(0)} + \left( \omega^{(\text{INITER})} - \omega^{(0)} \right)\left( t/\text{INITER} \right)` " title="\Large `\omega^{(t)} = \omega^{(0)} + \left( \omega^{(\text{INITER})} - \omega^{(0)} \right)\left( t/\text{INITER} \right)`" />  (X.4)  <br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;\omega^{(t)} = \omega^{(0)} + \left( \omega^{(\text{INITER})} - \omega^{(0)} \right)\left( t/\text{INITER} \right) " title="\Large \omega^{(t)} = \omega^{(0)} + \left( \omega^{(\text{INITER})} - \omega^{(0)} \right)\left( t/\text{INITER} \right)" />  (X.4)  <br>
 The inertia value for all subsequent iterations, after INITER, is held constant at FINERT. The value for IINERT should be greater than FINERT; a good example would be 0.7 and 0.4, respectively. These values should range between greater than zero and one.
 
 *NEIBR* and *NNEIBR*
@@ -4439,11 +4483,11 @@ These integer variables tell PESTPP-PSO if neighborhoods are used, and if so, th
 
 *OBJNME* and *OBJMETH*
 
-OBJNME is a character string and the name of the objective function being minimized ($`f_{0}`$ in Equation 11.1). This name must coincide with an observation group name specified in the PEST control file. OBJMETH determines whether the objective function represents a sum of squares (i.e., for calibration) or a general objective function that should be comprised of a single “observation” which comprises the objective function itself. For the former, OBJMETH should be set to 1, and for the latter, set to 2. A user may wish to produce their own post-processed objective function value given a set of decision variables, e.g., for maximizing remediation of a contaminated site. In this case, the user should input their calculated objective function as a single “observation” comprising the objective function seen by PESTPP-PSO with OBJMETH set to 2. This will be common for problems that are not calibration problems, and thus do not need a sum of squared residuals.
+OBJNME is a character string and the name of the objective function being minimized ($f_{0}$ in Equation 11.1). This name must coincide with an observation group name specified in the PEST control file. OBJMETH determines whether the objective function represents a sum of squares (i.e., for calibration) or a general objective function that should be comprised of a single “observation” which comprises the objective function itself. For the former, OBJMETH should be set to 1, and for the latter, set to 2. A user may wish to produce their own post-processed objective function value given a set of decision variables, e.g., for maximizing remediation of a contaminated site. In this case, the user should input their calculated objective function as a single “observation” comprising the objective function seen by PESTPP-PSO with OBJMETH set to 2. This will be common for problems that are not calibration problems, and thus do not need a sum of squared residuals.
 
 *CONNME, CONMETH,* and *UPLIM*
 
-CONNME is a character variable that defines the names of the constraints that are to be maintained during optimization ($`f_{i}`$ in Equation 11.1). Each CONNME must correspond with an observation group in the PEST control file. CONMETH is similar to OBJMETH and determines if a constraint is comprised of a sum of squared residuals (enter a 1), or a general constraint that is treated as is (enter a 2). UPLIM is simply the upper limit applied to that constraint ($`b_{i}`$ in Equation 11.1). Constraints with a lower limit can be converted to ones with an upper limit by simply multiplying the constraint value and its associated lower limit value by a -1.
+CONNME is a character variable that defines the names of the constraints that are to be maintained during optimization ($f_{i}$ in Equation 11.1). Each CONNME must correspond with an observation group in the PEST control file. CONMETH is similar to OBJMETH and determines if a constraint is comprised of a sum of squared residuals (enter a 1), or a general constraint that is treated as is (enter a 2). UPLIM is simply the upper limit applied to that constraint ($b_{i}$ in Equation 11.1). Constraints with a lower limit can be converted to ones with an upper limit by simply multiplying the constraint value and its associated lower limit value by a -1.
 
 ### <a id='s14-5-3' />11.2.3. Pareto mode
 
@@ -4454,7 +4498,7 @@ The algorithm employed in *pareto* mode (i.e., multi-objective optimization) is 
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* control data<br>
 RSTPSO NOBJGP NCON NFORG VERBOSE<br>
 NPOP C1 C2 ISEED<br>
@@ -4493,17 +4537,17 @@ This integer flag sets the repository management method employed. A value of 1 i
 
 *RFIT*
 
-This real variable represents the maximum value that the exponent, $`\alpha`$, can take during fitness calculations; see equation below (based on Equation (6) of *Siade et al*, (2019)),
+This real variable represents the maximum value that the exponent, $\alpha$, can take during fitness calculations; see equation below (based on Equation (6) of *Siade et al*, (2019)),
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`f_{j}^{adj} = f_{j}^{\alpha(t)}` " title="\Large `f_{j}^{adj} = f_{j}^{\alpha(t)}`" />  (11.5)  <br>
-where, $`f_{j}^{adj}`$ is the adjusted fitness for the $`j`$-th repository position, $`f_{j}`$ is the fitness for the $`j`$-th repository position, and $`t`$ is the iteration count. At each iteration, each particle in the repository is given a value for fitness (ranging from 0 to 1), which is based on the diversity of non-dominated solutions obtained thus far. For example, a repository position that is relatively “far” from other repository positions (in objective space) will be assigned a high fitness value close to 1, and vice versa. The definition of what is meant by “far” will depend on the repository management method used, i.e., REPMODE. This fitness value is then raised to the exponent, $`\alpha`$. Therefore, a high value for $`\alpha`$ will have little effect on fitness values close to 1, but those having small fitness values will be reduced even further, which prevents them from being selected as a *g*-best position for particles in the swarm during the roulette wheel selection step (*Siade et al*., 2019). Therefore, high values of $`\alpha`$ will cause the algorithm to focus primarily on promoting diversity, which can be important when the repository positions have nearly converged on the true Pareto front. RFIT values around 2.0 seem to work well.
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;f_{j}^{adj} = f_{j}^{\alpha(t)} " title="\Large f_{j}^{adj} = f_{j}^{\alpha(t)}" />  (11.5)  <br>
+where, $f_{j}^{adj}$ is the adjusted fitness for the $j$-th repository position, $f_{j}$ is the fitness for the $j$-th repository position, and $t$ is the iteration count. At each iteration, each particle in the repository is given a value for fitness (ranging from 0 to 1), which is based on the diversity of non-dominated solutions obtained thus far. For example, a repository position that is relatively “far” from other repository positions (in objective space) will be assigned a high fitness value close to 1, and vice versa. The definition of what is meant by “far” will depend on the repository management method used, i.e., REPMODE. This fitness value is then raised to the exponent, $\alpha$. Therefore, a high value for $\alpha$ will have little effect on fitness values close to 1, but those having small fitness values will be reduced even further, which prevents them from being selected as a *g*-best position for particles in the swarm during the roulette wheel selection step (*Siade et al*., 2019). Therefore, high values of $\alpha$ will cause the algorithm to focus primarily on promoting diversity, which can be important when the repository positions have nearly converged on the true Pareto front. RFIT values around 2.0 seem to work well.
 
 *RRAMP*
 
-This real variable affects how $`\alpha`$ is adjusted at each iteration based on repository size,
+This real variable affects how $\alpha$ is adjusted at each iteration based on repository size,
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;`\alpha(t) = 1.0 + \left( \frac{\text{exp}\left( RRAMP*p_{full} \right) - 1.0}{\text{exp(}RRAMP) - 1.0} \right)(RFIT - 1.0)` " title="\Large `\alpha(t) = 1.0 + \left( \frac{\text{exp}\left( RRAMP*p_{full} \right) - 1.0}{\text{exp(}RRAMP) - 1.0} \right)(RFIT - 1.0)`" />  (11.6)  <br>
-where, $`p_{full}`$ is the percentage of the repository that is full. When the repository only has three positions, all fitness values are 1, so the value of $`\alpha`$ has no effect. Once the repository size becomes four or greater, the value for $`\alpha`$ begins to increase as a function of how full the repository is. The base value for $`\alpha`$ is 1.0, and then increases toward RFIT until the repository is full, in which case $`\alpha`$ equals RFIT. The value for RRAMP affects how quickly RFIT is reached. RRAMP cannot be 0.0; however, values close to 0.0 will yield an approximately linear increase in $`\alpha`$. Negative values for RRAMP will cause $`\alpha`$ to approach RFIT more quickly, and the opposite applies to positive values. If you wish to have a constant value for $`\alpha`$ simply set RRAMP to a very large negative number, such as -5.0E+02; this will cause RFIT to be reached immediately. The converse is true for large positive values, i.e., $`\alpha`$ will remain at 1.0 and then suddenly jump to RFIT when the repository is full. The absolute value for RRAMP should not exceed 5.0E+02.
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;\alpha(t) = 1.0 + \left( \frac{\text{exp}\left( RRAMP*p_{full} \right) - 1.0}{\text{exp(}RRAMP) - 1.0} \right)(RFIT - 1.0) " title="\Large \alpha(t) = 1.0 + \left( \frac{\text{exp}\left( RRAMP*p_{full} \right) - 1.0}{\text{exp(}RRAMP) - 1.0} \right)(RFIT - 1.0)" />  (11.6)  <br>
+where, $p_{full}$ is the percentage of the repository that is full. When the repository only has three positions, all fitness values are 1, so the value of $\alpha$ has no effect. Once the repository size becomes four or greater, the value for $\alpha$ begins to increase as a function of how full the repository is. The base value for $\alpha$ is 1.0, and then increases toward RFIT until the repository is full, in which case $\alpha$ equals RFIT. The value for RRAMP affects how quickly RFIT is reached. RRAMP cannot be 0.0; however, values close to 0.0 will yield an approximately linear increase in $\alpha$. Negative values for RRAMP will cause $\alpha$ to approach RFIT more quickly, and the opposite applies to positive values. If you wish to have a constant value for $\alpha$ simply set RRAMP to a very large negative number, such as -5.0E+02; this will cause RFIT to be reached immediately. The converse is true for large positive values, i.e., $\alpha$ will remain at 1.0 and then suddenly jump to RFIT when the repository is full. The absolute value for RRAMP should not exceed 5.0E+02.
 
 *PTONME* and *PTOLIM*
 
@@ -4523,7 +4567,7 @@ To supply PESTPP-PSO with user-defined set of initial swarm positions, the user 
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>* control data<br>
 0 2 0 10 2<br>
 100 1.00E+00 1.00E+00 171<br>
@@ -4553,7 +4597,7 @@ The number of parameter values listed in the external initial-swarm file must be
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>NPOP<br>
 PARNME PARVAL-1 PARVAL-2 … PARVAL-NPOP<br>
 (<em>one such line for each decision variable (or parameter)</em>)<br></th>
@@ -4573,15 +4617,15 @@ Output files produced by PESTPP-PSO are listed in the following table. The conte
 
 Table X.1 PESTPP-PSO output files. Note that each of these output files are updated after each iteration of the respective PSO algorithm. Therefore, if the user wishes to force-quit a simulation, much of the current status of the simulation will be contained in these output files. It is assumed that the name of the PEST control file is *case.pst*.
 
-| File | Contents |
-|----|----|
-| *case.rec* | The run record file. This file begins by echoing information provided in the PEST and PSO control files. It then records the history of the optimization process undertaken by PESTPP-PSO. The level of verbose-ness of this file can be controlled with the VERBOSE control variable in the PSO control file. |
-| *case.pbs (estimation mode)* | A decision variable (parameter) value file. This file records the *p*-best particle positions at the end of the simulation. This file is updated after each iteration of the respective PSO algorithm and uses the same format as the external initial-swarm file described in Figure 11.5. |
-| *case.gbs (estimation mode)* | A decision variable (parameter) file containing the single *g*-best particle position of the swarm at the end of the simulation. This file is updated after each iteration of the PSO algorithm and uses the same format as the external initial-swarm file described in Figure 11.5. |
-| *case.obs* | This file contains the simulated observations of the *g*-best particle position (*estimation* mode) or the repository positions (*pareto* mode) at the end of the PSO or MOPSO simulation, respectively. This file is updated after each iteration of the respective PSO algorithm. |
-| *case.rst* | The restart file. If PESTPP-PSO is restarted from a previous simulation (i.e., the control variable RSTPSO is set to 1), PESTPP-PSO will look for a file named *case.rst* to gain all the information necessary to restart the respective PSO simulation. |
-| *case.rep (Pareto mode)* | This file contains the objective function values corresponding to the repository positions at the end of the simulation; that is, this file contains the Pareto front. This file will be updated at the end of each iteration. Furthermore, additional *case_x.rep* files will also be created at each iteration, where x is the iteration number. This helps the user visualise the convergence of the MOPSO algorithm. |
-| *case.par (Pareto mode)* | This file contains the decision variable (or parameter) values associated with the objective function values that comprise the Pareto front (i.e., the weakly Pareto optimal set), at the end of the simulation. This file is also updated after each iteration and uses the same format as the external initial-swarm file described in Figure 11.5. |
+| File                     | Contents                                                                                                                                                                                                                                                                                                                                                                                                             |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *case.rec*                   | The run record file. This file begins by echoing information provided in the PEST and PSO control files. It then records the history of the optimization process undertaken by PESTPP-PSO. The level of verbose-ness of this file can be controlled with the VERBOSE control variable in the PSO control file.                                                                                                           |
+| *case.pbs (estimation mode)* | A decision variable (parameter) value file. This file records the *p*-best particle positions at the end of the simulation. This file is updated after each iteration of the respective PSO algorithm and uses the same format as the external initial-swarm file described in Figure 11.5.                                                                                                                              |
+| *case.gbs (estimation mode)* | A decision variable (parameter) file containing the single *g*-best particle position of the swarm at the end of the simulation. This file is updated after each iteration of the PSO algorithm and uses the same format as the external initial-swarm file described in Figure 11.5.                                                                                                                                    |
+| *case.obs*                   | This file contains the simulated observations of the *g*-best particle position (*estimation* mode) or the repository positions (*pareto* mode) at the end of the PSO or MOPSO simulation, respectively. This file is updated after each iteration of the respective PSO algorithm.                                                                                                                                      |
+| *case.rst*                   | The restart file. If PESTPP-PSO is restarted from a previous simulation (i.e., the control variable RSTPSO is set to 1), PESTPP-PSO will look for a file named *case.rst* to gain all the information necessary to restart the respective PSO simulation.                                                                                                                                                                |
+| *case.rep (Pareto mode)*     | This file contains the objective function values corresponding to the repository positions at the end of the simulation; that is, this file contains the Pareto front. This file will be updated at the end of each iteration. Furthermore, additional *case_x.rep* files will also be created at each iteration, where x is the iteration number. This helps the user visualise the convergence of the MOPSO algorithm. |
+| *case.par (Pareto mode)*     | This file contains the decision variable (or parameter) values associated with the objective function values that comprise the Pareto front (i.e., the weakly Pareto optimal set), at the end of the simulation. This file is also updated after each iteration and uses the same format as the external initial-swarm file described in Figure 11.5.                                                                    |
 
 # <a id='s15' />12. PESTPP-DA
 
@@ -4738,10 +4782,9 @@ In this way, the string-based cycle values allow users to apply sophisticated ru
 
 Although PESTPP-DA is a tool designed for flexible sequential and batch data assimilation, the generalized nature of the cycle concept, in concert with the observation and weight cycle tables, also provides a range of other functionality. In this way, the cycle concept can be thought of as an outer iteration process. For example, users can undertake the advanced “direct predictive hypothesis testing” analysis (e.g., Moore et al., 2010) with PESTPP-DA by constructing a generic weight cycle table where each cycle includes increasing weight on a control file observation quantity that represents a simulated outcome of interest. For example, assume a model has been constructed to simulate surface-water/groundwater exchange (SGE) along an important river reach. Further assume that the simulated SGE along this reach is included in the control file as an observation. To test the hypothesis that the SGE for this reach could be zero, users should set the observation value quantity in the control file to 0.0 and set the weight to 1.0 (this weight will not be used but simply activates this quantity in the PESTPP-DA cycle process). Now users can construct a weight cycle table. Let’s use 10 cycles. For the historic observations that are being assimilated, the entries for all cycles in the weight cycle table for these observations should be identical to the weights in the control file. The entries for the SGE “observation” in the weight cycle table should slow increase from 0.0 in the first cycle to a value large enough to dominate the objective function in the last cycle. Conceptually, during each PESTPP-DA “cycle”, a (iterative) ensemble smoother formulation will be used to minimize the objective function, but as cycles progress, the desire to force the SGE towards zero increasingly features in the objective function. In this way, the compatibility between the fitting the historic observations and the ability to make SGE be zero is directly tested. If the ability to fit the past observations is maintained while also making the simulated SGE zero, then one cannot reject the hypothesis that the SGE could be zero on the basis of compatibility with historic observations. This technique is very similar to “pareto mode” in PEST(\_HP), except here, we can take advantage of the computational efficiency of the iterative ensemble solver in PESTPP-DA. Figure 12.XXX depicts the results of such an analysis
 
-<figure>
 <img src="./media/image8.png" style="width:6.26806in;height:6.29514in" alt="Chart, scatter chart Description automatically generated" />
-<figcaption>Figure 12.XXX. Results of a direct predictive hypothesis testing analysis where the relation between fitting historic observations and a desire to make surface-water/groundwater exchange (SGE) zero is evaluated. The ensemble-based pareto trade-off between these two quantities shows that simulating an SGE of zero is not compatible with the historic observations.<br></figcaption>
-</figure>
+
+Figure 12.XXX. Results of a direct predictive hypothesis testing analysis where the relation between fitting historic observations and a desire to make surface-water/groundwater exchange (SGE) zero is evaluated. The ensemble-based pareto trade-off between these two quantities shows that simulating an SGE of zero is not compatible with the historic observations.
 
 ### <a id='s15-2-10' />12.2.14 PESTPP-DA Output Files
 
@@ -4750,83 +4793,84 @@ The following table summarizes the contents of files that are recorded by PESTPP
 Since the parameters and observations being used can change across cycles, the PESTPP-DA output files for a given cycle may not contain all of the parameters and observations listed in the control file. However, any file tagged with “global” in the name will contain all parameters and observations listed in the control file.
 
 <div style="text-align: left"><table>
-</div><caption>Table 12.1. Files recorded by PESTPP-DA.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 33%" />
 <col style="width: 66%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th><strong>File</strong></th>
 <th><strong>Contents</strong></th>
 </tr>
 </thead>
 <tbody>
-<tr>
+<tr class="odd">
 <td><em>case.rec</em></td>
 <td>Run record file. This file records a complete history of the inversion process. It is available for user-inspection at any time during that process.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.rmr</em></td>
 <td>Parallel run management record file.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.log</em></td>
 <td>performance record. This file records the times commenced and completed various processing tasks.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.global.&lt;cycle&gt;.pe.csv</em><br>
 <em>case.global.&lt;cycle&gt;.pe.jcb</em><br></td>
 <td>The “global” parameter ensemble at the end of cycle &lt;cycle&gt;. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.global.&lt;cycle&gt;.oe.csv</em><br>
 <em>case.global.&lt;cycle&gt;.oe.jcb</em><br></td>
 <td>The “global” simulated output (e.g., observation) ensemble at the end of cycle &lt;cycle&gt;. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.global.&lt;cycle&gt;.obs+noise..csv</em><br>
 <em>case.global.&lt;cycle&gt;.obs+noise.jcb</em><br></td>
 <td>The “global” observations plus noise ensemble at the end of cycle &lt;cycle&gt;. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.&lt;cycle&gt;.&lt;iter&gt;.par.csv</em><br>
 <em>case.&lt;cycle&gt;.&lt;iter&gt;.par.jcb</em><br></td>
 <td>The parameter ensemble at the end of cycle &lt;cycle&gt; and iteration &lt;iter&gt;. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.&lt;cycle&gt;.&lt;iter&gt;.obs.csv</em><br>
 <em>case.&lt;cycle&gt;.&lt;iter&gt;.obs.jcb</em><br></td>
 <td>The simulated output (e.g., observation) ensemble at the end of cycle &lt;cycle&gt; and iteration &lt;iter&gt;. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.&lt;cycle&gt;.obs+noise.csv</em><br>
 <em>case.&lt;cycle&gt;.obs+noise.jcb</em><br></td>
 <td>The observations plus noise ensemble at the start of cycle &lt;cycle&gt;. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.&lt;cycle&gt;.&lt;iter&gt;.base.par</em></td>
 <td>A pest parameter value file for the “base” realization if present in the ensemble</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.&lt;cycle&gt;.&lt;iter&gt;.base.rei</em></td>
 <td>A pest residual value file for the “base” realization if present in the ensemble</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.global.prior.pe.csv</em><br>
 <em>case.gobal.prior.pe.jcb</em><br></td>
 <td>The global prior parameter ensemble. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.global.phi.actual.csv</em></td>
 <td>The global actual objective function (phi) ensemble csv record. “actual” refers to fact that these objective function values do not rely on the noise realizations.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>Case.global.&lt;cycle&gt;.&lt; iter&gt;.pcs.csv</em></td>
 <td>The global parameter change summary for cycle &lt;cycle&gt; after iteration &lt;iter&gt;</td>
 </tr>
 </tbody>
 </table>
+
+Table 12.1. Files recorded by PESTPP-DA.
 
 ## <a id='s15-3' />12.4 Summary of PESTPP-DA Control Variables
 
@@ -4848,14 +4892,14 @@ Table 12.XXX lists PEST++ control variables that are specific to only PESTPP-DA;
 
 Variables discussed in section 5.3.6 that control parallel run management are not listed in table 12.XXX.
 
-| Variable | Type | Role |
-|----|----|----|
-| *da_observation_cycle_table()* | text | The name of a CSV file representing the cycle-specific observation values. The row index should be integer cycle numbers and the column labels (header) should be observation names from the control file – these observation names in the control must be assigned a non-zero weight to activate their use in this table. Missing values should be represented by an empty entry. |
-| *da_weight_cycle_table()* | text | The name of a CSV file representing the cycle-specific weight values. The row index should be integer cycle numbers and the column labels (header) should be observation names from the control file – these observation names in the control must be assigned a non-zero weight to activate their use in this table. Missing values should be represented by an empty entry. |
-| *da_hostart_cycle()* | integer | The cycle number to start PESTPP-DA assimilation/simulation process. If no parameter and restart observation ensemble files are provided, a prior parameter ensemble is generated and used. If this argument is not supplied, the minimum cycle value found in control file quantities is used. |
-| *Da_stop_cycle()* | integer | The cycle number to stop PESTPP-DA on. If not supplied, PESTPP-DA will process all cycles found. |
-| *Da_use_simulated_states(true)* | bool | Use the simulated states at the end of each cycle as the initial states for the next cycle. This option should only be set to False for cases that include both initial and final state parameters quantities. As mentioned above, users are caution against setting this option to False. |
-| *Da_noptmax_schedule* | string | A two column ascii filename. The columns in this file should be integers can be space, tab, comma delimited. The integers correspond to the cycle number and noptmax value to use. For cycles that are not listed in the is file, the value of noptmax in the control file is used. In this way, users can control how many iterations should be used for each assimilation cycle. |
+| Variable                    | Type | Role                                                                                                                                                                                                                                                                                                                                                                           |
+|---------------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *da_observation_cycle_table()*  | text     | The name of a CSV file representing the cycle-specific observation values. The row index should be integer cycle numbers and the column labels (header) should be observation names from the control file – these observation names in the control must be assigned a non-zero weight to activate their use in this table. Missing values should be represented by an empty entry. |
+| *da_weight_cycle_table()*       | text     | The name of a CSV file representing the cycle-specific weight values. The row index should be integer cycle numbers and the column labels (header) should be observation names from the control file – these observation names in the control must be assigned a non-zero weight to activate their use in this table. Missing values should be represented by an empty entry.      |
+| *da_hostart_cycle()*            | integer  | The cycle number to start PESTPP-DA assimilation/simulation process. If no parameter and restart observation ensemble files are provided, a prior parameter ensemble is generated and used. If this argument is not supplied, the minimum cycle value found in control file quantities is used.                                                                                    |
+| *Da_stop_cycle()*               | integer  | The cycle number to stop PESTPP-DA on. If not supplied, PESTPP-DA will process all cycles found.                                                                                                                                                                                                                                                                                   |
+| *Da_use_simulated_states(true)* | bool     | Use the simulated states at the end of each cycle as the initial states for the next cycle. This option should only be set to False for cases that include both initial and final state parameters quantities. As mentioned above, users are caution against setting this option to False.                                                                                         |
+| *Da_noptmax_schedule*           | string   | A two column ascii filename. The columns in this file should be integers can be space, tab, comma delimited. The integers correspond to the cycle number and noptmax value to use. For cycles that are not listed in the is file, the value of noptmax in the control file is used. In this way, users can control how many iterations should be used for each assimilation cycle. |
 
 Table 12.2. PESTPP-DA specific control arguments. PESTPP-DA shares all other control arguments with PESTPP-IES
 
@@ -4946,84 +4990,85 @@ Decision variables are distinguished from parameters through the *opt_dec_var_gr
 The following table summarizes the contents of files that are recorded by PESTPP-DA. Most of these have been discussed above. It is assumed that the PEST control file on which the inversion process is based is named *case.pst*.
 
 <div style="text-align: left"><table>
-</div><caption>Table 13.1. Files recorded by PESTPP-MOU.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 33%" />
 <col style="width: 66%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th><strong>File</strong></th>
 <th><strong>Contents</strong></th>
 </tr>
 </thead>
 <tbody>
-<tr>
+<tr class="odd">
 <td><em>case.rec</em></td>
 <td>Run record file. This file records a complete history of the inversion process. It is available for user-inspection at any time during that process.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.rmr</em></td>
 <td>Parallel run management record file.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.log</em></td>
 <td>performance record. This file records the times commenced and completed various processing tasks.</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.pareto.summary.csv</em></td>
 <td>A summary of pareto dominant solutions for each generation.</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.chance.obs_pop.csv</em><br>
 <em>case.chance.obs_pop.jcb</em><br></td>
 <td>The current generation chance shifted simulate outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.chance.dv_pop.csv</em><br>
 <em>case.chance.dv_pop.jcb</em><br></td>
 <td>The current generation shifted decision-variable population that corresponds with the chance-shifted simulated outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.obs_pop.csv</em><br>
 <em>case.obs_pop.jcb</em><br></td>
 <td>The current generation raw (unshifted) simulate outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case..dv_pop.csv</em><br>
 <em>case.dv_pop.jcb</em><br></td>
 <td>The current generation decision-variable population that corresponds with the raw simulated outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.&lt;iter&gt;.obs_pop.csv</em><br>
 <em>case.&lt;iter&gt;.obs_pop.jcb</em><br></td>
 <td>The &lt;iter&gt; generation raw (unshifted) simulate outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.&lt;iter&gt;.dv_pop.csv</em><br>
 <em>case.&lt;iter&gt;.dv_pop.jcb</em><br></td>
 <td>The &lt;iter&gt; generation decision-variable population that corresponds with the raw simulated outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.&lt;iter&gt;.chance.obs_pop.csv</em><br>
 <em>case.&lt;iter&gt;.chance.obs_pop.jcb</em><br></td>
 <td>The &lt;iter&gt; generation chance-shifted simulate outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="even">
 <td><em>case.&lt;iter&gt;.chance.dv_pop.csv</em><br>
 <em>case.&lt;iter&gt;.chance.dv_pop.jcb</em><br></td>
 <td>The &lt;iter&gt; generation decision-variable population that corresponds with the chance-shifted simulated outputs. Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format</td>
 </tr>
-<tr>
+<tr class="odd">
 <td><em>case.lineage.csv</em></td>
 <td>The listing of parents used to generate each offspring for each generation</td>
 </tr>
-<tr>
+<tr class="even">
 <td></td>
 <td></td>
 </tr>
 </tbody>
 </table>
+
+Table 13.1. Files recorded by PESTPP-MOU.
 
 ## <a id='s16-3' />13.4 Summary of PESTPP-MOU Control Variables
 
@@ -5039,31 +5084,31 @@ Table 12.XXX lists PEST++ control variables that are specific to only PESTPP-MOU
 
 Variables discussed in section 5.3.6 that control parallel run management are not listed in table 13.2.
 
-| Variable | Type | Role |
-|----|----|----|
-| *Mou_population_size(100)* | int | The size of the population to use in PESTPP-MOU. Default is 100 |
-| *Mou_generator(DE)* | text | The generator to use. Valid values are “de” (differential evolution), “pso” (particle swarm optimization), “sbx” (simulated binary cross over), and “pm” (polynomial mutation), “simplex” (gradient simplex with increased parallelism). Default is “de” |
-| *Mou_dv_population_file()* | text | A file ending in .csv or .jco/.jcb that contains the initial population to use. If not passed, the initial population is generated from a uniform distribution defined by decision variable upper and lower bounds. |
-| *Mou_obs_population_restart_file()* | text | File ending in .csv or .jcb/.jco that contains the simulation results to restart PESTPP-MOU with. Requires *mou_population_file* and it is up to the user to make sure these two files are coherent (e.g., from the same generation of a previous PESTPP-MOU analysis) |
-| *Mou_objectives()* | text | Comma-separated list of observations and/or prior information equations to use as objectives. These quantities must have a group name that defines the desired extrema to seek (minimize or maximize) using the same rules used to name constraints. |
-| *Mou_max_archive_size(500)* | Int | The maximum number of solutions to track in the archive. default is 500. |
-| *Mou_risk_obj(false)* | Boolean | Flag to use risk-as-an-objective. Requires an adjustable parameter named “\_risk\_” and chance processes to be active. |
-| *Mou_verbose_level(1)* | Int | Level of verbosity for PESTPP-MOU. 1 is minimal, 4 is everything. |
-| *Mou_env_selector(NSGA)* | Text | Which environmental selector to use. Values are “nsga” or “spea”. Default is “nsga” |
-| *Mou_crossover_prob(0.75)* | Double | The crossover probability used in several generators. Default is 0.75 |
-| *Mou_mutation_prob()* | Double | The mutation probability used in several generators. If not passed, then 1.0 over number of decision variables is used. |
-| *Mou_mating_selector(tournament)* | text | The mating selector to use. Values can be “tournament” or “random”. Default is “tournament” |
-| *Mou_de_f(0.8)* | Double | The differential evolution “f” factor. Default is 0.8 |
-| *Mou_save_population_every(-1)* | Int | How often, in generations, to save the population files to disk. Default is -1 – don’t save any generation-specific populations. |
-| *Mou_pso_cognitive_const(2.0)* | double | The particle swarm cognitive constant. The default is 2.0 |
-| *Mou_pso_omega(0.7)* | Double | The particle swarm omega value. Default is 0.7 |
-| *Mou_pso_social_const(2.0)* | Double | The particle swarm social constant. Default is 2.0 |
-| *Mou_population_schedule()* | Text | A two column ascii file that defines the size of the population to use for each generation. Generations not listed use *mou_population_size*. This can be useful for finding a group of feasible initial population individuals. |
-| *Mou_simplex_reflections(10)* | int | Number of poor performing individuals to reflect. Must be less than the population size minus 1. Default is 10. |
-| *Mou_simplex_factors(0.5,.0.7,0.8)* | double | Backtracking points to test along each reflected simplex individual. |
-| *Mou_simplex_mutation(false)* | boolean | Flag to add guassian mutation to the reflected simplex individuals. Default is false |
-| *Mou_multigen_population* | boolean | Flag to retain and reuse all members across all generations when evaluating dominance and feasibility. This can result in re-enforcing the preference for feasible solutions, which can help with highly nonlinearly constrained problems. However, with a large population and many generations, this option can slow down the execution time of PESTPP-MOU since it must dominance sort a much large number of members. Default is false. Note the option activate automatically when using chances with “all’ chance points when chances are reused across generations. |
-| *Mou_chance_schedule()* | text | A two column ascii file that defines when to re-evaluate chances. Generations not listed are set to false. This can be useful to have more granular control regarding chance evaluation. |
+| Variable                        | Type | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|-------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *Mou_population_size(100)*          | int      | The size of the population to use in PESTPP-MOU. Default is 100                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| *Mou_generator(DE)*                 | text     | The generator to use. Valid values are “de” (differential evolution), “pso” (particle swarm optimization), “sbx” (simulated binary cross over), and “pm” (polynomial mutation), “simplex” (gradient simplex with increased parallelism). Default is “de”                                                                                                                                                                                                                                                                                                                   |
+| *Mou_dv_population_file()*          | text     | A file ending in .csv or .jco/.jcb that contains the initial population to use. If not passed, the initial population is generated from a uniform distribution defined by decision variable upper and lower bounds.                                                                                                                                                                                                                                                                                                                                                        |
+| *Mou_obs_population_restart_file()* | text     | File ending in .csv or .jcb/.jco that contains the simulation results to restart PESTPP-MOU with. Requires *mou_population_file* and it is up to the user to make sure these two files are coherent (e.g., from the same generation of a previous PESTPP-MOU analysis)                                                                                                                                                                                                                                                                                                     |
+| *Mou_objectives()*                  | text     | Comma-separated list of observations and/or prior information equations to use as objectives. These quantities must have a group name that defines the desired extrema to seek (minimize or maximize) using the same rules used to name constraints.                                                                                                                                                                                                                                                                                                                       |
+| *Mou_max_archive_size(500)*         | Int      | The maximum number of solutions to track in the archive. default is 500.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| *Mou_risk_obj(false)*               | Boolean  | Flag to use risk-as-an-objective. Requires an adjustable parameter named “\_risk\_” and chance processes to be active.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| *Mou_verbose_level(1)*              | Int      | Level of verbosity for PESTPP-MOU. 1 is minimal, 4 is everything.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| *Mou_env_selector(NSGA)*            | Text     | Which environmental selector to use. Values are “nsga” or “spea”. Default is “nsga”                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| *Mou_crossover_prob(0.75)*          | Double   | The crossover probability used in several generators. Default is 0.75                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| *Mou_mutation_prob()*               | Double   | The mutation probability used in several generators. If not passed, then 1.0 over number of decision variables is used.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| *Mou_mating_selector(tournament)*   | text     | The mating selector to use. Values can be “tournament” or “random”. Default is “tournament”                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| *Mou_de_f(0.8)*                     | Double   | The differential evolution “f” factor. Default is 0.8                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| *Mou_save_population_every(-1)*     | Int      | How often, in generations, to save the population files to disk. Default is -1 – don’t save any generation-specific populations.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| *Mou_pso_cognitive_const(2.0)*      | double   | The particle swarm cognitive constant. The default is 2.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| *Mou_pso_omega(0.7)*                | Double   | The particle swarm omega value. Default is 0.7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| *Mou_pso_social_const(2.0)*         | Double   | The particle swarm social constant. Default is 2.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| *Mou_population_schedule()*         | Text     | A two column ascii file that defines the size of the population to use for each generation. Generations not listed use *mou_population_size*. This can be useful for finding a group of feasible initial population individuals.                                                                                                                                                                                                                                                                                                                                           |
+| *Mou_simplex_reflections(10)*       | int      | Number of poor performing individuals to reflect. Must be less than the population size minus 1. Default is 10.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| *Mou_simplex_factors(0.5,.0.7,0.8)* | double   | Backtracking points to test along each reflected simplex individual.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| *Mou_simplex_mutation(false)*       | boolean  | Flag to add guassian mutation to the reflected simplex individuals. Default is false                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| *Mou_multigen_population*           | boolean  | Flag to retain and reuse all members across all generations when evaluating dominance and feasibility. This can result in re-enforcing the preference for feasible solutions, which can help with highly nonlinearly constrained problems. However, with a large population and many generations, this option can slow down the execution time of PESTPP-MOU since it must dominance sort a much large number of members. Default is false. Note the option activate automatically when using chances with “all’ chance points when chances are reused across generations. |
+| *Mou_chance_schedule()*             | text     | A two column ascii file that defines when to re-evaluate chances. Generations not listed are set to false. This can be useful to have more granular control regarding chance evaluation.                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Table 13.2. PESTPP-MOU specific control arguments. PESTPP-MOU shares many other control arguments with PESTPP-OPT
 
@@ -5344,175 +5389,175 @@ OBS_REPORT_1 OBS_REPORT_2 OBS_REPORT_3.. (*NOBS_REPORT items*)
 
 Table A1.1 Variables in the “control data” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| RSTFLE | text | “restart” or “norestart” | instructs PEST whether to write restart data |
-| PESTMODE | text | “estimation”, “prediction”, “regularization”, “pareto” | PEST’s mode of operation |
-| NPAR | integer | greater than zero | number of parameters |
-| NOBS | integer | greater than zero | number of observations |
-| NPARGP | integer | greater than zero | number of parameter groups |
-| NPRIOR | integer | any integer value | absolute value is number of prior information equations; negative value indicates supply of prior information in indexed format |
-| NOBSGP | integer | greater than zero | number of observation groups |
-| MAXCOMPDIM | integer | zero or greater | number of elements in compressed Jacobian matrix |
-| NTPLFLE | integer | greater than zero | number of template files |
-| NINSFLE | integer | greater than zero | number of instruction files |
-| PRECIS | text | “single” or “double” | format for writing parameter values to model input files |
-| DPOINT | text | “point” or “nopoint” | omit decimal point in parameter values if possible |
-| NUMCOM | integer | greater than zero | number of command lines used to run model |
-| JACFILE | integer | 0, 1 or -1 | indicates whether model provides external derivatives file |
-| MESSFILE | integer | zero or one | indicates whether PEST writes PEST-to-model message file |
-| OBSREREF | text | “obsreref”, “obsreref_N” or “noobsreref” | activates or de-activates observation re-referencing (with an optional pause after re-referencing runs) |
-| RLAMBDA1 | real | zero or greater | initial Marquardt lambda |
-| RLAMFAC | real | positive or negative, but not zero | dictates Marquardt lambda adjustment process |
-| PHIRATSUF | real | between zero and one | fractional objective function sufficient for end of current iteration |
-| PHIREDLAM | real | between zero and one | termination criterion for Marquardt lambda search |
-| NUMLAM | integer | one or greater; possibly negative with Parallel or BEOPEST | maximum number of Marquardt lambdas to test |
-| JACUPDATE | integer | zero or greater | activation of Broyden’s Jacobian update procedure |
-| LAMFORGIVE | text | “lamforgive” or “nolamforgive” | treat model run failure during lambda search as high objective function |
-| DERFORGIVE | text | “derforgive” or “noderforgive” | accommodates model failure during Jacobian runs by setting pertinent sensitivities to zero |
-| RELPARMAX | real | greater than zero | parameter relative change limit |
-| FACPARMAX | real | greater than one | parameter factor change limit |
-| FACORIG | real | between zero and one | minimum fraction of original parameter value in evaluating relative change |
-| ABSPARMAX(*N*) | real | greater than zero | parameter absolute change limit – *N’*th instance |
-| IBOUNDSTICK | integer | zero or greater | instructs PEST not to compute derivatives for parameter at its bounds |
-| UPVECBEND | integer | zero or one | instructs PEST to bend parameter upgrade vector if parameter hits bounds |
-| PHIREDSWH | real | between zero and one | sets objective function change for introduction of central derivatives |
-| NOPTSWITCH | integer | one or greater | iteration before which PEST will not switch to central derivatives computation |
-| SPLITSWH | real | zero or greater | the factor by which the objective function rises to invoke split slope derivatives analysis until end of run |
-| DOAUI | text | “aui”, “auid”, or “noaui” | instructs PEST to implement automatic user intervention |
-| DOSENREUSE | text | “senreuse” or “nosenreuse” | instructs PEST to reuse parameter sensitivities |
-| BOUNDSCALE | text | “boundscale” or “noboundscale” | parameters are scaled by the inter-bounds interval if using singular value decomposition, LSQR or SVDA |
-| NOPTMAX | integer | -2, -1, 0, or any number greater than zero | number of optimization iterations |
-| PHIREDSTP | real | greater than zero | relative objective function reduction triggering termination |
-| NPHISTP | integer | greater than zero | number of successive iterations over which PHIREDSTP applies |
-| NPHINORED | integer | greater than zero | number of iterations since last drop in objective function to trigger termination |
-| RELPARSTP | real | greater than zero | maximum relative parameter change triggering termination |
-| NRELPAR | integer | greater than zero | number of successive iterations over which RELPARSTP applies |
-| PHISTOPTHRESH | real | zero or greater | objective function threshold triggering termination |
-| LASTRUN | integer | zero or one | instructs PEST to undertake (or not) final model run with best parameters |
-| PHIABANDON | real or text | a positive number or name of a file | objective function value at which to abandon optimization process or filename containing abandonment schedule |
-| ICOV | integer | zero or one | record covariance matrix in matrix file |
-| ICOR | integer | zero or one | record correlation coefficient matrix in matrix file |
-| IEIG | integer | zero or one | record eigenvectors in matrix file |
-| IRES | integer | zero or one | record resolution data |
-| JCOSAVE | text | “jcosave” or “nojcosave” | save best Jacobian file as a JCO file - overwriting previously saved files of the same name as the inversion process progresses |
-| VERBOSEREC | text | “verboserec” or “noverboserec” | if set to “noverboserec”, parameter and observation data lists are omitted from the run record file |
-| JCOSAVEITN | text | “jcosaveitn” or “nojcosaveitn” | write current Jacobian matrix to iteration-specific JCO file at the end of every optimization iteration |
-| REISAVEITN | text | “reisaveitn” or “noreisaveitn” | store best-fit residuals to iteration-specific residuals file at end of every optimization iteration |
-| PARSAVEITN | text | “parsaveitn” or “noparsaveitn” | store iteration specific parameter value files |
-| PARSAVERUN | text | “parsaverun” or “noparsaverun” | store run specific parameter value files |
+| Variable   | Type     | Values                                                 | Description                                                                                                                 |
+|----------------|--------------|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| RSTFLE         | text         | “restart” or “norestart”                                   | instructs PEST whether to write restart data                                                                                    |
+| PESTMODE       | text         | “estimation”, “prediction”, “regularization”, “pareto”     | PEST’s mode of operation                                                                                                        |
+| NPAR           | integer      | greater than zero                                          | number of parameters                                                                                                            |
+| NOBS           | integer      | greater than zero                                          | number of observations                                                                                                          |
+| NPARGP         | integer      | greater than zero                                          | number of parameter groups                                                                                                      |
+| NPRIOR         | integer      | any integer value                                          | absolute value is number of prior information equations; negative value indicates supply of prior information in indexed format |
+| NOBSGP         | integer      | greater than zero                                          | number of observation groups                                                                                                    |
+| MAXCOMPDIM     | integer      | zero or greater                                            | number of elements in compressed Jacobian matrix                                                                                |
+| NTPLFLE        | integer      | greater than zero                                          | number of template files                                                                                                        |
+| NINSFLE        | integer      | greater than zero                                          | number of instruction files                                                                                                     |
+| PRECIS         | text         | “single” or “double”                                       | format for writing parameter values to model input files                                                                        |
+| DPOINT         | text         | “point” or “nopoint”                                       | omit decimal point in parameter values if possible                                                                              |
+| NUMCOM         | integer      | greater than zero                                          | number of command lines used to run model                                                                                       |
+| JACFILE        | integer      | 0, 1 or -1                                                 | indicates whether model provides external derivatives file                                                                      |
+| MESSFILE       | integer      | zero or one                                                | indicates whether PEST writes PEST-to-model message file                                                                        |
+| OBSREREF       | text         | “obsreref”, “obsreref_N” or “noobsreref”                   | activates or de-activates observation re-referencing (with an optional pause after re-referencing runs)                         |
+| RLAMBDA1       | real         | zero or greater                                            | initial Marquardt lambda                                                                                                        |
+| RLAMFAC        | real         | positive or negative, but not zero                         | dictates Marquardt lambda adjustment process                                                                                    |
+| PHIRATSUF      | real         | between zero and one                                       | fractional objective function sufficient for end of current iteration                                                           |
+| PHIREDLAM      | real         | between zero and one                                       | termination criterion for Marquardt lambda search                                                                               |
+| NUMLAM         | integer      | one or greater; possibly negative with Parallel or BEOPEST | maximum number of Marquardt lambdas to test                                                                                     |
+| JACUPDATE      | integer      | zero or greater                                            | activation of Broyden’s Jacobian update procedure                                                                               |
+| LAMFORGIVE     | text         | “lamforgive” or “nolamforgive”                             | treat model run failure during lambda search as high objective function                                                         |
+| DERFORGIVE     | text         | “derforgive” or “noderforgive”                             | accommodates model failure during Jacobian runs by setting pertinent sensitivities to zero                                      |
+| RELPARMAX      | real         | greater than zero                                          | parameter relative change limit                                                                                                 |
+| FACPARMAX      | real         | greater than one                                           | parameter factor change limit                                                                                                   |
+| FACORIG        | real         | between zero and one                                       | minimum fraction of original parameter value in evaluating relative change                                                      |
+| ABSPARMAX(*N*) | real         | greater than zero                                          | parameter absolute change limit – *N’*th instance                                                                               |
+| IBOUNDSTICK    | integer      | zero or greater                                            | instructs PEST not to compute derivatives for parameter at its bounds                                                           |
+| UPVECBEND      | integer      | zero or one                                                | instructs PEST to bend parameter upgrade vector if parameter hits bounds                                                        |
+| PHIREDSWH      | real         | between zero and one                                       | sets objective function change for introduction of central derivatives                                                          |
+| NOPTSWITCH     | integer      | one or greater                                             | iteration before which PEST will not switch to central derivatives computation                                                  |
+| SPLITSWH       | real         | zero or greater                                            | the factor by which the objective function rises to invoke split slope derivatives analysis until end of run                    |
+| DOAUI          | text         | “aui”, “auid”, or “noaui”                                  | instructs PEST to implement automatic user intervention                                                                         |
+| DOSENREUSE     | text         | “senreuse” or “nosenreuse”                                 | instructs PEST to reuse parameter sensitivities                                                                                 |
+| BOUNDSCALE     | text         | “boundscale” or “noboundscale”                             | parameters are scaled by the inter-bounds interval if using singular value decomposition, LSQR or SVDA                          |
+| NOPTMAX        | integer      | -2, -1, 0, or any number greater than zero                 | number of optimization iterations                                                                                               |
+| PHIREDSTP      | real         | greater than zero                                          | relative objective function reduction triggering termination                                                                    |
+| NPHISTP        | integer      | greater than zero                                          | number of successive iterations over which PHIREDSTP applies                                                                    |
+| NPHINORED      | integer      | greater than zero                                          | number of iterations since last drop in objective function to trigger termination                                               |
+| RELPARSTP      | real         | greater than zero                                          | maximum relative parameter change triggering termination                                                                        |
+| NRELPAR        | integer      | greater than zero                                          | number of successive iterations over which RELPARSTP applies                                                                    |
+| PHISTOPTHRESH  | real         | zero or greater                                            | objective function threshold triggering termination                                                                             |
+| LASTRUN        | integer      | zero or one                                                | instructs PEST to undertake (or not) final model run with best parameters                                                       |
+| PHIABANDON     | real or text | a positive number or name of a file                        | objective function value at which to abandon optimization process or filename containing abandonment schedule                   |
+| ICOV           | integer      | zero or one                                                | record covariance matrix in matrix file                                                                                         |
+| ICOR           | integer      | zero or one                                                | record correlation coefficient matrix in matrix file                                                                            |
+| IEIG           | integer      | zero or one                                                | record eigenvectors in matrix file                                                                                              |
+| IRES           | integer      | zero or one                                                | record resolution data                                                                                                          |
+| JCOSAVE        | text         | “jcosave” or “nojcosave”                                   | save best Jacobian file as a JCO file - overwriting previously saved files of the same name as the inversion process progresses |
+| VERBOSEREC     | text         | “verboserec” or “noverboserec”                             | if set to “noverboserec”, parameter and observation data lists are omitted from the run record file                             |
+| JCOSAVEITN     | text         | “jcosaveitn” or “nojcosaveitn”                             | write current Jacobian matrix to iteration-specific JCO file at the end of every optimization iteration                         |
+| REISAVEITN     | text         | “reisaveitn” or “noreisaveitn”                             | store best-fit residuals to iteration-specific residuals file at end of every optimization iteration                            |
+| PARSAVEITN     | text         | “parsaveitn” or “noparsaveitn”                             | store iteration specific parameter value files                                                                                  |
+| PARSAVERUN     | text         | “parsaverun” or “noparsaverun”                             | store run specific parameter value files                                                                                        |
 
 Table A1.2 Variables in the optional “sensitivity reuse” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|:---|
-| SENRELTHRESH | real | zero to one | relative parameter sensitivity below which sensitivity reuse is activated for a parameter |
-| SENMAXREUSE | integer | integer other than zero | maximum number of reused sensitivities per iteration |
-| SENALLCALCINT | integer | greater than one | iteration interval at which all sensitivities re-calculated |
-| SENPREDWEIGHT | real | any number | weight to assign to prediction in computation of composite parameter sensitivities to determine sensitivity reuse |
-| SENPIEXCLUDE | text | “yes” or “no” | include or exclude prior information when computing composite parameter sensitivities to determine sensitivity reuse |
+| Variable  | Type | Values              | Description                                                                                                      |
+|---------------|----------|-------------------------|----------------------------------------------------------------------------------------------------------------------|
+| SENRELTHRESH  | real     | zero to one             | relative parameter sensitivity below which sensitivity reuse is activated for a parameter                            |
+| SENMAXREUSE   | integer  | integer other than zero | maximum number of reused sensitivities per iteration                                                                 |
+| SENALLCALCINT | integer  | greater than one        | iteration interval at which all sensitivities re-calculated                                                          |
+| SENPREDWEIGHT | real     | any number              | weight to assign to prediction in computation of composite parameter sensitivities to determine sensitivity reuse    |
+| SENPIEXCLUDE  | text     | “yes” or “no”           | include or exclude prior information when computing composite parameter sensitivities to determine sensitivity reuse |
 
 Table A1.3 Variables in the optional “automatic user intervention” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| MAXAUI | integer | zero or greater | maximum number of AUI iterations per optimization iteration |
-| AUISTARTOPT | integer | one or greater | optimization iteration at which to commence AUI |
-| NOAUIPHIRAT | real | between zero and one | relative objective function reduction threshold triggering AUI |
-| AUIRESTITN | integer | zero or greater, but not one | AUI rest interval expressed in optimization iterations |
-| AUISENSRAT | real | greater than one | composite parameter sensitivity ratio triggering AUI |
-| AUIHOLDMAXCHG | integer | zero or one | instructs PEST to target parameters which change most when deciding which parameters to hold |
-| AUINUMFREE | integer | greater than zero | cease AUI when only AUINUMFREE parameters are unheld |
-| AUIPHIRATSUF | real | between zero and one | relative objective function improvement for termination of AUI |
-| AUIPHIRATACCEPT | real | between zero and one | relative objective function reduction threshold for acceptance of AUI-calculated parameters |
-| NAUINOACCEPT | integer | greater than zero | number of iterations since acceptance of parameter change for termination of AUI |
+| Variable    | Type | Values                   | Description                                                                              |
+|-----------------|----------|------------------------------|----------------------------------------------------------------------------------------------|
+| MAXAUI          | integer  | zero or greater              | maximum number of AUI iterations per optimization iteration                                  |
+| AUISTARTOPT     | integer  | one or greater               | optimization iteration at which to commence AUI                                              |
+| NOAUIPHIRAT     | real     | between zero and one         | relative objective function reduction threshold triggering AUI                               |
+| AUIRESTITN      | integer  | zero or greater, but not one | AUI rest interval expressed in optimization iterations                                       |
+| AUISENSRAT      | real     | greater than one             | composite parameter sensitivity ratio triggering AUI                                         |
+| AUIHOLDMAXCHG   | integer  | zero or one                  | instructs PEST to target parameters which change most when deciding which parameters to hold |
+| AUINUMFREE      | integer  | greater than zero            | cease AUI when only AUINUMFREE parameters are unheld                                         |
+| AUIPHIRATSUF    | real     | between zero and one         | relative objective function improvement for termination of AUI                               |
+| AUIPHIRATACCEPT | real     | between zero and one         | relative objective function reduction threshold for acceptance of AUI-calculated parameters  |
+| NAUINOACCEPT    | integer  | greater than zero            | number of iterations since acceptance of parameter change for termination of AUI             |
 
 Table A1.4 Variables in the optional “singular value decomposition” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| SVDMODE | integer | zero or one | activates truncated singular value decomposition for solution of inverse problem |
-| MAXSING | integer | greater than zero | number of singular values at which truncation occurs |
-| EIGTHRESH | real | zero or greater, but less than one | eigenvalue ratio threshold for truncation |
-| EIGWRITE | integer | zero or one | determines content of SVD output file |
+| Variable | Type | Values                         | Description                                                                  |
+|--------------|----------|------------------------------------|----------------------------------------------------------------------------------|
+| SVDMODE      | integer  | zero or one                        | activates truncated singular value decomposition for solution of inverse problem |
+| MAXSING      | integer  | greater than zero                  | number of singular values at which truncation occurs                             |
+| EIGTHRESH    | real     | zero or greater, but less than one | eigenvalue ratio threshold for truncation                                        |
+| EIGWRITE     | integer  | zero or one                        | determines content of SVD output file                                            |
 
 Table A1.5 Variables in the optional “LSQR” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|----|
-| LSQRMODE | integer | zero or one | activates LSQR solution of inverse problem |
-| LSQR_ATOL | real | zero or greater | LSQR algorithm *atol* variable |
-| LSQR_BTOL | real | zero or greater | LSQR algorithm *btol* variable |
-| LSQR_CONLIM | real | zero or greater | LSQR algorithm *conlim* variable |
-| LSQR_ITNLIM | integer | greater than zero | LSQR algorithm *itnlim* variable |
-| LSQR_WRITE | integer | zero or one | instructs PEST to write LSQR file |
+| Variable | Type | Values        | Description                            |
+|--------------|----------|-------------------|--------------------------------------------|
+| LSQRMODE     | integer  | zero or one       | activates LSQR solution of inverse problem |
+| LSQR_ATOL    | real     | zero or greater   | LSQR algorithm *atol* variable             |
+| LSQR_BTOL    | real     | zero or greater   | LSQR algorithm *btol* variable             |
+| LSQR_CONLIM  | real     | zero or greater   | LSQR algorithm *conlim* variable           |
+| LSQR_ITNLIM  | integer  | greater than zero | LSQR algorithm *itnlim* variable           |
+| LSQR_WRITE   | integer  | zero or one       | instructs PEST to write LSQR file          |
 
 Table A1.6 Variables in the optional “SVD-assist” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|:---|
-| BASEPESTFILE | text | a filename | name of base PEST control file |
-| BASEJACFILE | text | a filename | name of base PEST Jacobian matrix file |
-| SVDA_MULBPA | integer | zero or one | instructs PEST to record multiple BPA files |
-| SVDA_SCALADJ | integer | -4 to 4 | sets type of parameter scaling undertaken in super parameter definition |
-| SVDA_EXTSUPER | integer | 0, 1, 2, -2, 3 | sets means used to calculate super parameters |
-| SVDA_SUPDERCALC | integer | zero or one | instructs PEST to compute super parameter sensitivities from base parameter sensitivities |
-| SVDA_PAR_EXCL | integer | 0, 1 or -1 | if set to 1, instructs PEST to compute super parameters on basis only of observation group in base parameter PEST control file to which pareto-adjustable weighting is assigned in super parameter PEST control file. If set to -1 all groups other than this form basis for super parameter definition |
+| Variable    | Type | Values     | Description                                                                                                                                                                                                                                                                                         |
+|-----------------|----------|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| BASEPESTFILE    | text     | a filename     | name of base PEST control file                                                                                                                                                                                                                                                                          |
+| BASEJACFILE     | text     | a filename     | name of base PEST Jacobian matrix file                                                                                                                                                                                                                                                                  |
+| SVDA_MULBPA     | integer  | zero or one    | instructs PEST to record multiple BPA files                                                                                                                                                                                                                                                             |
+| SVDA_SCALADJ    | integer  | -4 to 4        | sets type of parameter scaling undertaken in super parameter definition                                                                                                                                                                                                                                 |
+| SVDA_EXTSUPER   | integer  | 0, 1, 2, -2, 3 | sets means used to calculate super parameters                                                                                                                                                                                                                                                           |
+| SVDA_SUPDERCALC | integer  | zero or one    | instructs PEST to compute super parameter sensitivities from base parameter sensitivities                                                                                                                                                                                                               |
+| SVDA_PAR_EXCL   | integer  | 0, 1 or -1     | if set to 1, instructs PEST to compute super parameters on basis only of observation group in base parameter PEST control file to which pareto-adjustable weighting is assigned in super parameter PEST control file. If set to -1 all groups other than this form basis for super parameter definition |
 
 Table A1.7 Variables required for each parameter group in the “parameter groups” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| PARGPNME | text | 12 characters or less | parameter group name |
-| INCTYP | text | “relative”, “absolute”, “rel_to_max” | method by which parameter increments are calculated |
-| DERINC | real | greater than zero | absolute or relative parameter increment |
-| DERINCLB | real | zero or greater | absolute lower bound of relative parameter increment |
-| FORCEN | text | “switch”, “always_2”, “always_3”, “switch_5”, “always_5” | determines whether higher order derivatives calculation is undertaken |
-| DERINCMUL | real | greater than zero | derivative increment multiplier when undertaking higher order derivatives calculation |
-| DERMTHD | text | “parabolic”, “outside_pts”, “best_fit”, “minvar”, “maxprec” | method of higher order derivatives calculation |
-| SPLITTHRESH | real | greater than zero (or zero to deactivate) | slope threshold for split slope analysis |
-| SPLITRELDIFF | real | greater than zero | relative slope difference threshold for action |
-| SPLITACTION | text | text | “smaller”, “zero” or “previous” |
+| Variable | Type | Values                                                  | Description                                                                       |
+|--------------|----------|-------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| PARGPNME     | text     | 12 characters or less                                       | parameter group name                                                                  |
+| INCTYP       | text     | “relative”, “absolute”, “rel_to_max”                        | method by which parameter increments are calculated                                   |
+| DERINC       | real     | greater than zero                                           | absolute or relative parameter increment                                              |
+| DERINCLB     | real     | zero or greater                                             | absolute lower bound of relative parameter increment                                  |
+| FORCEN       | text     | “switch”, “always_2”, “always_3”, “switch_5”, “always_5”    | determines whether higher order derivatives calculation is undertaken                 |
+| DERINCMUL    | real     | greater than zero                                           | derivative increment multiplier when undertaking higher order derivatives calculation |
+| DERMTHD      | text     | “parabolic”, “outside_pts”, “best_fit”, “minvar”, “maxprec” | method of higher order derivatives calculation                                        |
+| SPLITTHRESH  | real     | greater than zero (or zero to deactivate)                   | slope threshold for split slope analysis                                              |
+| SPLITRELDIFF | real     | greater than zero                                           | relative slope difference threshold for action                                        |
+| SPLITACTION  | text     | text                                                        | “smaller”, “zero” or “previous”                                                       |
 
 Table A1.8 Variables required for each parameter in the “parameter data” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| PARNME | text | 12 characters or less | parameter name |
-| PARTRANS | text | “log”, “none”, “fixed”, “tied” | parameter transformation |
-| PARCHGLIM | text | “relative”, “factor”, or absolute(*N*) | type of parameter change limit |
-| PARVAL1 | real | any real number | initial parameter value |
-| PARLBND | real | less than or equal to PARVAL1 | parameter lower bound |
-| PARUBND | real | greater than or equal to PARVAL1 | parameter upper bound |
-| PARGP | text | 12 characters or less | parameter group name |
-| SCALE | real | any number other than zero | multiplication factor for parameter |
-| OFFSET | real | any number | number to add to parameter |
-| DERCOM | integer | zero or greater | model command line used in computing parameter increments |
-| PARTIED | text | 12 characters or less | the name of the parameter to which another parameter is tied |
+| Variable | Type | Values                             | Description                                              |
+|--------------|----------|----------------------------------------|--------------------------------------------------------------|
+| PARNME       | text     | 12 characters or less                  | parameter name                                               |
+| PARTRANS     | text     | “log”, “none”, “fixed”, “tied”         | parameter transformation                                     |
+| PARCHGLIM    | text     | “relative”, “factor”, or absolute(*N*) | type of parameter change limit                               |
+| PARVAL1      | real     | any real number                        | initial parameter value                                      |
+| PARLBND      | real     | less than or equal to PARVAL1          | parameter lower bound                                        |
+| PARUBND      | real     | greater than or equal to PARVAL1       | parameter upper bound                                        |
+| PARGP        | text     | 12 characters or less                  | parameter group name                                         |
+| SCALE        | real     | any number other than zero             | multiplication factor for parameter                          |
+| OFFSET       | real     | any number                             | number to add to parameter                                   |
+| DERCOM       | integer  | zero or greater                        | model command line used in computing parameter increments    |
+| PARTIED      | text     | 12 characters or less                  | the name of the parameter to which another parameter is tied |
 
 Table A1.9 Variables required for each observation group in the “observation groups” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|:---|
-| OBGNME | text | 12 characters or less | observation group name |
-| GTARG | real | positive | group-specific target measurement objective function |
-| COVFILE | text | a filename | covariance matrix file associated with group |
+| Variable | Type | Values            | Description                                      |
+|--------------|----------|-----------------------|------------------------------------------------------|
+| OBGNME       | text     | 12 characters or less | observation group name                               |
+| GTARG        | real     | positive              | group-specific target measurement objective function |
+| COVFILE      | text     | a filename            | covariance matrix file associated with group         |
 
 Table A1.10 Variables required for each observation in the “observation data” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|----|
-| OBSNME | text | 20 characters or less | observation name |
-| OBSVAL | real | any number | measured value of observation |
-| WEIGHT | real | zero or greater | observation weight |
-| OBGNME | text | 12 characters or less | observation group to which observation belongs |
+| Variable | Type | Values            | Description                                |
+|--------------|----------|-----------------------|------------------------------------------------|
+| OBSNME       | text     | 20 characters or less | observation name                               |
+| OBSVAL       | real     | any number            | measured value of observation                  |
+| WEIGHT       | real     | zero or greater       | observation weight                             |
+| OBGNME       | text     | 12 characters or less | observation group to which observation belongs |
 
 Table A1.11 Variables in the optional “derivatives command line” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|:---|
-| DERCOMLINE | text | system command | command to run model for derivatives calculation |
-| EXTDERFLE | text | a filename | name of external derivatives file |
+| Variable | Type | Values     | Description                                  |
+|--------------|----------|----------------|--------------------------------------------------|
+| DERCOMLINE   | text     | system command | command to run model for derivatives calculation |
+| EXTDERFLE    | text     | a filename     | name of external derivatives file                |
 
 Table A1.12 Variables in the “model command line” section of the PEST control file.
 
@@ -5536,74 +5581,74 @@ Table A1.14 Variables in the “model output” section of the PEST control file
 
 Table A1.15 Variables in the optional “prior information” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| PILBL | text | 20 characters or less | name of prior information equation |
-| PIFAC | text | real number other than zero | parameter value factor |
-| PARNME | text | 12 characters or less | parameter name |
-| PIVAL | real | any number | “observed value” of prior information equation |
-| WEIGHT | real | zero or greater | prior information weight |
-| OBGNME | text | 12 characters or less | observation group name |
+| Variable | Type | Values                  | Description                                |
+|--------------|----------|-----------------------------|------------------------------------------------|
+| PILBL        | text     | 20 characters or less       | name of prior information equation             |
+| PIFAC        | text     | real number other than zero | parameter value factor                         |
+| PARNME       | text     | 12 characters or less       | parameter name                                 |
+| PIVAL        | real     | any number                  | “observed value” of prior information equation |
+| WEIGHT       | real     | zero or greater             | prior information weight                       |
+| OBGNME       | text     | 12 characters or less       | observation group name                         |
 
 Table A1.16 Variables in the optional “predictive analysis” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|----|:---|
-| NPREDMAXMIN | integer | -1 or 1 | maximise or minimise prediction |
-| PREDNOISE | integer | 0 or 1 | instructs PEST to include predictive noise in prediction |
-| PD0 | real | greater than zero | target objective function |
-| PD1 | real | greater than PD0 | acceptable objective function |
-| PD2 | real | greater than PD1 | objective function at which Marquardt lambda testing procedure is altered as prediction is maximised/minimised |
-| ABSPREDLAM | real | zero or greater | absolute prediction change to terminate Marquardt lambda testing |
-| RELPREDLAM | real | zero or greater | relative prediction change to terminate Marquardt lambda testing |
-| INITSCHFAC | real | greater than zero | initial line search factor |
-| MULSCHFAC | real | greater than one | factor by which line search factors are increased along line |
-| NSEARCH | integer | greater than zero | maximum number of model runs in line search |
-| ABSPREDSWH | real | zero or greater | absolute prediction change at which to use central derivatives calculation |
-| RELPREDSWH | real | zero or greater | relative prediction change at which to use central derivatives calculation |
-| NPREDNORED | integer | one or greater | iterations since prediction raised/lowered at which termination is triggered |
-| ABSPREDSTP | real | zero or greater | absolute prediction change at which to trigger termination |
-| RELPREDSTP | real | zero or greater | relative prediction change at which to trigger termination |
-| NPREDSTP | integer | two or greater | number of iterations over which ABSPREDSTP and RELPREDSTP apply |
+| Variable | Type | Values        | Description                                                                                                |
+|--------------|----------|-------------------|----------------------------------------------------------------------------------------------------------------|
+| NPREDMAXMIN  | integer  | -1 or 1           | maximise or minimise prediction                                                                                |
+| PREDNOISE    | integer  | 0 or 1            | instructs PEST to include predictive noise in prediction                                                       |
+| PD0          | real     | greater than zero | target objective function                                                                                      |
+| PD1          | real     | greater than PD0  | acceptable objective function                                                                                  |
+| PD2          | real     | greater than PD1  | objective function at which Marquardt lambda testing procedure is altered as prediction is maximised/minimised |
+| ABSPREDLAM   | real     | zero or greater   | absolute prediction change to terminate Marquardt lambda testing                                               |
+| RELPREDLAM   | real     | zero or greater   | relative prediction change to terminate Marquardt lambda testing                                               |
+| INITSCHFAC   | real     | greater than zero | initial line search factor                                                                                     |
+| MULSCHFAC    | real     | greater than one  | factor by which line search factors are increased along line                                                   |
+| NSEARCH      | integer  | greater than zero | maximum number of model runs in line search                                                                    |
+| ABSPREDSWH   | real     | zero or greater   | absolute prediction change at which to use central derivatives calculation                                     |
+| RELPREDSWH   | real     | zero or greater   | relative prediction change at which to use central derivatives calculation                                     |
+| NPREDNORED   | integer  | one or greater    | iterations since prediction raised/lowered at which termination is triggered                                   |
+| ABSPREDSTP   | real     | zero or greater   | absolute prediction change at which to trigger termination                                                     |
+| RELPREDSTP   | real     | zero or greater   | relative prediction change at which to trigger termination                                                     |
+| NPREDSTP     | integer  | two or greater    | number of iterations over which ABSPREDSTP and RELPREDSTP apply                                                |
 
 Table A1.17 Variables in the optional “regularization” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| PHIMLIM | real | greater than zero | target measurement objective function |
-| PHIMACCEPT | real | greater than PHIMLIM | acceptable measurement objective function |
-| FRACPHIM | real | zero or greater, but less than one | set target measurement objective function at this fraction of current measurement objective function |
-| MEMSAVE | text | “memsave” or “nomemsave” | activate conservation of memory at cost of execution speed and quantity of model output |
-| WFINIT | real | greater than zero | initial regularization weight factor |
-| WFMIN | real | greater than zero | minimum regularization weight factor |
-| WFMAX | real | greater than WFMAX | maximum regularization weight factor |
-| LINREG | text | “linreg” or “nonlinreg” | informs PEST that all regularization constraints are linear |
-| REGCONTINUE | text | “continue” or “nocontinue” | instructs PEST to continue minimising regularization objective function even if measurement objective function less than PHIMLIM |
-| WFFAC | real | greater than one | regularization weight factor adjustment factor |
-| WFTOL | real | greater than zero | convergence criterion for regularization weight factor |
-| IREGADJ | integer | 0, 1, 2, 3, 4 or 5 | instructs PEST to perform inter-regularization group weight factor adjustment, or to compute new relative weights for regularization observations and prior information equations |
-| NOPTREGADJ | integer | one or greater | the optimization iteration interval for re-calculation of regularization weights if IREGADJ is 4 or 5 |
-| REGWEIGHTRAT | real | absolute value of one or greater | the ratio of highest to lowest regularization weight; spread is logarithmic with null space projection if set negative |
-| REGSINGTHRESH | real | less than one and greater than zero | singular value of J<sup>t</sup>QJ (as factor of highest singular value) at which use of higher regularization weights commences if IREGADJ is set to 5 |
+| Variable  | Type | Values                          | Description                                                                                                                                                                   |
+|---------------|----------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PHIMLIM       | real     | greater than zero                   | target measurement objective function                                                                                                                                             |
+| PHIMACCEPT    | real     | greater than PHIMLIM                | acceptable measurement objective function                                                                                                                                         |
+| FRACPHIM      | real     | zero or greater, but less than one  | set target measurement objective function at this fraction of current measurement objective function                                                                              |
+| MEMSAVE       | text     | “memsave” or “nomemsave”            | activate conservation of memory at cost of execution speed and quantity of model output                                                                                           |
+| WFINIT        | real     | greater than zero                   | initial regularization weight factor                                                                                                                                              |
+| WFMIN         | real     | greater than zero                   | minimum regularization weight factor                                                                                                                                              |
+| WFMAX         | real     | greater than WFMAX                  | maximum regularization weight factor                                                                                                                                              |
+| LINREG        | text     | “linreg” or “nonlinreg”             | informs PEST that all regularization constraints are linear                                                                                                                       |
+| REGCONTINUE   | text     | “continue” or “nocontinue”          | instructs PEST to continue minimising regularization objective function even if measurement objective function less than PHIMLIM                                                  |
+| WFFAC         | real     | greater than one                    | regularization weight factor adjustment factor                                                                                                                                    |
+| WFTOL         | real     | greater than zero                   | convergence criterion for regularization weight factor                                                                                                                            |
+| IREGADJ       | integer  | 0, 1, 2, 3, 4 or 5                  | instructs PEST to perform inter-regularization group weight factor adjustment, or to compute new relative weights for regularization observations and prior information equations |
+| NOPTREGADJ    | integer  | one or greater                      | the optimization iteration interval for re-calculation of regularization weights if IREGADJ is 4 or 5                                                                             |
+| REGWEIGHTRAT  | real     | absolute value of one or greater    | the ratio of highest to lowest regularization weight; spread is logarithmic with null space projection if set negative                                                            |
+| REGSINGTHRESH | real     | less than one and greater than zero | singular value of J<sup>t</sup>QJ (as factor of highest singular value) at which use of higher regularization weights commences if IREGADJ is set to 5                    |
 
 Table A1.18 Variables in the optional “pareto” section of the PEST control file.
 
-| Variable | Type | Values | Description |
-|----|----|:---|:---|
-| PARETO_OBSGROUP | text | 12 characters or less | name of observation group whose weights are subject to multiplication by a variable weight factor |
-| PARETO_WTFAC_START | real | zero or greater | initial weight factor for user-specified observation group |
-| PARETO_WTFAC_FIN | real | greater than PARETO_WTFAC_START | final weight factor for user-specified observation group |
-| NUM_WTFAC_INT | integer | greater than zero | number of weight factor increments to employ in traversing Pareto front |
-| NUM_ITER_START | integer | zero or greater | number of optimization iterations to employ when using initial weight factor |
-| NUM_ITER_GEN | integer | greater than zero | number of optimization iterations to employ when using any weight factor other than PARETO_WTFAC_START or PARETO_WTFAC_FIN |
-| NUM_ITER_FIN | integer | zero or greater | number of optimization iterations to employ when using final weight factor |
-| ALT_TERM | integer | zero or one | set to one in order to activate PEST termination determined by value of a specified model output |
-| OBS_TERM | text | 20 characters or less | the name of an observation cited in the “observation data” section of the PEST control file whose value will be monitored for possible PEST run termination |
-| ABOVE_OR_BELOW | text | “above” or “below” | determines whether the monitored model output must be above or below the threshold to precipitate run termination |
-| OBS_THRESH | real | any number | value that monitored model output must exceed or undercut to precipitate model run termination |
-| ITER_THRESH | integer | zero or greater | the number of optimization iterations for which the model output threshold must be exceeded or undercut to precipitate run termination |
-| NOBS_REPORT | integer | zero or greater | number of model outputs whose values to report |
-| OBS_REPORT_N | text | 20 characters or less | the name of the *N*’th observation whose value is reported in the POD and PPD files written by PEST when run in “pareto” mode |
+| Variable       | Type | Values                      | Description                                                                                                                                             |
+|--------------------|----------|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PARETO_OBSGROUP    | text     | 12 characters or less           | name of observation group whose weights are subject to multiplication by a variable weight factor                                                           |
+| PARETO_WTFAC_START | real     | zero or greater                 | initial weight factor for user-specified observation group                                                                                                  |
+| PARETO_WTFAC_FIN   | real     | greater than PARETO_WTFAC_START | final weight factor for user-specified observation group                                                                                                    |
+| NUM_WTFAC_INT      | integer  | greater than zero               | number of weight factor increments to employ in traversing Pareto front                                                                                     |
+| NUM_ITER_START     | integer  | zero or greater                 | number of optimization iterations to employ when using initial weight factor                                                                                |
+| NUM_ITER_GEN       | integer  | greater than zero               | number of optimization iterations to employ when using any weight factor other than PARETO_WTFAC_START or PARETO_WTFAC_FIN                                  |
+| NUM_ITER_FIN       | integer  | zero or greater                 | number of optimization iterations to employ when using final weight factor                                                                                  |
+| ALT_TERM           | integer  | zero or one                     | set to one in order to activate PEST termination determined by value of a specified model output                                                            |
+| OBS_TERM           | text     | 20 characters or less           | the name of an observation cited in the “observation data” section of the PEST control file whose value will be monitored for possible PEST run termination |
+| ABOVE_OR_BELOW     | text     | “above” or “below”              | determines whether the monitored model output must be above or below the threshold to precipitate run termination                                           |
+| OBS_THRESH         | real     | any number                      | value that monitored model output must exceed or undercut to precipitate model run termination                                                              |
+| ITER_THRESH        | integer  | zero or greater                 | the number of optimization iterations for which the model output threshold must be exceeded or undercut to precipitate run termination                      |
+| NOBS_REPORT        | integer  | zero or greater                 | number of model outputs whose values to report                                                                                                              |
+| OBS_REPORT_N       | text     | 20 characters or less           | the name of the *N*’th observation whose value is reported in the POD and PPD files written by PEST when run in “pareto” mode                               |
 
 **Appendix**
 **B.1**
@@ -5621,7 +5666,7 @@ The specifications of a matrix file are illustrated by example. A PEST-compatibl
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>3 4 2<br>
 3.4423 23.323 2.3232 1.3232<br>
 5.4231 3.3124 4.4331 3.4442<br>
@@ -5658,7 +5703,7 @@ A special ICODE value is reserved for diagonal matrices. If NCOL is equal to NRO
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>5 5 -1<br>
 4.5<br>
 4.5<br>
@@ -5693,7 +5738,7 @@ Figure B.3 illustrates an uncertainty file.
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>~ An example of an uncertainty file<br>
 START STANDARD_DEVIATION<br>
 std_multiplier 3.0<br>
@@ -5781,12 +5826,11 @@ A JCO file is a binary file. It is used by members of the PEST and PEST++ suites
 Specifications are shown in Figure B.4.1
 
 <div style="text-align: left"><table>
-</div><caption>Figure B.4.1. Protocol of a JCO file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>negncol, nrow 32 bit integers<br>
 ncount 32 bit integer<br>
 index, value 32 bit integer, 64 bit real<br>
@@ -5801,16 +5845,18 @@ obsname 20 bit character<br>
 </tbody>
 </table>
 
+Figure B.4.1. Protocol of a JCO file.
+
 Variables cited in figure B.4.1 are as follows:
 
-| Variable name | Role |
-|----|----|
-| negncol | Negative of the number of columns in the matrix |
-| nrow | Number of rows in the matrix |
-| index | Index number of matrix element. Indices starts at 1. The index of an element is computed as (icol-1)\*nrow+icol |
-| value | The value of the matrix element |
-| parname | The name of a matrix column |
-| obsname | The name of a matrix row |
+| Variable name | Role                                                                                                        |
+|-------------------|-----------------------------------------------------------------------------------------------------------------|
+| negncol           | Negative of the number of columns in the matrix                                                                 |
+| nrow              | Number of rows in the matrix                                                                                    |
+| index             | Index number of matrix element. Indices starts at 1. The index of an element is computed as (icol-1)\*nrow+icol |
+| value             | The value of the matrix element                                                                                 |
+| parname           | The name of a matrix column                                                                                     |
+| obsname           | The name of a matrix row                                                                                        |
 
 If a value is not provided for a particular matrix element in a JCO file, its value is assumed to be zero.
 
@@ -5822,12 +5868,11 @@ A JCB file is a binary file. It is used by members of the PEST++ suite to hold a
 Specifications are shown in Figure B.5.2.
 
 <div style="text-align: left"><table>
-</div><caption>Figure B.5.2. Protocol of a JCB file.<br></caption>
-<colgroup>
+</div><colgroup>
 <col style="width: 100%" />
 </colgroup>
 <thead>
-<tr>
+<tr class="header">
 <th>ncol, nrow 32 bit integers<br>
 ncount 32 bit integer<br>
 irow, icol, value 32 bit integer, 32 bit integer, 64 bit real<br>
@@ -5841,6 +5886,8 @@ rowname 200 bit character<br>
 <tbody>
 </tbody>
 </table>
+
+Figure B.5.2. Protocol of a JCB file.
 
 Variables cited in figure B.4.1 are as follows:
 

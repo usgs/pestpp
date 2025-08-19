@@ -51,7 +51,7 @@ const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave 
 const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
-const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
+const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.01; //minimum avg runtime to try to kill and/or resched runs
 //const int RunManagerPanther::MILLISECONDS_BETWEEN_ECHOS = 10;
 //const int RunManagerPanther::TIMEOUT_MILLISECONDS = 10;
 
@@ -274,7 +274,7 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
 	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo, const vector<string>& par_names,
-	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds)
+	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds, bool _persistent_workers)
 
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
@@ -282,7 +282,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
 	idle_thread(nullptr), should_echo(_should_echo),nftx(0),timeout_milliseconds(_timeout_milliseconds),
-    echo_interval_milliseconds(_echo_interval_milliseconds)
+    echo_interval_milliseconds(_echo_interval_milliseconds),persistent_workers(_persistent_workers)
 {
 
 	const char * t =
@@ -691,6 +691,29 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 
 
     // Resume idle pinging thread
+
+    if (!persistent_workers) {
+        stringstream ss;
+
+        std::list<list<AgentInfoRec>::iterator> free_agent_list = get_free_agent_list();
+        list<AgentInfoRec>::iterator it_agent, iter_e;
+        for (int i=0;i<free_agent_list.size();i++) {
+            for (it_agent = agent_info_set.begin(), iter_e = agent_info_set.end();
+                 it_agent != iter_e; ++it_agent) {
+                AgentInfoRec::State state = it_agent->get_state();
+                if (state == AgentInfoRec::State::WAITING) {
+                    ss.str("");
+                    ss << "using non-persistent agents, closed connection to agent: " << it_agent->get_socket_name()
+                       << ", number of agents: " << socket_to_iter_map.size();
+                    close_agent(it_agent);
+
+
+                    report(ss.str(), false);
+                    break;
+                }
+            }
+        }
+    }
     resume_idle();
 
 	return terminate_reason;
@@ -1221,6 +1244,35 @@ void RunManagerPanther::schedule_runs()
 			cout << "exception trying to find overdue runs: " << endl << e.what() << endl;
 		}
 	}
+    if ((!persistent_workers) && (waiting_runs.size() < free_agent_list.size()))
+    {
+        stringstream ss;
+        free_agent_list = get_free_agent_list();
+        int num_to_close = free_agent_list.size() - waiting_runs.size();
+        list<AgentInfoRec>::iterator it_agent, iter_e;
+
+        int closed = 0;
+
+        for (int i=0;i<num_to_close;i++)
+        {
+            for (it_agent = agent_info_set.begin(), iter_e = agent_info_set.end();
+                 it_agent != iter_e; ++it_agent) {
+                AgentInfoRec::State state = it_agent->get_state();
+                if (state == AgentInfoRec::State::WAITING) {
+                    ss.str("");
+                    ss << "using non-persistent agents, closed connection to agent: " << it_agent->get_socket_name()
+                       << ", number of agents: " << socket_to_iter_map.size();
+                    close_agent(it_agent);
+                    closed++;
+
+
+                    report(ss.str(), false);
+                    break;
+                }
+            }
+        }
+
+    }
 }
 
 int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents)

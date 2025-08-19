@@ -286,6 +286,7 @@ void sequentialLP::initialize_and_check()
 	vector<string> ext_var_groups = pest_scenario.get_pestpp_options().get_opt_ext_var_groups();
 	dec_var_groups.insert(dec_var_groups.begin(), ext_var_groups.begin(), ext_var_groups.end());
 	dv_names.clear();
+	ParameterGroupInfo pinfo = pest_scenario.get_base_group_info();
 	//if the ++opt_dec_var_groups arg was passed
 	if (dec_var_groups.size() != 0)
 	{
@@ -327,17 +328,41 @@ void sequentialLP::initialize_and_check()
 	//if any decision vars have a transformation that is not allowed
 	vector<string> problem_trans;
 	vector<string> temp_dv_names;
-    vector<string> tied_dv_names;
-    //this should just skip over fixed dvs
-    for (auto &name : dv_names)
-    {
+	vector<string> tied_dv_names;
+	map<string,double> grp_derinc;
+	string group;
+	int group_len_max = 20;
+
+	//this should just skip over fixed dvs
+	for (auto &name : dv_names)
+	{
 		if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
-            temp_dv_names.push_back(name);
-        else if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::TIED)
-             tied_dv_names.push_back(name);
-        else if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::LOG)
+			temp_dv_names.push_back(name);
+		else if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::TIED)
+			tied_dv_names.push_back(name);
+		else if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::LOG)
 			problem_trans.push_back(name);
-    }
+
+		group = pinfo.get_group_name(name);
+		grp_derinc[group] = pinfo.get_group_rec(name).derinc;
+		group_len_max = max(group_len_max,(int)group.size());
+	}
+
+	f_rec << endl << "   --- DERINC summary ---   " << endl;
+	f_rec << setw(group_len_max) << left << "group name" << setw(20) << right << "derinc" << endl;
+	bool warn_derinc = false;
+	for (auto& item : grp_derinc) {
+		f_rec << setw(group_len_max) << left <<  item.first << setw(20) << right << setprecision(10) << item.second << endl;
+		if ((item.second<=0.05) && (pinfo.get_group_by_groupname(item.first).inctyp != "ABSOLUTE"))
+		{
+			warn_derinc = true;
+		}
+	}
+	f_rec << endl;
+	if (warn_derinc) {
+		cout << "WARNING: at least one decision variable group has a very small 'derinc' value, PESTPP-OPT needs larger perturbation values" << endl;
+		f_rec << "WARNING: at least one decision variable group has a very small 'derinc' value, PESTPP-OPT needs larger perturbation values" << endl;
+	}
     if (!problem_trans.empty())
 		throw_sequentialLP_error("the following decision variables have 'log' type parameter transformation: ", problem_trans);
     if (!tied_dv_names.empty())
@@ -705,6 +730,9 @@ CoinPackedMatrix sequentialLP::jacobian_to_coinpackedmatrix()
 void sequentialLP::solve()
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
+	ofstream &f_obj = file_mgr_ptr->open_ofile_ext("slp.iobj.csv");
+
+	f_obj << "iteration,objective_function" << endl;
 
 	slp_iter = 1;
 	while (true)
@@ -719,6 +747,10 @@ void sequentialLP::solve()
 		iter_presolve();
         iter_solve();
         iter_postsolve();
+		if (iter_obj_values.size() > 0)
+		{
+			f_obj << slp_iter << "," << iter_obj_values.at(iter_obj_values.size()-1) << endl;
+		}
 		if (terminate) break;
 		slp_iter++;
 		if (slp_iter > pest_scenario.get_control_info().noptmax)
@@ -732,6 +764,8 @@ void sequentialLP::solve()
 
         }
 	}
+	f_obj.close();
+
 	f_rec << endl << "  ---  objective function sequence  ---   " << endl << setw(10) << "iteration" << setw(15) << "obj func" << endl;
 	int i = 0;
 	for (auto &obj : iter_obj_values)

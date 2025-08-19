@@ -52,7 +52,11 @@ def basic_test(model_d="ies_10par_xsec"):
     shutil.copytree(base_d, new_d)
     print(platform.platform().lower())
     pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
-    print(pst.model_command)
+    cmd = pst.model_command[0].split()
+    print(cmd)
+    cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
+    print(cmd)
+    pst.model_command.append(cmd)
     
     # set first par as fixed
     #pst.parameter_data.loc[pst.par_names[0], "partrans"] = "fixed"
@@ -1465,6 +1469,8 @@ def build_and_draw_prior(t_d="ends",num_reals=500):
     pe.to_binary(os.path.join(t_d,"prior.jcb"))
 
 
+
+
 def run():
     model_d = "mf6_freyberg"
     t_d = os.path.join(model_d,"template")
@@ -1967,10 +1973,72 @@ def large_fake_test():
 
 
 
+def mf6_v5_ies_nonpersistent_test():
+    model_d = "mf6_freyberg"
+
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_ies_glm_loc")
+    #if os.path.exists(m_d):
+    #    shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pyemu.os_utils.run("{0} freyberg6_run_ies.pst".format(exe_path),cwd=t_d)
+
+    pst.control_data.noptmax = -1
+    par = pst.parameter_data
+
+    eff_lb = (par.parlbnd + (np.abs(par.parlbnd.values)*.01)).to_dict()
+    eff_ub = (par.parubnd - (np.abs(par.parlbnd.values)*.01)).to_dict()
+    log_idx = par.partrans.apply(lambda x: x=="log").to_dict()
+    for p,log in log_idx.items():
+        if log:
+            lb = np.log10(par.loc[p,"parlbnd"])
+            eff_lb[p] = (lb + (np.abs(lb)*.01))
+            ub = np.log10(par.loc[p,"parubnd"])
+            eff_ub[p] = (ub - (np.abs(ub)*.01))
+
+    pargp_map = par.groupby(par.pargp).groups
+    print(pargp_map)
+
+
+    m_d = None
+    m_d = os.path.join(model_d, "master_ies_nonpersist")
+    if os.path.exists(m_d):
+         shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.pestpp_options.pop("ies_localizer",None)
+    pst.pestpp_options.pop("ies_autoadaloc",None)
+    pst.pestpp_options["panther_persistent_workers"] = False
+    pst.pestpp_options["ies_bad_phi_sigma"] = 2.5
+    pst.pestpp_options["ies_num_reals"] = 100
+    pst.pestpp_options["ensemble_output_precision"] = 40
+    pst.pestpp_options["panther_master_timeout_milliseconds"] = 1000
+    pst.control_data.noptmax = -1
+    pst_name = "freyberg6_run_ies_nonpersist.pst"
+    pst.write(os.path.join(t_d, pst_name))
+    num_workers = 15
+    pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=num_workers,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+    found = 0
+    with open(os.path.join(m_d,pst_name.replace(".pst",".rmr")),'r') as f:
+        for line in f:
+            if "using non-persistent agents" in line:
+                found += 1
+    print("found: ",found,"num workers: ",num_workers)
+    assert found ==  num_workers
+
+
+
+
 
 if __name__ == "__main__":
-    large_fake_test()
-    exit()
+    basic_test()
+
+    #mf6_v5_ies_nonpersistent_test()
+    #large_fake_test()
+    #exit()
     #sweep_large_xfer_test()
     #sweep_bin_test()
     #exit()
@@ -1996,7 +2064,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    # cmdline_test()
+    #cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
@@ -2028,7 +2096,7 @@ if __name__ == "__main__":
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
-    #mf6_v5_opt_stack_test()
+    mf6_v5_opt_stack_test()
     # mf6_v5_glm_test()
     # mf6_v5_ies_test()
     #cmdline_test()
@@ -2039,5 +2107,4 @@ if __name__ == "__main__":
     #tplins1_test()
 
     #mf6_v5_glm_test()
-    mf6_v5_ies_test()
     #mf6_v5_sen_test()

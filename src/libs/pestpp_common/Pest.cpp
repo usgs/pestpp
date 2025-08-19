@@ -469,7 +469,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 	return process_ctl_file(fin, _pst_filename, f_out);
 }
 
-
+bool IsQuote(char c)
+{
+    switch(c)
+    {
+        case '\"':
+        case '\'':
+            return true;
+        default:
+            return false;
+    }
+}
 
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
@@ -1025,7 +1035,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		
 			else if (section == "MODEL COMMAND LINE")
 			{
-				model_exec_info.comline_vec.push_back(line);
+                if ((line.find('\"') != std::string::npos) || (line.find('\'') != std::string::npos))
+                {
+                    ss.str("");
+                    ss << "WARNING: single and/or double quote char(s) found in model command line :" << line << endl;
+                    string temp_line = line;
+                    temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                    //pest_utils::strip_ip(temp_line);
+
+                    ss << "         new model command line: " << temp_line << endl;
+                    cout << ss.str();
+                    f_rec << ss.str();
+                    model_exec_info.comline_vec.push_back(string(temp_line));
+                }
+                else
+                {
+                    model_exec_info.comline_vec.push_back(line);
+                }
 			}
 
 			else if (section == "MODEL INPUT")
@@ -1525,7 +1551,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
-		for (auto p : upgrade_ctl_pars)
+		for (auto& p : upgrade_ctl_pars)
 		{
 			/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
 				cout << p.first << endl;*/
@@ -3015,6 +3041,7 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 	if (s_obgnme.find(pi_name_group.second) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+        s_obgnme.emplace(pi_name_group.second);
 	}
 	
 }
@@ -3111,6 +3138,8 @@ void Pest::release_unused_for_agent()
     //base_group_info.clear();
     prior_info.clear();
     base_group_info.free_mem();
+    regul_scheme_ptr = NULL;
+
 }
 
 

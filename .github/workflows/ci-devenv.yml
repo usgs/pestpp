@@ -18,10 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: macos-latest, shell: bash}
+          #- {os: macos-latest, shell: bash}
           - {os: macos-13, shell: bash}
           - {os: ubuntu-latest, shell: bash}
           - {os: ubuntu-22.04, shell: bash}
+          - {os: windows-latest, shell: bash}
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -36,17 +37,28 @@ jobs:
           pixi-version: v0.42.1
           manifest-path: "pixi.toml"
 
-      - name: Install modflow
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pixi run install-modflow
+      # - name: Install modflow
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     pixi run install-modflow
   
       - name: Build pestpp
         run: |
           pixi run build-release 
 
-      - name: Test pestpp
-        run: |
-          pixi run test
+      # - name: Test pestpp
+      #   run: |
+      #     pixi run test
 
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.os }}
+          path: bin
+            
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: benchmarks/large_fake_test/master

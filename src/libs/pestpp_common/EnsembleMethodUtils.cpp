@@ -2503,6 +2503,61 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 	return sqrt(var / (phi_map->size() - 1));
 }
 
+double L2PhiHandler::calc_median(const std::vector<double>& values) {
+	size_t const size = values.size();
+	if (size % 2 != 0) {
+		// odd number of elements: median is the middle element
+		return values[size / 2];
+	} else {
+		// even number of elements: median is the average of the two middle elements
+		return (values[(size / 2) - 1] + values[size / 2]) / 2.0;
+	}
+}
+double L2PhiHandler::calc_iqr_thresh(map<string, double> *phi_map, double bad_phi_sigma) {
+	// get the phi map
+	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
+
+	// put the values into a vector
+	std::vector<double> values;
+	for (; pi != end; ++pi)
+		values.push_back(pi->second);
+	//for (const auto& pair : pi) {
+	//	values.push_back(pair.second);
+	//}
+	// sort 'em
+	std::sort(values.begin(), values.end());
+	// calc the median depending on vector size
+	double median = calc_median(values);
+
+	// get the total size
+	int const n = values.size();
+
+	// q1: median of the lower half)
+	std::vector<double> lower_half;
+	for (int i = 0; i < n / 2; ++i) {
+		lower_half.push_back(values[i]);
+	}
+	const double q1 = calc_median(lower_half);
+
+	// q3: median of the upper half)
+	std::vector<double> upper_half;
+	// Handle odd/even cases for upper half starting point
+	int upper_half_start_index = (n % 2 == 0) ? n / 2 : n / 2 + 1;
+	for (int i = upper_half_start_index; i < n; ++i) {
+		upper_half.push_back(values[i]);
+	}
+	const double q3 = calc_median(upper_half);
+
+	// calculate iqr
+	const double iqr =  q3 - q1;
+
+	// return the threshold
+	if (bad_phi_sigma<0)
+		bad_phi_sigma = -1*bad_phi_sigma;
+	return q3+bad_phi_sigma*iqr;
+}
+
+
 double L2PhiHandler::get_representative_phi(phiType pt)
 {
     //if (pest_scenario->get_pestpp_options().get_ies_n_iter_reinflate() < 0)
@@ -3103,21 +3158,19 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	if (bad_phi_sigma < std::numeric_limits<double>::max()) {
         if (bad_phi_sigma > 0) {
             bad_thres = min(std::numeric_limits<double>::max(), mean + (std * bad_phi_sigma));
+
             ofstream &frec = file_manager->rec_ofstream();
             frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of "
                  << bad_thres << endl;
         } else {
-            vector<double> meas_vec;
-            for (auto &m : _meas)
-                meas_vec.push_back(m.second);
-            sort(meas_vec.begin(), meas_vec.end());
-            double qval = -1. * bad_phi_sigma / 100.;
-            int qidx = (int) (qval * (double) meas_vec.size());
-            qidx = max(0, qidx);
-            qidx = min(((int) meas_vec.size()) - 2, qidx);
-            bad_thres = min(std::numeric_limits<double>::max(),meas_vec[qidx]);
+            const double qval = -1. * bad_phi_sigma;
+            bad_thres = min(std::numeric_limits<double>::max(),calc_iqr_thresh(&_meas, bad_phi_sigma));//Q3 + bad_phi_sigma * IQR
             ofstream &frec = file_manager->rec_ofstream();
-            frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
+            frec << "...bad_phi_sigma interquartile factor " << qval << " yields bad phi threshold of " << bad_thres << endl;
+        	if (qval > 3.) {
+        		frec << "WARNING:...bad_phi_sigma interquartile factor " << qval << " greater than 3.0 may be too large... " << endl;
+
+        	}
 
         }
     }

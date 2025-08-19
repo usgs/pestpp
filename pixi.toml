@@ -14,7 +14,7 @@ pyemu = "*"
 
 [tasks]
 # install
-install-modflow = "get-modflow --repo modflow6 $CONDA_PREFIX/bin"
+install-modflow = "get-modflow --repo executables $CONDA_PREFIX/bin"
 
 # debug build
 configure-debug = { cmd = "cmake -G Ninja -S . -B .build -DCMAKE_BUILD_TYPE=Debug", depends-on = ["clean-build"], outputs = [".build/"] }
