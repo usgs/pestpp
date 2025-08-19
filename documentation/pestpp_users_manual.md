@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.21
+# <a id='s1' />Version 5.2.22
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-July 2025
+August 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -27,7 +27,6 @@ On a personal note, thanks are also due to the following people who have contrib
 
 - Randy Hunt (USGS)
 
-
 - Wes Kitlasten (GNS Science)
 
 - Matt Knowling (GNS Science)
@@ -42,7 +41,13 @@ On a personal note, thanks are also due to the following people who have contrib
 
 - Ayman Alzraiee (USGS)
 
-- Zak Stanko (USGS)
+- Joe Hughes (INTERA)
+
+- Rui Hugman (INTERA)
+
+- Katie Markovich (INTERA)
+
+- Reygie Macasieb (INTERA)
 
 # <a id='s3' />Preface
 
