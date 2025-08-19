@@ -238,7 +238,7 @@ unsigned long Serialization::unserialize(const vector<int8_t> &ser_data, vector<
 {
 	unsigned total_bytes_read = 0;
 	assert(start_loc < ser_data.size());
-	total_bytes_read = min(ser_data.size()-start_loc, max_read_bytes);
+	total_bytes_read = min<unsigned long>((unsigned long)(ser_data.size()-start_loc), max_read_bytes);
 	string tmp_str = NetPackage::extract_string(ser_data, start_loc, total_bytes_read);
 	//string tmp_str(ser_data.begin()+start_loc, ser_data.begin()+start_loc+total_bytes_read);
 	string delm;
