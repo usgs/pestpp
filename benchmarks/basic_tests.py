@@ -52,7 +52,11 @@ def basic_test(model_d="ies_10par_xsec"):
     shutil.copytree(base_d, new_d)
     print(platform.platform().lower())
     pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
-    print(pst.model_command)
+    cmd = pst.model_command[0].split()
+    print(cmd)
+    cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
+    print(cmd)
+    pst.model_command.append(cmd)
     
     # set first par as fixed
     #pst.parameter_data.loc[pst.par_names[0], "partrans"] = "fixed"
@@ -1465,6 +1469,8 @@ def build_and_draw_prior(t_d="ends",num_reals=500):
     pe.to_binary(os.path.join(t_d,"prior.jcb"))
 
 
+
+
 def run():
     model_d = "mf6_freyberg"
     t_d = os.path.join(model_d,"template")
@@ -2026,8 +2032,11 @@ def mf6_v5_ies_nonpersistent_test():
 
 
 
+
 if __name__ == "__main__":
-    mf6_v5_ies_nonpersistent_test()
+    basic_test()
+
+    #mf6_v5_ies_nonpersistent_test()
     #large_fake_test()
     #exit()
     #sweep_large_xfer_test()
@@ -2055,7 +2064,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    # cmdline_test()
+    #cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()

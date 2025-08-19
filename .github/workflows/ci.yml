@@ -37,7 +37,7 @@ jobs:
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part4.py"}
           - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp-glm_benchmarks", test_script: "../benchmarks/glm_test_base.py"}
           - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests.py"}
-          #- { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests_2.py"}
+          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_ppd_fitness_tests.py"}
           - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/henry_test.py"}
           - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "../benchmarks/da_tests.py"}
           - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "../benchmarks/lorenz96_tests.py"}
