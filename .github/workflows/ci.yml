@@ -93,7 +93,7 @@ jobs:
     #     # use-only-tar-bz2: true
 
     - name: setup micromamba
-      uses: mamba-org/setup-micromamba@v1
+      uses: mamba-org/setup-micromamba@v2
       with:
         environment-file: etc/environment.yml
         cache-environment: false
