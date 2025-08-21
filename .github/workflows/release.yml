@@ -39,9 +39,9 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Set env vars
+      - name: Set ostag
+        id: ostag
         run: |
-          echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
           if [[ $RUNNER_OS == "Linux" ]]; then
             ostag="linux"
           elif [[ $RUNNER_OS == "macOS" ]]; then
@@ -53,7 +53,7 @@ jobs:
           elif [[ $RUNNER_OS == "Windows" ]]; then
             ostag="win"
           fi
-          echo "OSTAG=$ostag" >> $GITHUB_ENV
+          echo "ostag=$ostag" >> $GITHUB_OUTPUT
 
       - name: Build binaries
         run: |
@@ -62,12 +62,12 @@ jobs:
 
       - name: Make distribution
         run: |
-          path=pestpp-$VERSION-$OSTAG
+          path=pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
           mkdir -p $path
           cp -r bin $path
 
       - name: Upload distribution
         uses: actions/upload-artifact@v4
         with:
-          name: pestpp-$VERSION-$OSTAG
-          path: pestpp-$VERSION-$OSTAG
+          name: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
+          path: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
