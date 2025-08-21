@@ -1,0 +1,73 @@
+name: Release Pest++
+on:
+  workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to release from.'
+        required: true
+        type: string
+      version:
+        description: 'Release version number.'
+        required: true
+        type: string
+env:
+  PIXI_BETA_WARNING_OFF: true
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-13, macos-14, windows-2022]
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout pest++
+        uses: actions/checkout@v5
+        with:
+          repository: usgs/pestpp
+          ref: ${{ inputs.branch }}
+
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.9.0
+        with:
+          pixi-version: v0.41.4
+
+      - name: Setup windows compiler
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set ostag
+        id: ostag
+        run: |
+          if [[ $RUNNER_OS == "Linux" ]]; then
+            ostag="linux"
+          elif [[ $RUNNER_OS == "macOS" ]]; then
+            if [[ ${{ matrix.os }} == "macos-13" ]]; then
+              ostag="macintel"
+            elif [[ ${{ matrix.os }} == "macos-14" ]]; then
+              ostag="mac"
+            fi
+          elif [[ $RUNNER_OS == "Windows" ]]; then
+            ostag="win"
+          fi
+          echo "ostag=$ostag" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          pixi run configure
+          pixi run build-release
+
+      - name: Make distribution
+        run: |
+          path=pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
+          cp -r bin $path
+          rm -r $path/*/ || true
+
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
+          path: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
