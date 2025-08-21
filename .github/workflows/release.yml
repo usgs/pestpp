@@ -64,7 +64,7 @@ jobs:
         run: |
           path=pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
           mkdir -p $path
-          cp -r bin $path
+          cp bin/* $path
 
       - name: Upload distribution
         uses: actions/upload-artifact@v4
