@@ -24,7 +24,7 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-      - name: Checkout modflow6
+      - name: Checkout pest++
         uses: actions/checkout@v5
         with:
           repository: usgs/pestpp
