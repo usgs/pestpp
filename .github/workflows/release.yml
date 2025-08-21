@@ -46,7 +46,7 @@ jobs:
             ostag="linux"
           elif [[ $RUNNER_OS == "macOS" ]]; then
             if [[ ${{ matrix.os }} == "macos-13" ]]; then
-              ostag="mac-intel"
+              ostag="macintel"
             elif [[ ${{ matrix.os }} == "macos-14" ]]; then
               ostag="mac"
             fi
