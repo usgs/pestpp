@@ -42,7 +42,17 @@ jobs:
       - name: Set env vars
         run: |
           echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
-          ostag=$(python -c "from modflow_devtools.ostags import get_ostag; print(get_ostag())")
+          if [[ $RUNNER_OS == "Linux" ]]; then
+            ostag="linux"
+          elif [[ $RUNNER_OS == "macOS" ]]; then
+            if [[ ${{ matrix.os }} == "macos-13" ]]; then
+              ostag="mac_intel"
+            elif [[ ${{ matrix.os }} == "macos-14" ]]; then
+              ostag="mac"
+            fi
+          elif [[ $RUNNER_OS == "Windows" ]]; then
+            ostag="win"
+          fi
           echo "OSTAG=$ostag" >> $GITHUB_ENV
 
       - name: Build binaries
