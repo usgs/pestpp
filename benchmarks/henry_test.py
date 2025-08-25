@@ -318,7 +318,7 @@ def setup_pst():
     pf.pst.pestpp_options["opt_dec_var_groups"] = "dv_pars"
     pf.pst.pestpp_options["panther_echo"] = True
     pf.pst.pestpp_options["mou_risk_objective"] = True
-    pf.pst.pestpp_options["mou_generator"] = "de"
+    pf.pst.pestpp_options["mou_generator"] = "pso"
     pf.pst.pestpp_options["mou_population_size"] = 100
 
     pf.pst.try_parse_name_metadata()
