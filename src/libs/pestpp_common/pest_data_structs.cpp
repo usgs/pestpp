@@ -2147,7 +2147,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_rfit(2.0);
 	set_mou_pso_inertia(vector<double>{0.7, 0.4, 0});
 	set_mou_pso_vmax_factor(0.8);
-	set_mou_pso_dv_bound_handling("HYBRID");
+	set_mou_pso_dv_bound_handling("CLAMP");
 	set_mou_outer_repo_obs_file("");
 	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);
