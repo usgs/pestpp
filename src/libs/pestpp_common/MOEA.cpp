@@ -4257,7 +4257,6 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 	Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
 
 	real_names = _dp.get_real_names();
-	vector<string> dv_names = _dp.get_var_names();
 	for (int i = 0; i < _dp.shape().first; i++)
 	{
 		real_name = real_names[i];
