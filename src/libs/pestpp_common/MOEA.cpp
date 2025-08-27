@@ -257,16 +257,16 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	stringstream ss;
 	if (alpha == 0)
 	{
-		//double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+		alpha = 1.0;
 		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
 		double pfull = members.size() / maxarchivesize;
 		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
 		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
 
-		if (rramp == -5e+02)
-			throw runtime_error("PSO alpha is zero");
+		if (abs(rramp) > 5e+02)
+			throw runtime_error("PSO RRAMP is too large. Must be between -500 and 500.");
 		if (rramp == 0.0)
-			throw runtime_error("PSO RRAMP is zero");
+			throw runtime_error("PSO RRAMP cannot be zero");
 
 		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
 
