@@ -4257,7 +4257,6 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 	Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
 
 	real_names = _dp.get_real_names();
-	vector<string> dv_names = _dp.get_var_names();
 	for (int i = 0; i < _dp.shape().first; i++)
 	{
 		real_name = real_names[i];
@@ -4288,21 +4287,23 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 		{
 			for (int j = 0; j < dv_names.size(); j++)
 			{
-
 				double lb_val = lb[dv_names[j]];
 				double ub_val = ub[dv_names[j]];
 				double new_dv, cur_dv;
-				new_dv = new_par_dval[j] < lb_val - FLOAT_EPSILON ? lb_val : new_par_dval[j];
-				new_dv = new_par_dval[j] > ub_val + FLOAT_EPSILON ? ub_val : new_par_dval[j];
+				new_dv = new_par_dval[j];
+				new_dv = new_dv < lb_val - FLOAT_EPSILON ? lb_val : new_dv;
+				new_dv = new_dv > ub_val + FLOAT_EPSILON ? ub_val : new_dv;
 				new_par_dval[j] = new_dv;
 			}
-			
 		}
 		else
 		{
+			
 			double new_dv, cur_dv;
+			vector<string> dv_out_of_bounds;
 			for (int j = 0; j < dv_names.size(); j++)
 			{
+				double old_par_vel = new_par_vel[j];
 				double lb_val = lb[dv_names[j]];
 				double ub_val = ub[dv_names[j]];
 
@@ -4317,7 +4318,12 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 				new_dv = cur_real[j] + new_par_vel[j];
 				new_par_dval[j] = new_dv;
 				double curr_vel = new_par_vel[j];
-				int draws = 0;
+				int draws = 0, actual_draws, max_draws;
+				if (pest_scenario.get_pestpp_options().get_mou_debug_dv_handling())
+					max_draws = 0;
+				else
+					max_draws = 1000;
+
 				while (true)
 				{
 
@@ -4332,9 +4338,10 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 							throw_moea_error("invalid dv value in pso velocity calculation");
 
 						draws++;
-						if (draws > 1000)
+						if (draws > max_draws)
 						{
-							ss << "problem with perturbing member: " << real_name << endl;
+							
+							ss << "WARNING: problem with perturbing member: " << real_name << endl;
 							ss << "at dv: " << dv_names[j] << endl;
 							ss << setprecision(17) << fixed
 								<< "wiggle room: " << wiggle_room << endl
@@ -4344,10 +4351,18 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 								<< "current dv: " << cur_real[j] << endl
 								<< "new dv: " << new_dv << endl
 								<< "pbest: " << p_best[j] << endl
-								<< "gbest: " << g_best[j] << endl;
+								<< "gbest: " << g_best[j] << endl
+							    << "seems we're stuck in infinite loop in pso velocity calculation" << endl
+								<< "CLAMPING this dv" << endl;
 							ofstream& frec = file_manager.rec_ofstream();
 							frec << ss.str();
-							throw_moea_error("infinite loop in pso velocity calculation (see rec file for details)");
+
+							new_dv = new_par_dval[j];
+							new_dv = new_dv < lb_val - FLOAT_EPSILON ? lb_val : new_dv;
+							new_dv = new_dv > ub_val + FLOAT_EPSILON ? ub_val : new_dv;
+							new_par_dval[j] = new_dv;
+							new_par_vel[j] = old_par_vel;
+							break;
 						}
 
 						//Adam's recursive perturbation algo to seek new feasible dv
@@ -4363,8 +4378,10 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 							if ((2 * abs(wiggle_room) / (ub_val - lb_val)) < r3[0] - FLOAT_EPSILON &&
 								(pso_dv_bound_handling == "HYBRID"))
 							{
-								new_dv = new_par_dval[j] < lb_val - FLOAT_EPSILON ? lb_val : new_par_dval[j];
-								new_dv = new_par_dval[j] > ub_val + FLOAT_EPSILON ? ub_val : new_par_dval[j];
+								new_dv = new_par_dval[j];
+								new_dv = new_dv < lb_val - FLOAT_EPSILON ? lb_val : new_dv;
+								new_dv = new_dv > ub_val + FLOAT_EPSILON ? ub_val : new_dv;
+								new_par_dval[j] = new_dv;
 								new_par_dval[j] = new_dv;
 								break;
 							}
@@ -4393,6 +4410,22 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 					else
 						break;
 				}
+				
+				if (draws > max_draws)
+					dv_out_of_bounds.push_back(dv_names[j]);
+					
+				
+					
+			}
+			if (dv_out_of_bounds.size() > 0)
+			{
+				ss.str("");
+				ss << "WARNING: too many  draws to bring" << real_name << "within dv bounds" << endl;
+				ss << "the following dvs were clamped: ";
+				for (auto d : dv_out_of_bounds)
+					ss << d << " ";
+				ss << "see rec file for more details." << endl;
+				performance_log->log_event(ss.str());
 			}
 		}
 		new_vel.row(i) = new_par_vel;
