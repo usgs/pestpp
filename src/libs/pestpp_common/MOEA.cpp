@@ -257,23 +257,34 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	stringstream ss;
 	if (alpha == 0)
 	{
-		alpha = 1.0;
-		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
-		double pfull = members.size() / maxarchivesize;
-		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
-		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+		if (obj_names_ptr->size() == 1)
+		{
+			ss.str("");
+			ss << "WARNING: There is only one objective. Using constant alpha = 1.0 or specify another value.";
+			performance_log->log_event(ss.str());
+			alpha = 1.0;
+		}
+		else
+		{
+			double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+			double pfull = static_cast<double>(members.size()) / maxarchivesize;
+			double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+			double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
 
-		if (abs(rramp) > 5e+02)
-			throw runtime_error("PSO RRAMP is too large. Must be between -500 and 500.");
-		if (rramp == 0.0)
-			throw runtime_error("PSO RRAMP cannot be zero");
+			if (abs(rramp) > 5e+02)
+				throw runtime_error("PSO RRAMP is too large. Must be between -500 and 500.");
+			if (abs(rramp) < 1e-10)
+				throw runtime_error("PSO RRAMP is too close to zero");
+			if (rfit <= 0)
+				throw runtime_error("PSO RFIT must be positive");
 
-		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+			alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
 
-		stringstream ss;
-		ss.str("");
-		ss << "Computing fitness using alpha = " << alpha;
-		performance_log->log_event(ss.str());
+			stringstream ss;
+			ss.str("");
+			ss << "Computing fitness using alpha = " << alpha;
+			performance_log->log_event(ss.str());
+		}
 	}
 
 	map<string, double> fitness;
@@ -3287,6 +3298,7 @@ void MOEA::initialize()
 		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
 			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
 		dp_archive.set_trans_status(dp.get_trans_status());
+		ss.str("");
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
 		message(2, ss.str());
 
