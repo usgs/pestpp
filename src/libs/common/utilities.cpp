@@ -1883,7 +1883,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		if (quote_tokens.size() > 1)
 		{
 			int nqt = quote_tokens.size();
-			if (nqt % 2 == 0)
+			if (nqt % 2 != 0)
 				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
 			tokens.clear();
 			for (int i = 0; i < nqt; i++)
