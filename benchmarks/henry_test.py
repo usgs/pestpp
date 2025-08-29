@@ -618,8 +618,8 @@ def invest():
 
 
 
-def run_mou(risk_obj=False,chance_points="single",risk=0.5,stack_size=100,
-            num_workers=12,pop_size=100,tag="",recalc_every=100000,noptmax=100):
+def run_mou(risk_obj=False,chance_points="single",risk=0.5,stack_size=10,
+            num_workers=12,pop_size=10,tag="",recalc_every=100000,noptmax=3):
     t_d = os.path.join("henry","henry_template")
     pst = pyemu.Pst(os.path.join(t_d,"henry.pst"))
     pst.pestpp_options["opt_par_stack"] = "prior.jcb"
@@ -793,7 +793,7 @@ def simple_henry_test():
 
     plot_domain(os.path.join("henry", "henry_temp"))
     setup_pst()
-    run_mou(risk=0.65,tag="65_single_once",num_workers=10,noptmax=10,pop_size=50,stack_size=30)
+    run_mou(risk=0.65,tag="65_single_once",num_workers=10,noptmax=10,pop_size=10,stack_size=10)
 
 
 

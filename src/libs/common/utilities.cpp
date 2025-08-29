@@ -1880,7 +1880,11 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		
 		//check for double quotes
 		tokenize(next_line, quote_tokens, "\"", false);
-		if (quote_tokens.size() > 1)
+        if (quote_tokens[quote_tokens.size()-1].size() == 0)
+        {
+            quote_tokens.pop_back();
+        }
+        if (quote_tokens.size() > 1)
 		{
 			int nqt = quote_tokens.size();
 			if (nqt % 2 != 0)
