@@ -1887,7 +1887,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
         if (quote_tokens.size() > 1)
 		{
 			int nqt = quote_tokens.size();
-			if (nqt % 2 != 0)
+			if (nqt % 2 == 0)
 				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
 			tokens.clear();
 			for (int i = 0; i < nqt; i++)
@@ -1905,8 +1905,13 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 					last_size = quote_tokens[i].size();
 					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
 						temp_tokens.pop_back();
-					for (auto t : temp_tokens)
-						tokens.push_back(t);
+					for (auto& t : temp_tokens)
+                    {
+                        if (t.empty())
+                            continue;
+                        tokens.push_back(t);
+                    }
+
 				}
 				else if (quote_tokens[i].size() > 0)
 					tokens.push_back(quote_tokens[i]);
@@ -1922,7 +1927,8 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 			ss.str("");
 			ss << "wrong number of tokens on line " << lcount;
 			ss << " of file '" << filename << "'.  Expecting ";
-			ss << hsize << ", found " << tokens.size();
+			ss << hsize << ", found " << tokens.size() << endl;
+            ss << "line:" << next_line;
 			throw_externalctrlfile_error(ss.str());
 		}
 		row_map.clear();
