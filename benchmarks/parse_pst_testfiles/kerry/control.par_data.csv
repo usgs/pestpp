@@ -1,0 +1,12 @@
+Type,ID,parnme,parval1,parlbnd,parubnd,partrans,parchglim,pargp,scale,offset,dercom
+HK,1,HK_1,10.0,0.1,300.0,log,factor,hk,1,0,1
+HK,2,HK_2,10.0,0.1,300.0,log,factor,hk,1,0,1
+HK,3,HK_3,10.0,0.1,300.0,log,factor,hk,1,0,1
+HK,4,HK_4,10.0,0.1,300.0,log,factor,hk,1,0,1
+HK,5,HK_5,10.0,0.1,300.0,log,factor,hk,1,0,1
+VK,6,VK_6,0.001,0.0001,1.0,log,factor,vk,1,0,1
+VK,7,VK_7,0.001,0.0001,1.0,log,factor,vk,1,0,1
+VK,8,VK_8,0.001,0.0001,1.0,log,factor,vk,1,0,1
+VK,9,VK_9,0.001,0.0001,1.0,log,factor,vk,1,0,1
+VK,10,VK_10,0.001,0.0001,1.0,log,factor,vk,1,0,1
+RCH,11,RCH_11,0.0002,1e-05,0.001,log,factor,rch,1,0,1

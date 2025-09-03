@@ -2061,11 +2061,14 @@ def mf6_v5_ies_nonpersistent_test():
     assert found ==  num_workers
 
 
-
+def parse_pst_test():
+    t_d = os.path.join("parse_pst_testfiles","kerry")
+    pyemu.os_utils.run("{0} control.pst".format(exe_path),cwd=t_d)
 
 
 if __name__ == "__main__":
-    basic_test()
+    parse_pst_test()
+    #basic_test()
 
     #mf6_v5_ies_nonpersistent_test()
     #large_fake_test()
@@ -2127,7 +2130,7 @@ if __name__ == "__main__":
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
-    mf6_v5_opt_stack_test()
+    #mf6_v5_opt_stack_test()
     # mf6_v5_glm_test()
     # mf6_v5_ies_test()
     #cmdline_test()
