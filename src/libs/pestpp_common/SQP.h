@@ -70,6 +70,46 @@ private:
 
 };
 
+class CovMatAdapES 
+{
+
+public:
+	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen) {}
+	CovMatAdapES() {}
+
+	void initialize(int n_params, int _num_reals);
+	void update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe, Parameters prev_m, Parameters curr_m);
+	void set_covariance(const Eigen::MatrixXd& _C) { C = _C; }
+	Covariance get_covariance_matrix(const vector<string>& par_names);
+
+	void set_mean(const Eigen::VectorXd& _m) { m = _m; }
+	Eigen::VectorXd get_mean() const { return m; }
+
+	double get_sigma() const { return sigma; }
+
+	ParameterEnsemble generate_population(Parameters& _curr_m, vector<string> _parname, ParameterEnsemble _dv);
+
+private:
+	// CMA-ES parameters
+	int lambda;                    // Population size
+	int mu;                       // Number of parents
+	double sigma = 0.1;                 // Step size
+	Eigen::VectorXd m;            // Mean vector
+	Eigen::MatrixXd C;            // Covariance matrix
+	Eigen::MatrixXd B;            // Eigenvectors of C
+	Eigen::VectorXd D;            // Eigenvalues of C
+	Eigen::MatrixXd pc;           // Evolution path
+	Eigen::MatrixXd ps;           // Evolution path for sigma
+	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m;
+	vector<double> weights;
+
+protected:
+	std::mt19937* rand_gen_ptr;
+	Pest* pest_scenario_ptr;
+	Eigen::MatrixXd reals;
+
+};
+
 class SeqQuadProgram
 {
 public:
@@ -95,6 +135,7 @@ private:
 	//L2PhiHandler ph;
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
+	CovMatAdapES cmaes;
 	double reg_factor;
 	chancePoints chancepoints;
 	string obj_func_str;
@@ -115,7 +156,7 @@ private:
     double SF_INC_FAC = 1.1;
     double BASE_SCALE_FACTOR = 1.0;
     double PAR_SIGMA_DEC_FAC = 0.9;
-    double PAR_SIGMA_INC_FAC = 1.3;
+    double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
     double PHI_ACCEPT_FAC = 0.05;
     double par_sigma_max = 100;
@@ -169,7 +210,7 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	string best_name;
-	bool use_subset;
+	bool use_subset, use_localization, use_cmaes = true;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;
@@ -223,9 +264,9 @@ private:
 	bool seek_feasible();
 	bool line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad);
 
-	bool line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, ParameterEnsemble* dvs_subset = nullptr);
+	bool line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, ParameterEnsemble* dvs_subset = nullptr, bool first_pick = false);
 	bool iterative_partial_step(const string& _blocking_constraint);
-	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map, bool update_curr=true);
+	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map, bool first_pick = false);
 	pair<bool, pair<Parameters, Observations>> pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
 	bool pick_partial_step(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string, double>& sf_map);
 	bool check_wolfe_conditions(Parameters& trial_dv_values, Observations& trial_obs, const Eigen::VectorXd& search_d, 
@@ -234,6 +275,8 @@ private:
 
 	double compute_actual_reduction(Parameters& trial_dv_values, Observations& trial_obs);
 	double compute_predicted_reduction(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
+
+	Eigen::VectorXd compute_adaptive_localization_weights(const vector<string>& dv_names, const Eigen::MatrixXd& dv_anoms);
 	
 	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
 	Eigen::VectorXd solve_trust_region_subproblem_dogleg(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, double radius);
@@ -292,5 +335,7 @@ private:
 
 	vector<int> get_subset_idxs(int size, int nreal_subset);
 };
+
+
 
 #endif
