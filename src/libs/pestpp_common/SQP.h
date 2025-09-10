@@ -87,7 +87,7 @@ public:
 
 	double get_sigma() const { return sigma; }
 
-	ParameterEnsemble generate_population(Parameters& _curr_m, vector<string> _parname, ParameterEnsemble _dv);
+	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
 
 private:
 	// CMA-ES parameters
@@ -222,8 +222,8 @@ private:
 	Eigen::MatrixXd constraint_jco, base_constraint_jco;
 	vector<string> cnames;
 
-	ParameterEnsemble dv, dv_base;
-	ObservationEnsemble oe, oe_base;
+	ParameterEnsemble dv, dv_base,dv_pop;
+	ObservationEnsemble oe, oe_base, obs_pop;
 	map<string, string> constraint_sense;
 	Eigen::VectorXd lambda, base_lambda;
 

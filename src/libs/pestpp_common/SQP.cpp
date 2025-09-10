@@ -26,8 +26,6 @@ bool SqpFilter::accept(double obj_val, double violation_val, int iter, double al
 		obj_viol_pairs.insert(candidate);
 		return true;
 	}
-	//I think its cheaper to combine the tols with the candidate, rather adding them to every 
-	//existing pair...
 	if (minimize)
 		candidate.obj_val *= (1 + obj_tol);
 	else
@@ -43,7 +41,6 @@ bool SqpFilter::accept(double obj_val, double violation_val, int iter, double al
 		}
 	if ((keep) && (accept))
     {
-	    //cout << "obj:" << obj_val << ", viol:" << violation_val << ", alpha:" << alpha << endl;
 	    obj_viol_pairs.insert(candidate);
     }
 	return accept;
@@ -114,10 +111,6 @@ void SqpFilter::report(ofstream& frec, int iter)
 
 bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
 {
-    //check if this candidate is nondom
-	//bool acc = accept(obj_val, violation_val,iter, alpha);
-	//if (!acc)
-	//	return false;
 	FilterRec candidate;
 	candidate.obj_val = obj_val;
 	candidate.viol_val = violation_val;
@@ -181,14 +174,6 @@ void SeqQuadProgram::throw_sqp_error(string message)
 	performance_log->~PerformanceLog();
 	throw runtime_error("SeqQuadProgram error: " + message);
 }
-
-//SeqQuadProgram::apply_draw_mult()  // right place?
-//{
-//	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
-//	float dm = ppo->get_sqp_dv_draw_mult(); // TODO add as ppo arg
-//	cov * dm
-//	return cov 
-//}
 
 bool SeqQuadProgram::initialize_dv(Covariance &cov)
 {
@@ -363,7 +348,6 @@ void SeqQuadProgram::add_current_as_bases(ParameterEnsemble& _dv, ObservationEns
 		_dv.append(BASE_REAL_NAME, pars);
 	}
 
-	//check that 'base' isn't already in ensemble
 	rnames = _oe.get_real_names();
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
@@ -456,7 +440,6 @@ void SeqQuadProgram::sanity_checks()
 	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
 	{
 		warnings.push_back("'pestmode' == 'regularization', in pestpp-sqp, this has no meaning...");
-		//throw_sqp_error("'pestmode' == 'regularization', please reset to 'estimation'");
 	}
 	else if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::UNKNOWN)
 	{
@@ -493,7 +476,6 @@ void SeqQuadProgram::sanity_checks()
 			message(1, e);
 		throw_sqp_error(string("sanity_check() found some problems - please review rec file"));
 	}
-	//cout << endl << endl;
 }
 
 void SeqQuadProgram::initialize_objfunc()
@@ -503,7 +485,6 @@ void SeqQuadProgram::initialize_objfunc()
 	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
 
 	ofstream& f_rec = file_manager.rec_ofstream();
-
 
 	//check if the obj_str is an observation
 	use_obj_obs = false;
@@ -1169,8 +1150,8 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 			message(1, "generating new dv ensemble at current best phi via CMA-ES");
 			Covariance cmaes_cov = cmaes.get_covariance_matrix(dv_names);
 
-			// Use existing draw function with CMA-ES covariance
-			_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), _current_dv_vals, cmaes_cov, performance_log, 0, frec);
+			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			//_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), _current_dv_vals, cmaes_cov, performance_log, 0, frec);
 		}
 		else
 		{
@@ -1676,7 +1657,7 @@ bool SeqQuadProgram::update_hessian()
 	}
 	
 	Covariance old_hessian = hessian;
-	cout << "old hessian: " << endl << old_hessian << endl;
+	
 	Eigen::VectorXd prev_grad = grad_vector_map[iter-1].get_data_eigen_vec(dv_names);
 	Eigen::VectorXd curr_grad = grad_vector_map[iter].get_data_eigen_vec(dv_names);
 	
@@ -1824,7 +1805,8 @@ void SeqQuadProgram::iterate_2_solution()
 		if (use_cmaes)
 		{
 			message(1, "updating CMA-ES with approximate gradient");
-			cmaes.update(dv, oe, prev_ctl_dv_values, current_ctl_dv_values);
+			
+			cmaes.update(dv_pop, obs_pop, prev_ctl_dv_values, current_ctl_dv_values);
 		}
 		make_gradient_runs(current_ctl_dv_values, current_obs);
 
@@ -3012,9 +2994,9 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 		return false;
 	}
 
-	double initial_obj = get_obj_value(current_ctl_dv_values, current_obs);
-	double initial_slope = grad.dot(search_d["BASE"]);
-	int debug = 0;
+	/*double initial_obj = get_obj_value(current_ctl_dv_values, current_obs);
+	double initial_slope = grad.dot(search_d);*/
+
 	//TODO: REVISIT FOR ENSEMBLE handle non-descent direction
 	//if (initial_slope >= 0.1) 
 	//{
@@ -3203,6 +3185,25 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
 	oe_candidates.to_csv(ss.str());
+
+
+	dv_pop = dv_candidates;
+	obs_pop = oe_candidates;
+	vector<string> dv_reals = dv.get_real_names();
+	///combine candidates and current ensemble for CMA ES calcs
+	for (auto d : dv_reals)
+	{
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		Eigen::VectorXd dv_real = dv.get_real_vector(d);
+		pars.update_without_clear(dv_names, dv_real);
+		dv_pop.get_par_transform().active_ctl2numeric_ip(pars);
+		dv_pop.append(d, pars);
+
+		Observations obs = pest_scenario.get_ctl_observations();
+		Eigen::VectorXd oe_real = oe.get_real_vector(d);
+		obs.update_without_clear(oe.get_var_names(), oe_real);
+		obs_pop.append(d, obs);
+	}
 
 	return pick_candidate_and_update_current(dv_candidates, oe_candidates, real_sf_map, first_pick);
 }
@@ -3799,7 +3800,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 			if (first_pick.first)
 			{
 				ss.str("");
-				ss << "using best candidate from the current batch: ";
+				ss << "line search failed. centgering new ensemble at best member of the current ensemble: ";
 				message(1, ss.str());
 				
 				successful = true;
@@ -3808,6 +3809,11 @@ bool SeqQuadProgram::solve_new_ensemble()
 				else
 					BASE_SCALE_FACTOR *= SF_INC_FAC;
 
+				break;
+			}
+			if (use_cmaes)
+			{
+				message(1, "line search failed. updating covariance from current ensemble and regenerating ensemble via CMA-ES...");
 				break;
 			}
 			n_consec_failures++;
@@ -5200,24 +5206,18 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 {
 
 	lambda = _num_reals;
-	mu = lambda / 4;
+	mu = lambda / 2;
 	sigma = 1.0;
 
-	// Initialize mean to zero
 	m = Eigen::VectorXd::Zero(n_params);
-
-	// Initialize covariance to identity
 	C = Eigen::MatrixXd::Identity(n_params, n_params);
 
-	// Initialize evolution paths
 	pc = Eigen::VectorXd::Zero(n_params);
 	ps = Eigen::VectorXd::Zero(n_params);
 
-	// Initialize eigenvectors and eigenvalues
 	B = Eigen::MatrixXd::Identity(n_params, n_params);
 	D = Eigen::VectorXd::Ones(n_params);
 
-	// Initialize recombination weights
 	weights.resize(mu);
 	double sum_weights = 0.0;
 	for (int i = 0; i < mu; i++) {
@@ -5230,16 +5230,19 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 	}
 
 	c_c = 0.5;
-	c_1 = 2.0 / pow(static_cast<double>(n_params), 2);
-	c_mu = min(mu/ pow(static_cast<double>(n_params), 2), 1 - c_1);
 	c_m = 1.0;
+	c_mu = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_cmu();
+	c_1 = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_c1();
+	/*c_1 = 2.0 / pow(static_cast<double>(n_params), 2);
+	c_mu = min(mu/ pow(static_cast<double>(n_params), 2), 1 - c_1);*/
 }
 
 void CovMatAdapES::update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe, Parameters prev_m, Parameters curr_m) 
 {
-	cout << "C: " << endl << C << endl;
 	vector<string> real_names = curr_oe.get_real_names();
 	Eigen::VectorXd obj_vec = curr_oe.get_var_vector(pest_scenario_ptr->get_pestpp_options().get_opt_obj_func());
+
+	m = curr_m.get_data_eigen_vec(curr_m.get_keys());
 
 	vector<pair<double, string>> obj_real_pairs;
 	for (int i = 0; i < real_names.size(); i++) {
@@ -5260,17 +5263,18 @@ void CovMatAdapES::update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe
 	
 	vector<string> par_names = curr_pe.get_var_names();
 	ParameterEnsemble U = curr_pe;
-	mu_best_real_names.push_back(BASE_REAL_NAME);
+	//mu_best_real_names.push_back(BASE_REAL_NAME);
 	U.keep_rows(mu_best_real_names);
-	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names, BASE_REAL_NAME)/sigma;
+	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names)/sigma;
 	U_anoms.conservativeResize(U_anoms.rows() - 1, U_anoms.cols());
 
-	Eigen::MatrixXd rank_mu_update = (1 - c_mu) * C + c_mu * U_anoms.transpose() * U_anoms / mu;
+	Eigen::MatrixXd rank_mu_update = c_mu * U_anoms.transpose() * U_anoms / mu;
 	
 	pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
-	
-	C = ((1.0 - c_1 - c_mu) * C) + (c_mu * U_anoms.transpose() * U_anoms / mu) + (c_1 * (pc * pc.transpose()));
-	cout << "C: " << endl << C << endl;
+	Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
+
+	C = (1.0 - c_1 - c_mu) * C + rank_mu_update + rank_one_update;
+	cout << "CMA-ES approximated covariance: " << endl << C << endl;
 
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(C);
 	B = eigensolver.eigenvectors();
@@ -5281,29 +5285,43 @@ void CovMatAdapES::update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe
 	}
 }
 
-ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, vector<string> _parnames, ParameterEnsemble _dv) 
+ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, ParameterEnsemble _dv) 
 {	
 	vector<string> rnames;
-	//stringstream ss;
-	//for (int i = 0; i < num_reals; i++)
-	//{
-	//	ss.str("");
-	//	ss << i;
-	//	rnames.push_back(ss.str());
-	//}
-
+	vector<string> parnames = _dv.get_var_names();
 	ParameterEnsemble new_reals = _dv;
 	rnames = new_reals.get_real_names();
-	
+	auto it = find(rnames.begin(), rnames.end(), BASE_REAL_NAME);
+	if (it != rnames.end()) {
+		rnames.erase(it);
+	}
+	new_reals.keep_rows(rnames, true);
+
 	const ParameterInfo& par_info = pest_scenario_ptr->get_ctl_parameter_info();
 
 	for (int i = 0; i < lambda; i++) {
 		Eigen::VectorXd x;
-		bool valid = false;
-		int attempts = 0;
-		const int max_attempts = 100;
+		int draws = 1;
+		const int max_draws = 1000;
 
-		while (!valid && attempts < max_attempts) {
+		while (true) 
+		{
+			if (draws > max_draws) {
+				for (int j = 0; j < parnames.size(); ++j) {
+					const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(parnames[j]);
+					double lbnd = par_rec->lbnd;
+					double ubnd = par_rec->ubnd;
+
+					if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG) {
+						lbnd = log10(lbnd);
+						ubnd = log10(ubnd);
+					}
+
+					x(j) = max(lbnd, min(ubnd, x(j)));
+				}
+				break;
+			}
+
 			Eigen::VectorXd z(m.size());
 			for (int j = 0; j < m.size(); ++j) {
 				z(j) = draw_standard_normal(*rand_gen_ptr);
@@ -5312,10 +5330,8 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, vector<
 			Eigen::VectorXd y = B * (D.cwiseSqrt().asDiagonal() * z);
 			x = m + sigma * y;
 
-			// Check if within bounds
-			valid = true;
-			for (int j = 0; j < _parnames.size(); ++j) {
-				const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(_parnames[j]);
+			for (int j = 0; j < parnames.size(); ++j) {
+				const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(parnames[j]);
 				double lbnd = par_rec->lbnd;
 				double ubnd = par_rec->ubnd;
 
@@ -5325,33 +5341,14 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, vector<
 				}
 
 				if (x(j) < lbnd || x(j) > ubnd) {
-					valid = false;
 					break;
 				}
 			}
-			attempts++;
+			draws++;
 		}
-
-		if (!valid) {
-			// Fall back to clipping if rejection sampling fails
-			for (int j = 0; j < _parnames.size(); ++j) {
-				const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(_parnames[j]);
-				double lbnd = par_rec->lbnd;
-				double ubnd = par_rec->ubnd;
-
-				if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG) {
-					lbnd = log10(lbnd);
-					ubnd = log10(ubnd);
-				}
-
-				x(j) = max(lbnd, min(ubnd, x(j)));
-			}
-		}
-
 		new_reals.update_real_ip(rnames[i], x);
 		
 	}
-	cout << "new reals: " << endl << new_reals.get_eigen() << endl;
 	return new_reals;
 }
 
@@ -5364,47 +5361,11 @@ Covariance CovMatAdapES::get_covariance_matrix(const vector<string>& par_names)
 	const ParameterInfo& par_info = pest_scenario_ptr->get_ctl_parameter_info();
 	double sigma_range = pest_scenario_ptr->get_pestpp_options().get_par_sigma_range();
 
-	Eigen::MatrixXd scaled_cov = C;
-	cout << "scaled_cov (pre-bounds): " << endl << scaled_cov << endl;
-
-	// Find the maximum variance in the current covariance matrix
-	double max_current_var = -1E+30, min_current_var = 1E+30;
-	for (int i = 0; i < par_names.size(); ++i) {
-		max_current_var = max(max_current_var, scaled_cov(i, i));
-		min_current_var = min(min_current_var, scaled_cov(i, i));
-	}
-	double range_current_var = max_current_var - min_current_var;
-
-	// Find the maximum allowed variance across all parameters
-	double max_allowed_var = 0.0;
-	for (int i = 0; i < par_names.size(); ++i) {
-		const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(par_names[i]);
-		double lbnd = par_rec->lbnd;
-		double ubnd = par_rec->ubnd;
-
-		// Handle log-transformed parameters
-		if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG) {
-			lbnd = log10(lbnd);
-			ubnd = log10(ubnd);
-		}
-
-		// Calculate the maximum allowed variance for this parameter
-		double max_var = pow((ubnd - lbnd) / 6, 2.0);
-		max_allowed_var = max(max_allowed_var, max_var);
-	}
-
-	// Scale the entire covariance matrix proportionally
-	if (max_current_var > 0.0) {
-		double scale_factor = sqrt(max_allowed_var / range_current_var);
-		scaled_cov *= scale_factor;
-	}
-
-	// Convert Eigen matrix to sparse matrix
 	vector<Eigen::Triplet<double>> triplets;
-	for (int i = 0; i < scaled_cov.rows(); ++i) {
-		for (int j = 0; j < scaled_cov.cols(); ++j) {
-			if (scaled_cov(i, j) != 0.0) {
-				triplets.push_back(Eigen::Triplet<double>(i, j, scaled_cov(i, j)));
+	for (int i = 0; i < C.rows(); ++i) {
+		for (int j = 0; j < C.cols(); ++j) {
+			if (C(i, j) != 0.0) {
+				triplets.push_back(Eigen::Triplet<double>(i, j, C(i, j)));
 			}
 		}
 	}
@@ -5412,6 +5373,6 @@ Covariance CovMatAdapES::get_covariance_matrix(const vector<string>& par_names)
 	Eigen::SparseMatrix<double> sparse_cov(par_names.size(), par_names.size());
 	sparse_cov.setFromTriplets(triplets.begin(), triplets.end());
 	cov = Covariance(par_names, sparse_cov);
-	cout << "parcov: " << endl << cov << endl;
+	cout << "parcov: " << endl << cov << endl; //tmp
 	return cov;
 }

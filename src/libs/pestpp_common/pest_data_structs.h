@@ -389,6 +389,10 @@ public:
 	void set_sqp_filter_tol(double val) { sqp_filter_tol = val; }
 	double get_sqp_working_set_tol() const { return sqp_working_set_tol; }
 	void set_sqp_working_set_tol(double val) { sqp_working_set_tol = val; }
+	double get_sqp_cma_c1() const { return sqp_cma_c1; }
+	void set_sqp_cma_c1(double val) { sqp_cma_c1 = val; }
+	double get_sqp_cma_cmu() const { return sqp_cma_cmu; }
+	void set_sqp_cma_cmu(double val) { sqp_cma_cmu = val; }
 
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -802,6 +806,9 @@ private:
 	int max_consec_phiinc;
 	double sf_dec_fac;
 	double sf_inc_fac;
+	double sqp_cma_c1;
+	double sqp_cma_cmu;
+
 
 	int mou_population_size;
 	string mou_generator; 
