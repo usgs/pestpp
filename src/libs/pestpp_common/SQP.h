@@ -78,16 +78,17 @@ public:
 	CovMatAdapES() {}
 
 	void initialize(int n_params, int _num_reals);
-	void update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe, Parameters prev_m, Parameters curr_m);
+	void update(Parameters prev_m, Parameters curr_m);
 	void set_covariance(const Eigen::MatrixXd& _C) { C = _C; }
 	Covariance get_covariance_matrix(const vector<string>& par_names);
 
 	void set_mean(const Eigen::VectorXd& _m) { m = _m; }
 	Eigen::VectorXd get_mean() const { return m; }
-
 	double get_sigma() const { return sigma; }
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
+	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear = true);
+
 
 private:
 	// CMA-ES parameters
@@ -102,6 +103,11 @@ private:
 	Eigen::MatrixXd ps;           // Evolution path for sigma
 	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m;
 	vector<double> weights;
+	
+	ParameterEnsemble feas_dp_archive, infeas_dp_archive, _dp;
+	ObservationEnsemble feas_oe_archive, infeas_oe_archive, _op;
+
+	map<string, double> sorted_obj_map, sorted_viol_map;
 
 protected:
 	std::mt19937* rand_gen_ptr;

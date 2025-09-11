@@ -1806,7 +1806,7 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			message(1, "updating CMA-ES with approximate gradient");
 			
-			cmaes.update(dv_pop, obs_pop, prev_ctl_dv_values, current_ctl_dv_values);
+			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values);
 		}
 		make_gradient_runs(current_ctl_dv_values, current_obs);
 
@@ -2961,7 +2961,6 @@ bool SeqQuadProgram::line_search(Eigen::VectorXd& search_d, const Parameters& _c
 
 	}
 
-
 	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;
 
@@ -3185,25 +3184,6 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
 	oe_candidates.to_csv(ss.str());
-
-
-	dv_pop = dv_candidates;
-	obs_pop = oe_candidates;
-	vector<string> dv_reals = dv.get_real_names();
-	///combine candidates and current ensemble for CMA ES calcs
-	for (auto d : dv_reals)
-	{
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		Eigen::VectorXd dv_real = dv.get_real_vector(d);
-		pars.update_without_clear(dv_names, dv_real);
-		dv_pop.get_par_transform().active_ctl2numeric_ip(pars);
-		dv_pop.append(d, pars);
-
-		Observations obs = pest_scenario.get_ctl_observations();
-		Eigen::VectorXd oe_real = oe.get_real_vector(d);
-		obs.update_without_clear(oe.get_var_names(), oe_real);
-		obs_pop.append(d, obs);
-	}
 
 	return pick_candidate_and_update_current(dv_candidates, oe_candidates, real_sf_map, first_pick);
 }
@@ -4087,6 +4067,7 @@ pair<bool, pair<Parameters, Observations>> SeqQuadProgram::pick_upgrade_and_upda
 		oext = numeric_limits<double>::min();
 	int idx = -1;
 	vector<string> real_names = dv_candidates.get_real_names();
+	map<string, double> total_viol_map;
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, filter.get_viol_tol(), true);
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
@@ -4118,6 +4099,7 @@ pair<bool, pair<Parameters, Observations>> SeqQuadProgram::pick_upgrade_and_upda
 		for (auto& v : violations_nominal[real_names[i]])
 			infeas_sum_nom += v.second;
 		nviol_vec.push_back(infeas_sum_nom);
+		total_viol_map[real_names[i]] = infeas_sum_nom;
 		for (auto& f : feasible_distance[real_names[i]])
 			feas_dist -= f.second;
 		feas_dist_map.push_back(feas_dist);
@@ -4153,6 +4135,8 @@ pair<bool, pair<Parameters, Observations>> SeqQuadProgram::pick_upgrade_and_upda
 		cand_obs_values.update_without_clear(onames, t);
 		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false, tag);
 	}
+
+	cmaes.update_archives(dv_candidates, obj_map, total_viol_map, iter, true);
 
 	Parameters p;
 	Observations o;
@@ -4204,6 +4188,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		oext = numeric_limits<double>::min();
 	int idx = -1, jdx = -1;
 	vector<string> real_names = dv_candidates.get_real_names();
+	map<string, double> total_viol_map;
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe,filter.get_viol_tol(),true);
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
@@ -4235,6 +4220,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		for (auto& v : violations_nominal[real_names[i]])
 			infeas_sum_nom += v.second;
 		nviol_vec.push_back(infeas_sum_nom);
+		total_viol_map[real_names[i]] = infeas_sum_nom;
 		for (auto& f : feasible_distance[real_names[i]])
 			feas_dist -= f.second;
 		feas_dist_map.push_back(feas_dist);
@@ -4272,6 +4258,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false,tag);
 	}
 
+	cmaes.update_archives(dv_candidates, obj_map, total_viol_map, iter, false);
 
 	if (obj_sense == "minimize")
 		oext = numeric_limits<double>::max();
@@ -5199,12 +5186,8 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 
 }
 
-//CovMatAdapES::CovMatAdapES(int n_params, int pop_size, Pest* pest_ptr, std::mt19937* rand_gen)
-//	: lambda(pop_size), mu(pop_size / 2), sigma(1.0), pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen) {
-
 void CovMatAdapES::initialize(int n_params, int _num_reals)
 {
-
 	lambda = _num_reals;
 	mu = lambda / 2;
 	sigma = 1.0;
@@ -5237,38 +5220,26 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 	c_mu = min(mu/ pow(static_cast<double>(n_params), 2), 1 - c_1);*/
 }
 
-void CovMatAdapES::update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe, Parameters prev_m, Parameters curr_m) 
+void CovMatAdapES::update(Parameters prev_m, Parameters curr_m) 
 {
-	vector<string> real_names = curr_oe.get_real_names();
-	Eigen::VectorXd obj_vec = curr_oe.get_var_vector(pest_scenario_ptr->get_pestpp_options().get_opt_obj_func());
-
 	m = curr_m.get_data_eigen_vec(curr_m.get_keys());
-
-	vector<pair<double, string>> obj_real_pairs;
-	for (int i = 0; i < real_names.size(); i++) {
-		obj_real_pairs.push_back({ obj_vec[i], real_names[i] });
-	}
-	sort(obj_real_pairs.begin(), obj_real_pairs.end());
-	vector<string> sorted_real_names;
+	vector<string> par_names = feas_dp_archive.get_var_names();
+	ParameterEnsemble U = feas_dp_archive;
 	vector<string> mu_best_real_names;
 	int i = 0;
-	for (const auto& pair : obj_real_pairs) 
+	for (auto r : U.get_real_names())
 	{
 		i++;
-		sorted_real_names.push_back(pair.second);
-		if (i <= mu)
-			mu_best_real_names.push_back(pair.second);
-	}
-	curr_pe.reorder(sorted_real_names, curr_pe.get_var_names(), true);
-	
-	vector<string> par_names = curr_pe.get_var_names();
-	ParameterEnsemble U = curr_pe;
-	//mu_best_real_names.push_back(BASE_REAL_NAME);
-	U.keep_rows(mu_best_real_names);
-	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names)/sigma;
-	U_anoms.conservativeResize(U_anoms.rows() - 1, U_anoms.cols());
+		if (i > mu)
+			break;
+		mu_best_real_names.push_back(r);
 
-	Eigen::MatrixXd rank_mu_update = c_mu * U_anoms.transpose() * U_anoms / mu;
+	}
+	U.keep_rows(mu_best_real_names);
+	Eigen::MatrixXd Uu_anoms = U.get_eigen_anomalies(vector<string>(), par_names) / sigma;
+	//Uu_anoms.conservativeResize(Uu_anoms.rows() - 1, Uu_anoms.cols());
+	
+	Eigen::MatrixXd rank_mu_update = c_mu * Uu_anoms.transpose() * Uu_anoms / mu;
 	
 	pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
 	Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
@@ -5282,6 +5253,89 @@ void CovMatAdapES::update(ParameterEnsemble curr_pe, ObservationEnsemble curr_oe
 
 	for (int i = 0; i < D.size(); i++) {
 		D(i) = max(D(i), 1e-12);
+	}
+}
+
+void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear)
+{
+	vector<string> curr_names;
+	
+	if (clear) 
+	{
+		sorted_obj_map.clear();
+		sorted_viol_map.clear();
+
+		feas_dp_archive = pe;
+		feas_dp_archive.keep_rows(vector<string>(), true);
+		infeas_dp_archive = feas_dp_archive;
+	}
+
+	ParameterEnsemble curr_pe = pe;
+	for (auto o : obj_map) 
+	{
+		curr_names.push_back(o.first);
+		if (viol_map[o.first] == 0)
+		{
+			sorted_obj_map[to_string(iter) + "|" + o.first] = o.second;
+
+			Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+			pars.update_without_clear(curr_pe.get_var_names(), curr_pe.get_real_vector(o.first));
+			pe.get_par_transform().active_ctl2numeric_ip(pars);
+			feas_dp_archive.append(to_string(iter) + "|" + o.first, pars);
+		}
+		else
+		{
+			sorted_viol_map[to_string(iter) + "|" + o.first] = viol_map[o.first];
+			
+			Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+			pars.update_without_clear(curr_pe.get_var_names(), curr_pe.get_real_vector(o.first));
+			pe.get_par_transform().active_ctl2numeric_ip(pars);
+			infeas_dp_archive.append(to_string(iter) + "|" + o.first, pars);
+		}
+	}
+
+	vector<pair<string, double>> sorted_obj_map_vec(sorted_obj_map.begin(), sorted_obj_map.end());
+	sort(sorted_obj_map_vec.begin(), sorted_obj_map_vec.end(),
+		[](const pair<string, double>& a, const pair<string, double>& b) {
+			return a.second < b.second;
+		});
+
+	vector<string> sorted_names_from_obj;
+	sorted_obj_map.clear();
+	int i = 0;
+	for (const auto& pair : sorted_obj_map_vec) 
+	{
+		i++;
+		if (i > lambda)
+			break;
+		sorted_names_from_obj.push_back(pair.first);
+		sorted_obj_map[pair.first] = pair.second;
+
+	}
+	feas_dp_archive.keep_rows(sorted_names_from_obj, true);
+	feas_dp_archive.reorder(sorted_names_from_obj, curr_pe.get_var_names(), true);
+
+	
+	if (sorted_viol_map.size() > 0)
+	{
+		vector<pair<string, double>> sorted_viol_map_vec(sorted_viol_map.begin(), sorted_viol_map.end());
+		sort(sorted_viol_map_vec.begin(), sorted_viol_map_vec.end(),
+			[](const pair<string, double>& a, const pair<string, double>& b) {
+				return a.second < b.second;
+			});
+		vector<string> sorted_names_from_viol;
+		sorted_viol_map.clear();
+		int i = 0;
+		for (const auto& pair : sorted_viol_map_vec)
+		{
+			i++;
+			if (i > lambda)
+				break;
+			sorted_names_from_viol.push_back(pair.first);
+			sorted_viol_map[pair.first] = pair.second;
+		}
+		infeas_dp_archive.keep_rows(sorted_names_from_viol, true);
+		infeas_dp_archive.reorder(sorted_names_from_viol, curr_pe.get_var_names(), true);
 	}
 }
 
