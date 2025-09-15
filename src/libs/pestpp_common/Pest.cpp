@@ -1819,10 +1819,14 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 				if (p.second > p_rec->ubnd)
 				{
 					p.second = p_rec->ubnd;
+					// clamp to 95% of range just to avoid any weird floating point issues that might push a value beyond its limit
+					p.second *= 0.95; 
 				}
 				else if (p.second < p_rec->lbnd)
 				{
 					p.second = p_rec->lbnd;
+					// clamp to 5% of range just to avoid any weird floating point issues that might push a value beyond its limit
+					p.second *= 1.05;
 				}
 			}	
 		}
