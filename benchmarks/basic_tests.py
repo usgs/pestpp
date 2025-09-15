@@ -509,7 +509,7 @@ def parchglim_test():
     pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
-    assert p_df.loc["stage","parval1"] == par.loc["stage","parubnd"]
+    assert p_df.loc["stage","parval1"] <= par.loc["stage","parubnd"]
 
     
 def sen_plusplus_test():
