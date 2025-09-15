@@ -117,8 +117,9 @@ bool invalidChar (char c)
 	return !(c>=0 && c <128);
 }
 
-std::string& strip_nonascii_ip(string &s) {
+void strip_nonascii_ip(string &s) {
 	s.erase(remove_if(s.begin(),s.end(), invalidChar), s.end());
+
 }
 
 

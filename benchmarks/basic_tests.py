@@ -43,6 +43,50 @@ noptmax = 4
 num_reals = 20
 port = 4021
 
+
+def nonascii_path_test(model_d="ies_10par_xsec"):
+    pyemu.Ensemble.reseed()
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "test_template_\u0187")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    print(platform.platform().lower())
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    cmd = pst.model_command[0].split()
+    print(cmd)
+    cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
+    print(cmd)
+    pst.model_command.append(cmd)
+    cmd = pst.model_command[0].split()
+    cmd = "\"\'{0}\' \'{1}\'\"".format(cmd[0],cmd[1])
+    pst.model_command.append(cmd)
+
+    tpl_data = pst.model_input_data
+    tpl_data["pest_file"] = tpl_data.pest_file.apply(lambda x: "\"{0}\"".format(x))
+    tpl_data["model_file"] = tpl_data.model_file.apply(lambda x: "\"{0}\"".format(x))
+    
+    ins_data = pst.model_output_data
+    ins_data["pest_file"] = ins_data.pest_file.apply(lambda x: "\"{0}\"".format(x))
+    ins_data["model_file"] = ins_data.model_file.apply(lambda x: "\"{0}\"".format(x))
+    
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(new_d, "pest.pst"))
+    pst.observation_data.loc[pst.nnz_obs_names,"weight"] = 1.0
+    
+    m_d = os.path.join(model_d,"master_pestpp")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(new_d,m_d)
+
+    worker_root = os.path.join(model_d + "_\u0187")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)    
+    pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 1, master_dir=m_d,
+                           worker_root=worker_root,port=port,verbose=True)
+
+
 def basic_test(model_d="ies_10par_xsec"):
     pyemu.Ensemble.reseed()
     base_d = os.path.join(model_d, "template")
@@ -2068,7 +2112,8 @@ def parse_pst_test():
 
 if __name__ == "__main__":
     #parse_pst_test()
-    basic_test()
+    #basic_test()
+    nonascii_path_test()
 
     #mf6_v5_ies_nonpersistent_test()
     #large_fake_test()
