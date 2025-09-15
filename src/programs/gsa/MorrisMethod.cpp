@@ -56,7 +56,7 @@ void MorrisObsSenFile::add_sen_run_pair(const std::string &par_name, double p1, 
 void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, double> &obs_2_sen_weight,
 	map<string, double> &par_2_sen_weight)
 {
-	fout_obs_sen << "par_name, n_samples, obs_name, mean, abs_mean, sigma, scaled_sen" << endl;
+	fout_obs_sen << "parameter_name,n_samples,observation_name,sen_mean,sen_mean_abs,sen_std_dev,scaled_sen" << endl;
 	for (const auto &ip : par_names_vec)
 	{
 		string ipar = ip;
@@ -85,7 +85,7 @@ void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, d
 				sstr << value;
 				weighted_sen = sstr.str();
 			}
-			fout_obs_sen << ipar << ", " << n_samples << ", " << iobs << ", " << mean << ", " << abs_mean << ", " << sigma << ", " << weighted_sen << endl;
+			fout_obs_sen << pest_utils::lower_cp(ipar) << "," << n_samples << "," << pest_utils::lower_cp(iobs) << "," << mean << ", " << abs_mean << "," << sigma << "," << weighted_sen << endl;
 		}
 	}
 }
@@ -225,11 +225,11 @@ MatrixXd MorrisMethod::create_P_mat(int k)
 VectorXd MorrisMethod::create_x_vec(int k)
 {
 	// Warning Satelli's book is wrong.  Need to use Morris's original paper
-	// to compute x.  Maximim value of any xi shoud be 1.0 - delta.
+	// to compute x.  Maximum value of any xi should be 1.0 - delta.
 	VectorXd x(k);
 	double rnum;
 	// Used with the randon number generator below, max_num will produce a
-	// random interger which varies between 0 and (p-2)/2.  This will in turn
+	// random integer which varies between 0 and (p-2)/2.  This will in turn
 	// produce the correct xi's which vary from {0, 1/(p-1), 2/(p-1), .... 1 - delta)
 	// when divided by (p-1).  See Morris's paper for the derivaition.
 	// Satelli's book has this equation wrong!
@@ -438,7 +438,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 				it_senmap->second.add(sen);
 			}
 
-			//Compute sensitvities of indiviual observations
+			//Compute sensitivities of individual observations
 			obs_sen_file.add_sen_run_pair(par_name_1, p0, obs0, p1, obs1);
             for (auto& gphi : pg0)
 

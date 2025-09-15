@@ -51,6 +51,10 @@ x64
 /pest++/benchmarks/stor/pestpp/
 /pest++/benchmarks/tidal/pestpp/
 /pest++/benchmarks/mou_tests/
+/pest++/benchmarks/mic_bbgo/
+/pest++/benchmarks/michalewicz
+/pest++/benchmarks/rosendbrock_50d
+/pest++/benchmarks/ei_opt
 
 pest++/mio/model_input_output_interface.mod
 pest++/pest++/pestpp
@@ -71,3 +75,5 @@ pest++/sweep/sweep
 /src/UpgradeLog.htm
 *_z
 
+/dev_tests
+/benchmarks/g07

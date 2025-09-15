@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
         stringstream ss;
 
 
-		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
+		//Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 		//pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
@@ -253,7 +253,7 @@ int main(int argc, char* argv[])
 		vector <int> cycles_in_tables;
 		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, cycles_in_tables, fout_rec);
 		// process da obs cycle table
-		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
+		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isn't listed for a given cycle
 		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, cycles_in_tables, fout_rec, obs_in_tbl);
 		//process weights table
 		set<string> weights_in_tbl;
@@ -493,7 +493,10 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
 				pest_scenario.get_pestpp_options().get_panther_echo(),
 				pest_scenario.get_ctl_ordered_par_names(),
-				pest_scenario.get_ctl_ordered_obs_names());
+				pest_scenario.get_ctl_ordered_obs_names(),
+                pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
 		else
@@ -676,7 +679,7 @@ int main(int argc, char* argv[])
 			for (auto par : par1)
 
 			{
-				// ayman:  base_trans_seq above was copied from parent pest without any changes; the following statement temporarly fix
+				// ayman:  base_trans_seq above was copied from parent pest without any changes; the following statement temporary fix
 				// the issue; permenat solution should occur during the creation of childpest
 //				if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
 //					(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
@@ -851,7 +854,7 @@ int main(int argc, char* argv[])
 			if (use_existing)
             {
 			    ss.str("");
-			    ss << "...parameters and observations are consistent with previous cycle, reusing exsisting simulated outputs" << endl;
+			    ss << "...parameters and observations are consistent with previous cycle, reusing existing simulated outputs" << endl;
 			    cout << ss.str();
 			    fout_rec << ss.str();
             }
@@ -971,7 +974,7 @@ int main(int argc, char* argv[])
 
 			file_manager.close_all_files_containing(".phi.");
 
-			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
+			//transfer the best (current) simulated final states to the initial states pars in the pe for the cycle
 			//is the place to do this?
 			if (pest_scenario.get_pestpp_options().get_da_use_simulated_states()) {
                 da.transfer_dynamic_state_from_oe_to_initial_pe(curr_pe, curr_oe);

@@ -113,6 +113,7 @@ bool TerminationController::process_iteration(const PhiComponets &phi_comp, doub
 }
 bool TerminationController::check_last_iteration()
 {
+
 	if (nopt_count >= noptmax)
 	{
 		terminate_code = true;
@@ -167,7 +168,7 @@ void TerminationController::termination_summary(std::ostream &fout)
 	}
 	else
 	{
-		fout << "  NPHISTP lowest regularization PHI componets:" << endl;
+		fout << "  NPHISTP lowest regularization PHI components:" << endl;
 	}
 
 	for (const auto &it : lowest_phi)

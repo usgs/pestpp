@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.18
+# <a id='s1' />Version 5.2.22
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-April 2025
+August 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -41,7 +41,13 @@ On a personal note, thanks are also due to the following people who have contrib
 
 - Ayman Alzraiee (USGS)
 
-- Zak Stanko (USGS)
+- Joe Hughes (INTERA)
+
+- Rui Hugman (INTERA)
+
+- Katie Markovich (INTERA)
+
+- Reygie Macasieb (INTERA)
 
 # <a id='s3' />Preface
 
@@ -70,7 +76,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.18](#s1)
+- [Version 5.2.21](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -1591,7 +1597,7 @@ NPAR is the number of parameters featured in the “parameter data” section of
 
 ### <a id='s8-6-5' />4.6.5 Fourth Line 
 
-The two leading variables on this line are NTPFLE and NINSFLE. Both of these are integers. Both must be greater than 1. Even though these variables are not read by programs of the PEST++ suite, both should be given correct values to ensure that a PEST control file is PESTCHEK-friendly. NTPFLE is the number of template files featured in the “model input” section of the PEST control file, while NINSFLE is the number of instruction files featured in the “model output” section of the PEST control file.
+The two leading variables on this line are NTPFLE and NINSFLE. Both of these are integers. Both must be greater than 0. Even though these variables are not read by programs of the PEST++ suite, both should be given correct values to ensure that a PEST control file is PESTCHEK-friendly. NTPFLE is the number of template files featured in the “model input” section of the PEST control file, while NINSFLE is the number of instruction files featured in the “model output” section of the PEST control file.
 
 PRECIS and DPOINT are text variables which guide PEST in the writing of parameter values on model input files. Programs of the PEST++ suite do not use these variables. Set them to “single” and “point” respectively to render a PEST control file PESTCHEK-friendly.
 
@@ -2514,7 +2520,17 @@ Alternatively, users may want to the run manager to stop waiting on one or more 
 In some cases, users may want to retrieve one or more model output files from the agent working directories and collect those files in the master directory. For example, users may want an entire model output binary file for further processing after a successful model run. Or, if a model run fails to complete, users may wish to see certain model input/output files to diagnose issues. In a parallel run setting, both of these tasks can be difficult to complete. To support these use cases, the PEST++ tools allow transferring files from the agent directories to the master directory through the *panther_transfer_on_finish* and *panther_transfer_on_fail* options. Both of these options can be supplied as comma-separated lists of files or single file names. After successful completion or run failure, respectively, the panther run manager will transfer the nominated files found in the agent control file to the master working directory. This is worth saying again – the values of *panther_transfer_on_finish* and *panther_transfer_on_fail* listed in the agent’s control file are transferred to the master. This approach allows users to potentially transfer different files from each agent. To avoid naming conflicts in the master directory, the name of the file saved in the master directory is prepended with a unique tag staring with “ftx\_” and a counter. Additional metadata information including agent hostname, agent working directory, run manager run id value, run manager group id value and run manager information text (this information text usually includes information like realization name from pestpp-ies/pestpp-da and parameter name for Jacobian filling and global sensitivity analysis) are added to the run management record file along with the unique “ftx\_” tag, to that users can piece together which agent and in what context a file originated. Users are encouraged to study the .rmr file because it lists several valuable pieces of information regarding any file transfers.
 
 **panther_poll_interval**
-Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an interger value of seconds to sleep. By default, this value is 1 second.
+Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an integer value of seconds to sleep. By default, this value is 1 second.
+
+**panther_persistent_workers**
+Part of the run management design for panther is that workers persist for the duration of any long-term PESTPP run. All PESTPP-XXX programs have iterative steps involved that can result in idle workers at some times. With long and potentially variable runtimes the worker idle time can be significant. As users start to pay for cloud resources, for example, that idle time can be wasteful. *panther_persistent_workers* is a Boolean parameter (default value is True) that, if False, will shut down workers when no more forward runs are requested. This decreases idle time of workers but also requires users to manually restart workers for the next batch of forward runs as, at completion of a batch, all workers will be shut down. It is recommended to set *panther_master_timeout_milliseconds* to a higher value (\>=1000) if setting *panther_persistent_workers* to False to prevent overloading the master.
+
+
+**panther_master_timeout_milliseconds**
+In situations where the forward model runtime is very short, it is advantageous to have the panther master be as responsive as possible. But in other situations, where network traffic is heavy and latency is high, it is important for the panther master to be patience when communicating with workers. The *panther_master_timeout_milliseconds* option controls how quickly the panther master responds to requests. The default is 500 milliseconds. If users are experiencing “deadlock” on the master, you may need to increase the value.
+
+**panther_master_echo_interval_milliseconds**
+In situations where the forward model runtime is very short, allowing the master to echo as quickly as workers communicate can slow down responsiveness of physical host machine. The panther_master_echo_interval\_*milliseconds* option controls how often the panther master reports to the terminal screen. Default is 500 milliseconds.
 
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
@@ -3802,6 +3818,8 @@ Note that, as described above, PESTPP-IES also ceases execution if, during any p
 
 Special values of NOPTMAX can instigate special PESTPP-IES behaviour. If NOPTMAX is set to -1, PESTPP-IES does not upgrade random parameter sets which comprise an ensemble. It simply runs the model once for each parameter set, records model output values, and then ceases execution, thereby effective undertaking unconstrained Monte Carlo analysis. If NOPTMAX is set to zero, execution of PESTPP-IES is even shorter. It evaluates only the parameter values listed in the control file­ – replicating the behaviour of PESTPP-GLM and PEST. If NOPTMAX is supplied as -2, then PESTPP-IES will calculate the mean value of the initial parameter ensemble, evaluate it (by running the model once) and record the results.
 
+In many cases, users may want to run a single realization from an existing parameter ensemble file to have access to the underlying model input and output files. Historically, this involved several steps, including extracting the realization, setting the PARVAL1 quantity in the control file to the realization values, setting NOPTMAX = 0, saving the control file, and then running the PESTPP-IES. Clearly, this workflow provides many opportunities for hardship. To make this common set of steps easier and less prone to error, users can *ies_run_realname* to the name of a realization in the user-supplied parameter ensemble (through the *ies_parameter_ensemble* option), and set NOPTMAX = -2. When PESTPP-IES is run, it will extract the named realization and execute the model run process using this realization, record results and quit.
+
 PESTPP-IES reports several different objective functions, namely “composite”, “measurement”, “regularization”, and “actual”, depending on the mode of operation. The “measurement” objective function is calculated using the current simulated outputs and the observations values in the pest control combined with realizations of additive measurement noise (described elsewhere in this manual). The measurement objective function is calculated using the weights in the pest control file (unless an *obscov* is supplied, described elsewhere, or unless a user-generated observations plus noise ensemble is supplied, described elsewhere). Note that if the *ies_no_noise* option is activated, the “measurement” and “actual” objective functions are the same and only the “actual” is reported to the screen and record file.
 
 The “regularization” objective function is calculated as parameter value deviations from the initial (stochastic) realized values–this objective function is scaled by the diagonal of the prior parameter covariance matrix. Note the “regularization” objective function is only used and reported if the value of *ies_reg_factor* is supplied with a value greater than 0.0.
@@ -3814,7 +3832,9 @@ The “actual” objective function is calculated using the current simulated ou
 
 The importance of designing a composite objective function that emphasizes various components of multiple types of observations is a key to success in predictive environmental simulation. Typically, when using PESTPP-IES, this action requires users to run the prior parameter ensemble, stop PESTPP-IES, do some calculations/scripting to “balance” the objective function using the observed data, current weights in the control file, and the simulated results for the prior parameter ensemble. This step can be burdensome and potentially error prone. Therefore, PESTPP-IES allows users to option to have the objective function “balancing” done internally at runtime – isn’t that nice!
 
-The internal weight adjustment process is activated with the *ies_phi_factor_file* option. This option is string which should identify a filename. This filename should have two column and no header – the columns can be comma and/or whitespace delimited. The first column is “tag” – a group of letters and numbers that is used to identify observation groups that have non-zero weighted observations. These groups are identified by the tag if they contain the tag in a sub-string sense. In this way users can “regroup” multiple observation groups into a single “weighting group”. The second column of the *ies_phi_factor_file* is a strictly positive floating point number, which is the phi factor, which represent the portion (or factor) of the existing/current mean measurement phi (that is, the noisy observation phi) that the weighting group should occupy. Note that each non-zero weighted observation group must be identified by one and only one tag and PESTPP-IES will exit with an error message is this condition is not met.
+The internal weight adjustment process is activated with the *ies_phi_factor_file* option. This option is a string which should identify a filename. This filename should identify a file that has two column and no header – the columns can be comma and/or whitespace delimited. The first column is “tag” – a group of letters and numbers that is used to identify observation groups that have non-zero weighted observations. These groups are identified by the tag if they contain the tag in a sub-string sense. In this way users can “regroup” multiple observation groups into a single “weighting group”. The second column of the *ies_phi_factor_file* is a strictly positive floating point number, which is the phi factor, which represent the portion (or factor) of the existing/current mean measurement phi (that is, the noisy observation phi) that the weighting group should occupy. Note that each non-zero weighted observation group must be identified by one and only one tag and PESTPP-IES will exit with an error message is this condition is not met.
+
+By default, the residuals from the mean of the ensemble are used to calculate the weight adjustments. If a user has provided the *ies_center_on()* parameter, then the residuals for the realization (often the “base”) identified by *ies_center_on()* are used for rebalancing the weights.
 
 For example, let’s assume there are two primary observation types: heads and flows. There likely multiple observation groups that contain head observations (maybe one group per monitoring well) and multiple observation groups that contain flows (one group per gauge station). Furthermore, let’s assume that we want to balance the objective function so that it 75% heads and 25% flows. Let’s also assume that every observation group for heads contains the string “hds” (e.g. “hds_site1”, “hds_site2”) and for flows, “flowout” (e.g. “flowout_g1”,”flowout_g2). In this case, users need to make a simple ASCII file with two rows and two columns:
 
@@ -4157,7 +4177,7 @@ Note also that the number of control variables may change with time. Refer to th
 <tr class="odd">
 <td><em>ies_phi_factor_file</em></td>
 <td>text</td>
-<td>A two-column ASCII file that contains observation group “tags” and phi factors. Used to internally adjust weights to implement a balanced objective function using the mean residuals from the initial ensemble.</td>
+<td>A two-column ASCII file that contains observation group “tags” and phi factors. Used to internally adjust weights to implement a balanced objective function using the mean residuals from the initial ensemble. If <em>ies_center_on()</em> identifies a different realization to center the ensemble on for upgrades, that residuals of the identified realization are used instead of the mean to adjust weights.</td>
 </tr>
 <tr class="even">
 <td><em>ies_phi_factors_by_real</em></td>
@@ -4188,6 +4208,11 @@ Note also that the number of control variables may change with time. Refer to th
 <td><em>save_dense</em></td>
 <td>bool</td>
 <td>Flag to save ensembles in a “dense” binary format, which in constrast to the sparse binary format of jcb/jco. Ensemble files will be given a “.bin” extension. These files can be read by PESTPP-IES (for restarting) and by pyEMU. This option only applies of <em>save_</em>binary is True. Default is False</td>
+</tr>
+<tr class="even">
+<td><em>ies_run_realname</em></td>
+<td>Text</td>
+<td>The name of a parameter realization in an external parameter ensemble file to run. Only used if noptmax = -2.</td>
 </tr>
 </tbody>
 </table>

@@ -39,7 +39,7 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 	struct addrinfo *servinfo;
 	//cout << "setting hints" << endl;
 	memset(&hints, 0, sizeof hints);
-	//Use this for IPv4 aand IPv6
+	//Use this for IPv4 and IPv6
 	//hints.ai_family = AF_UNSPEC;
 	//Use this just for IPv4;
 	hints.ai_family = AF_INET;
@@ -126,8 +126,8 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		report("ERROR: PANTHER agent unable to open pest control file : " + ctl_filename, true);
 		throw PestError("PANTHER agent unable to open pest control file: " + ctl_filename);
 	}
+    pest_scenario.set_default_dynreg();
 	pest_scenario.process_ctl_file(fin,ctl_filename,frec);
-
 	if ((pest_scenario.get_ctl_parameters().size() > 250000) || (pest_scenario.get_ctl_observations().size() > 250000))
 	{
 		set<string> pargs = pest_scenario.get_pestpp_options().get_passed_args();
@@ -244,8 +244,8 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval
 	// returns -1  receive error
 	//         -990  error in call to select()
 	//         -991  connection closed
-	//          1  message recieved
-	//          2  no message recieved
+	//          1  message received
+	//          2  no message received
 }
 
 pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs)
@@ -671,7 +671,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		else if (net_pack.get_type() == NetPackage::PackType::PAR_NAMES)
 		{
 			report("received PAR_NAMES", true);
-			//Don't check first8 bytes as these contain an interger which stores the size of the data.
+			//Don't check first8 bytes as these contain an integer which stores the size of the data.
 			bool safe_data = NetPackage::check_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			if (!safe_data)
 			{
@@ -741,7 +741,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		else if (net_pack.get_type() == NetPackage::PackType::OBS_NAMES)
 		{
 			report("received OBS_NAMES", true);
-			//Don't check first8 bytes as these contain an interger which stores the size of the data.
+			//Don't check first8 bytes as these contain an integer which stores the size of the data.
 			bool safe_data = NetPackage::check_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			if (!safe_data)
 			{
@@ -811,7 +811,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_LINPACK)
 		{
 			report("received REQ_LINPACK",true);
-			linpack_wrap();
+			//linpack_wrap();
 			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,"");
 			char data;
 			err = send_message(net_pack, &data, 0);
@@ -1161,7 +1161,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 
 			else if (final_run_status.first == NetPackage::PackType::CORRUPT_MESG)
 			{
-				ss << "corrupt/incorrect message recieved from master:" << final_run_status.second << " " << info_txt << " quitting for safety";
+				ss << "corrupt/incorrect message received from master:" << final_run_status.second << " " << info_txt << " quitting for safety";
 				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, ss.str());
 				char data;
 				err = send_message(net_pack, &data, 0);

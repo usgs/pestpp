@@ -79,12 +79,13 @@ public:
 	to the specified group
 	*/
 	void insert_parameter_link(const string &parameter_name, const string & group_name);
-	const ParameterGroupRec* get_group_rec_ptr(const string &par_name) const;
-	const ParameterGroupRec* get_group_by_groupname(const string &group_name) const { return groups.at(group_name); }
-	ParameterGroupRec* get_group_by_groupname_4_mod(const string &group_name) { return groups.at(group_name); }
-	ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
+	const ParameterGroupRec get_group_rec(const string &par_name) const;
+    ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
+	const ParameterGroupRec get_group_by_groupname(const string &group_name) const { return groups.at(group_name); }
+	ParameterGroupRec* get_group_ptr_by_groupname_4_mod(const string &group_name) { return &groups.at(group_name); }
+
 	string get_group_name(const string &par_name) const;
-	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
+	//const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
 	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
@@ -93,8 +94,8 @@ public:
 	void free_mem();
 	~ParameterGroupInfo();
 private:
-	unordered_map<string, ParameterGroupRec*> groups;
-	unordered_map<string, ParameterGroupRec*> parameter2group;
+	unordered_map<string, ParameterGroupRec> groups;
+	unordered_map<string, ParameterGroupRec> parameter2group;
 
 };
 
@@ -412,10 +413,40 @@ public:
 	void set_mou_save_population_every(int every) { mou_save_population_every = every; }
 	double get_mou_pso_omega() const { return mou_pso_omega; }
 	void set_mou_pso_omega(double val) { mou_pso_omega = val; }
-	double get_mou_pso_social_const() const { return mou_pso_social_const; }
-	void set_mou_pso_social_const(double val) { mou_pso_social_const = val; }
-	double get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
-	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
+	vector<double> get_mou_pso_social_const() const { return mou_pso_social_const; }
+	void set_mou_pso_social_const(vector<double> _vals) { mou_pso_social_const = _vals; }
+	vector<double> get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
+	void set_mou_pso_cognitive_const(vector<double> _vals) { mou_pso_cognitive_const = _vals; }
+	double get_mou_pso_alpha() const { return mou_pso_alpha; }
+	void set_mou_pso_alpha(double val) { mou_pso_alpha = val; }
+	double get_mou_pso_rramp() const { return mou_pso_rramp; }
+	void set_mou_pso_rramp(double val) { mou_pso_rramp = val; }
+	double get_mou_pso_rfit() const { return mou_pso_rfit; }
+	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
+	vector<double> get_mou_pso_inertia() const { return mou_pso_inertia; }
+	void set_mou_pso_inertia(vector<double> _vals) { mou_pso_inertia = _vals; }
+	double get_mou_pso_vmax_factor() const { return mou_pso_vmax_factor; }
+	void set_mou_pso_vmax_factor(double _val) { mou_pso_vmax_factor = _val; }
+	string get_mou_pso_dv_bound_handling() const { return mou_pso_dv_bound_handling; }
+	void set_mou_pso_dv_bound_handling(string name) { mou_pso_dv_bound_handling = name; }
+	int get_mou_max_nn_search() const { return mou_max_nn_search;}
+	void set_mou_max_nn_search(int val) { mou_max_nn_search = val; }
+	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
+	void set_mou_outer_repo_obs_file(string name) { mou_outer_repo_obs_file = name; }
+	double get_mou_hypervolume_extreme() const { return mou_hypervolume_extreme; }
+	void set_mou_hypervolume_extreme(double val) { mou_hypervolume_extreme = val; }
+	int get_mou_infill_size() const { return mou_infill_size; }
+	void set_mou_infill_size(int size) { mou_infill_size = size; }
+	double get_mou_ppd_beta() const { return mou_ppd_beta; }
+	void set_mou_ppd_beta(double val) { mou_ppd_beta = val; }
+	double get_mou_fit_epsilon() const { return mou_fit_epsilon; }
+	void set_mou_fit_epsilon(double val) { mou_fit_epsilon = val; }
+	double get_mou_fit_gamma() const { return mou_fit_gamma; }
+	void set_mou_fit_gamma(double val) { mou_fit_gamma = val; }
+	int get_mou_resample_every()const { return mou_resample_every; }
+	void set_mou_resample_every(int _every) { mou_resample_every = _every; }
+	string get_mou_resample_command()const { return mou_resample_command; }
+	void set_mou_resample_command(string _rescmd) { mou_resample_command = _rescmd; }
 	string get_mou_population_schedule() const {return mou_population_schedule;}
     void set_mou_population_schedule(string fname) {mou_population_schedule = fname;}
 	int get_mou_simplex_reflections() const { return mou_simplex_reflections; }
@@ -497,9 +528,6 @@ public:
 
     bool get_save_dense() const {return save_dense; }
     void set_save_dense(bool _flag) {save_dense = _flag;}
-
-
-
 	int get_ies_num_threads() const { return ies_num_threads; }
 	void set_ies_num_threads(int _threads) { ies_num_threads = _threads; }
 
@@ -556,6 +584,8 @@ public:
     vector<double> get_ies_reinflate_factor() const {return ies_reinflate_factor;}
     void set_ies_aal_indicator_pars(vector<string> pars)  { ies_aal_indicator_pars = pars;}
     vector<string> get_ies_aal_indicator_pars() const {return ies_aal_indicator_pars;}
+    void set_ies_run_realname(string name) {ies_run_realname = name;}
+    string get_ies_run_realname() const {return ies_run_realname;}
 
     string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -642,6 +672,15 @@ public:
     const vector<string>& get_panther_transfer_on_fail() const {return panther_transfer_on_fail;}
     void set_panther_transfer_on_finish(vector<string> _files) {panther_transfer_on_finish = _files;}
     void set_panther_transfer_on_fail(vector<string> _files) {panther_transfer_on_fail = _files;}
+    void set_panther_timeout_milliseconds(int _value) {panther_timeout_milliseconds = _value;}
+    void set_panther_echo_interval_milliseconds(int _value) {panther_echo_interval_milliseconds = _value;}
+    const int get_panther_echo_interval_milliseconds() const { return panther_echo_interval_milliseconds;}
+    const int get_panther_timeout_milliseconds() const { return panther_timeout_milliseconds;}
+    void set_panther_persistent_workers(bool _flag) {panther_persistent_workers = _flag;}
+    const bool get_panther_persistent_workers() const {return panther_persistent_workers;}
+
+
+
 
 
 
@@ -763,8 +802,23 @@ private:
 	double mou_de_f;
 	int mou_save_population_every;
 	double mou_pso_omega;
-	double mou_pso_social_const;
-	double mou_pso_cognitive_const;
+	vector<double> mou_pso_social_const;
+	vector<double> mou_pso_cognitive_const;
+	double mou_pso_alpha;
+	double mou_pso_rramp;
+	double mou_pso_rfit;
+	string mou_pso_dv_bound_handling;
+	vector<double> mou_pso_inertia;
+	double mou_pso_vmax_factor;
+	double mou_ppd_beta;
+	double mou_fit_gamma;
+	double mou_fit_epsilon;
+	string mou_outer_repo_obs_file;
+	int mou_max_nn_search;
+	int mou_infill_size;
+	double mou_hypervolume_extreme;
+	int mou_resample_every;
+	string mou_resample_command;
 	string mou_population_schedule;
 	int mou_simplex_reflections;
 	vector<double> mou_simplex_factors;
@@ -835,6 +889,7 @@ private:
     vector<double> ies_reinflate_factor;
     bool ies_updatebyreals;
     vector<string> ies_aal_indicator_pars;
+    string ies_run_realname;
 
 
 
@@ -872,6 +927,9 @@ private:
 	bool panther_debug_fail_freeze;
 	bool panther_echo;
 	vector<string> panther_transfer_on_finish, panther_transfer_on_fail;
+    int panther_timeout_milliseconds;
+    int panther_echo_interval_milliseconds;
+    bool panther_persistent_workers;
 
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);

@@ -146,6 +146,7 @@ public:
     vector<string> get_fixed_names() {return fixed_names;}
     map<string,map<string,double>> get_fixed_info_map() {return fixed_info;}
 
+
 private:
 	bool initialized;
 	vector<string> fixed_names;

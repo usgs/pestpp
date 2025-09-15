@@ -125,7 +125,7 @@ void SVD_PROPACK::solve_ip(Eigen::SparseMatrix<double>& A, VectorXd &Sigma, Eige
 	int ld_tmpv = n_cols;
 	int ld_tmpb = kmax;
 
-	// Compute singluar values and vectors
+	// Compute singular values and vectors
 	int info=0;
 	double tolin = 1.0E-4 ;
 	if (performance_log)
@@ -138,7 +138,7 @@ void SVD_PROPACK::solve_ip(Eigen::SparseMatrix<double>& A, VectorXd &Sigma, Eige
 
 	if (performance_log)
 	{
-		performance_log->log_event("updating Vt, S and U matricies");
+		performance_log->log_event("updating Vt, S and U matrices");
 	}
 	//Compute number of singular values to be used in the solution
 	int n_sing_used = 0;
@@ -298,7 +298,7 @@ void SVD_PROPACK::solve_ip(Eigen::MatrixXd& A, Eigen::MatrixXd &Sigma, Eigen::Ma
 	int ld_tmpv = n_cols;
 	int ld_tmpb = kmax;
 
-	// Compute singluar values and vectors
+	// Compute singular values and vectors
 	int info = 0;
 	double tolin = 1.0E-4;
 	if (performance_log)
@@ -311,7 +311,7 @@ void SVD_PROPACK::solve_ip(Eigen::MatrixXd& A, Eigen::MatrixXd &Sigma, Eigen::Ma
 
 	if (performance_log)
 	{
-		performance_log->log_event("updating Vt, S and U matricies");
+		performance_log->log_event("updating Vt, S and U matrices");
 	}
 	//Compute number of singular values to be used in the solution
 	int n_sing_used = 0;

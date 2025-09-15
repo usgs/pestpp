@@ -82,6 +82,10 @@ public:
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
 
+	static double calc_median(const std::vector<double> &values);
+
+	double calc_iqr_thresh(map<string, double> *phi_map, double bad_phi_sigma);
+
 	map<string, double>* get_phi_map_ptr(L2PhiHandler::phiType pt);
 	map<string, double> get_phi_map(L2PhiHandler::phiType pt);
 	void report(bool echo=true, bool group_report=true);
@@ -294,8 +298,6 @@ protected:
 
 };
 
-
-
 class UpgradeThread
 {
 public: 
@@ -449,6 +451,7 @@ protected:
 	bool oe_drawn, pe_drawn;
     bool reinflate_to_minphi_real;
     ObservationInfo org_obs_info;
+    string dense_file_ext = ".bin";
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);

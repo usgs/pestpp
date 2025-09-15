@@ -97,43 +97,43 @@ ostream& operator<< (ostream &os, const ParameterGroupRec& val)
 }
 
 /////////////////////////////////////  ParameterGroupInfo Methods ///////////////////////
-const ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr(const string &name) const
+const ParameterGroupRec ParameterGroupInfo::get_group_rec(const string &name) const
 {
-	const ParameterGroupRec *ret_val = 0;
-	unordered_map<string, ParameterGroupRec*>::const_iterator g_iter;
+	ParameterGroupRec ret_val;
+	unordered_map<string, ParameterGroupRec>::const_iterator g_iter;
 
 	g_iter = parameter2group.find(name);
 	if(g_iter != parameter2group.end()) {
-		ret_val = (*g_iter).second;
+		ret_val = g_iter->second;
 	}
 	return ret_val;
 }
 
 ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr_4_mod(const string &name)
 {
-	ParameterGroupRec *ret_val = 0;
-	unordered_map<string, ParameterGroupRec*>::const_iterator g_iter;
+	ParameterGroupRec* ret_val = 0;
+	unordered_map<string, ParameterGroupRec>::iterator g_iter;
 
 	g_iter = parameter2group.find(name);
 	if (g_iter != parameter2group.end()) {
-		ret_val = (*g_iter).second;
+		ret_val = &g_iter->second;
 	}
 	return ret_val;
 }
 
 string ParameterGroupInfo::get_group_name(const string &par_name) const
 {
-	return get_group_rec_ptr(par_name)->name;
+	return get_group_rec(par_name).name;
 }
 
 void ParameterGroupInfo::insert_group(const string &group_name, ParameterGroupRec &rec)
 {
-	groups[group_name] = new ParameterGroupRec(rec);
+	groups[group_name] = rec;
 }
 
 void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, const string & group_name)
 {
-	unordered_map<string, ParameterGroupRec*>::const_iterator g_iter;
+	unordered_map<string, ParameterGroupRec>::const_iterator g_iter;
 
 	g_iter = groups.find(group_name);
 	if(g_iter == groups.end()) {
@@ -150,35 +150,35 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 
 }
 
-const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo &rhs)
-{
-	unordered_map<ParameterGroupRec*, ParameterGroupRec*> old2new;
-	unordered_map<string, ParameterGroupRec*>::const_iterator it(rhs.groups.begin());
-	unordered_map<string, ParameterGroupRec*>::const_iterator end(rhs.groups.end());
-	for (; it != end; ++it) {
-		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
-		groups[(*it).first] = new_ptr;
-		old2new[(*it).second] = new_ptr;
-
-	}
-	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
-	it = rhs.parameter2group.begin();
-	end =  rhs.parameter2group.end();
-	for (; it != end; ++it) {
-		it_find = old2new.find((*it).second);
-		if (it_find != old2new.end())
-			parameter2group[(*it).first] = (*it_find).second;
-	}
-//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
-//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+//const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo &rhs)
+//{
+//	unordered_map<ParameterGroupRec*, ParameterGroupRec*> old2new;
+//	unordered_map<string, ParameterGroupRec*>::const_iterator it(rhs.groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::const_iterator end(rhs.groups.end());
+//	for (; it != end; ++it) {
+//		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
+//		groups[(*it).first] = new_ptr;
+//		old2new[(*it).second] = new_ptr;
 //
-//    for (; iit != eend; ++iit) {
-//        delete (*iit).second;
-//        delete (*iit).first;
-//    }
-
-    return *this;
-}
+//	}
+//	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
+//	it = rhs.parameter2group.begin();
+//	end =  rhs.parameter2group.end();
+//	for (; it != end; ++it) {
+//		it_find = old2new.find((*it).second);
+//		if (it_find != old2new.end())
+//			parameter2group[(*it).first] = (*it_find).second;
+//	}
+////    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+////    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+////
+////    for (; iit != eend; ++iit) {
+////        delete (*iit).second;
+////        delete (*iit).first;
+////    }
+//
+//    return *this;
+//}
 
 vector<string> ParameterGroupInfo::get_group_names() const
 {
@@ -193,7 +193,7 @@ bool ParameterGroupInfo::have_switch_derivative() const
 	bool switch_der = false;
 	for (const auto irec : groups)
 	{
-		if (lower_cp(irec.second->forcen) == "switch")
+		if (lower_cp(irec.second.forcen) == "switch")
 		{
 			switch_der = true;
 			break;
@@ -220,28 +220,19 @@ ParameterGroupInfo::~ParameterGroupInfo()
 
 void ParameterGroupInfo::free_mem()
 {
-    unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
-	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
-	for (; it != end; ++it) {
-		delete (*it).second;
-	}
 
-    it = parameter2group.begin();
-	end = parameter2group.end();
-
-    for (; it != end; ++it) {
-        delete (*it).second;
-    }
     groups.clear();
+
     parameter2group.clear();
+
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
 {
-	unordered_map<string, ParameterGroupRec*>::const_iterator it(val.parameter2group.begin());
-	unordered_map<string, ParameterGroupRec*>::const_iterator end(val.parameter2group.end());
+	unordered_map<string, ParameterGroupRec>::const_iterator it(val.parameter2group.begin());
+	unordered_map<string, ParameterGroupRec>::const_iterator end(val.parameter2group.end());
 	for (; it != end; ++it) {
-		os << *(it->second) << endl;
+		os << (it->second) << endl;
 	}
 	return os;
 }
@@ -1231,6 +1222,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
     }
 
+    else if (key == "IES_RUN_REALNAME")
+    {
+        ies_run_realname = value;
+        return true;
+
+    }
+
 
 
     return false;
@@ -1417,6 +1415,23 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
         }
         return true;
     }
+    else if (key == "PANTHER_MASTER_TIMEOUT_MILLISECONDS")
+    {
+        convert_ip(value, panther_timeout_milliseconds);
+        return true;
+
+    }
+    else if (key == "PANTHER_MASTER_ECHO_INTERVAL_MILLISECONDS")
+    {
+        convert_ip(value, panther_echo_interval_milliseconds);
+        return true;
+
+    }
+    else if (key == "PANTHER_PERSISTENT_WORKERS")
+    {
+        panther_persistent_workers = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 
 	
 	return false;
@@ -1520,14 +1535,113 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	}
 	else if (key == "MOU_PSO_SOCIAL_CONST")
 	{
-		convert_ip(value, mou_pso_social_const);
+		mou_pso_social_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_social_const.push_back(v);
+		}
 		return true;
 	}
 	else if (key == "MOU_PSO_COGNITIVE_CONST")
 	{
-		convert_ip(value, mou_pso_cognitive_const);
+		mou_pso_cognitive_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_cognitive_const.push_back(v);
+		}
+		return true;
+		}
+	else if (key == "MOU_PSO_ALPHA")
+	{
+		convert_ip(value, mou_pso_alpha);
+		return true;
+		}
+	else if (key == "MOU_PSO_RRAMP")
+	{
+		convert_ip(value, mou_pso_rramp);
+		return true;
+		}
+	else if (key == "MOU_PSO_RFIT")
+	{
+		convert_ip(value, mou_pso_rfit);
+		return true;
+		}
+	else if (key == "MOU_PSO_INERTIA")
+	{
+		mou_pso_inertia.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_inertia.push_back(v);
+		}
 		return true;
 	}
+	else if (key == "MOU_PSO_VMAX_FACTOR")
+	{
+		convert_ip(value, mou_pso_vmax_factor);
+		return true;
+		}
+	if (key == "MOU_PSO_DV_BOUND_HANDLING")
+	{
+		mou_pso_dv_bound_handling = upper_cp(strip_cp(value));
+		return true;
+	}
+	else if (key == "MOU_OUTER_REPO_OBS_FILE")
+	{
+		mou_outer_repo_obs_file = org_value;
+		return true;
+		}
+	else if (key == "MOU_MAX_NN_SEARCH")
+	{
+		convert_ip(value, mou_max_nn_search);
+		return true;
+		}
+	else if (key == "MOU_HYPERVOLUME_EXTREME")
+	{
+		convert_ip(value, mou_hypervolume_extreme);
+		return true;
+		}
+	else if (key == "MOU_INFILL_SIZE")
+	{
+		convert_ip(value, mou_infill_size);
+		return true;
+		}
+	else if (key == "MOU_RESAMPLE_EVERY")
+	{
+		convert_ip(value, mou_resample_every);
+		return true;
+		}
+	else if (key == "MOU_RESAMPLE_COMMAND")
+	{
+		mou_resample_command = value;
+		return true;
+		}
+	else if (key == "MOU_PPD_BETA")
+	{
+		convert_ip(value, mou_ppd_beta);
+		return true;
+	}
+	else if (key == "MOU_FIT_GAMMA")
+	{
+		convert_ip(value, mou_fit_gamma);
+		return true;
+		}
+	else if (key == "MOU_FIT_EPSILON")
+	{
+		convert_ip(value, mou_fit_epsilon);
+		return true;
+		}
 	else if (key == "MOU_POPULATION_SCHEDULE")
     {
 	    mou_population_schedule = org_value;
@@ -1670,6 +1784,9 @@ void PestppOptions::summary(ostream& os) const
     os << "panther_transfer_on_fail: " << endl;
     for (auto& file : panther_transfer_on_fail)
         os << file << endl;
+    os << "panther_timeout_milliseconds: " << panther_timeout_milliseconds << endl;
+    os << "panther_echo_interval_milliseconds: " << panther_echo_interval_milliseconds << endl;
+    os << "panther_persistent_workers: " << panther_persistent_workers << endl;
 
     os << endl;
 
@@ -1797,8 +1914,30 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_de_f: " << mou_de_f << endl;
 	os << "mou_save_population_every: " << mou_save_population_every << endl;
 	os << "mou_pso_omega: " << mou_pso_omega << endl;
-	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
-	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
+	os << "mou_pso_inertia (IINER, FINERT, INITER): " << endl;
+	for (auto& f : mou_pso_inertia)
+	{
+		os << " " << f << " ";
+	}
+	os << endl;
+	os << "mou_pso_social_const: " << endl;
+	for (auto& f : mou_pso_social_const)
+	{
+		os << " " << f << endl;
+	}
+	os << "mou_pso_cognitive: " << endl;
+	for (auto& f : mou_pso_cognitive_const)
+	{
+		os << " " << f << endl;
+	}
+	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
+	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
+	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
+	os << "mou_pso_vmax_factor: " << mou_pso_vmax_factor << endl;
+	os << "mou_pso_dv_bound_handling: " << mou_pso_dv_bound_handling << endl;
+	os << "mou_ppd_beta: " << mou_ppd_beta << endl;
+	os << "mou_fit_gamma: " << mou_fit_gamma << endl;
+	os << "mou_fit_epsilon: " << mou_fit_epsilon << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
 	os << "mou_simplex_factors: " << endl;
@@ -1883,6 +2022,7 @@ void PestppOptions::summary(ostream& os) const
     for (auto v : ies_aal_indicator_pars)
         os << v << ",";
     os << endl;
+    os << "ies_run_realname: " << ies_run_realname;
 
     os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1948,7 +2088,6 @@ void PestppOptions::set_defaults()
 	set_basejac_filename(string());
     set_jac_scale(true);
 
-
     set_sweep_parameter_csv_file(string());
 	set_sweep_output_csv_file("sweep_out.csv");
 	set_sweep_base_run(false);
@@ -1957,7 +2096,6 @@ void PestppOptions::set_defaults()
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
     set_sweep_include_regul_phi(false);
-
 
 	set_opt_obj_func("");
     set_org_opt_obj_func("");
@@ -2002,8 +2140,23 @@ void PestppOptions::set_defaults()
 	set_mou_de_f(0.8);
 	set_mou_save_population_every(-1);
 	set_mou_pso_omega(0.7);
-	set_mou_pso_cognitive_const(2.0);
-	set_mou_pso_social_const(2.0);
+	set_mou_pso_cognitive_const(vector<double>{2.0});
+	set_mou_pso_social_const(vector<double>{2.0});
+	set_mou_pso_alpha(1.0);
+	set_mou_pso_rramp(-5e+02);
+	set_mou_pso_rfit(2.0);
+	set_mou_pso_inertia(vector<double>{0.7, 0.4, 0});
+	set_mou_pso_vmax_factor(0.8);
+	set_mou_pso_dv_bound_handling("HYBRID");
+	set_mou_outer_repo_obs_file("");
+	set_mou_max_nn_search(get_mou_population_size());
+	set_mou_hypervolume_extreme(1e+10);
+	set_mou_infill_size(100);
+	set_mou_ppd_beta(0.5);
+	set_mou_fit_epsilon(0.05);
+	set_mou_fit_gamma(0.25);
+	set_mou_resample_every(-1);
+	set_mou_resample_command("");
 	set_mou_population_schedule("");
 	set_mou_simplex_reflections(10);
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
@@ -2063,12 +2216,13 @@ void PestppOptions::set_defaults()
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
     set_ies_multimodal_alpha(1.0);
-    set_ensemble_output_precision(6);
+    set_ensemble_output_precision(20);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_reinflate(vector < int > {0});
     set_ies_reinflate_factor(vector < double > {1.0});
+    set_ies_run_realname("");
 
     set_ies_updatebyreals(false);
     set_save_dense(false);
@@ -2118,6 +2272,9 @@ void PestppOptions::set_defaults()
 	set_panther_echo(true);
     set_panther_transfer_on_finish(vector<string>{});
     set_panther_transfer_on_fail(vector<string>{});
+    set_panther_timeout_milliseconds(-999);
+    set_panther_echo_interval_milliseconds(1000);
+    set_panther_persistent_workers(true);
 
 }
 

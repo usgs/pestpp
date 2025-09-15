@@ -1077,7 +1077,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			precision--;
 		if (precision <= 0)
 		{
-			//time for desparate measures:
+			//time for desperate measures:
 			//if the exponent has a leading zero, drop it
 			if (val_str.substr(val_str.size() - 2, 1) == "0")
 			{
@@ -1109,7 +1109,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			        break;
             }
 			ss.str("");
-		 	ss << "TemplateFile casting error: cant represent value " << value;
+		 	ss << "TemplateFile casting error: can't represent value " << value;
 			ss << " for " << name << " in space that is only " << size << " chars wide";
 			throw_tpl_error(ss.str());
 		}
@@ -1134,7 +1134,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	if (val_str.size() < size)
 	{
 		ss.str("");
-		//if the fill value isnt a space and its a negative value
+		//if the fill value isn't a space and its a negative value
 		// we need to push the dash into the stringstream, then 
 		//remove the dash from the val string
 		int s = size;
@@ -1164,7 +1164,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 string TemplateFile::read_line( ifstream& f_tpl)
 {
 	if (f_tpl.bad())
-		throw_tpl_error("cant read next line", line_num);
+		throw_tpl_error("can't read next line", line_num);
 	string line;
 	if (f_tpl.eof())
 		throw_tpl_error("unexpected eof", line_num);
@@ -1178,7 +1178,7 @@ string TemplateFile::read_line( ifstream& f_tpl)
 string InstructionFile::read_ins_line(ifstream& f_ins)
 {
 	if (f_ins.bad())
-		throw_ins_error("cant read next instruction file line", ins_line_num);
+		throw_ins_error("can't read next instruction file line", ins_line_num);
 	string line;
 	if (f_ins.eof())
 		throw_ins_error("unexpected instruction file eof ", ins_line_num);
@@ -1193,7 +1193,7 @@ string InstructionFile::read_ins_line(ifstream& f_ins)
 string InstructionFile::read_out_line(ifstream& f_out)
 {
 	if (f_out.bad())
-		throw_ins_error("cant read next output file line", ins_line_num, out_line_num);
+		throw_ins_error("can't read next output file line", ins_line_num, out_line_num);
 	string line;
 	if (f_out.eof())
 		throw_ins_error("unexpected output file eof ", ins_line_num, out_line_num);
@@ -1287,7 +1287,7 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 	marker = s_marker.c_str()[0];
     if (marker == '!')
     {
-        throw_ins_error("the bang ('!') cant be used as the marker bc it is used to indicate free-format instructions");
+        throw_ins_error("the bang ('!') can't be used as the marker bc it is used to indicate free-format instructions");
     }
 }
 
@@ -1557,7 +1557,7 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	}
 	if ((info.first != "DUM") && (idx != temp.size()))
 	{
-		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruction: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
 	int pos = line.find(temp);
 	if (pos == string::npos)
@@ -1605,7 +1605,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	}
 	if ((info.first != "DUM") && (idx != tokens[0].size()))
 	{
-		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruction: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
 	pos = line.find(temp);
 	if (pos == string::npos)
@@ -1641,11 +1641,11 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	catch (...)
 	{
 		if (name != "DUM")
-			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
+			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruction: '"+token+"'", ins_line_num, out_line_num);
 	}
 	if ((name != "DUM") && (idx != tokens[0].size()))
 	{
-		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '" + token + "', left-over chars: '" + tokens[0].substr(idx,tokens[0].size())+"'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruction: '" + token + "', left-over chars: '" + tokens[0].substr(idx,tokens[0].size())+"'", ins_line_num, out_line_num);
 	}
 	int pos = line.find(tokens[0]);
 	if (pos == string::npos)
@@ -1691,7 +1691,7 @@ void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, c
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)
 {
 	//check that a closing marker is found
-	//this shouldnt be a prob,but good to check
+	//this shouldn't be a prob,but good to check
 	if (token.substr(token.size()-1,1) != string(1,marker))
 		throw_ins_error("primary marker token '" + token + "' doesn't have a closing marker char", ins_line_num);
 	int pos;
@@ -1718,7 +1718,7 @@ bool InstructionFile::execute_secondary(const string& token, string& line, ifstr
 	//check that a closing marker is found
 	int pos;
 	if (token.substr(token.size()-1,1) != string(1,marker))
-		throw_ins_error("secondary marker token '" + token + "' doesnt have a closing marker char");
+		throw_ins_error("secondary marker token '" + token + "' doesn't have a closing marker char");
 	string secondary_tag = token.substr(1, token.size()-2);
 	pos = line.find(secondary_tag);
 	if (pos == string::npos)
@@ -1751,7 +1751,7 @@ void InstructionFile::execute_whitespace(const string& token, string& line, ifst
 		pos = line.find(tokens[0]);
 		if (pos == string::npos)
 		{
-			throw_ins_error("internal error in execute_whitespace: couldnt find first token");
+			throw_ins_error("internal error in execute_whitespace: couldn't find first token");
 		}
 		line = line.substr(pos + tokens[0].size());
 		pos = line.find_first_not_of(delims);

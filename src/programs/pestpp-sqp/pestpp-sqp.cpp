@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-sqp: ensemble-based constrained squential quadratic programming" << endl << endl;
+		cout << "             pestpp-sqp: ensemble-based constrained sequential quadratic programming" << endl << endl;
 		//cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                   by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
 		int flag = remove(rns_file.c_str());
 		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
-		//run manger is specified on the command line.
+		//run manager is specified on the command line.
 		
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER)
 		{
@@ -148,8 +148,8 @@ int main(int argc, char* argv[])
 
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-sqp: ensemble-based constrained squential quadratic programming" << endl << endl;
-			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
+			fout_rec << "             pestpp-sqp: ensemble-based constrained sequential quadratic programming" << endl << endl;
+			fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
@@ -184,7 +184,7 @@ int main(int argc, char* argv[])
 		//pest_scenario.clear_ext_files();
 		pest_scenario.check_inputs(fout_rec);
 
-		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
+		//Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
@@ -223,13 +223,18 @@ int main(int argc, char* argv[])
 				cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
 			}
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerPanther(
-				rns_file, cmdline.panther_port,
-				file_manager.open_ofile_ext("rmr"),
-				pest_scenario.get_pestpp_options().get_max_run_fail(),
-				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
+            run_manager_ptr = new RunManagerPanther(
+                    rns_file, cmdline.panther_port,
+                    file_manager.open_ofile_ext("rmr"),
+                    pest_scenario.get_pestpp_options().get_max_run_fail(),
+                    pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
+                    pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
+                    pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+                    pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 		}
 		else
 		{

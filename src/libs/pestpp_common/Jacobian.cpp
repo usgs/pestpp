@@ -174,7 +174,7 @@ unordered_map<string, int> Jacobian::get_obs2row_map() const
 Eigen::SparseMatrix<double> Jacobian::get_matrix(const vector<string> &obs_names, const vector<string> & par_names, bool forgive_missing, int n_cols) const
 {
     /* the n_cols arg is so you can reserve a sparse matrix with columns that are all zeros - this is for the LP solver in pestpp-opt when you have
-     * external dec vars - they wont be in the Jacobian instance but they need to be in the LP solution matrix.
+     * external dec vars - they won't be in the Jacobian instance but they need to be in the LP solution matrix.
      */
     stringstream ss;
 	int n_rows = obs_names.size();
@@ -314,7 +314,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 		else
 		{
 			debug_msg("fail");
-			//cout << endl << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
+			//cout << endl << " warning: failed to compute parameter derivative for " << ipar_name << endl;
 			file_manager.rec_ofstream() << " warning: failed to compute parameter derivative for " << ipar_name << endl;
 			failed_parameter_names.insert(ipar_name);
 		}
@@ -374,7 +374,7 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		++i_run;
 	}
 
-	// process the parameter pertubation runs
+	// process the parameter perturbation runs
 	int nruns = run_manager.get_nruns();
 	int icol = 0;
 	int r_status;
@@ -464,12 +464,12 @@ bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &num
 
 	}
 	bool success = false;
-	const ParameterGroupRec *g_rec;
+	ParameterGroupRec g_rec;
 	debug_msg("Jacobian::get_derivative_parameters begin");
 	debug_print(par_name);
-	g_rec = group_info.get_group_rec_ptr(par_name);
+	g_rec = group_info.get_group_rec(par_name);
 
-	if (g_rec->forcen == "ALWAYS_3" || phiredswh_flag == true) {
+	if (g_rec.forcen == "ALWAYS_3" || phiredswh_flag == true) {
 		debug_msg("trying central");
 		// Central Difference
 		vector<double> new_par_vec;
@@ -504,7 +504,7 @@ bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &num
 std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &numeric_par_name, double base_numeric_par_value, int jcol, list<JacobianRun> &run_list,
 	const ParameterGroupInfo &group_info, const PriorInformation &prior_info, bool splitswh_flag)
 {
-	const ParameterGroupRec *g_rec;
+	ParameterGroupRec g_rec;
 	double del_par;
 	double del_obs;
 	double der;
@@ -520,15 +520,15 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 	auto  &run_last = run_list.back();
 
 	//p_rec = group_info.get_parameter_rec_ptr(*par_name);
-	g_rec = group_info.get_group_rec_ptr(numeric_par_name);
-	double splitthresh = g_rec->splitthresh;
-	double splitreldiff = g_rec->splitreldiff;
+	g_rec = group_info.get_group_rec(numeric_par_name);
+	double splitthresh = g_rec.splitthresh;
+	double splitreldiff = g_rec.splitreldiff;
 
 	irow = 0;
 	vector<double> sen_vec;
 	for (auto &iobs_name : base_sim_obs_names)
 	{
-		// Check if this is not prior infomation
+		// Check if this is not prior information
 		if (prior_info.find(iobs_name) == prior_info.end())
 		{
 			//Apply Split threshold on derivative if applicable
@@ -559,7 +559,7 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 				}
 			}
 
-			if (run_list.size() == 3 && g_rec->dermthd == "PARABOLIC" && !success)
+			if (run_list.size() == 3 && g_rec.dermthd == "PARABOLIC" && !success)
 			{
 				// Central Difference Parabola
 				// Solve Ac = o for c to get the equation for a parabola where:
@@ -603,7 +603,7 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 		}
 		else
 		{
-			// Prior Information allways calculated using outer model runs even for central difference
+			// Prior Information always calculated using outer model runs even for central difference
 			del_par = run_last.numeric_derivative_par - run_first.numeric_derivative_par;
 			double del_prior_info;
 
@@ -741,23 +741,23 @@ bool Jacobian::out_of_bounds(const Parameters &ctl_parameters,
 
 double Jacobian::derivative_inc(const string &name, const ParameterGroupInfo &group_info, double cur_par_value, bool central)
 {
-	const ParameterGroupRec *g_rec;
+	ParameterGroupRec g_rec;
 	double incr = 0.0;
 
 	//// to do add error checking
-	g_rec = group_info.get_group_rec_ptr(name);
-	if (g_rec->inctyp == "ABSOLUTE") {
-		incr = g_rec->derinc;}
-	else if (g_rec->inctyp == "RELATIVE") {
-		incr =  g_rec->derinc * abs(cur_par_value);
+	g_rec = group_info.get_group_rec(name);
+	if (g_rec.inctyp == "ABSOLUTE") {
+		incr = g_rec.derinc;}
+	else if (g_rec.inctyp == "RELATIVE") {
+		incr =  g_rec.derinc * abs(cur_par_value);
 	}
 	// apply derincmul for central derivatives
 	if (central) {
-		incr *= g_rec->derincmul;
+		incr *= g_rec.derincmul;
 	}
 	// apply lower bound
-	if ((g_rec->inctyp != "ABSOLUTE") && (incr < g_rec->derinclb)) {
-		incr = g_rec->derinclb;
+	if ((g_rec.inctyp != "ABSOLUTE") && (incr < g_rec.derinclb)) {
+		incr = g_rec.derinclb;
 	}
 	return incr;
 }
@@ -1013,7 +1013,7 @@ void Jacobian::report_errors(std::ostream &fout)
 		{
 			fout << right << "  " << setw(12) << ipar << endl;
 		}
-		cout << "WARNING:  " << failed_parameter_names.size() << " parameter pertubation runs failed while computing jacobian, see rec file for listing" << endl;
+		cout << "WARNING:  " << failed_parameter_names.size() << " parameter perturbation runs failed while computing jacobian, see rec file for listing" << endl;
 	}
 
 }

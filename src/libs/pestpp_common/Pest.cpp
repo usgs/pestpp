@@ -469,7 +469,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 	return process_ctl_file(fin, _pst_filename, f_out);
 }
 
-
+bool IsQuote(char c)
+{
+    switch(c)
+    {
+        case '\"':
+        case '\'':
+            return true;
+        default:
+            return false;
+    }
+}
 
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
@@ -567,7 +577,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (line_upper.substr(0, 2) == "++")
 			{
 				if (sections_found.find("CONTROL DATA KEYWORD") != sections_found.end())
-					throw_control_file_error(f_rec, "'* control data keyword' cant be used with '++' args");
+					throw_control_file_error(f_rec, "'* control data keyword' can't be used with '++' args");
 				sections_found.insert("PLUSPLUS");
 				pestpp_input.push_back(line);
 				section = "PLUSPLUS";
@@ -703,7 +713,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else if (sec_lnum == 6)
 				{
-					// remove text arguements from the line as these can be specified out of order
+					// remove text arguments from the line as these can be specified out of order
 					// and PEST++ does not use them
 					set<string> remove_tags = { "aui", "auid", "noaui", "senreuse", "nsenreuse", "boundscale", "noboundscale" };
 					auto end_iter = std::remove_if(tokens.begin(), tokens.end(),
@@ -759,7 +769,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* parameter group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* parameter group' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -795,7 +805,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					tokens_to_par_rec(f_rec, tokens, t_fixed, t_log, t_scale, t_offset);
 				}
-				// Get rest of information for tied paramters
+				// Get rest of information for tied parameters
 				else 
 				{
 					name = tokens[0];
@@ -839,7 +849,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						if (cnames.find(nn) == cnames.end())
 						{
 							ss.str("");
-							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing reqiured column '";
+							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing required column '";
 							ss << n << "' (alias '" + nn + "' also not found";
 							throw_control_file_error(f_rec, ss.str());
 						}
@@ -876,7 +886,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					{
 						ss.str("");
 						ss << "external '* parameter data' file '" << efile.get_filename() << "' included 'tied' parameters";
-						ss << "but doesnt have 'PARTIED' column";
+						ss << "but doesn't have 'PARTIED' column";
 						throw_control_file_error(f_rec, ss.str());
 					}
 
@@ -913,7 +923,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* observation group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* observation group' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -955,7 +965,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						if (cnames.find(nn) == cnames.end())
 						{
 							ss.str("");
-							ss << "external '* observation data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							ss << "external '* observation data' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 							throw_control_file_error(f_rec, ss.str());
 						}
 						else
@@ -1004,7 +1014,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* prior information' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* prior information' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -1025,7 +1035,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		
 			else if (section == "MODEL COMMAND LINE")
 			{
-				model_exec_info.comline_vec.push_back(line);
+                if ((line.find('\"') != std::string::npos) || (line.find('\'') != std::string::npos))
+                {
+                    ss.str("");
+                    ss << "WARNING: single and/or double quote char(s) found in model command line :" << line << endl;
+                    string temp_line = line;
+                    temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                    //pest_utils::strip_ip(temp_line);
+
+                    ss << "         new model command line: " << temp_line << endl;
+                    cout << ss.str();
+                    f_rec << ss.str();
+                    model_exec_info.comline_vec.push_back(string(temp_line));
+                }
+                else
+                {
+                    model_exec_info.comline_vec.push_back(line);
+                }
 			}
 
 			else if (section == "MODEL INPUT")
@@ -1048,7 +1074,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* model input' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* model input' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -1088,7 +1114,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (cnames.find(n) == cnames.end())
 					{
 						ss.str("");
-						ss << "external '* model output' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						ss << "external '* model output' file '" << efile.get_filename() << "' missing required column '" << n << "'";
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
@@ -1525,12 +1551,12 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
-		for (auto p : upgrade_ctl_pars)
+		for (auto& p : upgrade_ctl_pars)
 		{
 			/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
 				cout << p.first << endl;*/
 			last_val = last_ctl_pars.get_rec(p.first);
-			
+            
 			p_rec = p_info.get_parameter_rec_ptr(p.first);
 			parchglim = p_rec->chglim;
 
@@ -1587,6 +1613,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			{
 				throw runtime_error("Pest::enforce_par_limits() error: unrecognized 'parchglim': " + parchglim);
 			}
+
 
 
 			double temp = 1.0;
@@ -2020,7 +2047,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 			
 //			for (auto tpl : mi_cycle_map)
 //			{
-//				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change.
+//				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that because row order does not change.
 //
 //			}
 			for (auto& tpl : mi_cycle_dci_map)
@@ -2058,7 +2085,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		{		
 //			for (auto ins : mi_cycle_map)
 //			{
-//				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change.
+//				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that because row order does not change.
 //			}
 			for (auto& ins : mi_cycle_dci_map)
             {
@@ -2572,8 +2599,8 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
 
     if (stop_cycle < 0) {
         ss.str("");
-        ss << "WARNING: didnt find any explicit 'stop' cycle values in control file info, assuming smoother formulation" << endl;
-        ss << "         assinging a generic 'stop' value of " << start_cycle + 1 << " which is 'start' cycle plus 1" << endl;
+        ss << "WARNING: didn't find any explicit 'stop' cycle values in control file info, assuming smoother formulation" << endl;
+        ss << "         assigning a generic 'stop' value of " << start_cycle + 1 << " which is 'start' cycle plus 1" << endl;
         cout << ss.str();
         f_rec << ss.str();
         stop_cycle = start_cycle + 1;
@@ -2710,6 +2737,7 @@ Pest::~Pest() {
 		{
 		}
 	}
+    base_group_info.free_mem();
 }
 
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
@@ -2734,7 +2762,7 @@ pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &lin
 	tokenize(tmp_line,tokens,"\t ");
 	if (tokens.size() < 2)
 	{
-		throw_control_file_error(f_rec, "Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need atleast 2");
+		throw_control_file_error(f_rec, "Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need at least 2");
 	}
 	key = tokens[0];
 	upper_ip(key);
@@ -3017,6 +3045,7 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 	if (s_obgnme.find(pi_name_group.second) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+        s_obgnme.emplace(pi_name_group.second);
 	}
 	
 }
@@ -3112,6 +3141,9 @@ void Pest::release_unused_for_agent()
     ctl_ordered_par_group_names.clear();
     //base_group_info.clear();
     prior_info.clear();
+    base_group_info.free_mem();
+    regul_scheme_ptr = NULL;
+
 }
 
 
