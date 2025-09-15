@@ -112,6 +112,16 @@ enough to be able to accept some of these foreign types naturally.
 template void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty);
 template void tokenize(const std::string& str, list<string>& tokens, const std::string& delimiters, const bool trimEmpty);
 
+bool invalidChar (char c)
+{
+	return !(c>=0 && c <128);
+}
+
+std::string& strip_nonascii_ip(string &s) {
+	s.erase(remove_if(s.begin(),s.end(), invalidChar), s.end());
+}
+
+
 std::string& strip_ip(string &s, const string &op, const string &delimiters)
 {
 	size_t i;

@@ -97,6 +97,7 @@ namespace pest_utils
 		return x;
 	}
 
+	std::string& strip_nonascii_ip(string &s);
 	/* @brief Strip leading and/or trailing characters from a string
 
 		The characters contained in argument delimiters are stripped from

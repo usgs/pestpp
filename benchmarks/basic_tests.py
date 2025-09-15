@@ -2067,8 +2067,8 @@ def parse_pst_test():
 
 
 if __name__ == "__main__":
-    parse_pst_test()
-    #basic_test()
+    #parse_pst_test()
+    basic_test()
 
     #mf6_v5_ies_nonpersistent_test()
     #large_fake_test()
