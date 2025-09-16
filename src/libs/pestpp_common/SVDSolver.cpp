@@ -16,6 +16,7 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 	*/
+#include "RunManagerPanther.h"
 #include <fstream>
 #include <iostream>
 #include <iomanip>

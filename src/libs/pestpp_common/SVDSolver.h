@@ -18,7 +18,6 @@
 */
 #ifndef SVDSOLVER_H_
 #define SVDSOLVER_H_
-#include "RunManagerPanther.h"
 #include <map>
 #include <set>
 #include <iomanip>
