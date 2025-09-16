@@ -116,7 +116,8 @@ public:
 	~RunManagerPanther(void);
 	int get_n_waiting_runs() { return waiting_runs.size(); }
 	void close_agents();
-
+	map<string, int> get_agent_stats();
+	
 private:
 	std::string port;
 	static const int BACKLOG;
@@ -202,7 +203,6 @@ private:
 	int get_n_responsive_agents();
 	virtual void update_run_failed(int run_id, int socket_fd);
 	virtual void update_run_failed(int run_id);
-	map<string, int> get_agent_stats();
 	vector<string> par_names_to_check_worker;
 	vector<string> obs_names_to_check_worker;
     pair<string,string> get_recv_filenames(NetPackage& net_pack, string host_name, string working_dir);

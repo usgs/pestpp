@@ -616,6 +616,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
     {
         glm_debug_high_2nd_iter_phi = pest_utils::parse_string_arg_to_bool(value);
     }
+	else if (key == "GLM_HP_LAMBDA")
+    {
+        glm_hp_lambda = pest_utils::parse_string_arg_to_bool(value);
+    }
 	else if (key == "UPGRADE_AUGMENT")
 	{
 		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
@@ -2082,6 +2086,7 @@ void PestppOptions::set_defaults()
 	set_glm_rebase_super(false);
 	set_glm_iter_mc(false);
     set_glm_debug_high_2nd_iter_phi(false);
+	set_glm_hp_lambda(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());

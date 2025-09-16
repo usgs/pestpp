@@ -300,7 +300,8 @@ public:
     void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
     bool get_glm_debug_high_2nd_iter_phi() const {return glm_debug_high_2nd_iter_phi;}
     void set_glm_debug_high_2nd_iter_phi(bool _flag) {glm_debug_high_2nd_iter_phi = _flag;}
-
+	bool get_glm_hp_lambda() const {return glm_hp_lambda;}
+	void set_glm_hp_lambda(bool _flag) {glm_hp_lambda = _flag;}
 
 
 
@@ -714,9 +715,11 @@ private:
 	bool glm_rebase_super;
 	bool glm_iter_mc;
 	bool glm_debug_high_2nd_iter_phi;
+	bool glm_hp_lambda;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
+	
 	bool iter_summary_flag;
 	bool der_forgive;
 	bool uncert;
