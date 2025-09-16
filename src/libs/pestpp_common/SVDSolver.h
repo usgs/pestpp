@@ -18,7 +18,7 @@
 */
 #ifndef SVDSOLVER_H_
 #define SVDSOLVER_H_
-
+#include "RunManagerPanther.h"
 #include <map>
 #include <set>
 #include <iomanip>
@@ -34,7 +34,7 @@
 #include "RestartController.h"
 #include "PerformanceLog.h"
 #include "covariance.h"
-#include "yamr/RunManagerPanther.h" 
+
 
 class FileManager;
 class ModelRun;

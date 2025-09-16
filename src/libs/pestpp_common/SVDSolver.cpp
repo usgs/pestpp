@@ -40,7 +40,7 @@
 #include "linear_analysis.h"
 #include "Ensemble.h"
 #include "EnsembleSmoother.h"
-#include "RunManagerPanther.h"
+
 
 using namespace std;
 using namespace pest_utils;
