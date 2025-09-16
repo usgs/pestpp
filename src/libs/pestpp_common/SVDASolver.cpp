@@ -35,7 +35,7 @@
 #include "covariance.h"
 #include "Ensemble.h"
 #include "linear_analysis.h"
-#include "../run_managers/yamr/RunManagerPanther.h" 
+
 
 using namespace std;
 using namespace pest_utils;
