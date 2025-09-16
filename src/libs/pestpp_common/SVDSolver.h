@@ -34,7 +34,7 @@
 #include "RestartController.h"
 #include "PerformanceLog.h"
 #include "covariance.h"
-#include "RunManagerPanther.h" 
+#include "../run_managers/yamr/RunManagerPanther.h" 
 
 class FileManager;
 class ModelRun;
