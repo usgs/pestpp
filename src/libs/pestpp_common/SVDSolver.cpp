@@ -1077,50 +1077,83 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		num_lamb_runs++; 
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 		//Marquardt Lambda Update Vector
-		// if hp_lambda_num > 0, we're going to override the lambda_vec with hp-style lambdas
-		// commenting this out for now, need to finish coding it
 		vector<double> lambda_vec;
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		if (pest_scenario.get_pestpp_options().get_glm_hp_lambda())
+		// if glm_hp_lambdas is activated, we sidestep the entire old GLM lambda process
+		// all this code comes from interpreting a portion of the PEST_HP Fortran code
+		// that deals with lambda
+		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
 		{
-			int def_numlam = 10;
+			int lmrun = 3; // a default for cases where we're working in serial
+
 			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
 			stringstream panther_message;
 			
+			// if we're using panther, then we can ask it for the curret number of agents.
 			if (panther_manager) {
 				std::map<std::string, int> stats = panther_manager->get_agent_stats();
-				def_numlam = stats["total"];
+				lmrun = stats["total"];
 				panther_message.str("");
-				panther_message << "Number of connected agents to be used for lambda upgrades: " << def_numlam;
+				panther_message << "Number of connected agents to be used for lambda upgrades: " << lmrun;
 				performance_log->log_event(panther_message.str());
-				std::cout << "Number of connected agents to be used for lambda upgrades: " << def_numlam << std::endl;
-				fout_rec << "Number of connected agents to be used for lambda upgrade: " << def_numlam << endl;
-			} else {			
+				std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
+				fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
+			} else { // otherwise stick with our default
 				panther_message.str("");
-				panther_message << "The current run manager is not a Panther manager. Defaulting to 10 upgrade runs";
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
 				performance_log->log_event(panther_message.str());
-				std::cout << "The current run manager is not a Panther manager. Defaulting to 10 upgrade runs" << std::endl;
-				fout_rec << "The current run manager is not a Panther manager. Defaulting to 10 upgrade runs" << endl;
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
 			}
+			// determine how many lambdas to use based on how many agents are available
+			int maxitn;
+            if (lmrun <= 3) {
+                maxitn = 3;
+            } else if (lmrun <= 5) {
+                maxitn = lmrun;
+            } else if (lmrun <= 12) {
+                maxitn = 6;
+            } else if (lmrun <= 21) {
+                maxitn = 7;
+            } else if (lmrun <= 32) {
+                maxitn = 8;
+            } else if (lmrun <= 45) {
+                maxitn = 9;
+            } else {
+                maxitn = lmrun / 5;
+            }
+			
+
+			// Using HP's lambda scale vec
+			std::vector<double> hp_lambda_scale_vec = {1, 1.5, 0.75, 1.25, 0.5, 1.75, 2.0};
+			
+			// replacing the normal lambda_scale_vec
+			lambda_scale_vec.assign(hp_lambda_scale_vec.begin(), hp_lambda_scale_vec.end());
+            
+			// Determine the number of scales to use
+            int num_lrun_level = (lmrun - maxitn) / maxitn + 1;
+            if (num_lrun_level > lambda_scale_vec.size()) {
+                num_lrun_level = lambda_scale_vec.size();
+            }
+
+            // Slice the line search factor vector in place
+            if (num_lrun_level < lambda_scale_vec.size()) {
+                lambda_scale_vec.resize(num_lrun_level);
+            }
+			
+			// Generate lambdas according to how PEST_HP does it
 			const double def_rlambda1 = 10.0;
 			const double def_lowest_lambda_fac = 1.0e-14;
 			const double def_highest_lambda_fac = 1.0e14;
-
-			
-
-			//PhiData phi_data = obj_func.phi_report(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr);
 			double phi_initial = base_run.get_phi(*regul_scheme_ptr);
-
 			double num_nonzero_obs = obs_names_vec.size();
-
+			// this is the critical difference between GLM lambdas and HP lambdas
+			// HP lambdas are a factor of the current phi
 			double lambda_mid = phi_initial / static_cast<double>(num_nonzero_obs);
-
 			double def_lowest_lambda = lambda_mid * def_lowest_lambda_fac;
 			double def_highest_lambda = lambda_mid * def_highest_lambda_fac;
-
 			double lambda = def_rlambda1 * lambda_mid;
-
 			double rlamfac_exp;
 			double rlamfac_down = 1.0;
 			double rlamfac_up = 1.0;
@@ -1156,8 +1189,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 			if (rlamfac < 2.0)
 				rlamfac = 2.0;
-			std::vector<double> lambda_vec;
-			int half = def_numlam / 2;
+
+			int half = maxitn / 2;
 			
 			double lamkpl = lambda; 
 			double lamkph = lambda; 
@@ -1165,11 +1198,18 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		
 			for (int i = 0; i < half; ++i)
 			{
-				lamkpl /= rlamfac * rlamfac_down;
+				if (i == 0)
+				{
+					lamkpl /= rlamfac * rlamfac_down * 0.5; // HP does the first lambda down differently for whatever reason
+				}
+				else
+				{
+					lamkpl /= rlamfac * rlamfac_down;
+				}
 				lambda_vec.push_back(std::max(lamkpl, def_lowest_lambda));
 			}
 			
-			for (int i = 0; i < (def_numlam - 1 - half); ++i)
+			for (int i = 0; i < (maxitn - 1 - half); ++i)
 			{
 				lamkph *= rlamfac * rlamfac_up;
 				lambda_vec.push_back(std::min(lamkph, def_highest_lambda));
@@ -1179,9 +1219,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 		}
 		
-		else
+		else // non-HP option, do lambda as normal
 		{
-			vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+			lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
 		}
 		
 	    
@@ -1449,7 +1489,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	{
 		throw runtime_error("all upgrade runs failed.");
 	}
-	if (pest_scenario.get_pestpp_options().get_glm_hp_lambda() == false)
+	if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false)
 	{
 		// Check if best_lambda is at the edge of lambda_vec
 

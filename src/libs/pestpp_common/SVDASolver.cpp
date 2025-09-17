@@ -16,6 +16,7 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+#include "RunManagerPanther.h"
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -471,7 +472,155 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			}
 		}
 
-		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+		//Marquardt Lambda Update Vector
+		vector<double> lambda_vec;
+		
+		ofstream& fout_rec = file_manager.rec_ofstream();
+		// if glm_hp_lambdas is activated, we sidestep the entire old GLM lambda process
+		// all this code comes from interpreting a portion of the PEST_HP Fortran code
+		// that deals with lambda
+		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
+		{
+			int lmrun = 3; // a default for cases where we're working in serial
+
+			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
+			stringstream panther_message;
+			
+			// if we're using panther, then we can ask it for the curret number of agents.
+			if (panther_manager) {
+				std::map<std::string, int> stats = panther_manager->get_agent_stats();
+				lmrun = stats["total"];
+				panther_message.str("");
+				panther_message << "Number of connected agents to be used for lambda upgrades: " << lmrun;
+				performance_log->log_event(panther_message.str());
+				std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
+				fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
+			} else { // otherwise stick with our default
+				panther_message.str("");
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
+				performance_log->log_event(panther_message.str());
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
+			}
+			// determine how many lambdas to use based on how many agents are available
+			int maxitn;
+            if (lmrun <= 3) {
+                maxitn = 3;
+            } else if (lmrun <= 5) {
+                maxitn = lmrun;
+            } else if (lmrun <= 12) {
+                maxitn = 6;
+            } else if (lmrun <= 21) {
+                maxitn = 7;
+            } else if (lmrun <= 32) {
+                maxitn = 8;
+            } else if (lmrun <= 45) {
+                maxitn = 9;
+            } else {
+                maxitn = lmrun / 5;
+            }
+			
+
+			// Using HP's lambda scale vec
+			std::vector<double> hp_lambda_scale_vec = {1, 1.5, 0.75, 1.25, 0.5, 1.75, 2.0};
+			
+			// replacing the normal lambda_scale_vec
+			lambda_scale_vec.assign(hp_lambda_scale_vec.begin(), hp_lambda_scale_vec.end());
+            
+			// Determine the number of scales to use
+            int num_lrun_level = (lmrun - maxitn) / maxitn + 1;
+            if (num_lrun_level > lambda_scale_vec.size()) {
+                num_lrun_level = lambda_scale_vec.size();
+            }
+
+            // Slice the line search factor vector in place
+            if (num_lrun_level < lambda_scale_vec.size()) {
+                lambda_scale_vec.resize(num_lrun_level);
+            }
+			
+			// Generate lambdas according to how PEST_HP does it
+			const double def_rlambda1 = 10.0;
+			const double def_lowest_lambda_fac = 1.0e-14;
+			const double def_highest_lambda_fac = 1.0e14;
+			double phi_initial = base_run.get_phi(*regul_scheme_ptr);
+			double num_nonzero_obs = obs_names_vec.size();
+			// this is the critical difference between GLM lambdas and HP lambdas
+			// HP lambdas are a factor of the current phi
+			double lambda_mid = phi_initial / static_cast<double>(num_nonzero_obs);
+			double def_lowest_lambda = lambda_mid * def_lowest_lambda_fac;
+			double def_highest_lambda = lambda_mid * def_highest_lambda_fac;
+			double lambda = def_rlambda1 * lambda_mid;
+			double rlamfac_exp;
+			double rlamfac_down = 1.0;
+			double rlamfac_up = 1.0;
+
+			if (lambda > 0.1 * lambda_mid && lambda < 10.0 * lambda_mid)
+			{
+				rlamfac_exp = 2.0;
+				if (lambda > lambda_mid)
+					rlamfac_down = 2.0;
+			}
+			else if (lambda > 0.01 * lambda_mid && lambda < 100.0 * lambda_mid)
+			{
+				rlamfac_exp = 3.0;
+				if (lambda > lambda_mid)
+					rlamfac_down = 2.0;
+			}
+			else if (lambda < lambda_mid)
+			{
+				rlamfac_exp = 3.0;
+			}
+			else
+			{
+				rlamfac_exp = 4.0;
+			}
+
+			double rlamfac;
+			if (lambda > lambda_mid)
+				rlamfac = std::pow(lambda / lambda_mid, 1.0 / rlamfac_exp);
+			else if (lambda < lambda_mid)
+				rlamfac = std::pow(lambda_mid / lambda, 1.0 / rlamfac_exp);
+			else
+				rlamfac = 2.0;
+
+			if (rlamfac < 2.0)
+				rlamfac = 2.0;
+
+			int half = maxitn / 2;
+			
+			double lamkpl = lambda; 
+			double lamkph = lambda; 
+			lambda_vec.push_back(lambda);
+		
+			for (int i = 0; i < half; ++i)
+			{
+				if (i == 0)
+				{
+					lamkpl /= rlamfac * rlamfac_down * 0.5; // HP does the first lambda down differently for whatever reason
+				}
+				else
+				{
+					lamkpl /= rlamfac * rlamfac_down;
+				}
+				lambda_vec.push_back(std::max(lamkpl, def_lowest_lambda));
+			}
+			
+			for (int i = 0; i < (maxitn - 1 - half); ++i)
+			{
+				lamkph *= rlamfac * rlamfac_up;
+				lambda_vec.push_back(std::min(lamkph, def_highest_lambda));
+			}
+			
+			std::sort(lambda_vec.begin(), lambda_vec.end());
+
+		}
+		
+		else // non-HP option, do lambda as normal
+		{
+			lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+		}
+		
+	    
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
 		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
@@ -479,7 +628,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		stringstream prf_message;
 
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
-		ofstream& fout_rec = file_manager.rec_ofstream();
+		
 		int i_update_vec = 0;
 		
 		for (double i_lambda : lambda_vec)
@@ -701,44 +850,50 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		throw runtime_error("all upgrade runs failed");
 	}
 
-	// Check if best_lambda is at the edge of lambda_vec
-
-	// regrab lambda_vec
-	vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
-	std::sort(lambda_vec.begin(), lambda_vec.end());
-	auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
-	lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
-
-	auto last_lambda = lambda_vec.back();
-	auto first_lambda = lambda_vec.front();
-	file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
-	double lambda_spacing_factor = 10.0; // doing powers of 10 for now
-	bool extended = false;
-
-	if (best_lambda == last_lambda)
+	if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false)
 	{
-		// Add a new larger lambda
-		double new_lambda = last_lambda * lambda_spacing_factor;
-		if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+		// Check if best_lambda is at the edge of lambda_vec
+
+		// regrab lambda_vec
+		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
+		std::sort(lambda_vec.begin(), lambda_vec.end());
+		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+		auto last_lambda = lambda_vec.back();
+		auto first_lambda = lambda_vec.front();
+		file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
+		double lambda_spacing_factor = 10.0; // doing powers of 10 for now
+		bool extended = false;
+
+		if (best_lambda == last_lambda) // our best lambda is our highest lambda
 		{
-			lambda_vec.push_back(new_lambda);
-			extended = true;
-			file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
+			// Add a new larger lambda
+			double new_lambda = last_lambda * lambda_spacing_factor;
+			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+			{
+				lambda_vec.push_back(new_lambda);
+				extended = true;
+				file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
+				lambda_vec.erase(lambda_vec.begin()); // remove the highest lambda
+			}
 		}
-	}
-	else if (best_lambda == first_lambda)
-	{
-		// Add a new smaller lambda
-		double new_lambda = first_lambda / lambda_spacing_factor;
-		if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+		else if (best_lambda == first_lambda)
 		{
-			lambda_vec.push_back(new_lambda);
-			extended = true;
-			file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
+			// Add a new smaller lambda
+			double new_lambda = first_lambda / lambda_spacing_factor;
+			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+			{
+				lambda_vec.pop_back();
+				lambda_vec.push_back(new_lambda);
+				extended = true;
+				file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
+				
+			}
 		}
+		std::sort(lambda_vec.begin(), lambda_vec.end());
+		pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 	}
-	std::sort(lambda_vec.begin(), lambda_vec.end());
-	pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 	return best_upgrade_run;
 }
 
