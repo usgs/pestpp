@@ -2683,11 +2683,20 @@ def pi_output_test():
     assert len([f for f in os.listdir(m1) if "pi_pop" in f]) > 0
 
 
-
+def mou_bound_handling_test():
+    test_d = "freyberg_mou"
+    org_t_d = os.path.join(test_d,"template")
+    new_t_d = org_t_d.replace("template","boundtest")
+    if os.path.exists(new_t_d):
+        shutil.rmtree(new_t_d)
+    shutil.copytree(org_t_d,new_t_d)
+    
+    pyemu.os_utils.run("{0} test1.pst".format(exe_path),cwd=new_t_d)
 
 
 if __name__ == "__main__":
-    basic_pso_test()
+    mou_bound_handling_test()
+    #basic_pso_test()
     #test_restart_all()
     #chance_consistency_test()
     #zdt1_chance_schedule_test()

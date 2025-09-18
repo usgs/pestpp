@@ -57,7 +57,38 @@ def basic_test(model_d="ies_10par_xsec"):
     cmd = "\"\"{0}\" \"{1}\"\"".format(cmd[0],cmd[1])
     print(cmd)
     pst.model_command.append(cmd)
+    cmd = pst.model_command[0].split()
+    cmd = "\"\'{0}\' \'{1}\'\"".format(cmd[0],cmd[1])
+    pst.model_command.append(cmd)
+
+    tpl_data = pst.model_input_data
+    tpl_data["pest_file"] = tpl_data.pest_file.apply(lambda x: "\"{0}\"".format(x))
+    tpl_data["model_file"] = tpl_data.model_file.apply(lambda x: "\"{0}\"".format(x))
     
+    ins_data = pst.model_output_data
+    ins_data["pest_file"] = ins_data.pest_file.apply(lambda x: "\"{0}\"".format(x))
+    ins_data["model_file"] = ins_data.model_file.apply(lambda x: "\"{0}\"".format(x))
+    
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(new_d, "pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+    # pst.write(os.path.join(new_d, "pest.pst"),version=2)
+    # pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+    
+    tpl_data = pst.model_input_data
+    tpl_data["pest_file"] = tpl_data.pest_file.apply(lambda x: "\'{0}\'".format(x))
+    tpl_data["model_file"] = tpl_data.model_file.apply(lambda x: "\'{0}\'".format(x))
+    
+    ins_data = pst.model_output_data
+    ins_data["pest_file"] = ins_data.pest_file.apply(lambda x: "\'{0}\'".format(x))
+    ins_data["model_file"] = ins_data.model_file.apply(lambda x: "\'{0}\'".format(x))
+
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(new_d, "pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+    # pst.write(os.path.join(new_d, "pest.pst"),version=2)
+    # pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+
     # set first par as fixed
     #pst.parameter_data.loc[pst.par_names[0], "partrans"] = "fixed"
 

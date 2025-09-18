@@ -300,8 +300,8 @@ public:
     void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
     bool get_glm_debug_high_2nd_iter_phi() const {return glm_debug_high_2nd_iter_phi;}
     void set_glm_debug_high_2nd_iter_phi(bool _flag) {glm_debug_high_2nd_iter_phi = _flag;}
-	bool get_glm_hp_lambda() const {return glm_hp_lambda;}
-	void set_glm_hp_lambda(bool _flag) {glm_hp_lambda = _flag;}
+	bool get_glm_hp_lambdas() const {return glm_hp_lambdas;}
+	void set_glm_hp_lambdas(bool _flag) {glm_hp_lambdas = _flag;}
 
 
 
@@ -460,6 +460,8 @@ public:
     void set_mou_use_multigen(bool _flag) {mou_use_multigen = _flag;}
     bool get_mou_shuffle_fixed_pars() const {return mou_shuffle_fixed_pars;}
     void set_mou_shuffle_fixed_pars(bool _flag) {mou_shuffle_fixed_pars = _flag;}
+	bool get_mou_debug_dv_handling() const { return mou_debug_dv_handling; }
+	void set_mou_debug_dv_handling(bool _flag) { mou_debug_dv_handling = _flag; }
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -715,7 +717,7 @@ private:
 	bool glm_rebase_super;
 	bool glm_iter_mc;
 	bool glm_debug_high_2nd_iter_phi;
-	bool glm_hp_lambda;
+	bool glm_hp_lambdas;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
@@ -828,6 +830,7 @@ private:
 	bool mou_simplex_mutation;
 	bool mou_use_multigen;
 	bool mou_shuffle_fixed_pars;
+	bool mou_debug_dv_handling;
 
 	int ies_subset_size;
 	string ies_par_csv;

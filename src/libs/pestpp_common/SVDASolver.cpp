@@ -16,6 +16,7 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+#include "RunManagerPanther.h"
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -473,12 +474,12 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 
 		//Marquardt Lambda Update Vector
 		vector<double> lambda_vec;
-
-		ofstream &fout_rec = file_manager.rec_ofstream();
-		// if glm_hp_lambda is activated, we sidestep the entire old GLM lambda process
+		
+		ofstream& fout_rec = file_manager.rec_ofstream();
+		// if glm_hp_lambdas is activated, we sidestep the entire old GLM lambda process
 		// all this code comes from interpreting a portion of the PEST_HP Fortran code
 		// that deals with lambda
-		if (pest_scenario.get_pestpp_options().get_glm_hp_lambda())
+		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
 		{
 			int lmrun = 3; // a default for cases where we're working in serial
 
@@ -627,7 +628,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		stringstream prf_message;
 
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
-		ofstream& fout_rec = file_manager.rec_ofstream();
+		
 		int i_update_vec = 0;
 		
 		for (double i_lambda : lambda_vec)
@@ -849,7 +850,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		throw runtime_error("all upgrade runs failed");
 	}
 
-	if (pest_scenario.get_pestpp_options().get_glm_hp_lambda() == false)
+	if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false)
 	{
 		// Check if best_lambda is at the edge of lambda_vec
 

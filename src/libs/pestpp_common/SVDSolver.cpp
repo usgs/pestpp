@@ -1080,6 +1080,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		vector<double> lambda_vec;
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
+		// if glm_hp_lambdas is activated, we sidestep the entire old GLM lambda process
+		// all this code comes from interpreting a portion of the PEST_HP Fortran code
+		// that deals with lambda
+		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
 		// if glm_hp_lambda is activated, we sidestep the entire old GLM lambda process
 		// all this code comes from interpreting a portion of the PEST_HP Fortran code
 		// that deals with lambda
@@ -1489,7 +1493,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	{
 		throw runtime_error("all upgrade runs failed.");
 	}
-	if (pest_scenario.get_pestpp_options().get_glm_hp_lambda() == false)
+	if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false)
 	{
 		// Check if best_lambda is at the edge of lambda_vec
 
