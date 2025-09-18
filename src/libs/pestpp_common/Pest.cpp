@@ -1857,6 +1857,18 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 				}
 			}	
 		}
+
+		// do a second pass to check for slightly out of bounds
+		// seems to still come up as an issue for some strange reason
+		for (auto &p : upgrade_ctl_pars)
+		{
+			p_rec = p_info.get_parameter_rec_ptr(p.first);
+			if (p.second < p_rec->lbnd)
+				p.second = p_rec->lbnd;
+			else if (p.second > p_rec->ubnd)
+				p.second = p_rec->ubnd;
+
+		}
 	}
 
 	pair<string, double> _control_info(ss.str(), scaling_factor);
