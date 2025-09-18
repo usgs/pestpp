@@ -1690,6 +1690,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
         mou_shuffle_fixed_pars = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
+	else if (key == "MOU_DEBUG_DV_HANDLING")
+	{
+		mou_debug_dv_handling = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 
 
 	return false;
@@ -1952,7 +1957,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_simplex_mutation: " << mou_simplex_mutation << endl;
     os << "mou_use_multigen:" << mou_use_multigen << endl;
     os << "mou_shuffle_fixed_pars: " << mou_shuffle_fixed_pars << endl;
-
+	os << "mou_debug_dv_handling: " << mou_debug_dv_handling << endl;
 
 	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
 	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
@@ -2152,7 +2157,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_rfit(2.0);
 	set_mou_pso_inertia(vector<double>{0.7, 0.4, 0});
 	set_mou_pso_vmax_factor(0.8);
-	set_mou_pso_dv_bound_handling("HYBRID");
+	set_mou_pso_dv_bound_handling("CLAMP");
 	set_mou_outer_repo_obs_file("");
 	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);
@@ -2168,6 +2173,7 @@ void PestppOptions::set_defaults()
     set_mou_simplex_mutation(false);
     set_mou_use_multigen(false);
     set_mou_shuffle_fixed_pars(false);
+	set_mou_debug_dv_handling(false);
 	
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
