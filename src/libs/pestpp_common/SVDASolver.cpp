@@ -481,7 +481,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		// that deals with lambda
 		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
 		{
-			int lmrun = 3; // a default for cases where we're working in serial
+			int lmrun = 15; // a default for cases where we're working in serial
 
 			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
 			stringstream panther_message;
@@ -497,10 +497,10 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 				fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
 			} else { // otherwise stick with our default
 				panther_message.str("");
-				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs";
 				performance_log->log_event(panther_message.str());
-				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
-				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << endl;
 			}
 			// determine how many lambdas to use based on how many agents are available
 			int maxitn;
@@ -612,18 +612,90 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			}
 			
 			std::sort(lambda_vec.begin(), lambda_vec.end());
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
 
 		}
 		
 		else // non-HP option, do lambda as normal
 		{
 			lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+			std::sort(lambda_vec.begin(), lambda_vec.end());
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+			// if glm_panther_lambdas is turned on, we'll slightly modify the use lambda 
+			// protocol to make sure we're utilizing just the right amount of lambda.
+			if (pest_scenario.get_pestpp_options().get_glm_panther_lambdas())
+			{
+				int lmrun;
+				RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
+				stringstream panther_message;
+				
+				// if we're using panther, then we can ask it for the curret number of agents.
+				if (panther_manager) 
+				{
+					std::map<std::string, int> stats = panther_manager->get_agent_stats();
+					lmrun = stats["total"];
+					panther_message.str("");
+					panther_message << "Number of connected agents to be used for lambda upgrades: " << lmrun;
+					performance_log->log_event(panther_message.str());
+					std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
+					fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
+
+					int current_product = lambda_vec.size() * lambda_scale_vec.size();
+
+					// Loop until the product is less than or equal to lmrun
+					while (current_product > lmrun) {
+						// Decide whether to remove from lambda_vec or lambda_scale_vec
+						// A simple heuristic is to remove from the larger vector to balance them
+						if (lambda_vec.size() > lambda_scale_vec.size()) 
+						{
+							lambda_vec.pop_back(); // Remove the largest lambda
+						} 
+						else 
+						{
+							lambda_scale_vec.pop_back(); // Remove the largest scale
+						}
+						current_product = lambda_vec.size() * lambda_scale_vec.size();
+					}
+
+					// Now, add lambdas if the product is still too small
+					while (current_product < lmrun) {
+						// Add a new lambda value.
+						double lowest_lambda = lambda_vec.front();
+						double highest_lambda = lambda_vec.back();
+
+						// Add a new value, alternating between low and high
+						if (lambda_vec.size() % 2 == 0) 
+						{ // Add a low value
+							lambda_vec.insert(lambda_vec.begin(), lowest_lambda / 10.0);
+						} else 
+						{ // Add a high value
+							lambda_vec.push_back(highest_lambda * 10.0);
+						}
+
+						// Keep lambda_vec sorted after adding
+						std::sort(lambda_vec.begin(), lambda_vec.end());
+
+						current_product = lambda_vec.size() * lambda_scale_vec.size();
+						}
+					} 
+					else 
+					{ // otherwise stick with our default
+						panther_message.str("");
+						panther_message << "The current run manager is not a Panther manager. Not altering GLM lambda runs.";
+						performance_log->log_event(panther_message.str());
+						std::cout << "The current run manager is not a Panther manager. Not altering GLM lambda runs." << std::endl;
+						fout_rec << "The current run manager is not a Panther manager. Not altering GLM lambda runs." << endl;
+					}
+
+			
+			}
 		}
 		
 	    
-		std::sort(lambda_vec.begin(), lambda_vec.end());
-		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
-		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+		
 		stringstream message;
 		stringstream prf_message;
 
@@ -672,6 +744,10 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 				Parameters scaled_pars = base_numeric_pars1 + del_numeric_pars * i_scale;
 				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+				pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_pars,false,true);
+				scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+                //now flip back to all ctl pars not just active...
+                scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 

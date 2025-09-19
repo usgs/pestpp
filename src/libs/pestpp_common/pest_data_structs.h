@@ -302,6 +302,9 @@ public:
     void set_glm_debug_high_2nd_iter_phi(bool _flag) {glm_debug_high_2nd_iter_phi = _flag;}
 	bool get_glm_hp_lambdas() const {return glm_hp_lambdas;}
 	void set_glm_hp_lambdas(bool _flag) {glm_hp_lambdas = _flag;}
+	bool get_glm_panther_lambdas() const {return glm_panther_lambdas;}
+	void set_glm_panther_lambdas(bool _flag) {glm_panther_lambdas = _flag;}
+	
 
 
 
@@ -718,6 +721,7 @@ private:
 	bool glm_iter_mc;
 	bool glm_debug_high_2nd_iter_phi;
 	bool glm_hp_lambdas;
+	bool glm_panther_lambdas;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
