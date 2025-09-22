@@ -21,6 +21,8 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
+#include <algorithm>
+#include <sstream>
 #include "SVDASolver.h"
 #include "ModelRunPP.h"
 #include "QSqrtMatrix.h"
