@@ -746,10 +746,10 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 				Parameters scaled_pars = base_numeric_pars1 + del_numeric_pars * i_scale;
 				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
-				pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_pars,false,true);
-				scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+				// pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_pars,false,true);
+				// scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
                 //now flip back to all ctl pars not just active...
-                scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+                // scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
