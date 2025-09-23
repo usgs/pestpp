@@ -9120,13 +9120,19 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 
 	else if (how == "RANDOM")
 	{
+        nreal_subset = 100;
 		std::uniform_int_distribution<int> uni(0, size - 1);
 		int idx;
 		for (int i = 0; i < 1000000000; i++)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			idx = uni(subset_rand_gen);
+			//idx = uni(subset_rand_gen);
+            idx = uniform_int_draws(1,0,size-1,rand_gen)[0];
+            if ((idx < 0) || (idx > (size-1)))
+            {
+                continue;
+            }
 			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
 				continue;
 			subset_idxs.push_back(idx);
