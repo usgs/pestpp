@@ -76,7 +76,8 @@ def nonascii_path_test(model_d="ies_10par_xsec"):
     
     pst.control_data.noptmax = 1
     pst.observation_data.loc[pst.nnz_obs_names,"weight"] = 1.0
-    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.pestpp_options["ies_num_reals"] = 5
     pst.write(os.path.join(new_d, "pest.pst"))
 
     
@@ -95,8 +96,9 @@ def nonascii_path_test(model_d="ies_10par_xsec"):
     except Exception as e:
         if plat != "windows":
             raise Exception(e)
-    elif plat == "windows":
-        raise Exception("should have failed")
+    else:
+        if plat == "windows":
+            raise Exception("should have failed")
 
 
 def basic_test(model_d="ies_10par_xsec"):
