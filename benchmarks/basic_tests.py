@@ -8,12 +8,16 @@ import platform
 import pyemu
 
 bin_path = os.path.join("test_bin")
+plat = "unknown"
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
+    plat = "linux"
 elif "darwin" in platform.platform().lower() or "macos" in platform.platform().lower() :
     bin_path = os.path.join(bin_path,"mac")
+    plat = "apple"
 else:
     bin_path = os.path.join(bin_path,"win")
+    plat = "windows"
 
 bin_path = os.path.abspath("test_bin")
 os.environ["PATH"] += os.pathsep + bin_path
@@ -85,8 +89,14 @@ def nonascii_path_test(model_d="ies_10par_xsec"):
     if os.path.exists(worker_root):
         shutil.rmtree(worker_root)
     os.makedirs(worker_root)    
-    pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 1, master_dir=m_d,
-                           worker_root=worker_root,port=port,verbose=True)
+    try:
+        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 1, master_dir=m_d,
+                               worker_root=worker_root,port=port,verbose=True)
+    except Exception as e:
+        if plat != "windows":
+            raise Exception(e)
+    elif plat == "windows":
+        raise Exception("should have failed")
 
 
 def basic_test(model_d="ies_10par_xsec"):

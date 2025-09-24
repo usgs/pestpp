@@ -42,13 +42,11 @@ int main(int argc, char* argv[])
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
 		cout << "             pestpp-sqp: ensemble-based constrained sequential quadratic programming" << endl << endl;
-		//cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                   by the PEST++ development team" << endl;
-		cout << endl << endl << "version: " << version << endl;
-		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+		cout << endl;
         auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
-        cout << "started at " << start_string << endl;
+
 		CmdLine cmdline(argc, argv);
 
         if (quit_file_found())
@@ -75,6 +73,8 @@ int main(int argc, char* argv[])
 				ofstream frec("panther_worker.rec");
 				if (frec.bad())
 					throw runtime_error("error opening 'panther_worker.rec'");
+				cmdline.startup_report(frec,start_string);
+				cmdline.startup_report(cout,start_string);
 				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
@@ -146,23 +146,12 @@ int main(int argc, char* argv[])
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
-		if (!restart_flag || save_restart_rec_header)
-		{
-			fout_rec << "             pestpp-sqp: ensemble-based constrained sequential quadratic programming" << endl << endl;
-			fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
-			fout_rec << endl;
-			fout_rec << endl << endl << "version: " << version << endl;
-			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-            fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
-            fout_rec << "started at " << start_string << endl << endl;
-		}
 
-		cout << endl;
-		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-        cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+		fout_rec << "             pestpp-sqp: ensemble-based constrained sequential quadratic programming" << endl << endl;
+		fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
+		fout_rec << endl;
+		cmdline.startup_report(fout_rec,start_string);
+		cmdline.startup_report(cout,start_string);
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
