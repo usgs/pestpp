@@ -1758,6 +1758,16 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_cma_cmu);
 		return true;
 	}
+	else if (key == "SQP_CMA_CC")
+	{
+		convert_ip(value, sqp_cma_cc);
+		return true;
+	}
+	else if (key == "SQP_CMA_STEPSIZE_CONTROL")
+	{
+		sqp_cma_stepsize_control = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	return false;
 }
 
@@ -1930,6 +1940,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_working_set_tol: " << sqp_working_set_tol << endl;
 	os << "sqp_cma_c1: " << sqp_cma_c1 << endl;
 	os << "sqp_cma_cmu: " << sqp_cma_cmu << endl;
+	os << "sqp_cma_cc: " << sqp_cma_cc << endl;
+	os << "sqp_cma_stepsize_control: " << sqp_cma_stepsize_control << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2163,8 +2175,10 @@ void PestppOptions::set_defaults()
 	set_sqp_alpha_mults(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 0.75, 1.0,3.0, 5.0});
 	set_sqp_filter_tol(0.05);
 	set_sqp_working_set_tol(0.10);
-	set_sqp_cma_c1(0.08);
-	set_sqp_cma_cmu(0.8);
+	set_sqp_cma_c1(-1);
+	set_sqp_cma_cmu(-1);
+	set_sqp_cma_cc(-1);
+	set_sqp_cma_stepsize_control(false);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

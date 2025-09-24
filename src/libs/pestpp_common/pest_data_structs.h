@@ -393,6 +393,10 @@ public:
 	void set_sqp_cma_c1(double val) { sqp_cma_c1 = val; }
 	double get_sqp_cma_cmu() const { return sqp_cma_cmu; }
 	void set_sqp_cma_cmu(double val) { sqp_cma_cmu = val; }
+	double get_sqp_cma_cc() const { return sqp_cma_cc; }
+	void set_sqp_cma_cc(double val) { sqp_cma_cc = val; }
+	bool get_sqp_cma_stepsize_control()const { return sqp_cma_stepsize_control; }
+	void set_sqp_cma_stepsize_control(bool _flag) { sqp_cma_stepsize_control = _flag; }
 
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -808,6 +812,8 @@ private:
 	double sf_inc_fac;
 	double sqp_cma_c1;
 	double sqp_cma_cmu;
+	double sqp_cma_cc;
+	bool sqp_cma_stepsize_control;
 
 
 	int mou_population_size;

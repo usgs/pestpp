@@ -3366,10 +3366,10 @@ pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par
 		else if (abs(constraint_map[name]) < working_set_tol) {
 			working_set.push_back(name);
 		}
-		/*else if ((constraint_map[name] > -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
+		/*else if ((-constraint_map[name] < working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
             working_set.push_back(name);
         }
-		else if ((constraint_map[name] < -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::greater_than)) {
+		else if ((-constraint_map[name] > working_set_tol) && (constraint_sense_map[name] == ConstraintSense::greater_than)) {
 			working_set.push_back(name);
 		}*/
     }

@@ -94,14 +94,14 @@ private:
 	// CMA-ES parameters
 	int lambda;                    // Population size
 	int mu;                       // Number of parents
-	double sigma = 0.1;                 // Step size
+	double sigma = 1.0;           // Step size
 	Eigen::VectorXd m;            // Mean vector
 	Eigen::MatrixXd C;            // Covariance matrix
 	Eigen::MatrixXd B;            // Eigenvectors of C
 	Eigen::VectorXd D;            // Eigenvalues of C
 	Eigen::MatrixXd pc;           // Evolution path
 	Eigen::MatrixXd ps;           // Evolution path for sigma
-	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m;
+	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m, mu_eff;
 	vector<double> weights;
 	
 	ParameterEnsemble feas_dp_archive, infeas_dp_archive, _dp;
@@ -158,7 +158,7 @@ private:
 	int MAX_CONSEC_INFEAS = 100000;
     int MAX_CONSEC_INFEAS_IES = 3;
     int MAX_CONSEC_PHIINC = 100000;
-    double SF_DEC_FAC = 0.5;
+    double SF_DEC_FAC = 0.8;
     double SF_INC_FAC = 1.1;
     double BASE_SCALE_FACTOR = 1.0;
     double PAR_SIGMA_DEC_FAC = 0.9;

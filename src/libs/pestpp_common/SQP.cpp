@@ -1791,7 +1791,7 @@ void SeqQuadProgram::iterate_2_solution()
 		else
 			accept = solve_new();
 		//accept = solve_new();
-		if (accept)
+		if (accept && !use_ensemble_grad)
 			working_set_tol = max(0.05, ws * 0.5);
 
 
@@ -1823,7 +1823,7 @@ void SeqQuadProgram::iterate_2_solution()
 		if (should_terminate())
 			break;
 
-		if (n_consec_infeas > MAX_CONSEC_INFEAS_IES || !accept)
+		if (n_consec_infeas > MAX_CONSEC_INFEAS_IES)
         {
 		    ss.str("");
 		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
@@ -3575,14 +3575,29 @@ bool SeqQuadProgram::solve_new_ensemble()
 		cnames_en[d] = constraint_mat_en[d].first.get_row_names();
 		constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
 
-		ss.str("");
-		ss << "starting search direction calcs for realization " << d << " with working set: " << cnames_en[d];
-		performance_log->log_event(ss.str());
-		frec << ss.str() << endl;
-
 		pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
 		search_d_en[d] = x.first;
 		lm_en[d] = x.second;
+
+		ss.str("");
+		if (cnames_en[d].size() == 0)
+		{
+			ss << "calculating search direction for realization " << d << " with working set: EMPTY" << endl;
+			ss << "   search direction norm: " << search_d_en[d].norm() << endl;
+		}
+		else
+		{
+			ss << "calculating search direction for realization " << d << " with working set:" << endl;
+			int i = 0;
+			for (auto c : cnames_en[d])
+			{
+				ss << "   " << c << " (lm = " << lm_en[d][i] << ")" << endl;
+				i++;
+			}
+			ss << "   search direction norm: " << search_d_en[d].norm() << endl;
+		}
+			
+		message(1, ss.str());
 
 		if ((lm_en[d].array() > 0).any())
 		{
@@ -3692,10 +3707,11 @@ bool SeqQuadProgram::solve_new_ensemble()
 
 		if (successful)
 		{
-			if ((search_d.norm() < 0.1) && (((lm.array() < 0).all()) || (lm.size() != 0)))
+			/*if ((search_d.norm() < 0.1) && (((lm.array() < 0).all()) || (lm.size() != 0)))
 				BASE_SCALE_FACTOR /= SF_INC_FAC;
 			else
-				BASE_SCALE_FACTOR *= SF_INC_FAC;
+				BASE_SCALE_FACTOR *= SF_INC_FAC;*/
+			BASE_SCALE_FACTOR *= SF_DEC_FAC;
 		}
 		else
 		{
@@ -3706,13 +3722,16 @@ bool SeqQuadProgram::solve_new_ensemble()
 				message(1, ss.str());
 				
 				successful = true;
-				if ((search_d.norm() < 0.1) && (((lm.array() < 0).all()) || (lm.size() != 0)))
+				/*if ((search_d.norm() < 0.1) && (((lm.array() < 0).all()) || (lm.size() != 0)))
 					BASE_SCALE_FACTOR /= SF_INC_FAC;
 				else
-					BASE_SCALE_FACTOR *= SF_INC_FAC;
-
+					BASE_SCALE_FACTOR *= SF_INC_FAC;*/
+				BASE_SCALE_FACTOR *= SF_DEC_FAC;
 				break;
 			}
+			else
+				BASE_SCALE_FACTOR *= SF_INC_FAC;
+
 			if (use_cmaes)
 			{
 				message(1, "line search failed. updating covariance from current ensemble and regenerating ensemble via CMA-ES...");
@@ -3721,10 +3740,10 @@ bool SeqQuadProgram::solve_new_ensemble()
 			n_consec_failures++;
 			line_search_attempts++;
 
-			if (use_ensemble_grad)
+			/*if (use_ensemble_grad)
 				BASE_SCALE_FACTOR /= SF_INC_FAC;
-			else
-				BASE_SCALE_FACTOR *= SF_DEC_FAC;
+			else*/
+			//BASE_SCALE_FACTOR *= SF_DEC_FAC;
 
 			if (n_consec_failures >= max_consec_failures)
 			{
@@ -5145,7 +5164,7 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 void CovMatAdapES::initialize(int n_params, int _num_reals)
 {
 	lambda = _num_reals;
-	mu = lambda / 2;
+	mu = lambda / 4;
 	sigma = 1.0;
 
 	m = Eigen::VectorXd::Zero(n_params);
@@ -5157,23 +5176,52 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 	B = Eigen::MatrixXd::Identity(n_params, n_params);
 	D = Eigen::VectorXd::Ones(n_params);
 
-	weights.resize(mu);
-	double sum_weights = 0.0;
+	weights.resize(_num_reals);
 	for (int i = 0; i < mu; i++) {
 		weights[i] = log(mu + 0.5) - log(i + 1.0);
-		sum_weights += weights[i];
+	}
+
+	for (int i = mu; i < lambda; i++) {
+		weights[i] = 0.0;
+	}
+
+	double sum_positive_weights = 0.0;
+	for (int i = 0; i < mu; i++) {
+		sum_positive_weights += weights[i];
 	}
 
 	for (int i = 0; i < mu; i++) {
-		weights[i] /= sum_weights;
+		weights[i] /= sum_positive_weights;
 	}
 
-	c_c = 0.5;
+	double sum_squared_weights = 0.0;
+	for (int i = 0; i < mu; i++) {
+		sum_squared_weights += weights[i] * weights[i];
+	}
+	mu_eff = 1.0 / sum_squared_weights;
+
+	//c_c = 0.5;
 	c_m = 1.0;
-	c_mu = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_cmu();
-	c_1 = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_c1();
-	/*c_1 = 2.0 / pow(static_cast<double>(n_params), 2);
-	c_mu = min(mu/ pow(static_cast<double>(n_params), 2), 1 - c_1);*/
+
+	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_c1() != -1)
+		c_1 = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_c1();
+	else
+		c_1 = 2.0 / ((n_params + 1.3) * (n_params + 1.3) + mu_eff);
+
+	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_cmu() != -1)
+		c_mu = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_cmu();
+	else
+		c_mu = min(1 - c_1, 2.0 / (n_params + sqrt(2.0)) + min(1.0, 2.0 * mu_eff / (n_params + 2.0)) * (1.0 / (n_params + 2.0)));
+	
+	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_cc() != -1)
+		c_c = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_cc();
+	else
+		c_c = (4.0 + mu_eff / n_params) / (n_params + 4.0 + 2.0 * mu_eff / n_params);
+	
+	c_sigma = (mu_eff + 2.0) / (n_params + mu_eff + 5.0);
+	d_sigma = 1.0 + 2.0 * max(0.0, sqrt((mu_eff - 1.0) / (n_params + 1.0)) - 1.0) + c_sigma;
+	chi_n = sqrt(n_params) * (1.0 - 1.0 / (4.0 * n_params) + 1.0 / (21.0 * n_params * n_params));
+
 }
 
 void CovMatAdapES::update(Parameters prev_m, Parameters curr_m) 
@@ -5211,15 +5259,25 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m)
 
 		U.append_other_rows(U_);
 	}
-	
-		
+
+	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_stepsize_control())
+	{
+		Eigen::VectorXd y_w = (m - prev_m.get_data_eigen_vec(par_names)) / sigma;
+		ps = (1.0 - c_sigma) * ps + sqrt(c_sigma * (2.0 - c_sigma) * mu_eff) *
+			(C.inverse().llt().solve(y_w));
+		sigma = sigma * exp((c_sigma / d_sigma) * (ps.norm() / chi_n - 1.0));
+	}
 
 	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names) / sigma;
-	//Uu_anoms.conservativeResize(Uu_anoms.rows() - 1, Uu_anoms.cols());
 	
-	Eigen::MatrixXd rank_mu_update = c_mu * U_anoms.transpose() * U_anoms / mu;
+	Eigen::MatrixXd rank_mu_update = Eigen::MatrixXd::Zero(C.rows(), C.cols());
+	for (int i = 0; i < mu; i++) {
+		Eigen::VectorXd y_i = U_anoms.row(i);
+		rank_mu_update += weights[i] * (y_i * y_i.transpose());
+	}
+	rank_mu_update = c_mu * rank_mu_update;
 	
-	pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
+	pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu_eff) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
 	Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
 
 	C = (1.0 - c_1 - c_mu) * C + rank_mu_update + rank_one_update;
