@@ -16,6 +16,7 @@
 #include "network_package.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include "network_wrapper.h"
 
 
 //template <class T> const T& min ( const T& a, const T& b );
@@ -2166,9 +2167,19 @@ bool try_remove_quit_file()
 CmdLine::CmdLine(int argc, char* argv[]) :
 	ctl_file_name(""), panther_host_name(""), panther_port(""), 
 	runmanagertype(RunManagerType::SERIAL),org_cmdline_str(""),
-	restart(false),jac_restart(false)
+	restart(false),jac_restart(false),opersys("unknown"),
+	cwd(".")
 {
-	for (int i = 0; i < argc; ++i)
+#ifdef OS_LINUX
+	opersys = "linux";
+#endif
+#ifdef OS_WIN
+    opersys = "windows";
+#endif
+#ifdef OS_MAC
+    opersys = "apple";
+#endif
+for (int i = 0; i < argc; ++i)
 	{
 		org_cmdline_str.append(" ");
 		org_cmdline_str.append(argv[i]);
@@ -2214,7 +2225,13 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 	org_cmdline_vec = temp;
 	lower_cmdline_vec = temp_lower;
 
-
+    cwd = OperSys::getcwd();
+    string clean_path = cwd;
+    pest_utils::strip_nonascii_ip(clean_path);
+    if ((cwd != clean_path) && (opersys == "windows"))
+    {
+        throw_cmdline_error("non-ascii character(s) in current working directory path: \""+ cwd +"\", windows does not like this...");
+    }
 	if ((lower_cmdline_vec.size() == 3) || (lower_cmdline_vec.size() > 4))
 	{
 		throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
@@ -2311,6 +2328,18 @@ void CmdLine::throw_cmdline_error(string message)
 	cerr << " additional options can be found in the PEST++ users manual" << endl;
 	cerr << "--------------------------------------------------------" << endl;
 	exit(1);
+}
+
+void CmdLine::startup_report(std::ostream &s, string start_string) {
+
+	string version = PESTPP_VERSION;
+	s << endl << endl << "version: " << version << endl;
+	s << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	s << "using control file: \"" << ctl_file_name << "\"" << endl;
+	s << "in directory: \"" << cwd << "\"" << endl;
+	s << "on host: \"" << w_get_hostname() << "\"" << endl;
+	s << "on a(n) " << opersys << " operating system" << endl;
+	s << "started at " << start_string << endl << endl;
 }
 
 // end of namespace pest_utils
