@@ -9119,9 +9119,8 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 	}
 
 	else if (how == "RANDOM")
-	{
-        nreal_subset = 100;
-		std::uniform_int_distribution<int> uni(0, size - 1);
+    {
+		//std::uniform_int_distribution<int> uni(0, size - 1);
 		int idx;
 		for (int i = 0; i < 1000000000; i++)
 		{
