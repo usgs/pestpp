@@ -631,7 +631,7 @@ def tenpar_high_phi_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = [0.5, 1.0]
     pst.pestpp_options["lambda_scale_fac"] = [0.9, 1.0]
-    pst.pestpp_options['ies_subset_size'] = 3
+    pst.pestpp_options['ies_subset_size'] = 5
     pst.pestpp_options["ies_debug_high_upgrade_phi"] = True
     pst.pestpp_options["ies_debug_fail_subset"] = True
     pst.pestpp_options["ies_debug_fail_remainder"] = True
@@ -652,7 +652,7 @@ def tenpar_high_phi_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = [0.5, 1.0]
     pst.pestpp_options["lambda_scale_fac"] = [0.9, 1.0]
-    pst.pestpp_options['ies_subset_size'] = 3
+    pst.pestpp_options['ies_subset_size'] = 5
     pst.pestpp_options["ies_debug_high_subset_phi"] = True
     pst.pestpp_options["ies_debug_fail_subset"] = True
     pst.pestpp_options["ies_debug_fail_remainder"] = True
@@ -676,7 +676,7 @@ def tenpar_high_phi_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = [0.5, 1.0]
     pst.pestpp_options["lambda_scale_fac"] = [0.9, 1.0]
-    pst.pestpp_options['ies_subset_size'] = 3
+    pst.pestpp_options['ies_subset_size'] = 5
     #pst.pestpp_options["ies_debug_high_subset_phi"] = True
     #pst.pestpp_options["ies_debug_fail_subset"] = True
     #pst.pestpp_options["ies_debug_fail_remainder"] = True
@@ -4225,11 +4225,12 @@ def tenpar_iqr_bad_phi_sigma_test():
 
 
 if __name__ == "__main__":
+    tenpar_high_phi_test()
     #tenpar_iqr_bad_phi_sigma_test()
-    multimodal_test()
+    #multimodal_test()
     #plot_mm1_sweep_results()
     #plot_mm1_results()
-    plot_mm1_results_seq()
+    #plot_mm1_results_seq()
     #tenpar_fixed_restart_test()
     #freyberg_stacked_pe_invest()
     #freyberg_mean_invest()

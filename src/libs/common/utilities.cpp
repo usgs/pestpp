@@ -1891,14 +1891,16 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		
 		//check for double quotes
 		tokenize(next_line, quote_tokens, "\"", false);
+        bool stripped_last = false;
         if (quote_tokens[quote_tokens.size()-1].size() == 0)
         {
             quote_tokens.pop_back();
+            stripped_last = true;
         }
         if (quote_tokens.size() > 1)
 		{
 			int nqt = quote_tokens.size();
-			if (nqt % 2 == 0)
+			if ((!stripped_last) && (nqt % 2 == 0))
 				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
 			tokens.clear();
 			for (int i = 0; i < nqt; i++)

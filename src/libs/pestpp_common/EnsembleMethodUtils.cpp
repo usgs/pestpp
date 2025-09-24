@@ -7311,6 +7311,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
         if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi()) {
             cout << "ies_debug_high_subset_phi active" << endl;
+            frec << "ies_debug_high_subset_phi active" << endl;
             best_mean = acc_phi + 1.0;
         }
 
@@ -7537,6 +7538,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	if (pest_scenario.get_pestpp_options().get_ies_debug_high_upgrade_phi())
 	{
 		cout << "ies_debug_high_upgrade_phi active" << endl;
+        frec << "ies_debug_high_upgrade_phi active" << endl;
 		best_mean = (last_best_mean * acc_fac) + 1.0;
 	}
 
