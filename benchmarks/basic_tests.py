@@ -71,8 +71,10 @@ def nonascii_path_test(model_d="ies_10par_xsec"):
     ins_data["model_file"] = ins_data.model_file.apply(lambda x: "\"{0}\"".format(x))
     
     pst.control_data.noptmax = 1
-    pst.write(os.path.join(new_d, "pest.pst"))
     pst.observation_data.loc[pst.nnz_obs_names,"weight"] = 1.0
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.write(os.path.join(new_d, "pest.pst"))
+
     
     m_d = os.path.join(model_d,"master_pestpp")
     if os.path.exists(m_d):
