@@ -11,7 +11,7 @@
 #define DEF_DLANBPRO_SPARCE DLANSVD
 #define DEF_DLANSVD DLANSVD_SPARCE
 #define OS_SEP '\\'
-#elif defined (__LINUX__)
+#elif defined (__linux__)
 #define OS_LINUX
 #define DEF_DLAMCH dlamch_
 #define DEF_DLANBPRO_SPARCE dlanbpro_sparce_
