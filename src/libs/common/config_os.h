@@ -11,6 +11,7 @@
 #define DEF_DLANBPRO_SPARCE DLANSVD
 #define DEF_DLANSVD DLANSVD_SPARCE
 #define OS_SEP '\\'
+#elif defined (__LINUX__)
 std::string opersys = "linux";
 #define OS_LINUX
 #define DEF_DLAMCH dlamch_
