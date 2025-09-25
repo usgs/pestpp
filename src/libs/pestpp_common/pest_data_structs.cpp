@@ -2647,6 +2647,22 @@ vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bou
 	return vals;
 	
 }
+vector<int> uniform_int_draws(int num_reals, int lower_bound, int upper_bound, std::mt19937& rand_gen)
+{
+	vector<int> vals;
+	int v1;
+    //vector<double> uvals = uniform_draws(num_reals,(double)lower_bound,(double)upper_bound,rand_gen);
+	for (int i = 0; i < num_reals; i++)
+    //for (auto& v : uvals)
+	{
+		v1 = (rand_gen() % (upper_bound - lower_bound + 1)) + lower_bound;
+
+		vals.push_back(floor(v1));
+	}
+	return vals;
+
+}
+
 
 
 

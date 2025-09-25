@@ -50,11 +50,9 @@ head
  h02_09                4.7000000000E+00      0.0000000000E+00       head                 
  h02_10                5.1000000000E+00      0.0000000000E+00       head                 
 * model command line
-mfnwt ./10par_xsec.nam
+mfnwt 10par_xsec.nam
 * model input/output
-.\hk_Layer_1.ref.tpl .\hk_Layer_1.ref
-.\hk_Layer_1.ref.tpl .\nested/really\deep/hk_Layer_1.ref
-.\strt_Layer_1.ref.tpl .\strt_Layer_1.ref
-.\10par_xsec.hds.ins .\10par_xsec.hds
-++panther_transfer_on_finish(10par_xsec.hds,10par_xsec.list)
-++ies_num_reals(5)
+hk_Layer_1.ref.tpl hk_Layer_1.ref
+hk_Layer_1.ref.tpl nested/really\deep/hk_Layer_1.ref
+strt_Layer_1.ref.tpl strt_Layer_1.ref
+10par_xsec.hds.ins 10par_xsec.hds

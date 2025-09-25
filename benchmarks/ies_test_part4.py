@@ -631,7 +631,7 @@ def tenpar_high_phi_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = [0.5, 1.0]
     pst.pestpp_options["lambda_scale_fac"] = [0.9, 1.0]
-    pst.pestpp_options['ies_subset_size'] = 3
+    pst.pestpp_options['ies_subset_size'] = 5
     pst.pestpp_options["ies_debug_high_upgrade_phi"] = True
     pst.pestpp_options["ies_debug_fail_subset"] = True
     pst.pestpp_options["ies_debug_fail_remainder"] = True
@@ -652,7 +652,7 @@ def tenpar_high_phi_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = [0.5, 1.0]
     pst.pestpp_options["lambda_scale_fac"] = [0.9, 1.0]
-    pst.pestpp_options['ies_subset_size'] = 3
+    pst.pestpp_options['ies_subset_size'] = 5
     pst.pestpp_options["ies_debug_high_subset_phi"] = True
     pst.pestpp_options["ies_debug_fail_subset"] = True
     pst.pestpp_options["ies_debug_fail_remainder"] = True
@@ -676,7 +676,7 @@ def tenpar_high_phi_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = [0.5, 1.0]
     pst.pestpp_options["lambda_scale_fac"] = [0.9, 1.0]
-    pst.pestpp_options['ies_subset_size'] = 3
+    pst.pestpp_options['ies_subset_size'] = 5
     #pst.pestpp_options["ies_debug_high_subset_phi"] = True
     #pst.pestpp_options["ies_debug_fail_subset"] = True
     #pst.pestpp_options["ies_debug_fail_remainder"] = True
@@ -1141,7 +1141,7 @@ def tenpar_upgrade_on_disk_test():
 
 
 def multimodal_test():
-    noptmax = 2
+    noptmax = 1
     num_reals = 100
     # can be "circle" or "h"
     func = "circle"
@@ -1391,8 +1391,8 @@ def plot_mm1_results(noptmax=None, func="circle", show_info=False,mm_d = None):
                                                             df=pd.read_csv(fname.replace(".par.", ".obs."), index_col=0))
         mm_pv = oe_pt_mm.phi_vector
         pe_pr = pd.read_csv(os.path.join(mm_d, "mm1.0.par.csv"))
-        pe_pt_mm.index = pe_pt_mm.index.map(lambda x: str(int(np.float(x))))
-        pe_pr.index = pe_pr.index.map(lambda x: str(int(np.float(x))))
+        pe_pt_mm.index = pe_pt_mm.index.map(lambda x: str(int(float(x))))
+        pe_pr.index = pe_pr.index.map(lambda x: str(int(float(x))))
         pe_pr.index = pe_pr.index.map(lambda x: str(x))
 
         if show_info and noptmax > 0:
@@ -1465,7 +1465,7 @@ def plot_mm1_results(noptmax=None, func="circle", show_info=False,mm_d = None):
             axes[1].imshow(H, alpha=0.7,extent=(-4,4,-4,4),cmap="jet")
             H = np.flipud(H)
             #axes[0].contour(X,Y,H,color="0.5",linestyles="dashed")
-
+        plt.tight_layout()
         plt.savefig(os.path.join(mm_d, "compare_{0:02d}.png".format(noptmax)),dpi=1000)
         plt.close(fig)
 
@@ -1475,6 +1475,152 @@ def plot_mm1_results(noptmax=None, func="circle", show_info=False,mm_d = None):
     cmd += "\"fps=10,scale=720:-1:flags=lanczos[x];[x][1:v]paletteuse\" -y  -final_delay 150 compare.gif"
     pyemu.os_utils.run(cmd, cwd=mm_d)
 
+
+def plot_mm1_results_seq(noptmax=1, func="circle",mm_d = None):
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle
+
+    base_d = os.path.join("mm1", "master_base_{0}".format(func))
+    if mm_d is None:
+        mm_d = os.path.join("mm1", "master_mm_{0}_mt".format(func))
+    pst = pyemu.Pst(os.path.join(base_d, "mm1.pst"))
+    if noptmax is None:
+        noptmax = pst.control_data.noptmax
+    org_noptmax = noptmax + 1
+    figcount = 0
+    for noptmax in [1]:
+        fname = os.path.join(base_d, "mm1.{0}.par.csv".format(noptmax))
+        for i in range(noptmax):
+            if os.path.exists(fname):
+                break
+            fname = os.path.join(base_d, "mm1.{0}.par.csv".format(noptmax - i))
+
+        pe_pt_base = pd.read_csv(fname)
+        oe_pt_base = pyemu.ObservationEnsemble(pst=pst, df=pd.read_csv(fname.replace(".par.", ".obs."), index_col=0))
+        base_pv = oe_pt_base.phi_vector
+
+        fname = os.path.join(mm_d, "mm1.{0}.par.csv".format(noptmax))
+        for i in range(noptmax):
+            if os.path.exists(fname):
+                break
+            fname = os.path.join(mm_d, "mm1.{0}.par.csv".format(noptmax - i))
+        pe_pt_mm = pd.read_csv(fname,index_col=0)
+        pe_pt_mm.index = pe_pt_mm.index.astype(str)
+        oe_pt_mm = pyemu.ObservationEnsemble.from_dataframe(pst=pst,
+                                                            df=pd.read_csv(fname.replace(".par.", ".obs."), index_col=0))
+        oe_pt_mm.index = oe_pt_mm.index.astype(str)
+        mm_pv = oe_pt_mm.phi_vector
+        mm_pv.index = mm_pv.index.astype(str)
+        #mm_pv.sort_values(inplace=True,ascending=False)
+        pe_pr = pd.read_csv(os.path.join(mm_d, "mm1.0.par.csv"),index_col=0)
+        pe_pr.index = pe_pr.index.astype(str)
+        #pe_pt_mm.index = pe_pt_mm.index.map(lambda x: str(int(float(x))))
+        #pe_pr.index = pe_pr.index.map(lambda x: str(int(float(x))))
+        #pe_pr.index = pe_pr.index.map(lambda x: str(x))
+        mm_info_fname = [f for f in os.listdir(mm_d) if "mm1.{0}.".format(noptmax) in f and f.endswith(".mm.info.csv")][0]
+        print(mm_info_fname)
+        
+        mm_df = pd.read_csv(os.path.join(mm_d, mm_info_fname))
+        #mm_df.index = np.arange(mm_df.shape[0])
+        mm_df.loc[:, "pe_real_name"] = mm_df.pe_real_name.apply(lambda x: str(x))
+        mm_df.index = mm_df.pe_real_name
+        mm_df = mm_df.loc[mm_pv.index]
+        print(mm_df.index)
+
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+        c = Circle([0,0],1,edgecolor="r",facecolor="none")
+        ax.add_patch(c)
+
+        ax.scatter(pe_pr.par1.values, pe_pr.par2.values, marker=".", color="0.5", alpha=0.5)
+        ax.set_title("prior")
+        ax.set_ylabel("par2")
+        ax.set_xlabel("par1")
+        plt.tight_layout()
+        plt.savefig(os.path.join(mm_d, "prior.png"),dpi=1000)
+        ax.scatter(pe_pt_base.par1.values, pe_pt_base.par2.values, marker=".", color="b", alpha=0.5)
+        ax.set_title("posterior")
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(mm_d, "standard_solution.png"),dpi=1000)
+        plt.close(fig)
+
+        previous_pvals = [[],[]]
+        ireal = 0
+        for mm_rname in mm_df.index:
+            if mm_rname not in pe_pt_mm.index:
+                print("missing",mm_rname)
+                continue
+            if np.abs(pe_pr.loc[mm_rname,"par1"]) < 1 and np.abs(pe_pr.loc[mm_rname,"par2"]) < 1:
+                print("skipping",mm_rname)
+                continue
+            nei_cols = mm_df.columns[mm_df.columns.map(lambda x: "neighbor" in x)]
+            mm_rnames = set(pe_pr.index.tolist())
+            df = mm_df.loc[mm_rname, :]
+            neis = df.loc[nei_cols].apply(str)
+            neis = neis.loc[neis.apply(lambda x: x in mm_rnames)]
+            df = df.loc[neis.index]
+            print(neis)
+            # print(pe_pt_mm.index)
+            pe_pr_nei = pe_pr.loc[neis, :]
+            #print(mm_rname, pe_pr.loc[mm_rname, :], pe_pt_mm.loc[mm_rname, :])
+
+            fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+            c = Circle([0,0],1,edgecolor="r",facecolor="none")
+            ax.add_patch(c)
+
+            ax.scatter(pe_pr.par1.values, pe_pr.par2.values, marker=".", color="0.5", alpha=0.5)
+
+            #if len(previous_pvals[0]) > 0:
+            #    ax.scatter(previous_pvals[0],previous_pvals[1],marker='.',color="b",alpha=0.5)
+
+            ax.scatter([pe_pr.loc[mm_rname, "par1"]], [pe_pr.loc[mm_rname, "par2"]], marker="^", color="0.5", s=50)
+            ax.set_title("multimodal upgrade realization {0}".format(mm_rname))
+            ax.set_ylabel("par2")
+            ax.set_xlabel("par1")
+            plt.tight_layout()
+            plt.savefig(os.path.join(mm_d, "seqcompare_{0:02d}.png".format(figcount)),dpi=1000)
+            figcount += 1
+
+            
+            ax.scatter(pe_pr_nei.par1.values, pe_pr_nei.par2.values, marker=".", color="c", s=100)
+            plt.tight_layout()
+            plt.savefig(os.path.join(mm_d, "seqcompare_{0:02d}.png".format(figcount)),dpi=1000)
+            figcount += 1
+            
+            ax.scatter([pe_pt_mm.loc[mm_rname, "par1"]], [pe_pt_mm.loc[mm_rname, "par2"]], marker="^", color="b",
+                            s=50)
+            previous_pvals[0].append(pe_pt_mm.loc[mm_rname, "par1"])
+            previous_pvals[1].append(pe_pt_mm.loc[mm_rname, "par2"])
+            
+            ax.plot([pe_pr.loc[mm_rname, "par1"],pe_pt_mm.loc[mm_rname, "par1"]],[pe_pr.loc[mm_rname, "par2"],pe_pt_mm.loc[mm_rname, "par2"]],
+                "b--",dashes=(1,1),lw=1.5)  
+            plt.tight_layout()
+            plt.savefig(os.path.join(mm_d, "seqcompare_{0:02d}.png".format(figcount)),dpi=1000)
+            plt.close(fig)
+            figcount += 1
+            ireal += 1
+            if ireal > 10:
+                break
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    c = Circle([0,0],1,edgecolor="r",facecolor="none")
+    ax.add_patch(c)
+
+    ax.scatter(pe_pr.par1.values, pe_pr.par2.values, marker=".", color="0.5", alpha=0.5)
+    ax.scatter(pe_pt_mm.par1.values, pe_pt_mm.par2.values, marker=".", color="b", alpha=0.5)
+    ax.set_title("posterior")
+    ax.set_ylabel("par2")
+    ax.set_xlabel("par1")
+    plt.tight_layout()
+    plt.savefig(os.path.join(mm_d, "seqcompare_{0:02d}.png".format(figcount)),dpi=1000)
+    plt.close(fig)
+    figcount += 1
+
+    pyemu.os_utils.run("ffmpeg -i seqcompare_02.png -vf palettegen=16 -y palette.png",
+                       cwd=mm_d)
+    cmd = "ffmpeg -framerate 1  -i seqcompare_%02d.png -i palette.png -y -filter_complex  "
+    cmd += "\"scale=720:-1:flags=lanczos[x];[x][1:v]paletteuse\" -y  -final_delay 250 seqcompare.gif"
+    pyemu.os_utils.run(cmd, cwd=mm_d)
 
 def mm_invest():
     # model_d = "mm1"
@@ -4079,7 +4225,12 @@ def tenpar_iqr_bad_phi_sigma_test():
 
 
 if __name__ == "__main__":
-    tenpar_iqr_bad_phi_sigma_test()
+    tenpar_high_phi_test()
+    #tenpar_iqr_bad_phi_sigma_test()
+    #multimodal_test()
+    #plot_mm1_sweep_results()
+    #plot_mm1_results()
+    #plot_mm1_results_seq()
     #tenpar_fixed_restart_test()
     #freyberg_stacked_pe_invest()
     #freyberg_mean_invest()

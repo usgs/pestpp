@@ -16,7 +16,6 @@ message(STATUS
 # This logic needs to be considered before project()
 set(_change_MSVC_flags FALSE)
 if(WIN32)
-  add_compile_options(/bigobj)
   if(CMAKE_VERSION VERSION_LESS 3.15.0)
     set(_change_MSVC_flags TRUE)
   else()
