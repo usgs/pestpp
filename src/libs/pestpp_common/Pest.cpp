@@ -1039,6 +1039,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
                 {
                     ss.str("");
                     ss << "WARNING: single and/or double quote char(s) found in model command line :" << line << endl;
+
                     string temp_line = line;
                     temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
                     //pest_utils::strip_ip(temp_line);
@@ -1058,7 +1059,22 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens.size() != 2)
 					throw_control_file_error(f_rec, "wrong number of tokens on '* model input' line '" + line + "' expecting 2");
-				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+				for (auto& token : tokens_case_sen)
+                {
+                    if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos))
+                    {
+                        ss.str("");
+                        ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token << endl;
+                        cout << ss.str();
+                        f_rec << ss.str();
+                        string temp_line = token;
+                        temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                        token = string(temp_line);
+                    }
+                }
+
+
+                model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
 				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
 			}
 
@@ -1083,6 +1099,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				for (auto ro : efile.get_row_order())
 				{
 					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
+                    for (auto& token: mi_tokens) {
+                        if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos)) {
+                            ss.str("");
+                            ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token
+                               << endl;
+                            cout << ss.str();
+                            f_rec << ss.str();
+                            string temp_line = token;
+                            temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote),
+                                            temp_line.end());
+                            token = string(temp_line);
+                        }
+                    }
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
 					//model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
@@ -1099,6 +1128,18 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens.size() != 2)
 					throw_control_file_error(f_rec, "wrong number of tokens on '* model output' line '" + line + "' expecting 2");
+                for (auto& token : tokens_case_sen) {
+                    if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos)) {
+                        ss.str("");
+                        ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token
+                           << endl;
+                        cout << ss.str();
+                        f_rec << ss.str();
+                        string temp_line = token;
+                        temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                        token = string(temp_line);
+                    }
+                }
 				model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
 				model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
 			}
@@ -1123,6 +1164,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				for (auto ro : efile.get_row_order())
 				{
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
+                    for (auto& token : mo_tokens)
+                    {
+                        if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos))
+                        {
+                            ss.str("");
+                            ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token << endl;
+                            cout << ss.str();
+                            f_rec << ss.str();
+                            string temp_line = token;
+                            temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                            token = string(temp_line);
+                        }
+                    }
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
 					//model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
@@ -1139,7 +1193,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 			if (tokens.size() != 2)
 				throw_control_file_error(f_rec, "wrong number of tokens on '* model input/output' line '" + line + "' expecting 2");
-
+                for (auto& token : tokens_case_sen)
+                {
+                    if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos))
+                    {
+                        ss.str("");
+                        ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token << endl;
+                        cout << ss.str();
+                        f_rec << ss.str();
+                        string temp_line = token;
+                        temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
+                        token = string(temp_line);
+                    }
+                }
 				if (i_tpl_ins < num_tpl_file)
 				{
 					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);

@@ -7311,6 +7311,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
         if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi()) {
             cout << "ies_debug_high_subset_phi active" << endl;
+            frec << "ies_debug_high_subset_phi active" << endl;
             best_mean = acc_phi + 1.0;
         }
 
@@ -7537,6 +7538,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	if (pest_scenario.get_pestpp_options().get_ies_debug_high_upgrade_phi())
 	{
 		cout << "ies_debug_high_upgrade_phi active" << endl;
+        frec << "ies_debug_high_upgrade_phi active" << endl;
 		best_mean = (last_best_mean * acc_fac) + 1.0;
 	}
 
@@ -9119,14 +9121,19 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 	}
 
 	else if (how == "RANDOM")
-	{
-		std::uniform_int_distribution<int> uni(0, size - 1);
+    {
+		//std::uniform_int_distribution<int> uni(0, size - 1);
 		int idx;
 		for (int i = 0; i < 1000000000; i++)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			idx = uni(subset_rand_gen);
+			//idx = uni(subset_rand_gen);
+            idx = uniform_int_draws(1,0,size-1,rand_gen)[0];
+            if ((idx < 0) || (idx > (size-1)))
+            {
+                continue;
+            }
 			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
 				continue;
 			subset_idxs.push_back(idx);

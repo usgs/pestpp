@@ -97,6 +97,7 @@ namespace pest_utils
 		return x;
 	}
 
+	void strip_nonascii_ip(string &s);
 	/* @brief Strip leading and/or trailing characters from a string
 
 		The characters contained in argument delimiters are stripped from
@@ -389,6 +390,8 @@ string get_time_string_short();
 int quit_file_found();
 bool try_remove_quit_file();
 
+
+
 class CmdLine {
 
 public:
@@ -398,13 +401,18 @@ public:
 	string panther_host_name;
 	string org_cmdline_str;
 	string panther_port;
+	string opersys;
+	string cwd;
 	bool jac_restart;
 	bool restart;
 	RunManagerType runmanagertype;
+
+	void startup_report(ostream& s,string start_string);
 private:
 	void throw_cmdline_error(string message);
 
 };
+
 
 
 
