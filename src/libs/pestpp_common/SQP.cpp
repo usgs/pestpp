@@ -1157,7 +1157,6 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 			_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), _current_dv_vals, parcov, performance_log, 0, frec);
 		}
 
-		cout << "dv: " << endl << _dv.get_eigen() << endl;
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
         add_current_as_bases(_dv, _oe);
@@ -1987,67 +1986,23 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	
 	if (use_ensemble_grad)
 	{
-		//ensemble stuff here
-		//if (use_obj_obs)
-		{
 			// compute sample dec var cov matrix and its pseudo inverse
 			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
-			// TODO: so can pseudo inverse: Covariance dv_cov_matrix; 
-			//Eigen::MatrixXd parcov_inv;
-			// start by computing mean-shifted dec var ensemble
+
 			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, "BASE"); 
-			//dv_anoms.conservativeResize(dv_anoms.rows() - 1, dv_anoms.cols());
-			/*if (dv.shape().first > 1000)  // until we encounter
-			{
-				// lower rank - diag elements only
-				throw_sqp_error("TODO: use dv.get_diagonal_cov matrix()? need to check for consistency if so"); 
-				//parcov = dv.get_diagonal_cov_matrix();  // check ok to instantiate empricially here  // pass helpful center_on here too
-				//Eigen::VectorXd parcov_inv;
-				//Covariance parcov_diag;
-				//parcov_diag.from_diagonal(parcov);
-				//parcov_inv = parcov_diag.get_matrix().diagonal();
-				//parcov_inv = parcov_inv.cwiseInverse();  // equivalent to pseudo inv?
-			}*/
 			Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
-			//message(1, "dv_cov:", dv_cov_matrix);
-			//parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
-
-//			if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior()) {
-//                //the second return matrix should be shrunk optimally to be nonsingular...but who knows!
-//                Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
-//                shrunk_cov.inv_ip();
-//                parcov_inv = shrunk_cov.e_ptr()->toDense();
-//            }
-//			else
-//            {
-//			    parcov_inv = parcov.inv().e_ptr()->toDense();
-//            }
-			//cout << "parcov inv: " << endl << parcov_inv << endl;
-			//TODO: Matt to check consistency being sample cov forms
-            //message(1, "empirical parcov inv:", parcov_inv);  // tmp
-			
-			// try pseudo_inv_ip()
-			//Covariance x;
-			//x = Covariance(dv_names, dv_cov_matrix.sparseView(), Covariance::MatType::SPARSE);
-			//x.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-			//message(1, "pseudo inv:", x);  // tmp
-
-			// CMA implementation to go here
 
 			// compute dec var-phi cross-cov vector
 			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
-			// start by computing mean-shifted obj function ensemble
+
             Eigen::MatrixXd s, V, U, st;
             SVD_REDSVD rsvd;
-            //SVD_EIGEN rsvd;
             rsvd.set_performance_log(performance_log);
-            //dv_anoms.transposeInPlace();
             rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
 			Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 			Eigen::MatrixXd obj_anoms(dv.shape().first,1);
             if (use_obj_obs) {
                 obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},"BASE");
-				//obj_anoms.conservativeResize(obj_anoms.rows() - 1, obj_anoms.cols());
             }
             else
             {
@@ -2072,11 +2027,10 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
             }
 			Eigen::VectorXd cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
 
-			// now compute grad vector
-			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
-			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015) 
+			// now compute grad vector: Chen et al. (2009) and Fonseca et al. (2015) 
 			grad = dv_cov_pseudoinv * cross_cov_vector;
 
+			//keeping here for later use (I reckon this is no longer needed because CMA sort of does the same thing already)
 			//if (use_localization)
 			//{
 			//	Eigen::VectorXd loc_weights;
@@ -2103,44 +2057,16 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
              //throw_sqp_error("obs-based obj for ensembles not implemented");
 
              //todo: localize the gradient here - fun times
-
-		}
-		//pi base obj, need representative dv values using the "center_on" arg
-		//represent the mean/median/base - that is, derived from the "center_on" arg
-		//todo: for now, just using mean dv values
-//		else
-//		{
-//			//if not center_on arg, use the mean dv values
-//			//if (center_on.size() == 0)
-//			//{
-//			//	//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-//			//	for (int i = 0; i < dv_names.size(); i++)
-//			//	{
-//			//		grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
-//			//	}
-//			//}
-//			//else
-//			//{
-//
-//			//	grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
-//			//}
-//			//
-//			//I think we should just eval the gradient around the current dv values
-//			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
-//		}
 			
 	}
 	else
 	{
-		//obs-based obj
 		if (use_obj_obs)
 		{
-			//just a jco row
 			vector<string> obj_name_vec{ obj_func_str };
 			Eigen::MatrixXd t = jco.get_matrix(obj_name_vec, dv_names);
 			grad = t.row(0);
 		}
-		//pi based obj
 		else
 		{
 			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
@@ -3287,7 +3213,6 @@ bool SeqQuadProgram::solve_new()
 	//current_constraint_mat = constraint_mat.first;
 	//cnames = constraint_mat.first.get_row_names();
 
-	////copy for BFGS later
 	//prev_ctl_dv_values = current_ctl_dv_values; 
 	//prev_constraint_mat = current_constraint_mat;
 
@@ -3305,11 +3230,6 @@ bool SeqQuadProgram::solve_new()
 	//	pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(_current_num_dv_values, grad);
 	//	search_d = x.first;
 	//	lm = x.second;
-
-	//	message(1, "constraint_jco:", constraint_jco); // tmp
-	//	message(1, "sd:", search_d.transpose());  // tmp
-	//	message(1, "sd_norm:", search_d.norm()); //tmp
-	//	message(1, "lm:", lm); //tmp
 
 	//	if (cnames.size() > 0)
 	//	{
@@ -3450,7 +3370,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 	ofstream& frec = file_manager.rec_ofstream();
 
 	prev_ctl_dv_values = current_ctl_dv_values;
-	bool first_pick = pick_upgrade_and_update_current(dv, oe, true, false);
+	bool first_pick = pick_upgrade_and_update_current(dv, oe, cma_reset_archive, false);
 
 	if ((use_ensemble_grad) && (dv.shape().first <= error_min_reals))
 	{
@@ -3472,7 +3392,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 	ParameterEnsemble _dvs = dv;
 	_dvs.drop_rows(vector<string>{"BASE"}, true);
 
-	//use subset to determine optimal search direction
 	int local_subset_size = pest_scenario.get_pestpp_options().get_sqp_subset_size();
 	if (local_subset_size < 0)
 	{
@@ -3604,7 +3523,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 			constraint_mat_en[d] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, &lm_en[d]);
 			if (constraint_mat_en[d].first.get_row_names() != cnames_en[d]) 
 			{
-				//current_constraint_mat = constraint_mat.first;
 				vector<string> prev_cnames = cnames_en[d];
 				cnames_en[d] = constraint_mat_en[d].first.get_row_names();
 				vector<string> dropped_cnames;
@@ -3626,13 +3544,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 		}
 	}
 
-	//message(1, "constraint_jco:", constraint_jco); // tmp
-	//message(1, "sd:", search_d_en["BASE"].transpose());  // tmp
-	//message(1, "sd_norm:", search_d.norm()); //tmp
-	//message(1, "lm:", lm_en["BASE"]); //tmp
-
-
-	//pair<Mat, bool> constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs, (working_set_tol));
 	constraint_jco = constraint_mat_en["BASE"].first.e_ptr()->toDense();
 	current_constraint_mat = constraint_mat_en["BASE"].first;
 	cnames = constraint_mat_en["BASE"].first.get_row_names();
@@ -3650,87 +3561,30 @@ bool SeqQuadProgram::solve_new_ensemble()
 
 		is_blocking_constraint = false;
 		successful = line_search(search_d_en, grad, &_drawn_dvs);
-		string blocking_constraint = "";
-		/*if (successful)
-		{
-			if (is_blocking_constraint && !use_ensemble_grad)
-			{
-				map<string, double> violations;
-				if (infeas_cand_obs.size() != 0)
-					violations = constraints.get_unsatified_obs_constraints(infeas_cand_obs, 0.0);
-
-				if (!violations.empty())
-				{
-					double max_violation = -1.0;
-					for (const auto& v : violations)
-					{
-						if (v.second > max_violation)
-						{
-							max_violation = v.second;
-							blocking_constraint = v.first;
-						}
-					}
-
-					if (find(cnames.begin(), cnames.end(), blocking_constraint) == cnames.end())
-					{
-						message(1, "adding blocking constraint to working set:", blocking_constraint);
-						cnames.push_back(blocking_constraint);
-						pair<Mat, bool> new_constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs);
-						current_constraint_mat = new_constraint_mat.first;
-					}
-					else
-						blocking_constraint = "";
-				}
-			}
-		}*/
-
-
-		//if (blocking_constraint != "" && !use_ensemble_grad)
-		//{
-		//	successful = false;
-		//	message(1, "performing binary search for constraint boundary with working set:", cnames);
-		//	if (pest_scenario.get_pestpp_options().get_sqp_solve_partial_step())
-		//	{
-		//		if (iterative_partial_step(blocking_constraint))
-		//		{
-		//			constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs, (working_set_tol));
-		//			current_constraint_mat = constraint_mat.first;
-		//			successful = true;
-		//			BASE_SCALE_FACTOR *= SF_INC_FAC;
-		//			break;
-		//		}
-		//		else
-		//			throw_sqp_error("Something is wrong with iterative partial step...");
-		//	}
-		//}
-
 
 		if (successful)
 		{
-			/*if ((search_d.norm() < 0.1) && (((lm.array() < 0).all()) || (lm.size() != 0)))
-				BASE_SCALE_FACTOR /= SF_INC_FAC;
-			else
-				BASE_SCALE_FACTOR *= SF_INC_FAC;*/
 			BASE_SCALE_FACTOR *= SF_DEC_FAC;
+			cma_reset_archive = true;
 		}
 		else
 		{
 			if (first_pick)
 			{
 				ss.str("");
-				ss << "line search failed. centering new ensemble at best candidate: ";
+				ss << "line search failed. centering new ensemble at best member of current ensemble ";
 				message(1, ss.str());
 				
 				successful = true;
-				/*if ((search_d.norm() < 0.1) && (((lm.array() < 0).all()) || (lm.size() != 0)))
-					BASE_SCALE_FACTOR /= SF_INC_FAC;
-				else
-					BASE_SCALE_FACTOR *= SF_INC_FAC;*/
+				cma_reset_archive = true;
 				BASE_SCALE_FACTOR *= SF_DEC_FAC;
 				break;
 			}
 			else
+			{
 				BASE_SCALE_FACTOR *= SF_INC_FAC;
+				cma_reset_archive = false;
+			}
 
 			if (use_cmaes)
 			{
@@ -3739,11 +3593,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 			}
 			n_consec_failures++;
 			line_search_attempts++;
-
-			/*if (use_ensemble_grad)
-				BASE_SCALE_FACTOR /= SF_INC_FAC;
-			else*/
-			//BASE_SCALE_FACTOR *= SF_DEC_FAC;
 
 			if (n_consec_failures >= max_consec_failures)
 			{

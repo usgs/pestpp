@@ -233,10 +233,6 @@ private:
 	map<string, string> constraint_sense;
 	Eigen::VectorXd lambda, base_lambda;
 
-	//these are used so that we can update the constraints based on the current best values
-	//Parameters best_mean_dv_values;
-	//Observations best_mean_obs_values;
-
 	void save_current_dv_obs();
 
 	Constraints constraints;
@@ -244,14 +240,12 @@ private:
 	bool oe_drawn, dv_drawn;
 	set<int> selected_dv_indices; 
 	set<int> unselected_dv_indices;  
-	bool sampling_tracking_initialized;
+	bool sampling_tracking_initialized, cma_reset_archive = true;
 
 	bool use_ensemble_grad;
 	bool is_blocking_constraint = false;
 
 	Jacobian_1to1 jco;
-
-	//store the hessian as a cov since it is symmetric...
 	Covariance hessian;
 
 	SqpFilter filter;
