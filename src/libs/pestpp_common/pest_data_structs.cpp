@@ -1942,6 +1942,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_cma_cmu: " << sqp_cma_cmu << endl;
 	os << "sqp_cma_cc: " << sqp_cma_cc << endl;
 	os << "sqp_cma_stepsize_control: " << sqp_cma_stepsize_control << endl;
+	os << "sqp_cma_reinflation_factor: " << sqp_cma_reinflation_factor << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2179,6 +2180,7 @@ void PestppOptions::set_defaults()
 	set_sqp_cma_cmu(-1);
 	set_sqp_cma_cc(-1);
 	set_sqp_cma_stepsize_control(false);
+	set_sqp_cma_reinflation_factor(1.1);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

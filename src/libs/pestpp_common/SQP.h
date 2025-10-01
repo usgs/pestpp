@@ -79,6 +79,7 @@ public:
 
 	void initialize(int n_params, int _num_reals);
 	void update(Parameters prev_m, Parameters curr_m);
+	void reinflate_C(double reinflation_factor = 1.0);
 	void set_covariance(const Eigen::MatrixXd& _C) { C = _C; }
 	Covariance get_covariance_matrix(const vector<string>& par_names);
 
@@ -208,6 +209,7 @@ private:
 	vector<double> best_violations;
 	double best_phi_yet;
 	double best_violation_yet;
+	double base_ens_viol;
 	double working_set_tol;
 
 	int warn_min_reals, error_min_reals;
@@ -244,6 +246,7 @@ private:
 
 	bool use_ensemble_grad;
 	bool is_blocking_constraint = false;
+	bool is_base_infeas = false;
 
 	Jacobian_1to1 jco;
 	Covariance hessian;
