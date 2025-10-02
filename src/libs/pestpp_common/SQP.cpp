@@ -18,9 +18,9 @@
 #include "EnsembleSmoother.h"
 
 
-bool SqpFilter::accept(double obj_val, double violation_val, int iter, double alpha,bool keep)
+bool SqpFilter::accept(double obj_val, double violation_val, Parameters p, int iter, bool keep)
 {
-	FilterRec candidate{ obj_val, violation_val,iter,alpha };
+	FilterRec candidate{ obj_val, violation_val,iter, p};
 	if (obj_viol_pairs.size() == 0)
 	{
 		obj_viol_pairs.insert(candidate);
@@ -109,13 +109,13 @@ void SqpFilter::report(ofstream& frec, int iter)
 
 }
 
-bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
+bool SqpFilter::update(double obj_val, double violation_val, Parameters p, int iter)
 {
 	FilterRec candidate;
 	candidate.obj_val = obj_val;
 	candidate.viol_val = violation_val;
 	candidate.iter = iter;
-	candidate.alpha = alpha;
+	candidate.fdp = p;
 	multiset<FilterRec> updated;
 	obj_viol_pairs.insert(candidate);
 	bool i_is_dominated = false;
@@ -147,6 +147,46 @@ bool SqpFilter::update(double obj_val, double violation_val, int iter, double al
 	obj_viol_pairs = updated;
 	return true;
  }
+
+Parameters SqpFilter::get_knee(Parameters p)
+{
+	multiset<FilterRec>::iterator it = obj_viol_pairs.begin();
+	FilterRec k;
+	double min_obj = numeric_limits<double>::max(), min_viol = numeric_limits<double>::max();
+	for (int i = 0;i < obj_viol_pairs.size();i++)
+	{
+		if (it->obj_val < min_obj)
+			min_obj = it->obj_val;
+		if (it->viol_val < min_viol)
+			min_viol = it->viol_val;
+		it++;
+
+	}
+
+	it = obj_viol_pairs.begin();
+	int opt_idx = -1;
+	double dist, opt_dist = numeric_limits<double>::max();
+
+	for (int i = 0;i < obj_viol_pairs.size();i++)
+	{
+		dist = pow((it->obj_val - min_obj), 2) + pow((it->viol_val - min_viol), 2);
+		if (dist < opt_dist)
+		{
+			opt_idx = i;
+			opt_dist = dist;
+			k = *it;
+		}
+		it++;
+	}
+
+	if (opt_idx == -1)
+		throw runtime_error("couldn't find nearest optimal point in current filter");
+
+	Parameters knee_pars = p;
+	knee_pars.insert(k.fdp);
+
+	return knee_pars;
+}
 
 SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
@@ -945,7 +985,7 @@ void SeqQuadProgram::initialize()
 
     double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
-	filter.update(last_best, v, 0, -1.0);
+	filter.update(last_best, v, current_ctl_dv_values, 0);
 
 	if ((v > 0.0) && !use_ensemble_grad)
 	{
@@ -3868,6 +3908,16 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	vector<string> real_names = dv_candidates.get_real_names();
 	map<string, double> total_viol_map;
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
+	
+	map<string, Parameters> par_map;
+	for (auto d : real_names)
+	{
+		Parameters p = current_ctl_dv_values;
+		Eigen::VectorXd t = dv_candidates.get_real_vector(d);
+		p.update_without_clear(dv_names, t);
+		par_map[d] = p;
+	}
+
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
 	map<string, map<string, double>> feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
@@ -3901,7 +3951,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 		for (auto& f : feasible_distance[real_names[i]])
 			feas_dist -= f.second;
 		feas_dist_map.push_back(feas_dist);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum_nom, iter);
+		filter_accept = filter.accept(obj_vec[i], infeas_sum_nom, par_map[real_names[i]], iter);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
@@ -3990,6 +4040,9 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 	if (idx != -1)
 	{
+		if (nviol < base_ens_viol)
+			base_ens_viol = nviol;
+
 		last_best = oext;
 		last_viol = nviol;
 		message(1, "accepting realization ", real_names[idx]);
@@ -4007,7 +4060,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 			current_ctl_dv_values[d] = p.get_rec(d);
 		current_obs.update_without_clear(_oe.get_var_names(), o.get_data_eigen_vec(_oe.get_var_names()));
 
-		filter.update(oext, nviol_vec[idx], iter);
+		filter.update(oext, nviol_vec[idx], p, iter);
 
 		if (report)
 		{
@@ -4055,7 +4108,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 			current_ctl_dv_values = infeas_cand_dv_values;
 			current_obs = infeas_cand_obs;
 		}
-		filter.update(obj_vec[jdx], nviol_vec[jdx], iter);
+		filter.update(obj_vec[jdx], nviol_vec[jdx], p, iter);
 
 		if (report)
 		{
@@ -4091,6 +4144,16 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	vector<string> real_names = dv_candidates.get_real_names();
 	map<string, double> total_viol_map;
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
+
+	map<string, Parameters> par_map;
+	for (auto d : real_names)
+	{
+		Parameters p = current_ctl_dv_values;
+		Eigen::VectorXd t = dv_candidates.get_real_vector(d);
+		p.update_without_clear(dv_names, t);
+		par_map[d] = p;
+	}
+
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe,filter.get_viol_tol(),true);
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
 	map<string, map<string, double>> feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
@@ -4125,7 +4188,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		for (auto& f : feasible_distance[real_names[i]])
 			feas_dist -= f.second;
 		feas_dist_map.push_back(feas_dist);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,sf_map.at(real_names[i]),false);
+		filter_accept = filter.accept(obj_vec[i], infeas_sum, par_map[real_names[i]], iter);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
@@ -4222,7 +4285,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		}
 		
 		if (idx != -1)
-			filter.update(oext,infeas_vec[idx],iter,sf_map.at(real_names.at(idx)));
+			filter.update(oext,infeas_vec[idx],par_map[real_names[idx]], iter);
     }
 	else
     {
@@ -4262,7 +4325,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
         }
 
 		if (idx != -1)
-			filter.update(oext, infeas_vec[idx], iter, sf_map.at(real_names.at(idx)));
+			filter.update(oext, infeas_vec[idx], par_map[real_names[idx]], iter);
 		/*if (idx == -1)
 		{
 			message(0, "no feasible solutions, choosing lowest constraint violation...");
@@ -4423,7 +4486,7 @@ bool SeqQuadProgram::pick_partial_step(ParameterEnsemble& dv_candidates, Observa
 			infeas_sum += v.second;
 		ss << " infeasibilty total: " << infeas_sum << ", ";
 		infeas_vec.push_back(infeas_sum);
-		filter_accept = partial_step_filter.accept(obj_vec[i], infeas_sum, iter, sf_map.at(real_names[i]), false);
+		//filter_accept = partial_step_filter.accept(obj_vec[i], infeas_sum, iter, sf_map.at(real_names[i]), false);
 		if (filter_accept)
 		{
 			ss << " filter accepted ";
@@ -4463,7 +4526,7 @@ bool SeqQuadProgram::pick_partial_step(ParameterEnsemble& dv_candidates, Observa
 				}
 			}
 		}
-		partial_step_filter.update(oext, infeas_vec[idx], iter, sf_map.at(real_names.at(idx)));
+		//partial_step_filter.update(oext, infeas_vec[idx], iter, sf_map.at(real_names.at(idx)));
 	}
 
 	if (accept)

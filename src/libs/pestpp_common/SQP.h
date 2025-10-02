@@ -27,7 +27,7 @@ struct FilterRec
 	double obj_val;
 	double viol_val;
 	int iter;
-	double alpha;
+	Parameters fdp;
     friend bool operator<(const FilterRec &k1, const FilterRec &k2) {
         if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
             return true;
@@ -50,8 +50,9 @@ public:
 	SqpFilter(bool _minimize=true,double _obj_tol = 0.001, double _viol_tol = 0.001) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
-	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0, bool keep=false);
-	bool update(double obj_val, double violation_val, int iter=0,double alpha=-1.0);
+	bool accept(double obj_val, double violation_val, Parameters p, int iter=0, bool keep=false);
+	bool update(double obj_val, double violation_val, Parameters p, int iter=0);
+	Parameters get_knee(Parameters p);
     void report(ofstream& frec,int iter);
     double get_viol_tol() {return viol_tol;}
 	void set_tol(double tol) { 
