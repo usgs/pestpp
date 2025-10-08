@@ -79,7 +79,7 @@ public:
 	CovMatAdapES() {}
 
 	void initialize(int n_params, int _num_reals);
-	void update(Parameters prev_m, Parameters curr_m);
+	void update(Parameters prev_m, Parameters curr_m, int iter);
 	void reinflate_C(double reinflation_factor = 1.0);
 	void set_covariance(const Eigen::MatrixXd& _C) { C = _C; }
 	Eigen::MatrixXd get_covariance_matrix() { return C; }
@@ -90,10 +90,18 @@ public:
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
 	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear = true);
-
+	string get_cma_update_summary() const { return cma_update_summary; }
 
 private:
-	// CMA-ES parameters
+	struct CovMetrics {
+		double trace;
+		double determinant;
+		double frobenius_norm;
+		double max_eigenvalue;
+		double min_eigenvalue;
+		double condition_number;
+	};
+
 	int lambda;                    // Population size
 	int mu;                       // Number of parents
 	double sigma = 1.0;           // Step size
@@ -110,6 +118,11 @@ private:
 	ObservationEnsemble feas_oe_archive, infeas_oe_archive, _op;
 
 	map<string, double> sorted_obj_map, sorted_viol_map;
+	string cma_update_summary;
+
+	CovMetrics compute_cov_metrics() const;
+	string report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter) const;
+	
 
 protected:
 	std::mt19937* rand_gen_ptr;
@@ -140,7 +153,7 @@ private:
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;
-	//L2PhiHandler ph;
+
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
 	CovMatAdapES cmaes;
@@ -168,7 +181,7 @@ private:
     bool SOLVE_EACH_REAL = false;
     double PHI_ACCEPT_FAC = 0.05;
     double par_sigma_max = 100;
-	double penalty_param = 10.0;  // Base penalty parameter
+
     //todo add warning for par_sigma_range too low
     double par_sigma_min = 10;
 	double eigthresh;

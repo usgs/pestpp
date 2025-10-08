@@ -1801,16 +1801,28 @@ void SeqQuadProgram::iterate_2_solution()
 		else
 			accept = solve_new();
 
-		if (accept && !use_ensemble_grad)
-			working_set_tol = max(0.05, working_set_tol * 0.5);
-		
-		if (!accept)
-			n_consec_infeas++;
+		if (accept)
+		{
+			n_consec_infeas = 0;
+			if (!use_ensemble_grad)
+				working_set_tol = max(0.05, working_set_tol * 0.5);
+		}
+		else
+		{
+			if (best_violations.size() > 0)
+			{
+				if (best_violations[best_violations.size() - 1] > filter.get_viol_tol())
+					n_consec_infeas++;
+			}
+			else
+				n_consec_infeas++;
+		}
         
 		if (use_cmaes)
 		{
 			message(1, "updating CMA-ES with approximate gradient");
-			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values);
+			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
+			message(1, cmaes.get_cma_update_summary());
 
 			ss.str("");
 			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
@@ -1856,19 +1868,19 @@ void SeqQuadProgram::iterate_2_solution()
 bool SeqQuadProgram::should_terminate()
 {
     stringstream ss;
-    //todo: use ies accept fac here?
+
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
     int nphinored = MAX_CONSEC_PHIINC;
     bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-    double phi, ratio, infeas;
+    double phi, ratio, viol;
     int count = 0;
     int nphired = 0;
     best_phi_yet = 1.0e+300;
     int best_idx_yet = -1;
     for (int i=0;i<best_phis.size();i++)
     {
-        if (best_phis[i]<best_phi_yet)
+		if ((best_phis[i] < best_phi_yet) && (best_violations[i] == 0))
         {
             best_phi_yet = best_phis[i];
             best_violation_yet = best_violations[i];
@@ -1883,13 +1895,20 @@ bool SeqQuadProgram::should_terminate()
 
     ss.str("");
     ss << "best phi, total violation sequence:" << endl;
-    int ii = 0;
+
     for (int i=0;i<best_phis.size();i++)
     {
         phi = best_phis[i];
-        infeas = best_violations[i];
-        ss << "    " << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << infeas << endl;
-        ii++;
+        viol = best_violations[i];
+
+		if (viol == 0.0)
+		{
+			ratio = (phi - best_phi_yet) / phi;
+			if (ratio <= phiredstp)
+				count++;
+		}
+
+        ss << "    " << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << viol << endl;
     }
     ss << endl;
     message(0, ss.str());
@@ -1900,12 +1919,7 @@ bool SeqQuadProgram::should_terminate()
     message(1, "nphinored: ", nphinored);
     message(1, "best phi yet: ", best_phi_yet);
     message(1,"number of consecutive infeasible solutions: ",n_consec_infeas);
-    for (auto& phi : best_phis)
-    {
-        ratio = (phi - best_phi_yet) / phi;
-        if (ratio <= phiredstp)
-            count++;
-    }
+
     message(1, "number of iterations satisfying phiredstp criteria: ", count);
     if (count >= nphistp)
     {
@@ -3580,7 +3594,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 	infeas_cand_obs.clear();
 	infeas_cand_dv_values.clear();
 
-	is_blocking_constraint = false;
 	successful = line_search(search_d_en, grad, &_drawn_dvs);
 
 	if (successful)
@@ -3604,11 +3617,11 @@ bool SeqQuadProgram::solve_new_ensemble()
 		{
 			BASE_SCALE_FACTOR *= SF_INC_FAC;
 			cma_reset_archive = false;
-			FilterRec knee_par = filter.get_knee();
+			//FilterRec knee_par = filter.get_knee();
 			ss.str("");
 			ss << "line search failed. Centering new ensemble at best member (knee pt) in the filter: " << endl;
 				
-			current_ctl_dv_values = knee_par.dp_val;
+			/*current_ctl_dv_values = knee_par.dp_val;
 			last_best = knee_par.obj_val;
 			last_viol = knee_par.viol_val;
 
@@ -3620,7 +3633,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 			best_violations.push_back(last_viol);
 			
 			if (last_viol > 0.0)
-				is_base_infeas = true;
+				is_base_infeas = true;*/
 
 			ss << "   with phi and total violation: " << last_best << ", " << last_viol << endl;
 			message(1, ss.str());
@@ -4115,7 +4128,12 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	}
 	else
 	{
-		throw_sqp_error("SeqQuadProgram::pick_upgrade_and_update_current() error: no candidate found");
+		ss.str("");
+		ss << "no feasible and better realization passed the filter. " << endl;
+		ss << "   resampling from the current BASE" << endl;
+		message(1, ss.str());
+
+		return false;
 	}
 }
 
@@ -5149,7 +5167,7 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 
 }
 
-void CovMatAdapES::update(Parameters prev_m, Parameters curr_m) 
+void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter) 
 {
 	m = curr_m.get_data_eigen_vec(curr_m.get_keys());
 	vector<string> par_names = feas_dp_archive.get_var_names();
@@ -5201,6 +5219,8 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m)
 		sigma = sigma * exp((c_sigma / d_sigma) * (ps.norm() / chi_n - 1.0));
 	}
 
+	CovMetrics metrics_prior = compute_cov_metrics();
+
 	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names) / sigma;
 	
 	Eigen::MatrixXd rank_mu_update = Eigen::MatrixXd::Zero(C.rows(), C.cols());
@@ -5222,11 +5242,20 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m)
 	for (int i = 0; i < D.size(); i++) {
 		D(i) = max(D(i), 1e-12);
 	}
+
+	CovMetrics metrics_post = compute_cov_metrics();
+	cma_update_summary = report_cov_shrinkage(metrics_prior, metrics_post, iter);
 }
 
 void CovMatAdapES::reinflate_C(double reinflation_factor)
 {
-	D *= reinflation_factor;
+	C *= reinflation_factor;
+
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(C);
+	B = eigensolver.eigenvectors();
+	D = eigensolver.eigenvalues();
+
+	//D *= reinflation_factor;
 	for (int i = 0; i < D.size(); i++) {
 		D(i) = max(D(i), 1e-12);
 	}
@@ -5320,6 +5349,66 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 
 	if (sorted_obj_map.size() + sorted_viol_map.size() == 0)
 		throw runtime_error("no members in sorted obj or viol maps after CovMatAdapES::update_archives()");
+
+}
+
+CovMatAdapES::CovMetrics CovMatAdapES::compute_cov_metrics() const
+{
+	CovMetrics metrics;
+
+	metrics.trace = C.trace();
+	metrics.determinant = C.determinant();
+	metrics.frobenius_norm = C.norm();
+	metrics.max_eigenvalue = D.maxCoeff();
+	metrics.min_eigenvalue = D.minCoeff();
+	metrics.condition_number = metrics.max_eigenvalue / (metrics.min_eigenvalue + 1E-10);
+
+	return metrics;
+}
+
+string CovMatAdapES::report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter) const
+{
+
+	double trace_ratio = post.trace / (prior.trace + 1E-10);
+	double det_ratio = post.determinant / (prior.determinant + 1E-10);
+	double frobenius_ratio = post.frobenius_norm / (prior.frobenius_norm + 1E-10);
+	double max_eigenval_ratio = post.max_eigenvalue / (prior.max_eigenvalue + 1E-10);
+
+	stringstream ss;
+	ss << endl;
+	ss << "Covariance Update Summary:" << endl;
+	ss << std::left; 
+	ss << std::setw(20) << " " 
+		<< std::setw(14) << "Prior"
+		<< std::setw(14) << "Post"
+		<< std::setw(10) << "Ratio" << endl;
+
+	ss << std::scientific << std::setprecision(4);
+	ss << "  Trace           " << std::setw(12) << prior.trace
+		<< "  " << std::setw(12) << post.trace
+		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << trace_ratio << endl;
+
+	ss << std::scientific << std::setprecision(4);
+	ss << "  Determinant     " << std::setw(12) << prior.determinant
+		<< "  " << std::setw(12) << post.determinant
+		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << det_ratio << endl;
+
+	ss << std::scientific << std::setprecision(4);
+	ss << "  Frobenius Norm  " << std::setw(12) << prior.frobenius_norm
+		<< "  " << std::setw(12) << post.frobenius_norm
+		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << frobenius_ratio << endl;
+
+	ss << std::scientific << std::setprecision(4);
+	ss << "  Max Eigenvalue  " << std::setw(12) << prior.max_eigenvalue
+		<< "  " << std::setw(12) << post.max_eigenvalue
+		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << max_eigenval_ratio << endl;
+
+	ss << std::scientific << std::setprecision(4);
+	ss << "  Condition No.   " << std::setw(12) << prior.condition_number
+		<< "  " << std::setw(12) << post.condition_number
+		<< "  " << std::setw(10) << " " << endl;
+
+	return ss.str();
 
 }
 

@@ -1735,6 +1735,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_working_set_tol);
 		return true;
 	}
+	else if (key == "SQP_CMA_REINFLATION_FACTOR")
+	{
+		convert_ip(value, sqp_cma_reinflation_factor);
+		return true;
+	}
 	else if (key == "SQP_ALPHA_MULTS")
 	{
 		sqp_alpha_mults.clear();
