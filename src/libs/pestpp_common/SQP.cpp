@@ -115,7 +115,7 @@ bool SqpFilter::update(double obj_val, double violation_val, Parameters p, int i
 	candidate.obj_val = obj_val;
 	candidate.viol_val = violation_val;
 	candidate.iter = iter;
-	candidate.fdp = p;
+	candidate.dp_val = p;
 	multiset<FilterRec> updated;
 	obj_viol_pairs.insert(candidate);
 	bool i_is_dominated = false;
@@ -148,7 +148,7 @@ bool SqpFilter::update(double obj_val, double violation_val, Parameters p, int i
 	return true;
  }
 
-Parameters SqpFilter::get_knee(Parameters p)
+FilterRec SqpFilter::get_knee()
 {
 	multiset<FilterRec>::iterator it = obj_viol_pairs.begin();
 	FilterRec k;
@@ -182,10 +182,7 @@ Parameters SqpFilter::get_knee(Parameters p)
 	if (opt_idx == -1)
 		throw runtime_error("couldn't find nearest optimal point in current filter");
 
-	Parameters knee_pars = p;
-	knee_pars.insert(k.fdp);
-
-	return knee_pars;
+	return k;
 }
 
 SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
@@ -745,11 +742,8 @@ void SeqQuadProgram::initialize_parcov()
 	if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
 		return;
 	string how = parcov.try_from(pest_scenario, file_manager);
-	cout << endl << parcov << endl;
 	message(1, "parcov loaded ", how);
-	//if (parcov.e_ptr()->rows() > 0)
 	parcov = parcov.get(act_par_names);
-
 }
 
 void SeqQuadProgram::initialize()
@@ -969,8 +963,6 @@ void SeqQuadProgram::initialize()
 
 	working_set_tol = pest_scenario.get_pestpp_options().get_sqp_working_set_tol();
 
-	use_localization = true; //TODO: add ++args
-
 	//set the initial grad vector
 	message(2, "calculating initial objective function gradient");
 	current_grad_vector = calc_gradient_vector(current_ctl_dv_values);
@@ -979,7 +971,9 @@ void SeqQuadProgram::initialize()
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
-	message(0, "Initial phi value, infeasible value:", vector<double>{last_best,last_viol});
+	ss.str("");
+	ss << "Initial phi, infeasibility values: " << last_best << " , " << last_viol;
+	message(0, ss.str());
 	best_phis.push_back(last_best);
     best_violations.push_back(last_viol);
 
@@ -1192,7 +1186,6 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
         add_current_as_bases(_dv, _oe);
 		message(1, "running new dv ensemble");
 		run_ensemble(_dv, _oe);
-		save(_dv, _oe);
 		dv = _dv;
 		oe = _oe;
 	}
@@ -1396,16 +1389,10 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 
-	//TODO: I think the base_oe should just be a "no noise" obs ensemble?
-	//or do we even need it?  Or can we use this to do a chen-oliver style 
-	//robust opt?
-	oe_base = oe; //copy
-
-	//reorder this for later...
+	oe_base = oe;
 	oe_base.reorder(vector<string>(), act_obs_names);
 
-	dv_base = dv; //copy
-	//reorder this for later
+	dv_base = dv;
 	dv_base.reorder(vector<string>(), act_par_names);
 
 	//no restart
@@ -1579,13 +1566,10 @@ bool SeqQuadProgram::hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k
 bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian)
 {
 	stringstream ss;
-	//ofstream& frec = file_manager.rec_ofstream();
 	ss.str("");
 
-	ss << "starting BFGS hessian update for iteration " << iter << endl;
-	message(1, ss.str());
-	// quasi-Newton Hessian updating via BFGS
-	// TODO: check if there are conditions to satisfy (some of which are user-specified)
+	cout << endl;
+	message(1, "starting BFGS hessian update for iteration ", iter);
 
 	const double eps = 1e-10;
 	const double max_condition = 1e8;
@@ -1666,7 +1650,7 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 	return true;
 }
 
-bool SeqQuadProgram::update_hessian()
+bool SeqQuadProgram::update_hessian(string how)
 {
 	stringstream ss;
 	ss.str("");
@@ -1759,11 +1743,13 @@ bool SeqQuadProgram::update_hessian()
 		performance_log->log_event(ss.str());
 	}
 
-	
-	//return hessian_update_sr1(s_k, y_k, old_hessian);
-	return hessian_update_bfgs(s_k, y_k, old_hessian);
+	if (how == "BFGS")
+		return hessian_update_bfgs(s_k, y_k, old_hessian);
+	else if (how == "SR1")
+		return hessian_update_sr1(s_k, y_k, old_hessian);
+	else
+		throw_sqp_error("unknown hessian update method: " + how);
 
-	cout << "new hessian: " << endl << hessian << endl;
 }
 
 void SeqQuadProgram::update_scaling(const Eigen::VectorXd& step, const Eigen::VectorXd& grad) {
@@ -1809,33 +1795,34 @@ void SeqQuadProgram::iterate_2_solution()
 	bool accept;
 	n_consec_infeas = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
-	{
-		iter++;
-		message(0, "starting solve for iteration:", iter);
- 		
-		double ws = working_set_tol;
-
+	{ 		
 		if (use_ensemble_grad)
 			accept = solve_new_ensemble();
 		else
 			accept = solve_new();
-		//accept = solve_new();
+
 		if (accept && !use_ensemble_grad)
-			working_set_tol = max(0.05, ws * 0.5);
-
-
-        if (use_ensemble_grad)
-            report_and_save_ensemble();
-        else
-            save_current_dv_obs();
+			working_set_tol = max(0.05, working_set_tol * 0.5);
+		
+		if (!accept)
+			n_consec_infeas++;
         
 		if (use_cmaes)
 		{
 			message(1, "updating CMA-ES with approximate gradient");
-			
 			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values);
+
+			ss.str("");
+			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+			frec << ss.str();
+
 		}
 		make_gradient_runs(current_ctl_dv_values, current_obs);
+
+		if (use_ensemble_grad)
+			report_and_save_ensemble();
+		else
+			save_current_dv_obs();
 
 		grad_vector_map[iter] = calc_gradient_vector(current_ctl_dv_values);
 		current_grad_vector = grad_vector_map[iter];
@@ -1862,7 +1849,7 @@ void SeqQuadProgram::iterate_2_solution()
         }
 
 		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian())
-			update_hessian();
+			update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
 	}
 }
 
@@ -2104,7 +2091,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	}
 	Parameters pgrad = _current_dv_values;
 	pgrad.update_without_clear(dv_names, grad);
-	ss << "approximate gradient" << endl << grad << endl;
+	ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
 	frec << ss.str();
 
 	return pgrad;
@@ -3056,6 +3043,8 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 	dv_candidates.to_csv(ss.str());
+	message(1, "saved candidate decvar/parameter ensemble to: ", ss.str());
+
 
 	Eigen::VectorXd v1, v2;
 	double d;
@@ -3086,11 +3075,12 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 		}
 
 	}
-	message(0, "running candidate decision variable batch");
+	message(0, "running candidate dv/pars");
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates);
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
 	oe_candidates.to_csv(ss.str());
+	message(1, "saved candidate ensemble obs to: ", ss.str());
 
 	if (use_ensemble_grad)
 		return pick_upgrade_and_update_current(dv_candidates, oe_candidates, false, true);
@@ -3399,10 +3389,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 
-	prev_ctl_dv_values = current_ctl_dv_values;
-	base_ens_viol = 1E+30;
-	bool first_pick = pick_upgrade_and_update_current(dv, oe, cma_reset_archive, false);
-
 	if ((use_ensemble_grad) && (dv.shape().first <= error_min_reals))
 	{
 		message(0, "too few active realizations:", oe.shape().first);
@@ -3416,6 +3402,13 @@ bool SeqQuadProgram::solve_new_ensemble()
 		string s = ss.str();
 		message(1, s);
 	}
+
+	prev_ctl_dv_values = current_ctl_dv_values;
+	base_ens_viol = 1E+30;
+	bool first_pick = pick_upgrade_and_update_current(dv, oe, cma_reset_archive, false);
+
+	iter++;
+	message(0, "starting solve for iteration:", iter);
 
 	performance_log->log_event("reordering variables in dv");
 	dv.reorder(vector<string>(), dv_names);
@@ -3579,70 +3572,64 @@ bool SeqQuadProgram::solve_new_ensemble()
 	current_constraint_mat = constraint_mat_en["BASE"].first;
 	cnames = constraint_mat_en["BASE"].first.get_row_names();
 
-	
 	prev_constraint_mat = current_constraint_mat;
 
 	Eigen::VectorXd search_d, lm;
 	bool successful = false;
-	int line_search_attempts = 0;
-	while (!successful && line_search_attempts < max_line_search_attempts)
+
+	infeas_cand_obs.clear();
+	infeas_cand_dv_values.clear();
+
+	is_blocking_constraint = false;
+	successful = line_search(search_d_en, grad, &_drawn_dvs);
+
+	if (successful)
 	{
-		infeas_cand_obs.clear();
-		infeas_cand_dv_values.clear();
-
-		is_blocking_constraint = false;
-		successful = line_search(search_d_en, grad, &_drawn_dvs);
-
-		if (successful)
+		BASE_SCALE_FACTOR *= SF_DEC_FAC;
+		cma_reset_archive = true;
+	}
+	else
+	{
+		if (first_pick)
 		{
-			BASE_SCALE_FACTOR *= SF_DEC_FAC;
+			ss.str("");
+			ss << "line search failed. Centering new ensemble at best member of current ensemble ";
+			message(1, ss.str());
+				
+			successful = true;
 			cma_reset_archive = true;
+			BASE_SCALE_FACTOR *= SF_DEC_FAC;
 		}
 		else
 		{
-			if (first_pick)
-			{
-				ss.str("");
-				ss << "line search failed. centering new ensemble at best member of current ensemble ";
-				message(1, ss.str());
+			BASE_SCALE_FACTOR *= SF_INC_FAC;
+			cma_reset_archive = false;
+			FilterRec knee_par = filter.get_knee();
+			ss.str("");
+			ss << "line search failed. Centering new ensemble at best member (knee pt) in the filter: " << endl;
 				
-				successful = true;
-				cma_reset_archive = true;
-				BASE_SCALE_FACTOR *= SF_DEC_FAC;
-				break;
-			}
-			else
-			{
-				BASE_SCALE_FACTOR *= SF_INC_FAC;
-				cma_reset_archive = false;
-			}
+			current_ctl_dv_values = knee_par.dp_val;
+			last_best = knee_par.obj_val;
+			last_viol = knee_par.viol_val;
 
-			if (use_cmaes)
-			{
-				message(1, "line search failed. updating covariance from current ensemble and regenerating ensemble via CMA-ES...");
-				break;
-			}
-			n_consec_failures++;
-			line_search_attempts++;
+			if (!best_phis.empty())
+				best_phis.pop_back();
+			if (!best_violations.empty())
+				best_violations.pop_back();
+			best_phis.push_back(last_best);
+			best_violations.push_back(last_viol);
+			
+			if (last_viol > 0.0)
+				is_base_infeas = true;
 
-			if (n_consec_failures >= max_consec_failures)
-			{
-				Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-				h.setIdentity();
-				update_scaling(search_d_en["BASE"], grad);
-				for (int i = 0; i < dv_names.size(); i++) {
-					h.coeffRef(i, i) *= diagonal_scaling(i);
-				}
+			ss << "   with phi and total violation: " << last_best << ", " << last_viol << endl;
+			message(1, ss.str());
 
-				hessian = Covariance(dv_names, h);
-				n_consec_failures = 0;
-				BASE_SCALE_FACTOR *= SF_INC_FAC;
-			}
-			if (n_consec_failures >= max_consec_failures)
-				break;
+			
 		}
-
 	}
+
+	
 	message(0, "new base scale factor: ", BASE_SCALE_FACTOR);
 	return successful;
 }
@@ -3878,7 +3865,7 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 
 bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc, bool report)
 {
-	message(0, " current best phi:", last_best);
+	message(0, "current best phi:", last_best);
 	stringstream ss;
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
 	double oext, oviol = 0.0, nviol = 0.0, lviol = numeric_limits<double>::max();
@@ -4046,7 +4033,9 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 		last_best = oext;
 		last_viol = nviol;
 		message(1, "accepting realization ", real_names[idx]);
-		message(0, "new best phi and total violation: ", vector<double>{last_best, last_viol});
+		ss.str("");
+		ss << "new best phi and total violation: " << last_best << ", " << last_viol;
+		message(0, ss.str());
 
 		vector<string> vnames = dv_candidates.get_var_names();
 
@@ -4064,7 +4053,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 		if (report)
 		{
-			constraints.sqp_report(iter, p, o, true, ss.str());
+			constraints.sqp_report(iter, p, o, true, real_names[idx]);
 			filter.report(file_manager.rec_ofstream(), iter);
 
 			best_phis.push_back(last_best);
@@ -4080,8 +4069,9 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	{
 		ss.str("");
 		ss << "no feasible realization passed the filter. " << endl;
-		ss << "least violating candidate from this ensemble: " << real_names[jdx] << " with total violation: " << lviol << endl;
-		ss << "continuing search..." << endl;
+		ss << "   provisionally accepting least violating realization: " << real_names[jdx] << endl;
+		ss << "   with phi and total violation: " << obj_vec[jdx] << ", " << lviol << endl;
+		ss << "   continuing search..." << endl;
 		message(1, ss.str());
 
 		vector<string> vnames = dv_candidates.get_var_names();
@@ -4112,7 +4102,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 		if (report)
 		{
-			constraints.sqp_report(iter, p, o, true, ss.str());
+			constraints.sqp_report(iter, p, o, true, real_names[jdx]);
 			filter.report(file_manager.rec_ofstream(), iter);
 
 			best_phis.push_back(last_best);
@@ -4452,7 +4442,7 @@ bool SeqQuadProgram::pick_partial_step(ParameterEnsemble& dv_candidates, Observa
 {
 	SqpFilter partial_step_filter = filter;
 	partial_step_filter.set_tol(0.0);
-	message(0, " current best phi:", last_best);
+	message(0, "current best phi:", last_best);
 	stringstream ss;
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
 	double oext, oviol = 0.0;
@@ -5040,7 +5030,7 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 
 		subset_idxs.push_back(bidx - dv_names.begin());
 	}
-	//int size = pe.shape().first;
+
 	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 	if (how == "FIRST")
 	{
@@ -5138,9 +5128,6 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 	}
 	mu_eff = 1.0 / sum_squared_weights;
 
-	//c_c = 0.5;
-	c_m = 1.0;
-
 	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_c1() != -1)
 		c_1 = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_c1();
 	else
@@ -5227,7 +5214,6 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m)
 	Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
 
 	C = (1.0 - c_1 - c_mu) * C + rank_mu_update + rank_one_update;
-	cout << "CMA-ES approximated covariance: " << endl << C << endl;
 
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(C);
 	B = eigensolver.eigenvectors();
@@ -5402,29 +5388,4 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 		
 	}
 	return new_reals;
-}
-
-Covariance CovMatAdapES::get_covariance_matrix(const vector<string>& par_names)
-{
-	vector<string> pnames = par_names;
-	Covariance cov(pnames);
-
-	// Get parameter bounds and scale the covariance matrix
-	const ParameterInfo& par_info = pest_scenario_ptr->get_ctl_parameter_info();
-	double sigma_range = pest_scenario_ptr->get_pestpp_options().get_par_sigma_range();
-
-	vector<Eigen::Triplet<double>> triplets;
-	for (int i = 0; i < C.rows(); ++i) {
-		for (int j = 0; j < C.cols(); ++j) {
-			if (C(i, j) != 0.0) {
-				triplets.push_back(Eigen::Triplet<double>(i, j, C(i, j)));
-			}
-		}
-	}
-
-	Eigen::SparseMatrix<double> sparse_cov(par_names.size(), par_names.size());
-	sparse_cov.setFromTriplets(triplets.begin(), triplets.end());
-	cov = Covariance(par_names, sparse_cov);
-	cout << "parcov: " << endl << cov << endl; //tmp
-	return cov;
 }

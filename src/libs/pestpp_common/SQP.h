@@ -27,7 +27,7 @@ struct FilterRec
 	double obj_val;
 	double viol_val;
 	int iter;
-	Parameters fdp;
+	Parameters dp_val;
     friend bool operator<(const FilterRec &k1, const FilterRec &k2) {
         if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
             return true;
@@ -52,7 +52,7 @@ public:
 	}
 	bool accept(double obj_val, double violation_val, Parameters p, int iter=0, bool keep=false);
 	bool update(double obj_val, double violation_val, Parameters p, int iter=0);
-	Parameters get_knee(Parameters p);
+	FilterRec get_knee();
     void report(ofstream& frec,int iter);
     double get_viol_tol() {return viol_tol;}
 	void set_tol(double tol) { 
@@ -82,7 +82,7 @@ public:
 	void update(Parameters prev_m, Parameters curr_m);
 	void reinflate_C(double reinflation_factor = 1.0);
 	void set_covariance(const Eigen::MatrixXd& _C) { C = _C; }
-	Covariance get_covariance_matrix(const vector<string>& par_names);
+	Eigen::MatrixXd get_covariance_matrix() { return C; }
 
 	void set_mean(const Eigen::VectorXd& _m) { m = _m; }
 	Eigen::VectorXd get_mean() const { return m; }
@@ -103,7 +103,7 @@ private:
 	Eigen::VectorXd D;            // Eigenvalues of C
 	Eigen::MatrixXd pc;           // Evolution path
 	Eigen::MatrixXd ps;           // Evolution path for sigma
-	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m, mu_eff;
+	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m = 1.0, mu_eff;
 	vector<double> weights;
 	
 	ParameterEnsemble feas_dp_archive, infeas_dp_archive, _dp;
@@ -219,7 +219,7 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	string best_name;
-	bool use_subset, use_localization, use_cmaes = true;
+	bool use_subset, use_cmaes = true;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;
@@ -257,7 +257,7 @@ private:
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
 
-	bool update_hessian();
+	bool update_hessian(string how);
 	void update_scaling(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
