@@ -91,6 +91,7 @@ public:
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
 	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear = true);
 	string get_cma_update_summary() const { return cma_update_summary; }
+	bool should_terminate();
 
 private:
 	struct CovMetrics {
@@ -114,14 +115,20 @@ private:
 	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m = 1.0, mu_eff;
 	vector<double> weights;
 	
+	double trace_ratio, det_ratio, frobenius_ratio, max_eigenval_ratio;
+	double trace_ratio_0, det_ratio_0, frobenius_ratio_0, max_eigenval_ratio_0;
+	bool possibly_converged = false;
+	int cov_stopcrit_count;
+	
 	ParameterEnsemble feas_dp_archive, infeas_dp_archive, _dp;
 	ObservationEnsemble feas_oe_archive, infeas_oe_archive, _op;
 
 	map<string, double> sorted_obj_map, sorted_viol_map;
 	string cma_update_summary;
-
+	CovMetrics metrics_init;
 	CovMetrics compute_cov_metrics() const;
-	string report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter) const;
+	string report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter);
+	
 	
 
 protected:

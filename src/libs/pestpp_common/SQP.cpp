@@ -1822,8 +1822,7 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			message(1, "updating CMA-ES with approximate gradient");
 			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
-			message(1, cmaes.get_cma_update_summary());
-
+		
 			ss.str("");
 			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
 			frec << ss.str();
@@ -1868,7 +1867,7 @@ void SeqQuadProgram::iterate_2_solution()
 bool SeqQuadProgram::should_terminate()
 {
     stringstream ss;
-
+	
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
     int nphinored = MAX_CONSEC_PHIINC;
@@ -1912,7 +1911,7 @@ bool SeqQuadProgram::should_terminate()
     }
     ss << endl;
     message(0, ss.str());
-
+	
     message(0, "phi-based termination criteria check");
     message(1, "phiredstp: ", phiredstp);
     message(1, "nphistp: ", nphistp);
@@ -1944,6 +1943,18 @@ bool SeqQuadProgram::should_terminate()
         message(1, "phi-based termination criteria satisfied, all done");
         return true;
     }
+
+	if (use_cmaes)
+	{
+		message(0, "cov-based termination criteria check");
+		message(1, cmaes.get_cma_update_summary());
+		if (cmaes.should_terminate())
+		{
+			message(1, "covariance has shrunk significantly, all done");
+			return true;
+		}
+	}
+
 	if (converged)
 	{
 		message(1, "optimal solution detected at solve EQP step (lagrangian multiplier for all ineq constraints in working set is non-neg)");
@@ -3619,7 +3630,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 			cma_reset_archive = false;
 			//FilterRec knee_par = filter.get_knee();
 			ss.str("");
-			ss << "line search failed. Centering new ensemble at best member (knee pt) in the filter: " << endl;
+			ss << "line search failed. Centering new ensemble at least violating member of current ensemble" << endl;
 				
 			/*current_ctl_dv_values = knee_par.dp_val;
 			last_best = knee_par.obj_val;
@@ -5220,6 +5231,9 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 	}
 
 	CovMetrics metrics_prior = compute_cov_metrics();
+	if (iter == 1)
+		metrics_init = metrics_prior;
+	
 
 	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names) / sigma;
 	
@@ -5240,11 +5254,11 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 	D = eigensolver.eigenvalues();
 
 	for (int i = 0; i < D.size(); i++) {
-		D(i) = max(D(i), 1e-12);
+		D(i) = max(D(i), D.maxCoeff() * 1e-14);
 	}
 
 	CovMetrics metrics_post = compute_cov_metrics();
-	cma_update_summary = report_cov_shrinkage(metrics_prior, metrics_post, iter);
+	cma_update_summary = report_cov_shrinkage(metrics_prior, metrics_post, iter); 
 }
 
 void CovMatAdapES::reinflate_C(double reinflation_factor)
@@ -5366,49 +5380,77 @@ CovMatAdapES::CovMetrics CovMatAdapES::compute_cov_metrics() const
 	return metrics;
 }
 
-string CovMatAdapES::report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter) const
+string CovMatAdapES::report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter)
 {
 
-	double trace_ratio = post.trace / (prior.trace + 1E-10);
-	double det_ratio = post.determinant / (prior.determinant + 1E-10);
-	double frobenius_ratio = post.frobenius_norm / (prior.frobenius_norm + 1E-10);
-	double max_eigenval_ratio = post.max_eigenvalue / (prior.max_eigenvalue + 1E-10);
+	trace_ratio = post.trace / (prior.trace + 1E-10);
+	det_ratio = post.determinant / (prior.determinant + 1E-10);
+	frobenius_ratio = post.frobenius_norm / (prior.frobenius_norm + 1E-10);
+	max_eigenval_ratio = post.max_eigenvalue / (prior.max_eigenvalue + 1E-10);
+
+	int criteria_sat = 0;
+	double tol = 0.05;
+	trace_ratio_0 = post.trace / (metrics_init.trace + 1E-10);
+	if (trace_ratio_0 < tol)
+		criteria_sat++;
+	det_ratio_0 = post.determinant / (metrics_init.determinant + 1E-10);
+	if (det_ratio_0 < tol)
+		criteria_sat++;
+	frobenius_ratio_0 = post.frobenius_norm / (metrics_init.frobenius_norm + 1E-10);
+	if (frobenius_ratio_0 < tol)
+		criteria_sat++;
+	max_eigenval_ratio_0 = post.max_eigenvalue / (metrics_init.max_eigenvalue + 1E-10);
+	if (max_eigenval_ratio_0 < tol)
+		criteria_sat++;
 
 	stringstream ss;
 	ss << endl;
-	ss << "Covariance Update Summary:" << endl;
 	ss << std::left; 
 	ss << std::setw(20) << " " 
 		<< std::setw(14) << "Prior"
 		<< std::setw(14) << "Post"
-		<< std::setw(10) << "Ratio" << endl;
+		<< std::setw(10) << "Po/Pr"
+		<< std::setw(10) << "Po/Pr_0" << endl;
 
 	ss << std::scientific << std::setprecision(4);
 	ss << "  Trace           " << std::setw(12) << prior.trace
 		<< "  " << std::setw(12) << post.trace
-		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << trace_ratio << endl;
+		<< "  " << std::fixed << std::setprecision(6) 
+		<< std::setw(12) << trace_ratio << std::setw(10) << trace_ratio_0 << endl;
 
 	ss << std::scientific << std::setprecision(4);
 	ss << "  Determinant     " << std::setw(12) << prior.determinant
 		<< "  " << std::setw(12) << post.determinant
-		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << det_ratio << endl;
+		<< "  " << std::fixed << std::setprecision(6) 
+		<< std::setw(12) << det_ratio << std::setw(10) << det_ratio_0 << endl;
 
 	ss << std::scientific << std::setprecision(4);
 	ss << "  Frobenius Norm  " << std::setw(12) << prior.frobenius_norm
 		<< "  " << std::setw(12) << post.frobenius_norm
-		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << frobenius_ratio << endl;
+		<< "  " << std::fixed << std::setprecision(6) 
+		<< std::setw(12) << frobenius_ratio << std::setw(10) << frobenius_ratio_0 << endl;
 
 	ss << std::scientific << std::setprecision(4);
 	ss << "  Max Eigenvalue  " << std::setw(12) << prior.max_eigenvalue
 		<< "  " << std::setw(12) << post.max_eigenvalue
-		<< "  " << std::fixed << std::setprecision(6) << std::setw(10) << max_eigenval_ratio << endl;
+		<< "  " << std::fixed << std::setprecision(6) 
+		<< std::setw(12) << max_eigenval_ratio << std::setw(10) << max_eigenval_ratio_0 << endl;
 
 	ss << std::scientific << std::setprecision(4);
 	ss << "  Condition No.   " << std::setw(12) << prior.condition_number
 		<< "  " << std::setw(12) << post.condition_number
-		<< "  " << std::setw(10) << " " << endl;
-
+		<< "  " << std::setw(12) << " " << std::setw(10) << " " << endl;
+	ss << "  number of cov-based criteria satisfied: " << criteria_sat << endl;
 	return ss.str();
+
+}
+
+bool CovMatAdapES::should_terminate()
+{
+	if (trace_ratio_0 < 0.05 && det_ratio_0 < 0.05 && frobenius_ratio_0 < 0.05 && max_eigenval_ratio_0 < 0.05)
+		return true;
+	else
+		return false;
 
 }
 
