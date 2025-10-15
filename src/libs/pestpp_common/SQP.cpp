@@ -153,23 +153,38 @@ FilterRec SqpFilter::get_knee()
 	multiset<FilterRec>::iterator it = obj_viol_pairs.begin();
 	FilterRec k;
 	double min_obj = numeric_limits<double>::max(), min_viol = numeric_limits<double>::max();
-	for (int i = 0;i < obj_viol_pairs.size();i++)
+	double max_obj = numeric_limits<double>::lowest(), max_viol = numeric_limits<double>::lowest();
+	for (int i = 0; i < obj_viol_pairs.size(); i++)
 	{
 		if (it->obj_val < min_obj)
 			min_obj = it->obj_val;
+		if (it->obj_val > max_obj)
+			max_obj = it->obj_val;
 		if (it->viol_val < min_viol)
 			min_viol = it->viol_val;
+		if (it->viol_val > max_viol)
+			max_viol = it->viol_val;
 		it++;
-
 	}
+
+	double range_obj = max_obj - min_obj;
+	double range_viol = max_viol - min_viol;
+
+	if (range_obj == 0.0) 
+		range_obj = 1.0;
+	if (range_viol == 0.0) 
+		range_viol = 1.0;
 
 	it = obj_viol_pairs.begin();
 	int opt_idx = -1;
 	double dist, opt_dist = numeric_limits<double>::max();
 
-	for (int i = 0;i < obj_viol_pairs.size();i++)
+	for (int i = 0; i < obj_viol_pairs.size(); i++)
 	{
-		dist = pow((it->obj_val - min_obj), 2) + pow((it->viol_val - min_viol), 2);
+		double norm_obj = (it->obj_val - min_obj) / range_obj;
+		double norm_viol = (it->viol_val - min_viol) / range_viol;
+		dist = pow(norm_obj, 2) + pow(norm_viol, 2);
+
 		if (dist < opt_dist)
 		{
 			opt_idx = i;
@@ -1888,7 +1903,7 @@ bool SeqQuadProgram::should_terminate()
     }
     if (best_idx_yet == -1)
     {
-        throw_sqp_error("something is wrong in shouuld_terminate()");
+        throw_sqp_error("something is wrong in should_terminate()");
     }
     nphired = best_phis.size() - best_idx_yet;
 
@@ -1951,7 +1966,7 @@ bool SeqQuadProgram::should_terminate()
 		if (cmaes.should_terminate())
 		{
 			message(1, "covariance has shrunk significantly, all done");
-			return true;
+			//return true;
 		}
 	}
 
@@ -3628,11 +3643,12 @@ bool SeqQuadProgram::solve_new_ensemble()
 		{
 			BASE_SCALE_FACTOR *= SF_INC_FAC;
 			cma_reset_archive = false;
-			//FilterRec knee_par = filter.get_knee();
+			FilterRec knee_par = filter.get_knee();
 			ss.str("");
-			ss << "line search failed. Centering new ensemble at least violating member of current ensemble" << endl;
+			//ss << "line search failed. Centering new ensemble at least violating member of current ensemble" << endl;
+			ss << "line search failed. Centering new ensemble at filter knee" << endl;
 				
-			/*current_ctl_dv_values = knee_par.dp_val;
+			current_ctl_dv_values = knee_par.dp_val;
 			last_best = knee_par.obj_val;
 			last_viol = knee_par.viol_val;
 
@@ -3644,7 +3660,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 			best_violations.push_back(last_viol);
 			
 			if (last_viol > 0.0)
-				is_base_infeas = true;*/
+				is_base_infeas = true;
 
 			ss << "   with phi and total violation: " << last_best << ", " << last_viol << endl;
 			message(1, ss.str());
@@ -4021,33 +4037,41 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 					oviol = infeas_vec[iidx];
 					nviol = nviol_vec[iidx];
 				}
-			}
-			if (infeas_vec[iidx] > 1E-6)
-			{
-				if (nviol_vec[iidx] < lviol)
+				else
 				{
-					jdx = iidx;
-					lviol = nviol_vec[iidx];
+					if (nviol_vec[iidx] < lviol)
+					{
+						jdx = iidx;
+						lviol = nviol_vec[iidx];
+					}
 				}
 			}
+			//if (infeas_vec[iidx] > 1E-6)
+			//{
+			//	if (nviol_vec[iidx] < lviol)
+			//	{
+			//		jdx = iidx;
+			//		lviol = nviol_vec[iidx];
+			//	}
+			//}
 		}
 	}
-	else
-	{
-		lviol = numeric_limits<double>::max();
-		for (int i = 0; i < obj_vec.size(); i++)
-		{
-			if (nviol_vec[i] > 1E-6)
-			{
-				if (nviol_vec[i] < lviol)
-				{
-					jdx = i;
-					lviol = nviol_vec[i];
-				}
-			}
-		}
-		
-	}
+	//else
+	//{
+	//	lviol = numeric_limits<double>::max();
+	//	for (int i = 0; i < obj_vec.size(); i++)
+	//	{
+	//		if (nviol_vec[i] > 1E-6)
+	//		{
+	//			if (nviol_vec[i] < lviol)
+	//			{
+	//				jdx = i;
+	//				lviol = nviol_vec[i];
+	//			}
+	//		}
+	//	}
+	//	
+	//}
 
 	if (idx != -1)
 	{
@@ -4093,10 +4117,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	{
 		ss.str("");
 		ss << "no feasible realization passed the filter. " << endl;
-		ss << "   provisionally accepting least violating realization: " << real_names[jdx] << endl;
-		ss << "   with phi and total violation: " << obj_vec[jdx] << ", " << lviol << endl;
-		ss << "   continuing search..." << endl;
-		message(1, ss.str());
+		
 
 		vector<string> vnames = dv_candidates.get_var_names();
 
@@ -4108,6 +4129,10 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 		if (lviol < base_ens_viol)
 		{
+			ss << "   provisionally accepting least violating realization: " << real_names[jdx] << endl;
+			ss << "   with phi and total violation: " << obj_vec[jdx] << ", " << lviol << endl;
+			ss << "   continuing search..." << endl;
+			
 			base_ens_viol = lviol;
 			last_viol = lviol;
 			last_best = obj_vec[jdx];
@@ -4122,6 +4147,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 			current_ctl_dv_values = infeas_cand_dv_values;
 			current_obs = infeas_cand_obs;
 		}
+		message(1, ss.str());
 		filter.update(obj_vec[jdx], nviol_vec[jdx], p, iter);
 
 		if (report)
@@ -4139,9 +4165,11 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	}
 	else
 	{
+		best_phis.push_back(last_best);
+		best_violations.push_back(last_viol);
 		ss.str("");
 		ss << "no feasible and better realization passed the filter. " << endl;
-		ss << "   resampling from the current BASE" << endl;
+		ss << "   keeping the current BASE" << endl;
 		message(1, ss.str());
 
 		return false;
@@ -5258,6 +5286,12 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 	}
 
 	CovMetrics metrics_post = compute_cov_metrics();
+	if (metrics_post.determinant < 1E-5)
+	{
+		reinflate_C(metrics_post.determinant * 1E+6);
+		cout << "WARNING: ensemble is shrinking too much. Reinflating cov matrix..." << endl;
+		metrics_post = compute_cov_metrics();
+	}
 	cma_update_summary = report_cov_shrinkage(metrics_prior, metrics_post, iter); 
 }
 
