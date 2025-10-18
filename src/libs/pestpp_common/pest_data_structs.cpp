@@ -2180,7 +2180,7 @@ void PestppOptions::set_defaults()
 	set_sqp_update_hessian(true);
 	set_sqp_hessian_update_method("BFGS");
 	set_sqp_solve_partial_step(true);
-	set_sqp_alpha_mults(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 0.75, 1.0,3.0, 5.0});
+	set_sqp_alpha_mults(vector<double>{-1.0, 0.1, 1.0, 2.0});
 	set_sqp_filter_tol(0.001);
 	set_sqp_working_set_tol(0.10);
 	set_sqp_cma_c1(-1);
