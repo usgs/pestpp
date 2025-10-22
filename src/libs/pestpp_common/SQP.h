@@ -38,15 +38,6 @@ struct FilterRec
     }
 };
 
-//template<>
-//struct std::less<FilterRec> {
-//    bool operator()(const FilterRec &k1, const FilterRec &k2) const {
-//        if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
-//            return true;
-//        return false;
-//    }
-//};
-
 class SqpFilter
 {
 public:
@@ -55,7 +46,7 @@ public:
 	}
 	bool accept(double obj_val, double violation_val, Parameters p, Observations o, string rname, int iter=0, bool keep=false);
 	bool update(double obj_val, double violation_val, Parameters p, Observations o, string rname, int iter=0);
-	
+
 	FilterRec get_knee() { return knee; }
     void report(ofstream& frec,int iter);
     double get_viol_tol() {return viol_tol;}
@@ -264,6 +255,7 @@ private:
 	bool use_ensemble_grad;
 	bool is_blocking_constraint = false;
 	bool is_base_infeas = false;
+	bool seek_ies = false;
 
 	Jacobian_1to1 jco;
 	Covariance hessian;
@@ -326,7 +318,9 @@ private:
 
 	void make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs);
 
-	void report_and_save_ensemble();
+	ObservationEnsemble combine_obs_and_pi(ObservationEnsemble& _oe, ParameterEnsemble& _pe);
+	Ensemble get_pi_ensemble(ParameterEnsemble& _dv, vector<string>& pinames);
+
 	void report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	void save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base=true);
 	void save_mat(string prefix, Eigen::MatrixXd &mat);

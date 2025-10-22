@@ -1013,6 +1013,7 @@ void SeqQuadProgram::initialize()
     best_violations.push_back(last_viol);
 
     double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
+	filter = SqpFilter((obj_sense == "minimize") ? true : false);
 	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
 	filter.update(last_best, v, current_ctl_dv_values, current_obs, "BASE", 0);
 
@@ -1201,10 +1202,16 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		{
 			message(1, "generating new dv ensemble at current best phi via CMA-ES");
 
-			if (is_base_infeas)
+			if (is_base_infeas && !seek_ies)
 			{
 				message(1, "BASE is infeasible, reinflating CMA-ES covariance");
 				cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor());
+			}
+			if (seek_ies)
+			{
+				message(1, "BASE obtained from IES, reinflating CMA-ES covariance");
+				cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor());
+				seek_ies = false;
 			}
 
 			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
@@ -1442,24 +1449,24 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 
+	vector<string> pinames = pest_scenario.get_ctl_ordered_pi_names();
+	ObservationEnsemble combined_oe = combine_obs_and_pi(oe, dv);
+
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.obs.jcb";
-		oe.to_binary(ss.str());
+		combined_oe.to_binary(ss.str());
 	}
 	else
 	{
 		ss << file_manager.get_base_filename() << ".0.obs.csv";
-		oe.to_csv(ss.str());
+		combined_oe.to_csv(ss.str());
 	}
 	message(1, "saved initial obs ensemble to", ss.str());
 
-	//save the 0th iter par and rei and well as the untagged par and rei
 	save_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
 	save_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
-
-
 
 	pcs = ParChangeSummarizer(&dv_base, &file_manager, &output_file_writer);
 
@@ -1877,9 +1884,18 @@ void SeqQuadProgram::iterate_2_solution()
 		else
 		{
 			n_consec_infeas++;
+			if (n_consec_infeas > MAX_CONSEC_INFEAS_IES)
+			{
+				seek_ies = true;
+				ss.str("");
+				ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
+				message(0, ss.str());
+				seek_feasible();
+				n_consec_infeas = 0;
+			}
 		}
         
-		if (use_cmaes)
+		if (use_cmaes && !seek_ies)
 		{
 			message(1, "updating CMA-ES with approximate gradient");
 			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
@@ -1887,12 +1903,12 @@ void SeqQuadProgram::iterate_2_solution()
 			ss.str("");
 			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
 			frec << ss.str();
-
 		}
+
 		make_gradient_runs(current_ctl_dv_values, current_obs);
 
 		if (use_ensemble_grad)
-			report_and_save_ensemble();
+			report_and_save_ensemble(dv, oe);
 		else
 			save_current_dv_obs();
 
@@ -1910,15 +1926,6 @@ void SeqQuadProgram::iterate_2_solution()
 
 		if (should_terminate())
 			break;
-
-		if (n_consec_infeas > MAX_CONSEC_INFEAS_IES)
-        {
-		    ss.str("");
-		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
-		    message(0,ss.str());
-		    seek_feasible();
-		    n_consec_infeas = 0;
-        }
 
 		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian())
 			update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
@@ -1947,11 +1954,9 @@ bool SeqQuadProgram::should_terminate()
             best_idx_yet = i;
         }
     }
-    if (best_idx_yet == -1)
-    {
-        throw_sqp_error("something is wrong in should_terminate()");
-    }
-    nphired = best_phis.size() - best_idx_yet;
+
+	if (best_idx_yet != -1)
+		nphired = best_phis.size() - best_idx_yet;
 
     ss.str("");
     ss << "best phi, total violation progress" << endl;
@@ -3167,9 +3172,10 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 	}
 	message(0, "running candidate dv/pars");
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates);
+	ObservationEnsemble combined_oe_candidates = combine_obs_and_pi(oe_candidates, dv_candidates);
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
-	oe_candidates.to_csv(ss.str());
+	combined_oe_candidates.to_csv(ss.str());
 	message(1, "saved candidate ensemble obs to: ", ss.str());
 
 	ParameterEnsemble dv_all = dv;
@@ -3202,6 +3208,71 @@ bool SeqQuadProgram::check_wolfe_conditions(Parameters& trial_dv_values, Observa
 		return false;
 
 	return true;
+}
+
+
+Ensemble SeqQuadProgram::get_pi_ensemble(ParameterEnsemble& _dv, vector<string>& pinames)
+{
+	vector<string> parnames = _dv.get_var_names();
+	vector<string> realnames = _dv.get_real_names();
+	PriorInformation pi_info = pest_scenario.get_prior_info();
+	
+	Ensemble pioe(&pest_scenario);
+	pioe.reserve(realnames, pinames);
+	Eigen::MatrixXd piX(realnames.size(), pinames.size());
+
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+
+	int i = 0;
+	for (auto& real : realnames)
+	{
+		Eigen::VectorXd parvals = _dv.get_real_vector(real);
+		pars.update_without_clear(parnames, parvals);
+
+		if (_dv.get_trans_status() == ParameterEnsemble::transStatus::NUM)
+			pts.numeric2ctl_ip(pars);
+
+		int j = 0;
+		for (auto& piname : pinames)
+		{
+			PriorInformationRec pi_rec = pi_info.get_pi_rec(piname);
+			pair<double, double> pi_sim_resid = pi_rec.calc_sim_and_resid(pars);
+			piX(i, j) = pi_sim_resid.first; 
+			j++;
+		}
+		i++;
+	}
+
+	pioe.from_eigen_mat(piX, realnames, pinames);
+	return pioe;
+}
+
+
+ObservationEnsemble SeqQuadProgram::combine_obs_and_pi(ObservationEnsemble& _oe, ParameterEnsemble& _pe)
+{
+	vector<string> pinames = pest_scenario.get_ctl_ordered_pi_names();
+	ObservationEnsemble combined_oe = _oe;
+
+	if (pinames.size() > 0)
+	{
+		Ensemble pi_oe = get_pi_ensemble(_pe, pinames);
+
+		Eigen::MatrixXd obs_mat = _oe.get_eigen();
+		Eigen::MatrixXd pi_mat = pi_oe.get_eigen();
+
+		Eigen::MatrixXd combined_mat(obs_mat.rows(), obs_mat.cols() + pi_mat.cols());
+		combined_mat << obs_mat, pi_mat;
+
+		vector<string> combined_var_names = _oe.get_var_names();
+		vector<string> pi_var_names = pi_oe.get_var_names();
+		combined_var_names.insert(combined_var_names.end(), pi_var_names.begin(), pi_var_names.end());
+
+		combined_oe = ObservationEnsemble(&pest_scenario, &rand_gen);
+		combined_oe.from_eigen_mat(combined_mat, _oe.get_real_names(), combined_var_names);
+	}
+
+	return combined_oe;
 }
 
 double SeqQuadProgram::get_reference_obj()
@@ -3783,7 +3854,7 @@ bool SeqQuadProgram::seek_feasible()
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_restart_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_restart_csv("");
-    ies_pest_scenario.get_control_info_4_mod().noptmax = 3; //TODO: make this an option some how?
+    ies_pest_scenario.get_control_info_4_mod().noptmax = 3;
     ss.str("");
     string org_base = file_manager.get_base_filename();
     ss << "feas_ies_" << iter << "_" << org_base;
@@ -3800,11 +3871,9 @@ bool SeqQuadProgram::seek_feasible()
         ies.initialize();
     }
 
-
-
 	ies.iterate_2_solution();
     file_manager.set_base_filename(org_base);
-	//what to do here? maybe we need to eval the kkt conditions to pick a new point that maintains the hessian?
+	
 	ParameterEnsemble* ies_pe_ptr = ies.get_pe_ptr();
 	ObservationEnsemble* ies_oe_ptr = ies.get_oe_ptr();
 	vector<string> oreal_names = ies_oe_ptr->get_real_names();
@@ -3818,11 +3887,6 @@ bool SeqQuadProgram::seek_feasible()
 	int mndiff_idx = -1;
 	for (int i = 0; i < ies_pe_ptr->shape().first; i++)
 	{
-	    //cout << "real:" << oreal_names[i] << ", phi: " << aphi_map[oreal_names[i]] << endl;
-		//Eigen::VectorXd real = ies_pe_ptr->get_eigen_ptr()->row(i);
-		//Eigen::VectorXd d = real - cdv;
-		//double diff = (d.array() * d.array()).sum();
-		//if (diff < mndiff)
 		if (aphi_map[oreal_names[i]] < mndiff)
 		{
 			mndiff = aphi_map[oreal_names[i]];
@@ -3835,17 +3899,31 @@ bool SeqQuadProgram::seek_feasible()
 	message(1,ss.str());
 	cdv = ies_pe_ptr->get_real_vector(mndiff_idx);
 	current_ctl_dv_values.update_without_clear(names, cdv);
-	//update current obs
+
 	cdv = ies.get_oe().get_real_vector(mndiff_idx);
 	names = ies.get_oe().get_var_names();
 	current_obs.update(names, cdv);
 	constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true, "post feasible seek");
-	//todo: probably more algorithmic things here...
+
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	best_phis[best_phis.size()-1] = last_best;
 	best_violations[best_violations.size() -1] = last_viol;
 	message(1, "finished seeking feasible, reset best phi,infeasible value to ", vector<double>{last_best,last_viol});
+
+	message(1, "updating cmaes archives with IES results for seeking feasibility");
+	map<string, double> obj_map = get_obj_map(*ies_pe_ptr, *ies_oe_ptr);
+	map<string, double> total_viol_map;
+	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(*ies_pe_ptr, *ies_oe_ptr, 0.0, true);
+	for (auto& real_name : oreal_names)
+	{
+		double infeas_sum_nom = 0.0;
+		for (auto& v : violations_nominal[real_name])
+			infeas_sum_nom += v.second;
+		total_viol_map[real_name] = infeas_sum_nom;
+	}
+	cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, -iter, false);
+
 	return false;
 }
 
@@ -3908,11 +3986,10 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 		double v;
 		for (int i = 0; i < _dv.shape().first; i++)
 		{
-			//pts.ctl2numeric_ip(pars);
 			real = _dv.get_real_vector(i);
 			pars.update_without_clear(vnames, real);
 			pts.numeric2ctl_ip(pars);
-			v = get_obj_value(pars, current_obs); //shouldn't be using current obs since this is dv-based obj
+			v = get_obj_value(pars, current_obs);
 			obj_vec[i] = v;
 			pts.ctl2numeric_ip(pars);
 		}
@@ -3925,37 +4002,24 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
-	double oext, oviol = 0.0, nviol = 0.0, lviol = numeric_limits<double>::max();
+	double oext, oviol = 0.0, nviol = 0.0;
 	
 	double viol_pad;
 	if (best_violations.size() == 0)
 		viol_pad = working_set_tol;
 	else
 	{
-		for (auto v : best_violations)
-		{
-			if (v < lviol)
-			{
-				viol_pad = v;
-				lviol = v;
-			}
-		}
+		double lviol = *min_element(best_violations.begin(), best_violations.end());
+		viol_pad = min(lviol, working_set_tol);
 	}
-	viol_pad = min(viol_pad, working_set_tol);
-	lviol = numeric_limits<double>::max();
 
-	if (obj_sense == "minimize")
-		oext = numeric_limits<double>::max();
-	else
-		oext = numeric_limits<double>::min();
-	int idx = -1, jdx = -1;
 	vector<string> real_names = dv_candidates.get_real_names();
 	map<string, double> total_viol_map;
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	
 	map<string, Parameters> par_map;
 	map<string, Observations> obs_map;
-	for (auto d : real_names)
+	for (auto& d : real_names)
 	{
 		Parameters p = current_ctl_dv_values;
 		Eigen::VectorXd t = dv_candidates.get_real_vector(d);
@@ -3971,16 +4035,12 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
 	map<string, map<string, double>> feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
-	Parameters cand_dv_values = current_ctl_dv_values;
-	Observations cand_obs_values = current_obs;
-	Eigen::VectorXd t;
+
 	vector<string> onames = _oe.get_var_names();
 	vector<string> vnames = dv_candidates.get_var_names();
-	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-	bool filter_accept;
+
 	vector<double> infeas_vec, nviol_vec, feas_dist_map;
 	vector<int> accept_idxs;
-	bool accept = false;
 
 	message(0, "current best phi:", last_best);
 	ss.str("");
@@ -4010,7 +4070,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 		for (auto& f : feasible_distance[real_names[i]])
 			feas_dist -= f.second;
 		feas_dist_map.push_back(feas_dist);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum_nom, par_map[real_names[i]], obs_map[real_names[i]], real_names[i], iter,true);
+		bool filter_accept = filter.accept(obj_vec[i], infeas_sum_nom, par_map[real_names[i]], obs_map[real_names[i]], real_names[i], iter,true);
 		string accept_reject = filter_accept ? "accept" : "reject";
 
 		ss	<< setw(20) << infeas_sum
@@ -4019,20 +4079,6 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 		if (filter_accept)
 			accept_idxs.push_back(i);
-
-		if (obj_vec[i] < oext)
-		{
-			idx = i;
-			oext = obj_vec[idx];
-			oviol = infeas_vec[idx];
-		}
-
-		t = dv_candidates.get_real_vector(real_names[i]);
-		cand_dv_values = current_ctl_dv_values;
-		cand_dv_values.update_without_clear(dv_names, t);
-		pts.numeric2ctl_ip(cand_dv_values);
-		t = _oe.get_real_vector(real_names[i]);
-		cand_obs_values.update_without_clear(onames, t);
 
 	}
 	ss << string(80, '-') << endl;
@@ -4062,7 +4108,7 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 	Parameters p;
 	Observations o;
 
-	t = knee_par.dp_val.get_data_eigen_vec(vnames);
+	Eigen::VectorXd t = knee_par.dp_val.get_data_eigen_vec(vnames);
 	p.update_without_clear(vnames, t);
 
 	t = knee_par.oe_val.get_data_eigen_vec(onames);
@@ -4533,12 +4579,6 @@ bool SeqQuadProgram::pick_partial_step(ParameterEnsemble& dv_candidates, Observa
 	}
 }
 
-void SeqQuadProgram::report_and_save_ensemble()
-{
-	if (use_ensemble_grad)
-		report_and_save_ensemble(dv, oe);
-
-}
 void SeqQuadProgram::report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
 	ofstream& frec = file_manager.rec_ofstream();
@@ -4593,149 +4633,6 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 
 }
 
-
-//void SeqQuadProgram::set_subset_idx(int size)
-//{
-//	//map<int,int> subset_idx_map;
-//	subset_idxs.clear();
-//	int nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();
-//	if ((!use_subset) || (nreal_subset >= size))
-//	{
-//		for (int i = 0; i < size; i++)
-//			subset_idxs.push_back(i);
-//		return;
-//	}
-//	vector<string> pe_names = dv.get_real_names();
-//
-//	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), base_name);
-//	if (bidx != pe_names.end())
-//	{
-//
-//		subset_idxs.push_back(bidx - pe_names.begin());
-//	}
-//	//int size = dv.shape().first;
-//	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
-//	if (how == "FIRST")
-//	{
-//		for (int i = 0; i < size; i++)
-//		{
-//			if (subset_idxs.size() >= nreal_subset)
-//				break;
-//			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-//				continue;
-//
-//			subset_idxs.push_back(i);
-//
-//		}
-//
-//	}
-//	else if (how == "LAST")
-//	{
-//
-//		for (int i = size-1; i >= 0; i--)
-//		{
-//			if (subset_idxs.size() >= nreal_subset)
-//				break;
-//			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-//				continue;
-//
-//			subset_idxs.push_back(i);
-//
-//		}
-//
-//	}
-//
-//	else if (how == "RANDOM")
-//	{
-//		std::uniform_int_distribution<int> uni(0, size-1);
-//		int idx;
-//		for (int i = 0; i < 10000000; i++)
-//		{
-//			if (subset_idxs.size() >= nreal_subset)
-//				break;
-//			idx = uni(subset_rand_gen);
-//			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
-//				continue;
-//			subset_idxs.push_back(idx);
-//		}
-//		if (subset_idxs.size() != nreal_subset)
-//			throw_sqp_error("max iterations exceeded when trying to find random subset idxs");
-//
-//	}
-//	else if (how == "PHI_BASED")
-//	{
-//		//sidx needs to be index of realization, not realization number
-//		vector<pair<double, int>> phis;
-//		//vector<int> sidx;
-//		int step;
-//		int idx;
-//		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-//		map<string, double> phi_map = ph.get_phi_map(pt);
-//		map<string, double>::iterator pi = phi_map.begin(), end = phi_map.end();
-//
-//		int i = 0;
-//		for (; pi != end; ++pi)
-//		{
-//			phis.push_back(make_pair(pi->second, i)); //phival,idx?
-//			++i;
-//		}
-//		sort(phis.begin(), phis.end());
-//
-//		//include idx for lowest and highest phi reals
-//		if (subset_idxs.size() < nreal_subset)
-//		{
-//			for (auto phi : phis)
-//			{
-//				if (find(subset_idxs.begin(), subset_idxs.end(), phi.second) == subset_idxs.end())
-//				{
-//					subset_idxs.push_back(phi.second);
-//					break;
-//				}
-//			}
-//		}
-//		if (subset_idxs.size() < nreal_subset)
-//		{
-//			for (int i = phis.size() - 1; i >= 0; i--)
-//			{
-//				if (find(subset_idxs.begin(), subset_idxs.end(), phis[i].second) == subset_idxs.end())
-//				{
-//					subset_idxs.push_back(phis[i].second);
-//					break;
-//				}
-//			}
-//		}
-//
-//
-//		step = (phis.size()-1) / nreal_subset;
-//		//cout << step << endl;
-//		//cout << (phis.size() - 1) << endl;
-//		for (i = 1; i < nreal_subset; ++i)
-//		{
-//			//add higher phis first
-//			idx = phis.size() - (i * step);
-//			if ((subset_idxs.size() < nreal_subset) && (find(subset_idxs.begin(), subset_idxs.end(), phis[idx].second) == subset_idxs.end()))
-//			{
-//				subset_idxs.push_back(phis[idx].second);
-//				//cout << i << endl;
-//				//cout << idx << endl;
-//				//cout << phis[idx].first << endl;
-//				//cout << phis[idx].second << endl;
-//			}
-//		}
-//	}
-//	else
-//	{
-//		//throw runtime_error("unknown 'subset_how'");
-//		throw_sqp_error("unknown 'subset_how'");
-//	}
-//	stringstream ss;
-//	for (auto i : subset_idxs)
-//		ss << i << ":" << pe_names[i] << ", ";
-//	message(1,"subset idx:dv real name: ",ss.str());
-//	return;
-//	//return subset_idx_map;
-//}
-
 ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates)
 {
 	run_mgr_ptr->reinitialize();
@@ -4745,10 +4642,7 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
 	
-	//set_subset_idx(dv_candidates[0].shape().first);
 	map<int, int> real_run_ids;
-	//ParameterEnsemble pe_lam;
-	//for (int i=0;i<pe_lams.size();i++)
 	try
 	{
 		real_run_ids = dv_candidates.add_runs(run_mgr_ptr);
