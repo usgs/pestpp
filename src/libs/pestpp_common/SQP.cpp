@@ -782,7 +782,7 @@ void SeqQuadProgram::initialize_parcov()
 		return;
 	string how = parcov.try_from(pest_scenario, file_manager);
 	message(1, "parcov loaded ", how);
-	parcov = parcov.get(act_par_names);
+	parcov = parcov.get(dv_names);
 }
 
 void SeqQuadProgram::initialize()
@@ -1734,13 +1734,45 @@ bool SeqQuadProgram::update_hessian(string how)
 		for (const auto& name : all_constraint_names)
 			constraint_to_row[name] = row_idx++;
 
-		if (!curr_cnames.empty()) {
+		if (!curr_cnames.empty()) 
+		{
 			Eigen::MatrixXd current_jco = current_constraint_mat.e_ptr()->toDense();
-			for (int i = 0; i < curr_cnames.size(); i++) {
+
+			if (current_jco.cols() != dv_names.size())
+			{
+				vector<string> jco_var_names = current_constraint_mat.get_col_names();
+				vector<int> dv_idxs;
+				for (int j = 0; j < dv_names.size(); j++)
+				{
+					auto it = find(jco_var_names.begin(), jco_var_names.end(), dv_names[j]);
+					if (it != jco_var_names.end())
+					{
+						dv_idxs.push_back(distance(jco_var_names.begin(), it));
+					}
+					else
+					{
+						throw_sqp_error("DV '" + dv_names[j] + "' not found in constraint jacobian");
+					}
+				}
+
+				Eigen::MatrixXd dv_jco(current_jco.rows(), dv_names.size());
+				for (int i = 0; i < current_jco.rows(); i++)
+				{
+					for (int j = 0; j < dv_idxs.size(); j++)
+					{
+						dv_jco(i, j) = current_jco(i, dv_idxs[j]);
+					}
+				}
+				current_jco = dv_jco;
+			}
+
+			for (int i = 0; i < curr_cnames.size(); i++) 
+			{
 				int row = constraint_to_row[curr_cnames[i]];
 				curr_full_jco.row(row) = current_jco.row(i);
 
-				if (constraint_sense[curr_cnames[i]] == "less_than") {
+				if (constraint_sense[curr_cnames[i]] == "less_than") 
+				{
 					curr_full_jco.row(row) *= -1;
 				}
 			}
@@ -3027,7 +3059,7 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 			const auto& names = dvs_subset->get_real_names();
 			if (std::find(names.begin(), names.end(), "BASE") == names.end())
 			{
-				d.reserve(vector<string>{ "BASE" }, pest_scenario.get_ctl_ordered_par_names());
+				d.reserve(vector<string>{ "BASE" }, dv_names);
 				d.add_2_row_ip("BASE", dv.get_real_vector("BASE"));
 				dvs_subset->append_other_rows(d);
 			}
@@ -3545,7 +3577,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 		string par_name = _dvs.get_real_names()[idx];
 
 		ParameterEnsemble t;
-		t.reserve(vector<string>{ par_name }, pest_scenario.get_ctl_ordered_par_names());
+		t.reserve(vector<string>{ par_name }, dv_names);
 		t.add_2_row_ip(par_name, _dvs.get_real_vector(par_name));
 
 		if (_drawn_dvs.shape().first == 0) 
@@ -5092,12 +5124,12 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 
 void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter) 
 {
-	m = curr_m.get_data_eigen_vec(curr_m.get_keys());
-	vector<string> par_names = feas_dp_archive.get_var_names();
 	ParameterEnsemble U = feas_dp_archive;
+	vector<string> par_names = U.get_var_names();
+	m = curr_m.get_data_eigen_vec(par_names);
 	vector<string> mu_best_real_names;
 	int i;
-	
+
 	if (U.shape().first != 0)
 	{
 		i = 0;
@@ -5147,11 +5179,12 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 		metrics_init = metrics_prior;
 	
 
-	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), par_names) / sigma;
+	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), vector<string>()) / sigma;
 	
 	Eigen::MatrixXd rank_mu_update = Eigen::MatrixXd::Zero(C.rows(), C.cols());
-	for (int i = 0; i < mu; i++) {
-		Eigen::VectorXd y_i = U_anoms.row(i);
+	for (int i = 0; i < mu; i++) 
+	{
+		Eigen::VectorXd y_i = U_anoms.row(i).transpose();
 		rank_mu_update += weights[i] * (y_i * y_i.transpose());
 	}
 	rank_mu_update = c_mu * rank_mu_update;
@@ -5165,7 +5198,8 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 	B = eigensolver.eigenvectors();
 	D = eigensolver.eigenvalues();
 
-	for (int i = 0; i < D.size(); i++) {
+	for (int i = 0; i < D.size(); i++) 
+	{
 		D(i) = max(D(i), D.maxCoeff() * 1e-14);
 	}
 
@@ -5187,8 +5221,8 @@ void CovMatAdapES::reinflate_C(double reinflation_factor)
 	B = eigensolver.eigenvectors();
 	D = eigensolver.eigenvalues();
 
-	//D *= reinflation_factor;
-	for (int i = 0; i < D.size(); i++) {
+	for (int i = 0; i < D.size(); i++) 
+	{
 		D(i) = max(D(i), 1e-12);
 	}
 	
@@ -5198,22 +5232,27 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 {
 	map<string, double> unique_obj_map;
 	set<double> seen_values;
-
-	
+	ParameterEnsemble curr_pe = pe;
 	
 	if (clear) 
 	{
 		sorted_obj_map.clear();
 		sorted_viol_map.clear();
 
-		feas_dp_archive = pe;
-		feas_dp_archive.keep_rows(vector<string>(), true);
-		infeas_dp_archive = feas_dp_archive;
+		feas_dp_archive = curr_pe.zeros_like(0);
+		infeas_dp_archive = curr_pe.zeros_like(0);
 
 		unique_obj_map = obj_map;
 	}
 	else
 	{
+		if (feas_dp_archive.shape().second == 0) 
+			feas_dp_archive = curr_pe.zeros_like(0);
+		
+		if (infeas_dp_archive.shape().second == 0) 
+			infeas_dp_archive = curr_pe.zeros_like(0);
+		
+
 		for (auto& o : obj_map)
 		{
 			bool is_duplicate = false;
@@ -5232,26 +5271,25 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 		}
 	}
 
-	ParameterEnsemble curr_pe = pe;
 	for (auto o : unique_obj_map)
 	{
 		if (viol_map[o.first] == 0)
 		{
 			sorted_obj_map[to_string(iter) + "|" + o.first] = o.second;
 
-			Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+			/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 			pars.update_without_clear(curr_pe.get_var_names(), curr_pe.get_real_vector(o.first));
-			pe.get_par_transform().active_ctl2numeric_ip(pars);
-			feas_dp_archive.append(to_string(iter) + "|" + o.first, pars);
+			pe.get_par_transform().active_ctl2numeric_ip(pars);*/
+			feas_dp_archive.append(to_string(iter) + "|" + o.first, curr_pe.get_real_vector(o.first));
 		}
 		else
 		{
 			sorted_viol_map[to_string(iter) + "|" + o.first] = viol_map[o.first];
 			
-			Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+			/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 			pars.update_without_clear(curr_pe.get_var_names(), curr_pe.get_real_vector(o.first));
-			pe.get_par_transform().active_ctl2numeric_ip(pars);
-			infeas_dp_archive.append(to_string(iter) + "|" + o.first, pars);
+			pe.get_par_transform().active_ctl2numeric_ip(pars);*/
+			infeas_dp_archive.append(to_string(iter) + "|" + o.first, curr_pe.get_real_vector(o.first));
 		}
 	}
 
@@ -5436,7 +5474,7 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 			}
 
 			Eigen::VectorXd y = B * (D.cwiseSqrt().asDiagonal() * z);
-			x = _curr_m.get_data_eigen_vec(_curr_m.get_keys()) + sigma * y;
+			x = _curr_m.get_data_eigen_vec(parnames) + sigma * y;
 
 			for (int j = 0; j < parnames.size(); ++j) {
 				const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(parnames[j]);
@@ -5457,5 +5495,32 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 		new_reals.update_real_ip(rnames[i], x);
 		
 	}
+
+	vector<string> all_adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+	if (all_adj_par_names.size() > parnames.size())
+	{
+		Parameters all_pars = pest_scenario_ptr->get_ctl_parameters();
+		ParamTransformSeq pts = pest_scenario_ptr->get_base_par_tran_seq();
+
+		if (new_reals.get_trans_status() == ParameterEnsemble::transStatus::NUM)
+			pts.ctl2numeric_ip(all_pars);
+
+		ParameterEnsemble expanded_reals(pest_scenario_ptr, rand_gen_ptr);
+		expanded_reals.reserve(rnames, all_adj_par_names);
+		expanded_reals.set_trans_status(new_reals.get_trans_status());
+
+		for (const auto& rname : rnames) 
+		{
+			Parameters real_pars = all_pars;
+
+			real_pars.update_without_clear(parnames, new_reals.get_real_vector(rname));
+
+			Eigen::VectorXd full_vec = real_pars.get_data_eigen_vec(all_adj_par_names);
+			expanded_reals.update_real_ip(rname, full_vec);
+		}
+
+		return expanded_reals;
+	}
+
 	return new_reals;
 }

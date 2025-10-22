@@ -200,25 +200,17 @@ private:
 
 	int n_consec_failures = 0;
 	int max_consec_failures = 2; //put this somewhere else later
-	int max_line_search_attempts = 3;
 
 	//trust region parameters
 	//TODO: Maybe put these as ++args later
 	double trust_radius = 2.0;
 	double trust_radius_max = 2.0;
 	double trust_radius_min = 1e-4;
-	double eta1 = 0.25;  // ratio threshold for radius reduction
-	double eta2 = 0.75;  // ratio threshold for radius increase
-	double gamma1 = 0.5; // radius reduction factor
-	double gamma2 = 2.0; // radius increase factor
-	const int batch_size = 10;
 	
 	vector<double> previous_obj_values;
 	const int memory_length = 5;  // Number of previous objectives to remember
-	double prev_successful_scale = 1.0;
 	const double c1 = 0.0001;  // Armijo condition parameter
 	const double c2 = 0.9;     // curvature condition parameter
-	const double min_scale = 1e-8;
 
 	Eigen::VectorXd diagonal_scaling;
 	double adaptation_rate = 0.3;  // How quickly to adapt scaling (0-1)
@@ -248,17 +240,17 @@ private:
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;
 
-	Parameters current_grad_vector, prev_grad_vector;
+	Parameters current_grad_vector;
 	map<int, Parameters> grad_vector_map;
 
 	Mat current_constraint_mat, prev_constraint_mat;
 	Eigen::MatrixXd constraint_jco, base_constraint_jco;
 	vector<string> cnames;
 
-	ParameterEnsemble dv, dv_base,dv_pop;
-	ObservationEnsemble oe, oe_base, obs_pop;
+	ParameterEnsemble dv, dv_base;
+	ObservationEnsemble oe, oe_base;
 	map<string, string> constraint_sense;
-	Eigen::VectorXd lambda, base_lambda;
+	Eigen::VectorXd lambda;
 
 	void save_current_dv_obs();
 
