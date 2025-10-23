@@ -174,7 +174,6 @@ private:
 	//todo: make these ++ args
 	int MAX_CONSEC_INFEAS = 100000;
     int MAX_CONSEC_INFEAS_IES = 3;
-    int MAX_CONSEC_PHIINC = 100000;
     double SF_DEC_FAC = 0.8;
     double SF_INC_FAC = 1.1;
     double BASE_SCALE_FACTOR = 1.0;

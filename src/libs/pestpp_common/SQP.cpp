@@ -1938,7 +1938,7 @@ bool SeqQuadProgram::should_terminate()
 	
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
-    int nphinored = MAX_CONSEC_PHIINC;
+    int nphinored = pest_scenario.get_control_info().nphinored;
     bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
     double phi, ratio, viol;
     int count = 0;
@@ -2015,13 +2015,13 @@ bool SeqQuadProgram::should_terminate()
 
 	if (use_cmaes)
 	{
-		message(0, "cov-based termination criteria check");
+		message(0, "cov-based metrics summary");
 		
 		message(2, cmaes.get_cma_update_summary());
 		if (cmaes.should_terminate())
 		{
-			message(1, "covariance has shrunk significantly, all done");
-			return true;
+			message(1, "WARNING: covariance has shrunk significantly");
+			//return true;
 		}
 	}
 
@@ -5100,8 +5100,9 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 	CovMetrics metrics_post = compute_cov_metrics();
 	if (metrics_post.determinant < 1E-5)
 	{
-		reinflate_C(metrics_post.determinant * 1E+6);
-		cout << "...WARNING: ensemble is shrinking too much. Reinflating cov matrix..." << endl;
+		double factor = metrics_post.determinant / pow(10.0, floor(log10(fabs(metrics_post.determinant))));
+		reinflate_C(factor);
+		cout << "...WARNING: ensemble is shrinking too much. Reinflating cov matrix by: " << factor << endl;
 		metrics_post = compute_cov_metrics();
 	}
 	cma_update_summary = report_cov_shrinkage(metrics_prior, metrics_post, iter); 
@@ -5255,23 +5256,23 @@ CovMatAdapES::CovMetrics CovMatAdapES::compute_cov_metrics() const
 string CovMatAdapES::report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter)
 {
 
-	trace_ratio = post.trace / (prior.trace + 1E-10);
-	det_ratio = post.determinant / (prior.determinant + 1E-10);
-	frobenius_ratio = post.frobenius_norm / (prior.frobenius_norm + 1E-10);
-	max_eigenval_ratio = post.max_eigenvalue / (prior.max_eigenvalue + 1E-10);
+	trace_ratio = post.trace / (prior.trace + 1E-30);
+	det_ratio = post.determinant / (prior.determinant + 1E-30);
+	frobenius_ratio = post.frobenius_norm / (prior.frobenius_norm + 1E-30);
+	max_eigenval_ratio = post.max_eigenvalue / (prior.max_eigenvalue + 1E-30);
 
 	int criteria_sat = 0;
 	double tol = 0.05;
-	trace_ratio_0 = post.trace / (metrics_init.trace + 1E-10);
+	trace_ratio_0 = post.trace / (metrics_init.trace + 1E-30);
 	if (trace_ratio_0 < tol)
 		criteria_sat++;
-	det_ratio_0 = post.determinant / (metrics_init.determinant + 1E-10);
+	det_ratio_0 = post.determinant / (metrics_init.determinant + 1E-30);
 	if (det_ratio_0 < tol)
 		criteria_sat++;
-	frobenius_ratio_0 = post.frobenius_norm / (metrics_init.frobenius_norm + 1E-10);
+	frobenius_ratio_0 = post.frobenius_norm / (metrics_init.frobenius_norm + 1E-30);
 	if (frobenius_ratio_0 < tol)
 		criteria_sat++;
-	max_eigenval_ratio_0 = post.max_eigenvalue / (metrics_init.max_eigenvalue + 1E-10);
+	max_eigenval_ratio_0 = post.max_eigenvalue / (metrics_init.max_eigenvalue + 1E-30);
 	if (max_eigenval_ratio_0 < tol)
 		criteria_sat++;
 
