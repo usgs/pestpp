@@ -401,6 +401,8 @@ public:
 	void set_sqp_cma_stepsize_control(bool _flag) { sqp_cma_stepsize_control = _flag; }
 	double get_sqp_cma_reinflation_factor() const { return sqp_cma_reinflation_factor; }
 	void set_sqp_cma_reinflation_factor(double val) { sqp_cma_reinflation_factor = val; }
+	int get_sqp_max_consec_infeas_ies()const { return sqp_max_consec_infeas_ies; }
+	void set_sqp_max_consec_infeas_ies(int _max) { sqp_max_consec_infeas_ies = _max; }
 
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }

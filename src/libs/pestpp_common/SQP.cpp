@@ -794,6 +794,7 @@ void SeqQuadProgram::initialize()
 
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	MAX_CONSEC_INFEAS_IES = pest_scenario.get_pestpp_options().get_sqp_max_consec_infeas_ies();
 
 	stringstream ss;
 	//set some defaults
@@ -1888,7 +1889,7 @@ void SeqQuadProgram::iterate_2_solution()
 			{
 				seek_ies = true;
 				ss.str("");
-				ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
+				ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS_IES << ", switching to IES to seek feasibility";
 				message(0, ss.str());
 				seek_feasible();
 				n_consec_infeas = 0;
@@ -3921,8 +3922,25 @@ bool SeqQuadProgram::seek_feasible()
 		for (auto& v : violations_nominal[real_name])
 			infeas_sum_nom += v.second;
 		total_viol_map[real_name] = infeas_sum_nom;
+
+		double obj_val = obj_map[real_name];
+		double viol_val = total_viol_map[real_name];
+
+		Parameters p = pest_scenario.get_ctl_parameters();
+		Eigen::VectorXd pv = ies_pe_ptr->get_real_vector(real_name);
+		p.update_without_clear(dv_names, pv);
+
+		Observations o = pest_scenario.get_ctl_observations();
+		Eigen::VectorXd ov = ies_oe_ptr->get_real_vector(real_name);
+		o.update_without_clear(ies_oe_ptr->get_var_names(), ov);
+
+		filter.update(obj_val, viol_val, p, o, real_name, -iter);  
 	}
-	cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, -iter, false);
+
+	if (last_viol < filter.get_viol_tol())
+		cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, iter, true);
+	else
+		cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, -iter, false);
 
 	return false;
 }
