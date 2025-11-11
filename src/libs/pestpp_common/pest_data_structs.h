@@ -375,6 +375,8 @@ public:
 	void set_sqp_dv_en(string _file) { sqp_dv_en = _file; }
 	string get_sqp_obs_restart_en()const { return sqp_obs_restart_en; }
 	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
+	string get_sqp_search_method()const { return sqp_search_method; }
+	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 	int get_sqp_subset_size()const { return sqp_subset_size; }
@@ -403,6 +405,8 @@ public:
 	void set_sqp_cma_reinflation_factor(double val) { sqp_cma_reinflation_factor = val; }
 	int get_sqp_max_consec_infeas_ies()const { return sqp_max_consec_infeas_ies; }
 	void set_sqp_max_consec_infeas_ies(int _max) { sqp_max_consec_infeas_ies = _max; }
+	double get_sqp_max_reinflation_cond_num() const { return sqp_max_reinflation_cond_num; }
+	void set_sqp_max_reinflation_cond_num(double val) { sqp_max_reinflation_cond_num = val; }
 
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -804,6 +808,7 @@ private:
 
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
+	string sqp_search_method;
 	int sqp_num_reals;
 	int sqp_subset_size;
 	bool sqp_update_hessian;
@@ -812,6 +817,7 @@ private:
 	vector<double> sqp_alpha_mults;
 	double sqp_filter_tol;
 	double sqp_working_set_tol;
+	double sqp_max_reinflation_cond_num;
 	int sqp_max_consec_infeas;
 	int sqp_max_consec_infeas_ies;
 	int max_consec_phiinc;

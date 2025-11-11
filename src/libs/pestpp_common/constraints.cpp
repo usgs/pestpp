@@ -3238,17 +3238,20 @@ pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& worki
 	// Find most negative Lagrange multiplier for inequality constraints
 	double lm_max = -9999;
 	int idx = -1;
+	vector<int> idxs;
 	set<string> working_set_ineq_set(working_set_ineq_names.begin(), working_set_ineq_names.end());
 
 	for (int i = 0; i < working_set.size(); i++)
 	{
 		if (working_set_ineq_set.find(working_set[i]) == working_set_ineq_set.end())
 			continue;
-		if ((lagrange_mults[i] > 0.0) && (lagrange_mults[i] > lm_max))
+		/*if ((lagrange_mults[i] > 0.0) && (lagrange_mults[i] > lm_max))
 		{
 			idx = i;
 			lm_max = lagrange_mults[i];
-		}
+		}*/
+		if (lagrange_mults[i] > 0.0)
+			idxs.push_back(i);
 	}
 
 	if (lm_max == 0.0)
@@ -3257,10 +3260,22 @@ pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& worki
 		//throw_constraints_error("optimal solution detected at solve EQP step (lagrangian multiplier for all ineq constraints in working set is non-neg)");
 	}
 
-	if (idx >= 0)
+	//if (idx >= 0)
+	//{
+	//	string to_drop = working_set[idx];
+	//	working_set.erase(working_set.begin() + idx);
+	//}
+
+	if (idxs.size() > 0)
 	{
-		string to_drop = working_set[idx];
-		working_set.erase(working_set.begin() + idx);
+		//drop all constraints with positive lagrange multipliers
+		//starting from back to avoid index shifting
+		sort(idxs.begin(), idxs.end(), greater<int>());
+		for (auto i : idxs)
+		{
+			string to_drop = working_set[i];
+			working_set.erase(working_set.begin() + i);
+		}
 	}
 
 	return pair<vector<string>, bool>(working_set, false);
@@ -3363,9 +3378,21 @@ pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par
     for (auto &name : ctl_ord_obs_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set.push_back(name);
-		else if (abs(constraint_map[name]) < working_set_tol) {
-			working_set.push_back(name);
+		else if (constraint_sense_map[name] == ConstraintSense::less_than) {
+			if (constraint_map[name] > working_set_tol) 
+				working_set.push_back(name);
+			else if (abs(constraint_map[name]) < working_set_tol)  
+				working_set.push_back(name);
 		}
+		else if (constraint_sense_map[name] == ConstraintSense::greater_than) {
+			if (constraint_map[name] < -working_set_tol) 
+				working_set.push_back(name);
+			else if (abs(constraint_map[name]) < working_set_tol)  
+				working_set.push_back(name);
+		}
+		/*else if (abs(constraint_map[name]) < working_set_tol) {
+			working_set.push_back(name);
+		}*/
 		/*else if ((-constraint_map[name] < working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
             working_set.push_back(name);
         }

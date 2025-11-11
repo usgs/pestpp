@@ -53,6 +53,8 @@ public:
 	void set_tol(double tol) { 
 		obj_tol = tol; 
 		viol_tol = tol;}
+	vector<FilterRec> get_feasible_solutions() const;
+	vector<FilterRec> get_filter_members() const;
 
 private:
 	bool minimize;
@@ -75,7 +77,7 @@ public:
 
 	void initialize(int n_params, int _num_reals);
 	void update(Parameters prev_m, Parameters curr_m, int iter);
-	void reinflate_C(double reinflation_factor = 1.0);
+	void reinflate_C(double reinflation_factor = 1.0, bool reset_corr = false, double max_cond_num = -1.0);
 	void set_covariance(const Eigen::MatrixXd& _C) { C = _C; }
 	Eigen::MatrixXd get_covariance_matrix() { return C; }
 
@@ -109,11 +111,10 @@ private:
 	Eigen::MatrixXd ps;           // Evolution path for sigma
 	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m = 1.0, mu_eff;
 	vector<double> weights;
-	
+
 	double trace_ratio, det_ratio, frobenius_ratio, max_eigenval_ratio;
 	double trace_ratio_0, det_ratio_0, frobenius_ratio_0, max_eigenval_ratio_0;
 	bool possibly_converged = false;
-	int cov_stopcrit_count;
 	
 	ParameterEnsemble feas_dp_archive, infeas_dp_archive, _dp;
 	ObservationEnsemble feas_oe_archive, infeas_oe_archive, _op;
@@ -168,7 +169,7 @@ private:
 	bool use_obj_pi;
 	bool converged = false;
 	map<string, double> obj_func_coef_map;
-
+	
 	int num_threads;
 	int n_consec_infeas;
 	//todo: make these ++ args
@@ -183,18 +184,13 @@ private:
     double PHI_ACCEPT_FAC = 0.05;
     double par_sigma_max = 100;
 
-    //todo add warning for par_sigma_range too low
     double par_sigma_min = 10;
 	double eigthresh;
-	bool reset_hessian = false;
-
-	int n_consec_failures = 0;
-	int max_consec_failures = 2; //put this somewhere else later
+	bool switch_method = false;
 
 	//trust region parameters
-	//TODO: Maybe put these as ++args later
-	double trust_radius = 2.0;
-	double trust_radius_max = 2.0;
+	double trust_radius = 5.0;
+	double trust_radius_max = 5.0;
 	double trust_radius_min = 1e-4;
 	
 	vector<double> previous_obj_values;
@@ -224,7 +220,6 @@ private:
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
-	string best_name;
 	bool use_subset, use_cmaes = true;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
@@ -274,33 +269,27 @@ private:
 
 	bool seek_feasible();
 	bool line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad);
-	bool line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, ParameterEnsemble* dvs_subset = nullptr);
+	bool line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr);
 	bool iterative_partial_step(const string& _blocking_constraint);
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
 	bool pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false);
-	bool pick_and_update(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
+	FilterRec pick_from_filter_by_merit(SqpFilter _filtered);
 	bool pick_partial_step(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string, double>& sf_map);
-	bool check_wolfe_conditions(Parameters& trial_dv_values, Observations& trial_obs, const Eigen::VectorXd& search_d, 
-		const Eigen::VectorXd& grad, double scale, double initial_obj, double initial_slope);
-	double get_reference_obj();
 
 	double compute_actual_reduction(Parameters& trial_dv_values, Observations& trial_obs);
 	double compute_predicted_reduction(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
 
-	Eigen::VectorXd compute_adaptive_localization_weights(const vector<string>& dv_names, const Eigen::MatrixXd& dv_anoms);
-	
 	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
+	bool trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
+		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset);
 	Eigen::VectorXd solve_trust_region_subproblem_dogleg(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, double radius);
-	Eigen::VectorXd solve_trust_region_subproblem(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, double radius);
-	Eigen::VectorXd compute_boundary_solution(const Eigen::VectorXd& p,	const Eigen::VectorXd& d, double radius);
+	Eigen::VectorXd solve_constrained_trust_region_step(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, const Eigen::MatrixXd& A, double radius);
+
+
 	Parameters calc_gradient_vector(const Parameters& _current_dv_values, string _center_on=string());
-	
 	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
-
-	
-
 	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr);

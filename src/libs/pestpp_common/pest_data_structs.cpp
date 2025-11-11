@@ -1705,6 +1705,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_obs_restart_en = org_value;
 		return true;
 	}
+	else if (key == "SQP_SEARCH_METHOD")
+	{
+		sqp_search_method = org_value;
+		return true;
+	}
 	else if (key == "SQP_NUM_REALS")
 	{
 		convert_ip(value, sqp_num_reals);
@@ -1771,6 +1776,16 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	else if (key == "SQP_CMA_STEPSIZE_CONTROL")
 	{
 		sqp_cma_stepsize_control = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_MAX_CONSEC_INFEAS_IES")
+	{
+		convert_ip(value, sqp_max_consec_infeas_ies);
+		return true;
+	}
+	else if (key == "SQP_MAX_REINFLATION_COND_NUM")
+	{
+		convert_ip(value, sqp_max_reinflation_cond_num);
 		return true;
 	}
 	return false;
@@ -1934,6 +1949,7 @@ void PestppOptions::summary(ostream& os) const
 	os << endl << "...pestpp-sqp options:" << endl;
 	os << "sqp_dv_en: " << sqp_dv_en << endl;
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
+	os << "sqp_search_method: " << sqp_search_method << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 	os << "sqp_subset_size: " << sqp_subset_size << endl;
 	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
@@ -1950,6 +1966,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_cma_stepsize_control: " << sqp_cma_stepsize_control << endl;
 	os << "sqp_cma_reinflation_factor: " << sqp_cma_reinflation_factor << endl;
 	os << "sqp_max_consec_infeas_ies: " << sqp_max_consec_infeas_ies << endl;
+	os << "sqp_max_reinflation_cond_num: " << sqp_max_reinflation_cond_num << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2176,6 +2193,7 @@ void PestppOptions::set_defaults()
 
 	set_sqp_dv_en("");
 	set_sqp_obs_restart_en("");
+	set_sqp_search_method("LINE");
 	set_sqp_num_reals(-1);
 	set_sqp_subset_size(-10);
 	set_sqp_update_hessian(true);
@@ -2188,8 +2206,9 @@ void PestppOptions::set_defaults()
 	set_sqp_cma_cmu(-1);
 	set_sqp_cma_cc(-1);
 	set_sqp_cma_stepsize_control(false);
-	set_sqp_cma_reinflation_factor(1.1);
+	set_sqp_cma_reinflation_factor(-1.0);
 	set_sqp_max_consec_infeas_ies(3);
+	set_sqp_max_reinflation_cond_num(500.0);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);
