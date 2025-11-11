@@ -3433,7 +3433,8 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 				else if (d < 0)
 					alpha(j) = x - lb;
 			}
-			scale_search_d[sd.first] = (sd.second / sd.second.norm()) * alpha.minCoeff() * scale_val;
+
+			scale_search_d[sd.first] = (sd.second / sd.second.norm()) * alpha.maxCoeff() * scale_val;
 			if (scale_search_d[sd.first].squaredNorm() < 1.0E-10)
 				short_upgrades.push_back(sd.first);
 		}
@@ -4588,6 +4589,43 @@ FilterRec SeqQuadProgram::pick_from_filter_by_merit(SqpFilter _filtered)
 	/*auto merit = [&](const FilterRec& fr) {
 		return fr.obj_val + 0.7 * fr.viol_val;
 		};*/
+
+	//map<int, double> merit_map;
+	//for (int i = 0; i < filterset.size(); i++)
+	//{
+	//	double m = merit(filterset[i]);
+	//	merit_map[i] = m;
+	//}
+
+	//sort(filterset.begin(), filterset.end(),
+	//	[&](const FilterRec& a, const FilterRec& b) {
+	//		return merit(a) < merit (b);
+	//	});
+
+	//int idx = -1;
+	//for (int i = 0; i < filterset.size(); i++)
+	//{
+	//	double oval = filterset[i].obj_val;
+	//	double vval = filterset[i].viol_val;
+	//	
+	//	if (find(best_phis.begin(), best_phis.end(), oval) != best_phis.end())
+	//		continue;
+	//	else
+	//	{
+	//		idx = i;
+	//		break;
+	//	}
+	//}
+
+	//if (idx != -1)
+	//{
+	//	return filterset[idx];
+	//}
+	//else
+	//{
+	//	message(1, "all filter candidates have been previously selected, picking best by merit");
+	//	return filterset[0];
+	//}
 
 	const FilterRec* best = &filterset[0];
 	double best_m = merit(filterset[0]);
