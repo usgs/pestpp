@@ -1273,8 +1273,20 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		if (use_cmaes)
 		{
 			message(1, "generating new dv ensemble at current best phi via CMA-ES");
+			if (reset)
+			{
+				message(1, "resetting Hessian to identity");
+				Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+				h.setIdentity();
+				hessian = Covariance(dv_names, h);
 
-			if (is_base_infeas && !seek_ies)
+				cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+				cmaes.clear_archives();
+
+				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+				reset = false;
+			}
+			else if (is_base_infeas && !seek_ies)
 			{
 				if(best_violations[best_violations.size()-2] == 0)
 				{
@@ -1285,31 +1297,19 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 			}
 			else if (seek_ies)
 			{
-				message(1, "generating new dv ensemble at current best phi");
-				//_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), _current_dv_vals, parcov, performance_log, 0, frec);
 				seek_ies = false;
-				//message(1, "BASE obtained from IES, reinflating CMA-ES covariance");
 				cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
 				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 			}
-			//else if (cmaes.should_terminate())
-			//{
-			//	message(1, "imminent covariance matrix collapse, resetting Hessian to identity");
-			//	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-			//	h.setIdentity();
-			//	hessian = Covariance(dv_names, h);
-			//	message(1, "resetting global filter");
-			//	filter = SqpFilter((obj_sense == "minimize") ? true : false);
-			//	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
-			//	//switch_method = true;
-			//	cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-			//	_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), _current_dv_vals, parcov, performance_log, 0, frec);
-			//}
 			else
 				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 
-			
+			ss.str("");
+			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+			frec << ss.str();
 
+			message(0, "CMA-ES metrics summary");
+			message(2, cmaes.get_cma_update_summary());
 		}
 		else
 		{
@@ -1340,14 +1340,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 {
 	stringstream ss;
 	message(1, "using stochastic gradient approximation (StoSAG)");
-	
-	//I think a bad phi option has use in SQP?
-	/*double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
-	if (bad_phi < 1.0e+30)
-		message(1, "using bad_phi: ", bad_phi);*/
 
 	dv_drawn = initialize_dv(parcov);
-
 	oe_drawn = initialize_restart();
 
 	try
@@ -1372,8 +1366,6 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 
 	if (dv.shape().first != oe.shape().first)
 	{
-		//the special case where par en < obs en and all par reals are found in obs en...
-
 		if (dv.shape().first < oe.shape().first)
 		{
 			vector<string> oe_names = oe.get_real_names();
@@ -1412,12 +1404,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 			throw_sqp_error(ss.str());
 		}
 	}
-
-	//message(1, "transforming parameter ensemble to numeric");
 	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
-
-	//TODO: think about what adding the base would do for SQP
     if (pp_args.find("SQP_RESTART_OBS_EN") != pp_args.end())
     {
         message(1, "Warning: even though `sqp_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
@@ -1434,7 +1422,6 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		}
 	}
 
-	//just check to see if common real names are found but are not in the same location
 	map<string, int> pe_map = dv.get_real_map(), oe_map = oe.get_real_map();
 	vector<string> misaligned;
 	for (auto item : pe_map)
@@ -1531,7 +1518,6 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	dv_base = dv;
 	dv_base.reorder(vector<string>(), act_par_names);
 
-	//no restart
 	if (oe_drawn)
 	{
 		performance_log->log_event("running initial ensemble");
@@ -1600,33 +1586,26 @@ void SeqQuadProgram::save_mat(string prefix, Eigen::MatrixXd &mat)
 	}
 }
 
-bool SeqQuadProgram::try_modify_hessian() {
-	// Get current Hessian matrix
+bool SeqQuadProgram::try_modify_hessian() 
+{
 	Eigen::MatrixXd H = *hessian.e_ptr();
-
-	// Compute eigendecomposition
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(H);
-	if (eigensolver.info() != Eigen::Success) {
+	if (eigensolver.info() != Eigen::Success)
 		return false;
-	}
-
-	// Get eigenvalues and eigenvectors
+	
 	Eigen::VectorXd eigenvalues = eigensolver.eigenvalues();
 	Eigen::MatrixXd eigenvectors = eigensolver.eigenvectors();
 
-	// Check if modification is needed
 	double min_eig = eigenvalues.minCoeff();
-	const double min_allowed_eig = 1e-3;  // Minimum allowed eigenvalue
+	const double min_allowed_eig = 1e-3; 
 
-	if (min_eig >= min_allowed_eig) {
-		return true; // No modification needed
-	}
+	if (min_eig >= min_allowed_eig) 
+		return true; 
 
 	//Algorithm 3.3, p. 51 Nocedal and Wright
 	double tau = 2 * abs(min_eig) + min_allowed_eig;
 	Eigen::MatrixXd modified_H = H + tau * Eigen::MatrixXd::Identity(H.rows(), H.cols()); 
 
-	// Update the Hessian
 	hessian = Covariance(dv_names, modified_H.sparseView());
 
 	message(1, "Modified Hessian to ensure positive definiteness. tau = ", tau);
@@ -1658,7 +1637,7 @@ bool SeqQuadProgram::hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k
 	double denominator = y_minus_Hs.dot(s_k);
 
 	// Check if SR1 update is numerically safe
-	if (std::abs(denominator) < sr1_threshold * y_minus_Hs.norm() * s_k.norm())
+	if (abs(denominator) < sr1_threshold * y_minus_Hs.norm() * s_k.norm())
 	{
 		message(1, "skipping SR1 update - denominator too small for numerical stability");
 		return false;
@@ -1752,7 +1731,7 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 	// First term: H_k*s_k*s_k^T*H_k from Eq. 6.19, Nocedal and Wright, p. 140
 	Eigen::VectorXd Hs = H_new * s_k;
 	double denom = s_k.dot(Hs);
-	if (std::abs(denom) < eps) {
+	if (abs(denom) < eps) {
 		message(1, "skipping BFGS update - s^T H s too small");
 		performance_log->log_event("skipping BFGS update - s^T H s too small\n");
 		return false;
@@ -1958,7 +1937,7 @@ void SeqQuadProgram::update_scaling(const Eigen::VectorXd& step, const Eigen::Ve
 			diagonal_scaling(i) *= (1.0 + adaptation_rate);
 		}
 
-		diagonal_scaling(i) = std::max(0.1, std::min(diagonal_scaling(i), 1000.0));
+		diagonal_scaling(i) = max(0.1, min(diagonal_scaling(i), 1000.0));
 	}
 
 	message(2, "Updated adaptive Hessian scaling");
@@ -2013,11 +1992,7 @@ void SeqQuadProgram::iterate_2_solution()
 		if (use_cmaes && !seek_ies)
 		{
 			message(1, "updating CMA-ES with approximate gradient");
-			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
-		
-			ss.str("");
-			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
-			frec << ss.str();
+			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);		
 		}
 
 		make_gradient_runs(current_ctl_dv_values, current_obs);
@@ -2054,7 +2029,7 @@ bool SeqQuadProgram::should_terminate()
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
     int nphinored = pest_scenario.get_control_info().nphinored;
-    bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
+    bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false, stationary = false;
     double phi, ratio, viol;
     int count = 0;
     int nphired = 0;
@@ -2131,17 +2106,20 @@ bool SeqQuadProgram::should_terminate()
         return true;
     }
 
+	const double grad_tol = 1e-6;
+	message(1, "gradient norm: ", current_grad_vector.get_data_eigen_vec(dv_names).norm());
+	if (current_grad_vector.get_data_eigen_vec(dv_names).norm() < grad_tol)
+		stationary = true;
+
     if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
     {
         message(1, "phi-based termination criteria satisfied, all done");
         return true;
     }
-
-	if (use_cmaes)
+	else if (stationary)
 	{
-		message(0, "cov-based metrics summary");
-		
-		message(2, cmaes.get_cma_update_summary());
+		message(1, "stationary point detected, all done");
+		return true;
 	}
 
 	if (converged)
@@ -2470,7 +2448,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::Matrix
 	// Following Nocedal & Wright Eq. 16.62
 	double constraint_scaling = 1.0;
 	if (G_reg.norm() > 1e-8) {
-		constraint_scaling = std::sqrt(G_reg.norm());
+		constraint_scaling = sqrt(G_reg.norm());
 	}
 
 	Eigen::MatrixXd scaled_constraint_jco = constraint_scaling * _constraint_jco;
@@ -2710,13 +2688,6 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 	ss << " BASE";
 	message(1, ss.str());
 
-	const double grad_tol = 1e-6;
-	if (grad.norm() < grad_tol)
-	{
-		message(1, "Possible stationary point detected - gradient norm below tolerance");
-		return false;
-	}
-
 	ParameterEnsemble dv_candidates(&pest_scenario, &rand_gen);
 	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
@@ -2747,7 +2718,7 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 		{
 			ParameterEnsemble d;
 			const auto& names = dvs_subset->get_real_names();
-			if (std::find(names.begin(), names.end(), "BASE") == names.end())
+			if (find(names.begin(), names.end(), "BASE") == names.end())
 			{
 				d.reserve(vector<string>{ "BASE" }, dv_names);
 				d.add_2_row_ip("BASE", dv.get_real_vector("BASE"));
@@ -2774,14 +2745,13 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 	map<string, double> real_rs_map;
 	Eigen::MatrixXd H = hessian.get_matrix();
 
-	for (std::size_t i = 0; i < radius_scale_vals.size(); ++i)
+	for (size_t i = 0; i < radius_scale_vals.size(); ++i)
 	{
 		double radius_scale = radius_scale_vals[i];
 		message(1, "starting trust region calcs for radius scale", radius_scale);
 
 		double candidate_trust_radius = trust_radius * radius_scale;
-		candidate_trust_radius = std::max(trust_radius_min,
-			std::min(candidate_trust_radius, trust_radius_max));
+		candidate_trust_radius = max(trust_radius_min, min(candidate_trust_radius, trust_radius_max));
 
 		if (use_ensemble_grad && dvs_subset != nullptr)
 		{
@@ -2815,13 +2785,13 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 					double lb = lbnd[dv_names[j]];
 					double ub = ubnd[dv_names[j]];
 
-					if (std::abs(d) < 1e-10)
+					if (abs(d) < 1e-10)
 						continue;
 
 					if (d > 0)
-						alpha(j) = std::min(alpha(j), (ub - x) / d);
+						alpha(j) = min(alpha(j), (ub - x) / d);
 					else if (d < 0)
-						alpha(j) = std::min(alpha(j), (x - lb) / (-d));
+						alpha(j) = min(alpha(j), (x - lb) / (-d));
 				}
 				double min_alpha = alpha.minCoeff();
 				if (min_alpha < 1.0)
@@ -2876,7 +2846,7 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 		{
 			v2 = (dv_candidates.get_real_vector(j) - v1).array() / v1.array().cwiseAbs();
 			d = v2.transpose() * v2;
-			if ((std::abs(d) < 1e-7) && (jvals.find(j) == jvals.end()))
+			if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end()))
 			{
 				message(1, "duplicate trust-region candidates:",
 					vector<string>{ dv_candidates.get_real_names()[i],
@@ -2925,7 +2895,7 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 			- get_obj_value(current_ctl_dv_values, current_obs);
 
 		double rho = 0.0;
-		if (std::abs(predicted) > 1e-10)
+		if (abs(predicted) > 1e-10)
 			rho = actual / predicted;
 
 		const double eta1 = 0.25;
@@ -2933,7 +2903,7 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 
 		if (rho > eta2 && step_taken.norm() > 0.8 * trust_radius)
 		{
-			trust_radius = std::min(2.0 * trust_radius, trust_radius_max);
+			trust_radius = min(2.0 * trust_radius, trust_radius_max);
 			ss.str("");
 			ss << "very successful trust region step with rho=" << rho << ", increasing radius to " << trust_radius;
 			message(1, ss.str());
@@ -2946,7 +2916,7 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 		}
 		else
 		{
-			trust_radius = std::max(trust_radius_min, 0.25 * trust_radius);
+			trust_radius = max(trust_radius_min, 0.25 * trust_radius);
 			ss.str("");
 			ss << "trust region step accepted by filter but rho=" << rho << ", reducing radius to " << trust_radius;
 			message(1, ss.str());
@@ -2954,7 +2924,7 @@ bool SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, double
 	}
 	else
 	{
-		trust_radius = std::max(trust_radius_min, 0.5 * trust_radius);
+		trust_radius = max(trust_radius_min, 0.5 * trust_radius);
 		message(1, "no trust region candidate accepted by filter, reducing radius to", trust_radius);
 	}
 	return success;
@@ -3145,13 +3115,6 @@ bool SeqQuadProgram::line_search(Eigen::VectorXd& search_d, const Parameters& _c
 	double initial_obj = get_obj_value(current_ctl_dv_values, current_obs);
 	double initial_slope = grad.dot(search_d);
 
-	//check if we're at a stationary point
-	const double grad_tol = 1e-6;  //can be made a class member
-	if (grad.norm() < grad_tol) {
-		message(1, "Possible stationary point detected - gradient norm below tolerance");
-		return false;
-	}
-
 	//handle non-descent direction
 	if (initial_slope >= 0.1)
 	{
@@ -3330,13 +3293,7 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 		ss << " " << n << ",";
 	ss << " BASE" << endl;
 	message(1, ss.str());
-
-	const double grad_tol = 1e-6;
-	if (grad.norm() < grad_tol) {
-		message(1, "Possible stationary point detected - gradient norm below tolerance");
-		return false;
-	}
-
+	
 	ParameterEnsemble dv_candidates(&pest_scenario, &rand_gen);
 	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
@@ -3370,7 +3327,7 @@ bool SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::
 		{
 			ParameterEnsemble d;
 			const auto& names = dvs_subset->get_real_names();
-			if (std::find(names.begin(), names.end(), "BASE") == names.end())
+			if (find(names.begin(), names.end(), "BASE") == names.end())
 			{
 				d.reserve(vector<string>{ "BASE" }, dv_names);
 				d.add_2_row_ip("BASE", dv.get_real_vector("BASE"));
@@ -4050,35 +4007,23 @@ bool SeqQuadProgram::solve_new_ensemble()
 
 
 	string search_method = pest_scenario.get_pestpp_options().get_sqp_search_method();
-	if (!switch_method)
-	{
-		if (search_method == "LINE" || search_method == "LINE_SEARCH" || search_method == "LS")
-			successful = line_search(search_d_en, grad, current_obj_en, &_drawn_dvs);
-		else if (search_method == "TRUST_REGION" || search_method == "TRUST" || search_method == "TR")
-			successful = trust_region_step(grad, current_obj_en, cnames_en, constraint_jco_en, &_drawn_dvs);
-		else
-			throw_sqp_error("search_method not recognized");
-	}
+	if (search_method == "LINE" || search_method == "LINE_SEARCH" || search_method == "LS")
+		successful = line_search(search_d_en, grad, current_obj_en, &_drawn_dvs);
+	else if (search_method == "TRUST_REGION" || search_method == "TRUST" || search_method == "TR")
+		successful = trust_region_step(grad, current_obj_en, cnames_en, constraint_jco_en, &_drawn_dvs);
 	else
-	{
-		if (search_method == "LINE" || search_method == "LINE_SEARCH" || search_method == "LS")
-			successful = trust_region_step(grad, current_obj_en, cnames_en, constraint_jco_en, &_drawn_dvs);
-		else if (search_method == "TRUST_REGION" || search_method == "TRUST" || search_method == "TR")
-			successful = line_search(search_d_en, grad, current_obj_en, &_drawn_dvs);
-		else
-			throw_sqp_error("search_method not recognized");
-		switch_method = false;
-	}
+		throw_sqp_error("search_method not recognized");
+	
 
 	if (successful)
 	{
-		BASE_SCALE_FACTOR *= SF_DEC_FAC;
+		//BASE_SCALE_FACTOR = max(0.10, BASE_SCALE_FACTOR * SF_DEC_FAC);
 		is_base_infeas = false;
 		cma_reset_archive = true;
 	}
 	else
 	{
-		BASE_SCALE_FACTOR *= SF_INC_FAC;
+		//BASE_SCALE_FACTOR = min(2.0, BASE_SCALE_FACTOR * SF_DEC_FAC);
 		is_base_infeas = true;
 		cma_reset_archive = false;
 	}
@@ -4494,40 +4439,22 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 	if (selected.obj_val == last_best && selected.viol_val == last_viol)
 	{
-		//selected = candidate_filter.get_knee();
-		/*if (selected.obj_val == last_best && selected.viol_val == last_viol)
-		{*/
-			selected = pick_from_filter_by_merit(candidate_filter);
-			message(1, "resetting Hessian to identity");
-			Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-			h.setIdentity();
-			hessian = Covariance(dv_names, h);
-			message(1, "resetting global filter");
-
-			if (selected.obj_val == last_best && selected.viol_val == last_viol && filter.get_filter_members().size()>0)
-			{
-				message(1, "no improvement in filter found, selecting best global filter candidate");
-				selected = filter.get_knee();
-				//if (selected.obj_val == last_best && selected.viol_val == last_viol)
-				//{
-				
-				//	filter = SqpFilter((obj_sense == "minimize") ? true : false);
-				//	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
-				//	//switch_method = true;
-				//}
-			}
-			else
-			{
-				message(1, "no improvement in filter found, selecting best current filter candidate by merit");
-				BASE_SCALE_FACTOR = 1.0;
-			}
-		/*}
+		selected = pick_from_filter_by_merit(candidate_filter);
+		reset = true;
+		
+		if (selected.obj_val == last_best && selected.viol_val == last_viol && filter.get_filter_members().size()>0)
+		{
+			message(1, "no improvement in filter found, selecting best global filter candidate");
+			selected = filter.get_knee();
+		}
 		else
-			message*/(1, "no improvement in filter found, selecting best current filter candidate");
+		{
+			message(1, "no improvement in filter found, selecting best current filter candidate by merit");
+			BASE_SCALE_FACTOR = 1.0;
+		}
+		message(1, "no improvement in filter found, selecting best current filter candidate");
 	}
-
 	
-
 	filter.update(selected.obj_val, selected.viol_val, selected.dp_val, selected.oe_val, selected.real_name, iter);
 	filter.report(frec, iter);
 	current_ctl_dv_values = selected.dp_val;
@@ -4573,59 +4500,18 @@ FilterRec SeqQuadProgram::pick_from_filter_by_merit(SqpFilter _filtered)
 {
 	vector<FilterRec> filterset = _filtered.get_filter_members();
 
-	double vmin = std::numeric_limits<double>::infinity(), vmax = -std::numeric_limits<double>::infinity();
+	double vmin = numeric_limits<double>::infinity(), vmax = -numeric_limits<double>::infinity();
 	for (const auto& fr : filterset) {
-		vmin = std::min(vmin, fr.viol_val);
-		vmax = std::max(vmax, fr.viol_val);
+		vmin = min(vmin, fr.viol_val);
+		vmax = max(vmax, fr.viol_val);
 	}
 	double mu = (1 + vmax) / (1 + vmin);
-	double vref = std::max(vmax - vmin, 1e-30);
+	double vref = max(vmax - vmin, 1e-30);
 
 	auto merit = [&](const FilterRec& fr) {
 		const double f_signed = (obj_sense == "minimize") ? fr.obj_val : -fr.obj_val;
 		return f_signed + mu * (fr.viol_val / vref);
 		};
-
-	/*auto merit = [&](const FilterRec& fr) {
-		return fr.obj_val + 0.7 * fr.viol_val;
-		};*/
-
-	//map<int, double> merit_map;
-	//for (int i = 0; i < filterset.size(); i++)
-	//{
-	//	double m = merit(filterset[i]);
-	//	merit_map[i] = m;
-	//}
-
-	//sort(filterset.begin(), filterset.end(),
-	//	[&](const FilterRec& a, const FilterRec& b) {
-	//		return merit(a) < merit (b);
-	//	});
-
-	//int idx = -1;
-	//for (int i = 0; i < filterset.size(); i++)
-	//{
-	//	double oval = filterset[i].obj_val;
-	//	double vval = filterset[i].viol_val;
-	//	
-	//	if (find(best_phis.begin(), best_phis.end(), oval) != best_phis.end())
-	//		continue;
-	//	else
-	//	{
-	//		idx = i;
-	//		break;
-	//	}
-	//}
-
-	//if (idx != -1)
-	//{
-	//	return filterset[idx];
-	//}
-	//else
-	//{
-	//	message(1, "all filter candidates have been previously selected, picking best by merit");
-	//	return filterset[0];
-	//}
 
 	const FilterRec* best = &filterset[0];
 	double best_m = merit(filterset[0]);
@@ -5230,8 +5116,8 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	if (failed_real_indices.size() > 0)
 	{
 		stringstream ss;
-		vector<string> par_real_names = dv.get_real_names();
-		vector<string> obs_real_names = oe.get_real_names();
+		vector<string> par_real_names = dv_candidates.get_real_names();
+		vector<string> obs_real_names = _oe.get_real_names();
 		vector<string> failed_par_names, failed_obs_names;
 		string oname, pname;
 		ss << "the following dv candidate runs failed -->";
@@ -5544,6 +5430,10 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 
 void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter) 
 {
+	CovMetrics metrics_prior = compute_cov_metrics();
+	if (iter == 1)
+		metrics_init = metrics_prior;
+
 	ParameterEnsemble U = feas_dp_archive;
 	vector<string> par_names = U.get_var_names();
 	m = curr_m.get_data_eigen_vec(par_names);
@@ -5586,59 +5476,52 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 			U = U_;
 	}
 
-	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_stepsize_control())
+	if (U.shape().first != 0)
 	{
-		Eigen::VectorXd y_w = (m - prev_m.get_data_eigen_vec(par_names)) / sigma;
-		ps = (1.0 - c_sigma) * ps + sqrt(c_sigma * (2.0 - c_sigma) * mu_eff) *
-			(C.inverse().llt().solve(y_w));
-		sigma = sigma * exp((c_sigma / d_sigma) * (ps.norm() / chi_n - 1.0));
+		if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_stepsize_control())
+		{
+			Eigen::VectorXd y_w = (m - prev_m.get_data_eigen_vec(par_names)) / sigma;
+			Eigen::VectorXd ww = D.cwiseInverse().cwiseSqrt().asDiagonal() * (B.transpose() * y_w);
+			ps = (1.0 - c_sigma) * ps + sqrt(c_sigma * (2.0 - c_sigma) * mu_eff) * (B * ww);
+			sigma = sigma * exp((c_sigma / d_sigma) * (ps.norm() / chi_n - 1.0));
+		}
+
+		Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), vector<string>()) / sigma;
+
+		Eigen::MatrixXd rank_mu_update = Eigen::MatrixXd::Zero(C.rows(), C.cols());
+		for (int i = 0; i < mu; i++)
+		{
+			Eigen::VectorXd y_i = U_anoms.row(i).transpose();
+			rank_mu_update += weights[i] * (y_i * y_i.transpose());
+		}
+		rank_mu_update = c_mu * rank_mu_update;
+
+		pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu_eff) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
+		Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
+
+		C = (1.0 - c_1 - c_mu) * C + rank_mu_update + rank_one_update;
+
+		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(C);
+		B = eigensolver.eigenvectors();
+		D = eigensolver.eigenvalues();
+
+		for (int i = 0; i < D.size(); i++)
+		{
+			D(i) = max(D(i), D.maxCoeff() * 1e-14);
+		}
 	}
-
-	CovMetrics metrics_prior = compute_cov_metrics();
-	if (iter == 1)
-		metrics_init = metrics_prior;
-	
-
-	Eigen::MatrixXd U_anoms = U.get_eigen_anomalies(vector<string>(), vector<string>()) / sigma;
-	
-	Eigen::MatrixXd rank_mu_update = Eigen::MatrixXd::Zero(C.rows(), C.cols());
-	for (int i = 0; i < mu; i++) 
-	{
-		Eigen::VectorXd y_i = U_anoms.row(i).transpose();
-		rank_mu_update += weights[i] * (y_i * y_i.transpose());
-	}
-	rank_mu_update = c_mu * rank_mu_update;
-	
-	pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu_eff) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
-	Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
-
-	C = (1.0 - c_1 - c_mu) * C + rank_mu_update + rank_one_update;
-
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(C);
-	B = eigensolver.eigenvectors();
-	D = eigensolver.eigenvalues();
-
-	for (int i = 0; i < D.size(); i++) 
-	{
-		D(i) = max(D(i), D.maxCoeff() * 1e-14);
-	}
+	else
+		cout << "...nothing to learn for covariance here...skipping CMA-ES update" << endl;
 
 	CovMetrics metrics_post = compute_cov_metrics();
-	//if (metrics_post.determinant < 1E-5)
-	//{
-	//	double factor = metrics_post.determinant / pow(10.0, floor(log10(fabs(metrics_post.determinant))));
-	//	reinflate_C(factor, false, pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num());
-	//	cout << "...WARNING: ensemble is shrinking too much. Reinflating cov matrix by: " << factor << endl;
-	//	metrics_post = compute_cov_metrics();
-	//}
-	if (metrics_post.condition_number > pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num())
+	if ((metrics_post.condition_number > pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num()) || (metrics_post.determinant < 1E-5))
 	{
 		double factor = metrics_post.determinant / pow(10.0, floor(log10(fabs(metrics_post.determinant))));
 		cout << "...WARNING: ensemble is shrinking too much. Reinflating cov matrix by: " << factor << endl;
 		reinflate_C(factor, false, pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num());
 		metrics_post = compute_cov_metrics();
 	}
-	cma_update_summary = report_cov_shrinkage(metrics_prior, metrics_post, iter); 
+	cma_update_summary = report_cmaes_metrics(metrics_prior, metrics_post, iter); 
 }
 
 void CovMatAdapES::reinflate_C(double reinflation_factor, bool reset_corr, double max_cond_num)
@@ -5681,38 +5564,38 @@ void CovMatAdapES::reinflate_C(double reinflation_factor, bool reset_corr, doubl
 			{
 				D(i) *= reinflation_factor;
 			}
-
+		
 			if (current_cond_num > max_cond_num)
 			{
 				double new_lambda_max = lambda_max * reinflation_factor;
 				double target_lambda_min = new_lambda_max / max_cond_num;
 
-				double min_eigenvalue_floor = target_lambda_min;
+					double min_eigenvalue_floor = target_lambda_min;
 
 				for (int i = 0; i < D.size(); i++)
 				{
-					double scaled_eigenvalue = D(i);
+						double scaled_eigenvalue = D(i);
 
-					if (scaled_eigenvalue < min_eigenvalue_floor)
-						D(i) = 0.5 * (scaled_eigenvalue + min_eigenvalue_floor);
-				
-					D(i) = max(D(i), 1e-12);
-				}
+						if (scaled_eigenvalue < min_eigenvalue_floor)
+							D(i) = 0.5 * (scaled_eigenvalue + min_eigenvalue_floor);
 
-				Eigen::MatrixXd D_matrix = D.asDiagonal();
-				C = B * D_matrix * B.transpose();
-				C = (C + C.transpose()) / 2.0;
+						D(i) = max(D(i), 1e-12);
+			}
+
+			Eigen::MatrixXd D_matrix = D.asDiagonal();
+					C = B * D_matrix * B.transpose();
+					C = (C + C.transpose()) / 2.0;
 			}
 			else
-			{
-				Eigen::MatrixXd D_matrix = D.asDiagonal();
-				C = B * D_matrix * B.transpose();
-				C = (C + C.transpose()) / 2.0;
-			}
+				{
+					Eigen::MatrixXd D_matrix = D.asDiagonal();
+					C = B * D_matrix * B.transpose();
+					C = (C + C.transpose()) / 2.0;
+				}
 		}
 		else
 		{
-			C *= reinflation_factor;
+				C *= reinflation_factor;
 
 			eigensolver.compute(C);
 			B = eigensolver.eigenvectors();
@@ -5725,13 +5608,20 @@ void CovMatAdapES::reinflate_C(double reinflation_factor, bool reset_corr, doubl
 
 		for (int i = 0; i < D.size(); i++)
 		{
-			D(i) = max(D(i), 1e-12);
+				D(i) = max(D(i), 1e-12);
 		}
 
 		Eigen::MatrixXd D_final = D.asDiagonal();
 		C = B * D_final * B.transpose();
 		C = (C + C.transpose()) / 2.0;
 	}
+}
+void CovMatAdapES::clear_archives()
+{
+	sorted_obj_map.clear();
+	sorted_viol_map.clear();
+	feas_dp_archive = feas_dp_archive.zeros_like(0);
+	infeas_dp_archive = infeas_dp_archive.zeros_like(0);
 }
 
 void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear)
@@ -5742,12 +5632,7 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 	
 	if (clear) 
 	{
-		sorted_obj_map.clear();
-		sorted_viol_map.clear();
-
-		feas_dp_archive = curr_pe.zeros_like(0);
-		infeas_dp_archive = curr_pe.zeros_like(0);
-
+		clear_archives();
 		unique_obj_map = obj_map;
 	}
 	else
@@ -5782,19 +5667,11 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 		if (viol_map[o.first] == 0)
 		{
 			sorted_obj_map[to_string(iter) + "|" + o.first] = o.second;
-
-			/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-			pars.update_without_clear(curr_pe.get_var_names(), curr_pe.get_real_vector(o.first));
-			pe.get_par_transform().active_ctl2numeric_ip(pars);*/
 			feas_dp_archive.append(to_string(iter) + "|" + o.first, curr_pe.get_real_vector(o.first));
 		}
 		else
 		{
 			sorted_viol_map[to_string(iter) + "|" + o.first] = o.second;
-			
-			/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-			pars.update_without_clear(curr_pe.get_var_names(), curr_pe.get_real_vector(o.first));
-			pe.get_par_transform().active_ctl2numeric_ip(pars);*/
 			infeas_dp_archive.append(to_string(iter) + "|" + o.first, curr_pe.get_real_vector(o.first));
 		}
 	}
@@ -5864,7 +5741,7 @@ CovMatAdapES::CovMetrics CovMatAdapES::compute_cov_metrics() const
 	return metrics;
 }
 
-string CovMatAdapES::report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter)
+string CovMatAdapES::report_cmaes_metrics(const CovMetrics& prior, const CovMetrics& post, int iter)
 {
 
 	trace_ratio = post.trace / (prior.trace + 1E-30);
@@ -5888,42 +5765,56 @@ string CovMatAdapES::report_cov_shrinkage(const CovMetrics& prior, const CovMetr
 		criteria_sat++;
 
 	stringstream ss;
-	ss << std::left; 
-	ss << std::setw(20) << "  " 
-		<< std::setw(14) << "Prior"
-		<< std::setw(14) << "Post"
-		<< std::setw(10) << "Po/Pr"
-		<< std::setw(10) << "Po/Pr_0" << endl;
+	ss << left; 
+	ss << setw(20) << "  " 
+		<< setw(14) << "Prior"
+		<< setw(14) << "Post"
+		<< setw(10) << "Po/Pr"
+		<< setw(10) << "Po/Pr_0" << endl;
 
-	ss << std::scientific << std::setprecision(4);
-	ss << "   Trace           " << std::setw(12) << prior.trace
-		<< "   " << std::setw(12) << post.trace
-		<< "   " << std::fixed << std::setprecision(6) 
-		<< std::setw(12) << trace_ratio << std::setw(10) << trace_ratio_0 << endl;
+	ss << scientific << setprecision(4);
+	ss << "   Trace           " << setw(12) << prior.trace
+		<< "   " << setw(12) << post.trace
+		<< "   " << fixed << setprecision(6) 
+		<< setw(12) << trace_ratio << setw(10) << trace_ratio_0 << endl;
 
-	ss << std::scientific << std::setprecision(4);
-	ss << "   Determinant     " << std::setw(12) << prior.determinant
-		<< "   " << std::setw(12) << post.determinant
-		<< "   " << std::fixed << std::setprecision(6) 
-		<< std::setw(12) << det_ratio << std::setw(10) << det_ratio_0 << endl;
+	ss << scientific << setprecision(4);
+	ss << "   Determinant     " << setw(12) << prior.determinant
+		<< "   " << setw(12) << post.determinant
+		<< "   " << fixed << setprecision(6) 
+		<< setw(12) << det_ratio << setw(10) << det_ratio_0 << endl;
 
-	ss << std::scientific << std::setprecision(4);
-	ss << "   Frobenius Norm  " << std::setw(12) << prior.frobenius_norm
-		<< "   " << std::setw(12) << post.frobenius_norm
-		<< "   " << std::fixed << std::setprecision(6) 
-		<< std::setw(12) << frobenius_ratio << std::setw(10) << frobenius_ratio_0 << endl;
+	ss << scientific << setprecision(4);
+	ss << "   Frobenius Norm  " << setw(12) << prior.frobenius_norm
+		<< "   " << setw(12) << post.frobenius_norm
+		<< "   " << fixed << setprecision(6) 
+		<< setw(12) << frobenius_ratio << setw(10) << frobenius_ratio_0 << endl;
 
-	ss << std::scientific << std::setprecision(4);
-	ss << "   Max Eigenvalue  " << std::setw(12) << prior.max_eigenvalue
-		<< "   " << std::setw(12) << post.max_eigenvalue
-		<< "   " << std::fixed << std::setprecision(6) 
-		<< std::setw(12) << max_eigenval_ratio << std::setw(10) << max_eigenval_ratio_0 << endl;
+	ss << scientific << setprecision(4);
+	ss << "   Max Eigenvalue  " << setw(12) << prior.max_eigenvalue
+		<< "   " << setw(12) << post.max_eigenvalue
+		<< "   " << fixed << setprecision(6) 
+		<< setw(12) << max_eigenval_ratio << setw(10) << max_eigenval_ratio_0 << endl;
 
-	ss << std::scientific << std::setprecision(4);
-	ss << "   Condition No.   " << std::setw(12) << prior.condition_number
-		<< "   " << std::setw(12) << post.condition_number
-		<< "   " << std::setw(12) << " " << std::setw(10) << " " << endl;
-	ss << "   number of cov-based criteria satisfied: " << criteria_sat << endl;
+	ss << scientific << setprecision(4);
+	ss << "   Condition No.   " << setw(12) << prior.condition_number
+		<< "   " << setw(12) << post.condition_number
+		<< "   " << setw(12) << " " << setw(10) << " " << endl;
+	ss << "   number of cov-based criteria satisfied: " << criteria_sat << endl << endl;
+
+	ss << left << setw(20) << "   CMA-ES parameter"
+		<<setw(18) << "Value" << endl;
+	ss << scientific << setprecision(6);
+	ss << setw(20) << "      c_c" << fixed << setprecision(6) << c_c << endl;
+	ss << setw(20) << "      c_1" << fixed << setprecision(6) << c_1 << endl;
+	ss << setw(20) << "      c_mu" << fixed << setprecision(6) << c_mu << endl;
+	ss << setw(20) << "      c_sigma" << fixed << setprecision(6) << c_sigma << endl;
+	ss << setw(20) << "      d_sigma" << fixed << setprecision(6) << d_sigma << endl;
+	ss << setw(20) << "      chi_n" << fixed << setprecision(6) << chi_n << endl;
+	ss << setw(20) << "      sigma" << fixed << setprecision(6) << sigma << endl;
+	ss << setw(20) << "      lambda" << fixed << setprecision(6) << lambda << endl;
+	ss << setw(20) << "      mu" << fixed << setprecision(6) << mu << endl;
+	ss << setw(20) << "      mu_eff" << fixed << setprecision(6) << mu_eff << endl;
 	return ss.str();
 
 }
@@ -5956,7 +5847,8 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 		int draws = 1;
 		const int max_draws = 1000;
 
-		while (true) 
+		bool found = false;
+		while (!found) 
 		{
 			if (draws > max_draws) {
 				for (int j = 0; j < parnames.size(); ++j) {
@@ -5982,6 +5874,7 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 			Eigen::VectorXd y = B * (D.cwiseSqrt().asDiagonal() * z);
 			x = _curr_m.get_data_eigen_vec(parnames) + sigma * y;
 
+			found = true;;
 			for (int j = 0; j < parnames.size(); ++j) {
 				const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(parnames[j]);
 				double lbnd = par_rec->lbnd;
@@ -5993,6 +5886,7 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 				}
 
 				if (x(j) < lbnd || x(j) > ubnd) {
+					found = false;
 					break;
 				}
 			}

@@ -3296,10 +3296,10 @@ pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_a
 		}
 
         Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
+        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies("BASE").transpose();
 
         cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
+        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies("BASE").transpose();
         //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
         Eigen::MatrixXd s, s_, V, U;
         Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |

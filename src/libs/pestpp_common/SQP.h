@@ -87,6 +87,7 @@ public:
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
 	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear = true);
+	void clear_archives();
 	string get_cma_update_summary() const { return cma_update_summary; }
 	bool should_terminate();
 
@@ -123,7 +124,7 @@ private:
 	string cma_update_summary;
 	CovMetrics metrics_init;
 	CovMetrics compute_cov_metrics() const;
-	string report_cov_shrinkage(const CovMetrics& prior, const CovMetrics& post, int iter);
+	string report_cmaes_metrics(const CovMetrics& prior, const CovMetrics& post, int iter);
 	
 	
 
@@ -169,11 +170,11 @@ private:
 	bool use_obj_pi;
 	bool converged = false;
 	map<string, double> obj_func_coef_map;
-	
+	bool reset = false;
+	int stall_count;
+
 	int num_threads;
 	int n_consec_infeas;
-	//todo: make these ++ args
-	int MAX_CONSEC_INFEAS = 100000;
     int MAX_CONSEC_INFEAS_IES;
     double SF_DEC_FAC = 0.8;
     double SF_INC_FAC = 1.1;
@@ -186,7 +187,6 @@ private:
 
     double par_sigma_min = 10;
 	double eigthresh;
-	bool switch_method = false;
 
 	//trust region parameters
 	double trust_radius = 5.0;
