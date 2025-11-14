@@ -86,7 +86,7 @@ public:
 	double get_sigma() const { return sigma; }
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
-	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, int iter, bool clear = true);
+	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear = true);
 	void clear_archives();
 	string get_cma_update_summary() const { return cma_update_summary; }
 	bool should_terminate();
@@ -161,7 +161,6 @@ private:
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
 	CovMatAdapES cmaes;
-	double reg_factor;
 	chancePoints chancepoints;
 	string obj_func_str;
 	string obj_obs;
@@ -170,10 +169,8 @@ private:
 	bool use_obj_pi;
 	bool converged = false;
 	map<string, double> obj_func_coef_map;
-	bool reset = false, recalc_working_set = false;
+	bool reset = false;
 	int recalc_attempt = 0;
-
-	int num_threads;
 	int n_consec_infeas;
     int MAX_CONSEC_INFEAS_IES;
     double SF_DEC_FAC = 0.8;
@@ -182,7 +179,6 @@ private:
     double PAR_SIGMA_DEC_FAC = 0.9;
     double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
-    double PHI_ACCEPT_FAC = 0.05;
     double par_sigma_max = 100;
 
     double par_sigma_min = 10;
@@ -212,7 +208,6 @@ private:
 	vector<double> best_violations;
 	double best_phi_yet;
 	double best_violation_yet;
-	double base_ens_viol;
 	double working_set_tol;
 
 	int warn_min_reals, error_min_reals;
@@ -232,8 +227,8 @@ private:
 	Eigen::MatrixXd constraint_jco, base_constraint_jco;
 	vector<string> cnames;
 
-	ParameterEnsemble dv, dv_base;
-	ObservationEnsemble oe, oe_base;
+	ParameterEnsemble dv, dv_base, dv_to_save;
+	ObservationEnsemble oe, oe_base, oe_to_save;
 	map<string, string> constraint_sense;
 	Eigen::VectorXd lambda;
 
@@ -242,7 +237,6 @@ private:
 	map<string, Eigen::VectorXd> search_d_en, lm_en;
 	map<string, double> current_obj_en;
 	map<string, Eigen::MatrixXd> constraint_jco_en;
-	map<string, double> total_viol_map;
 
 	void save_current_dv_obs();
 
@@ -261,7 +255,7 @@ private:
 	Jacobian_1to1 jco;
 	Covariance hessian;
 
-	SqpFilter filter;
+	SqpFilter filter, filter_stash;
 
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
@@ -273,7 +267,6 @@ private:
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool solve_new();
 	bool solve_new_ensemble();
-	bool resolve_new_ensemble();
 
 	bool seek_feasible();
 	bool line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad);
@@ -281,7 +274,7 @@ private:
 	bool iterative_partial_step(const string& _blocking_constraint);
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
 	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
-	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
+	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool recalc = true);
 	FilterRec pick_from_filter_by_merit(SqpFilter _filtered);
 	bool pick_partial_step(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string, double>& sf_map);
 
@@ -290,7 +283,7 @@ private:
 
 	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
 	FilterRec trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
-		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset);
+		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset, bool recalc);
 	Eigen::VectorXd solve_trust_region_subproblem_dogleg(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, double radius);
 	Eigen::VectorXd solve_constrained_trust_region_step(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, const Eigen::MatrixXd& A, double radius);
 
