@@ -240,7 +240,9 @@ private:
 	map <string, pair<Mat, bool>> constraint_mat_en;
 	map<string, vector<string>> cnames_en;
 	map<string, Eigen::VectorXd> search_d_en, lm_en;
+	map<string, double> current_obj_en;
 	map<string, Eigen::MatrixXd> constraint_jco_en;
+	map<string, double> total_viol_map;
 
 	void save_current_dv_obs();
 
@@ -275,10 +277,11 @@ private:
 
 	bool seek_feasible();
 	bool line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad);
-	bool line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr);
+	FilterRec line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	bool iterative_partial_step(const string& _blocking_constraint);
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
-	bool pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false);
+	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
+	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
 	FilterRec pick_from_filter_by_merit(SqpFilter _filtered);
 	bool pick_partial_step(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string, double>& sf_map);
 
@@ -286,7 +289,7 @@ private:
 	double compute_predicted_reduction(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
 
 	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
-	bool trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
+	FilterRec trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
 		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset);
 	Eigen::VectorXd solve_trust_region_subproblem_dogleg(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, double radius);
 	Eigen::VectorXd solve_constrained_trust_region_step(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, const Eigen::MatrixXd& A, double radius);
@@ -296,9 +299,10 @@ private:
 	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+	
 	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
-	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr);
+	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>());
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
@@ -308,6 +312,7 @@ private:
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
+	FilterRec run_search_routine(Eigen::VectorXd& grad, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 
 	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
 

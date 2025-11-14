@@ -3281,9 +3281,12 @@ pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& worki
 	return pair<vector<string>, bool>(working_set, false);
 }
 
-pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, double working_set_tol)
+pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, vector<string> curr_ws, double working_set_tol)
 {
     pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+	if (curr_ws.size() > 0)
+		working_set.first = curr_ws;
+
     Mat mat;
 	bool converged = false;
     if (working_set.first.size() > 0) {
@@ -3390,28 +3393,22 @@ pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par
 			else if (abs(constraint_map[name]) < working_set_tol)  
 				working_set.push_back(name);
 		}
-		/*else if (abs(constraint_map[name]) < working_set_tol) {
-			working_set.push_back(name);
-		}*/
-		/*else if ((-constraint_map[name] < working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
-            working_set.push_back(name);
-        }
-		else if ((-constraint_map[name] > working_set_tol) && (constraint_sense_map[name] == ConstraintSense::greater_than)) {
-			working_set.push_back(name);
-		}*/
     }
     for (auto &name : ctl_ord_pi_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set_pi.push_back(name);
-		else if (abs(constraint_map[name]) < working_set_tol) {
-			working_set.push_back(name);
+		else if (constraint_sense_map[name] == ConstraintSense::less_than) {
+			if (constraint_map[name] > working_set_tol)
+				working_set_pi.push_back(name);
+			else if (abs(constraint_map[name]) < working_set_tol)
+				working_set_pi.push_back(name);
 		}
-		/*else if ((constraint_map[name] > -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
-			working_set_pi.push_back(name);
+		else if (constraint_sense_map[name] == ConstraintSense::greater_than) {
+			if (constraint_map[name] < -working_set_tol)
+				working_set_pi.push_back(name);
+			else if (abs(constraint_map[name]) < working_set_tol)
+				working_set_pi.push_back(name);
 		}
-		else if ((constraint_map[name] < -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::greater_than)) {
-			working_set_pi.push_back(name);
-		}*/
     }
     return pair<vector<string>,vector<string>>(working_set,working_set_pi);
 }
