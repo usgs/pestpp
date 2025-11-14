@@ -170,8 +170,8 @@ private:
 	bool use_obj_pi;
 	bool converged = false;
 	map<string, double> obj_func_coef_map;
-	bool reset = false;
-	int stall_count;
+	bool reset = false, recalc_working_set = false;
+	int recalc_attempt = 0;
 
 	int num_threads;
 	int n_consec_infeas;
@@ -237,6 +237,11 @@ private:
 	map<string, string> constraint_sense;
 	Eigen::VectorXd lambda;
 
+	map <string, pair<Mat, bool>> constraint_mat_en;
+	map<string, vector<string>> cnames_en;
+	map<string, Eigen::VectorXd> search_d_en, lm_en;
+	map<string, Eigen::MatrixXd> constraint_jco_en;
+
 	void save_current_dv_obs();
 
 	Constraints constraints;
@@ -266,6 +271,7 @@ private:
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool solve_new();
 	bool solve_new_ensemble();
+	bool resolve_new_ensemble();
 
 	bool seek_feasible();
 	bool line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad);
@@ -295,6 +301,7 @@ private:
 	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr);
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
+	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad);

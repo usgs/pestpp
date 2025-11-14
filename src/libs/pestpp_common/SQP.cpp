@@ -1790,19 +1790,6 @@ bool SeqQuadProgram::update_hessian(string how)
 		return false;
 	}
 
-	//if (seek_ies)
-	//{
-	//	message(2, "just performed seek_feasibility(), resetting hessian to identity matrix");
-
-	//	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-	//	h.setIdentity();
-	//	hessian = Covariance(dv_names, h);
-
-	//	seek_ies = false;
-
-	//	return false;
-	//}
-	
 	Covariance old_hessian = hessian;
 	
 	Eigen::VectorXd prev_grad = grad_vector_map[iter-1].get_data_eigen_vec(dv_names);
@@ -3631,6 +3618,45 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);
 }
 
+bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+
+	if ((lm_en[rname].array() > 0).any())
+	{
+		constraint_mat_en[rname] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, &lm_en[rname]);
+		if (constraint_mat_en[rname].first.get_row_names() != cnames_en[rname])
+		{
+			vector<string> prev_cnames = cnames_en[rname];
+			cnames_en[rname] = constraint_mat_en[rname].first.get_row_names();
+			vector<string> dropped_cnames;
+			for (auto c : prev_cnames)
+			{
+				if (find(cnames_en[rname].begin(), cnames_en[rname].end(), c) == cnames_en[rname].end())
+					dropped_cnames.push_back(c);
+			}
+			ss.str("");
+			ss << "constraints dropped for realization " << rname << " due to non-negative multipliers: " << dropped_cnames;
+			ss << "recalculating search_d with new working set: " << cnames_en[rname];
+
+			constraint_jco = constraint_mat_en[rname].first.e_ptr()->toDense();
+			pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco, &cnames_en[rname]);
+			search_d_en[rname] = x.first;
+			lm_en[rname] = x.second;
+
+			ss << "   search direction norm: " << search_d_en[rname].norm() << endl;
+			frec << ss.str();
+
+			return true;
+		}
+		else
+			return false;
+	}
+	else
+		return false;
+}
+
 bool SeqQuadProgram::solve_new()
 {
 	//stringstream ss;
@@ -3808,6 +3834,10 @@ bool SeqQuadProgram::solve_new()
 
 	return true;
 }
+bool SeqQuadProgram::resolve_new_ensemble()
+{
+	return true;
+}
 
 bool SeqQuadProgram::solve_new_ensemble()
 {
@@ -3920,10 +3950,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 	}
 
 	Covariance old_hessian = hessian;
-	map <string, pair<Mat, bool>> constraint_mat_en;
-	map<string, vector<string>> cnames_en;
-	map<string, Eigen::VectorXd> search_d_en, lm_en;
-	map<string, Eigen::MatrixXd> constraint_jco_en;
 	map<string, double> current_obj_en;
 	Parameters dv_vals = current_ctl_dv_values;
 	Observations obs_vals = current_obs;
@@ -3966,54 +3992,41 @@ bool SeqQuadProgram::solve_new_ensemble()
 		}
 			
 		message(1, ss.str());
-
-		if ((lm_en[d].array() > 0).any())
-		{
-			constraint_mat_en[d] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, &lm_en[d]);
-			if (constraint_mat_en[d].first.get_row_names() != cnames_en[d]) 
-			{
-				vector<string> prev_cnames = cnames_en[d];
-				cnames_en[d] = constraint_mat_en[d].first.get_row_names();
-				vector<string> dropped_cnames;
-				for (auto c : prev_cnames)
-				{
-					if (find(cnames_en[d].begin(), cnames_en[d].end(), c) == cnames_en[d].end())
-						dropped_cnames.push_back(c);
-				}
-				ss.str("");
-				ss << "constraints dropped for realization " << d << " due to non-negative multipliers: " << dropped_cnames;
-				ss << "recalculating search_d with new working set: " << cnames_en[d];
-				frec << ss.str();
-
-				constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
-				pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d] , &cnames_en[d]);
-				search_d_en[d] = x.first;
-				lm_en[d] = x.second;
-			}
-		}
 	}
-
-	constraint_jco = constraint_mat_en["BASE"].first.e_ptr()->toDense();
-	current_constraint_mat = constraint_mat_en["BASE"].first;
-	cnames = constraint_mat_en["BASE"].first.get_row_names();
-
-	prev_constraint_mat = current_constraint_mat;
 
 	Eigen::VectorXd search_d, lm;
 	bool successful = false;
 
-	infeas_cand_obs.clear();
-	infeas_cand_dv_values.clear();
+	while (true)
+	{
+		for (auto d : dv.get_real_names())
+		{
+			Eigen::VectorXd real_dv_vec = dv.get_real_vector(d);
+			dv_vals.update_without_clear(dv_names, real_dv_vec);
+			Eigen::VectorXd real_obs_vec = oe.get_real_vector(d);
+			obs_vals.update_without_clear(oe.get_var_names(), real_obs_vec);
+			recalc_search_direction_vector(d, dv_vals, obs_vals, grad);
+		}
 
+		string search_method = pest_scenario.get_pestpp_options().get_sqp_search_method();
+		if (search_method == "LINE" || search_method == "LINE_SEARCH" || search_method == "LS")
+			successful = line_search(search_d_en, grad, current_obj_en, &_drawn_dvs);
+		else if (search_method == "TRUST_REGION" || search_method == "TRUST" || search_method == "TR")
+			successful = trust_region_step(grad, current_obj_en, cnames_en, constraint_jco_en, &_drawn_dvs);
+		else
+			throw_sqp_error("search_method not recognized");
 
-	string search_method = pest_scenario.get_pestpp_options().get_sqp_search_method();
-	if (search_method == "LINE" || search_method == "LINE_SEARCH" || search_method == "LS")
-		successful = line_search(search_d_en, grad, current_obj_en, &_drawn_dvs);
-	else if (search_method == "TRUST_REGION" || search_method == "TRUST" || search_method == "TR")
-		successful = trust_region_step(grad, current_obj_en, cnames_en, constraint_jco_en, &_drawn_dvs);
-	else
-		throw_sqp_error("search_method not recognized");
+		if (!recalc_working_set)
+		{
+			recalc_attempt = 0;
+			break;
+		}
+	}
 	
+	constraint_jco = constraint_mat_en["BASE"].first.e_ptr()->toDense();
+	current_constraint_mat = constraint_mat_en["BASE"].first;
+	cnames = constraint_mat_en["BASE"].first.get_row_names();
+	prev_constraint_mat = current_constraint_mat;
 
 	if (successful)
 	{
@@ -4439,60 +4452,75 @@ bool SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_candi
 
 	if (selected.obj_val == last_best && selected.viol_val == last_viol)
 	{
-		selected = pick_from_filter_by_merit(candidate_filter);
-		reset = true;
-		
-		if (selected.obj_val == last_best && selected.viol_val == last_viol && filter.get_filter_members().size()>0)
+		recalc_attempt++;
+		if (recalc_attempt > 2)
 		{
-			message(1, "no improvement in filter found, selecting best global filter candidate");
-			selected = filter.get_knee();
+			selected = pick_from_filter_by_merit(candidate_filter);
+			reset = true;
+			recalc_working_set = false;
+			recalc_attempt = 0;
+
+			if (selected.obj_val == last_best && selected.viol_val == last_viol && filter.get_filter_members().size() > 0)
+			{
+				message(1, "no improvement in filter found, selecting best global filter candidate");
+				selected = filter.get_knee();
+			}
+			else
+			{
+				message(1, "no improvement in filter found, selecting best current filter candidate by merit");
+				BASE_SCALE_FACTOR = 1.0;
+			}
+			message(1, "no improvement in filter found, selecting best current filter candidate");
+		}
+		else
+			recalc_working_set = true;
+	}
+	else
+		recalc_working_set = false;
+	
+	if (!recalc_working_set)
+	{
+		filter.update(selected.obj_val, selected.viol_val, selected.dp_val, selected.oe_val, selected.real_name, iter);
+		filter.report(frec, iter);
+		current_ctl_dv_values = selected.dp_val;
+		last_best = selected.obj_val;
+		last_viol = selected.viol_val;
+
+		best_phis.push_back(last_best);
+		best_violations.push_back(last_viol);
+
+		ss.str("");
+		ss << "updating BASE with realization: " << selected.iter << "|" << selected.real_name << endl;
+		ss << "   phi: " << last_best << ", violation: " << last_viol;
+		message(1, ss.str());
+
+		Parameters p;
+		Observations o;
+
+		Eigen::VectorXd t = selected.dp_val.get_data_eigen_vec(vnames);
+		p.update_without_clear(vnames, t);
+
+		t = selected.oe_val.get_data_eigen_vec(onames);
+		o.update_without_clear(onames, t);
+		constraints.sqp_report(iter, p, o, true, selected.real_name);
+
+		for (auto& d : vnames)
+			current_ctl_dv_values[d] = p.get_rec(d);
+		current_obs.update_without_clear(_oe.get_var_names(), o.get_data_eigen_vec(_oe.get_var_names()));
+
+		if (selected.viol_val > 0.0)
+		{
+			cmaes.update_archives(dv_candidates, obj_map, total_viol_map, iter, false);
+			return false;
 		}
 		else
 		{
-			message(1, "no improvement in filter found, selecting best current filter candidate by merit");
-			BASE_SCALE_FACTOR = 1.0;
+			cmaes.update_archives(dv_candidates, obj_map, total_viol_map, iter, false);
+			return true;
 		}
-		message(1, "no improvement in filter found, selecting best current filter candidate");
-	}
-	
-	filter.update(selected.obj_val, selected.viol_val, selected.dp_val, selected.oe_val, selected.real_name, iter);
-	filter.report(frec, iter);
-	current_ctl_dv_values = selected.dp_val;
-	last_best = selected.obj_val;
-	last_viol = selected.viol_val;
-		
-	best_phis.push_back(last_best);
-	best_violations.push_back(last_viol);
-
-	ss.str("");
-	ss << "updating BASE with realization: " << selected.iter << "|" << selected.real_name << endl;
-	ss << "   phi: " << last_best << ", violation: " << last_viol;
-	message(1, ss.str());
-	
-	Parameters p;
-	Observations o;
-
-	Eigen::VectorXd t = selected.dp_val.get_data_eigen_vec(vnames);
-	p.update_without_clear(vnames, t);
-
-	t = selected.oe_val.get_data_eigen_vec(onames);
-	o.update_without_clear(onames, t);
-	constraints.sqp_report(iter, p, o, true, selected.real_name);
-
-	for (auto& d : vnames)
-		current_ctl_dv_values[d] = p.get_rec(d);
-	current_obs.update_without_clear(_oe.get_var_names(), o.get_data_eigen_vec(_oe.get_var_names()));
-
-	if (selected.viol_val > 0.0)
-	{
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, iter, false);
-		return false;
 	}
 	else
-	{
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, iter, false);
-		return true;
-	}
+		return false;
 
 }
 
