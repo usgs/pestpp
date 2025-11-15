@@ -407,6 +407,10 @@ public:
 	void set_sqp_max_consec_infeas_ies(int _max) { sqp_max_consec_infeas_ies = _max; }
 	double get_sqp_max_reinflation_cond_num() const { return sqp_max_reinflation_cond_num; }
 	void set_sqp_max_reinflation_cond_num(double val) { sqp_max_reinflation_cond_num = val; }
+	double get_sqp_scale_up_factor() const { return sqp_scale_up_factor; }
+	void set_sqp_scale_up_factor(double val) { sqp_scale_up_factor = val; }
+	double get_sqp_scale_down_factor() const { return sqp_scale_down_factor; }
+	void set_sqp_scale_down_factor(double val) { sqp_scale_down_factor = val; }
 
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -821,8 +825,8 @@ private:
 	int sqp_max_consec_infeas;
 	int sqp_max_consec_infeas_ies;
 	int max_consec_phiinc;
-	double sf_dec_fac;
-	double sf_inc_fac;
+	double sqp_scale_up_factor;
+	double sqp_scale_down_factor;
 	double sqp_cma_c1;
 	double sqp_cma_cmu;
 	double sqp_cma_cc;

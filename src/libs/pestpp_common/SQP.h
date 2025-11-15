@@ -168,13 +168,14 @@ private:
 	bool use_obj_obs;
 	bool use_obj_pi;
 	bool converged = false;
+	bool found_feasible = false;
 	map<string, double> obj_func_coef_map;
 	bool reset = false;
 	int recalc_attempt = 0;
 	int n_consec_infeas;
     int MAX_CONSEC_INFEAS_IES;
-    double SF_DEC_FAC = 0.8;
-    double SF_INC_FAC = 1.1;
+    double SF_DEC_FAC;
+    double SF_INC_FAC;
     double BASE_SCALE_FACTOR = 1.0;
     double PAR_SIGMA_DEC_FAC = 0.9;
     double PAR_SIGMA_INC_FAC = 2.0;
