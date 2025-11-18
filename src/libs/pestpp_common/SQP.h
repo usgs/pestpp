@@ -181,6 +181,7 @@ private:
     double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
     double par_sigma_max = 100;
+	double step_limit_factor = 0.05;
 
     double par_sigma_min = 10;
 	double eigthresh;
@@ -216,7 +217,7 @@ private:
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
-	bool use_subset, use_cmaes = true;
+	bool use_subset, use_cmaes = true, adjust_step_control = false;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;
