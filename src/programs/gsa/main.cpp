@@ -38,6 +38,8 @@
 #include "RunManagerSerial.h"
 #include "OutputFileWriter.h"
 #include "PantherAgent.h"
+#include "RunManagerExternal.h"
+#include "RunManagerPanther.h"
 #include "Serialization.h"
 #include "system_variables.h"
 
@@ -59,11 +61,9 @@ int main(int argc, char* argv[])
 	cout << endl << endl;
 	cout << "             pestpp-sen: a tool for global sensitivity analysis" << endl << endl;
 	cout << "                       by The PEST++ Development Team" << endl;
-	cout << endl << endl << "version: " << version << endl;
-	cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-    auto start = chrono::steady_clock::now();
+	cout << endl;
+	auto start = chrono::steady_clock::now();
     string start_string = get_time_string();
-    cout << "started at " << start_string << endl;
 	CmdLine cmdline(argc, argv);
 
     if (quit_file_found())
@@ -84,6 +84,8 @@ int main(int argc, char* argv[])
 			ofstream frec("panther_worker.rec");
 			if (frec.bad())
 				throw runtime_error("error opening 'panther_worker.rec'");
+			cmdline.startup_report(frec,start_string);
+			cmdline.startup_report(cout,start_string);
 			PANTHERAgent yam_agent(frec);
 			string ctl_file = "";
 			try {
@@ -119,26 +121,19 @@ int main(int argc, char* argv[])
 		exit(1);
 
 	}
-	if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+	/*if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 	{
 		cerr << "external run manager ('/e') no longer supported, please use PANTHER instead" << endl;
 		exit(1);
 
-	}
+	}*/
 
 	ofstream &fout_rec = file_manager.open_ofile_ext("rec");
 	fout_rec << "             pestpp-sen: a tool for global sensitivity analysis" << endl << endl;
 	fout_rec << "                         by The PEST++ Development Team" << endl << endl;
-	fout_rec << endl << endl << "version: " << version << endl;
-	fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-	fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-	fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-	fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
-    fout_rec << "started at " << start_string << endl;
-	cout << endl;
-	cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-	cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-	cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+	fout_rec << endl;
+	cmdline.startup_report(fout_rec,start_string);
+	cmdline.startup_report(cout, start_string);
 
 	// create pest run and process control file to initialize it
 	Pest pest_scenario;
@@ -187,6 +182,15 @@ int main(int argc, char* argv[])
             pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
             pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
             pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+	}
+	else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+	{
+		string rns_file = file_manager.build_filename("rns");
+		const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+		run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+		exi.tplfile_vec, exi.inpfile_vec,
+	   exi.insfile_vec, exi.outfile_vec,
+		rns_file);
 	}
 	else
 	{

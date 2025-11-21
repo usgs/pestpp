@@ -2017,8 +2017,9 @@ void RunManagerPanther::kill_all_active_runs()
 
 	 bool just_quit = false;
      int q = pest_utils::quit_file_found();
-     if ((q == 1) || (q == 2) || (q == 4))
-         just_quit = true;
+     if ((q == 1) || (q == 2) || (q == 4)) {
+	     just_quit = true;
+     }
 
 	 double duration;
 	 for (auto &i = range_pair.first; i != range_pair.second; ++i)

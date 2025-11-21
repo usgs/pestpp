@@ -38,11 +38,16 @@ void IterEnsembleSmoother::iterate_2_solution()
 	bool accept;
 	vector<int> n_iter_reinflate = pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate();
     vector<double> reinflate_factor = pest_scenario.get_pestpp_options().get_ies_reinflate_factor();
+    vector<int> reinflate_num_reals = pest_scenario.get_pestpp_options().get_ies_reinflate_num_reals();
 
     int iters_since_reinflate = 0;
     int n_iter_reinflate_idx = 0;
     int current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
     double current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
+    int current_num_reals = reinflate_num_reals[n_iter_reinflate_idx];
+	if (reinflate_num_reals.size() > n_iter_reinflate_idx+1) {
+		current_num_reals = reinflate_num_reals[n_iter_reinflate_idx+1];
+	}
     int solution_iter = 0;
     int q;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
@@ -93,7 +98,7 @@ void IterEnsembleSmoother::iterate_2_solution()
             message(2,"incrementing iteration count for reinflation cycle");
             iter++;
 
-            reset_par_ensemble_to_prior_mean(current_reinflate_factor);
+            reinflate_par_ensemble(current_reinflate_factor,current_num_reals);
             //adjust_weights(true);
             iters_since_reinflate = 0;
             n_iter_reinflate_idx++;
@@ -101,10 +106,12 @@ void IterEnsembleSmoother::iterate_2_solution()
             {
                 current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
             }
-            if (n_iter_reinflate.size() > n_iter_reinflate_idx)
-            {
-                current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
+            if (n_iter_reinflate.size() > n_iter_reinflate_idx) {
+	            current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
             }
+        	if (reinflate_num_reals.size() > n_iter_reinflate_idx+1) {
+        		current_num_reals = reinflate_num_reals[n_iter_reinflate_idx+1];
+        	}
             //now report again to get the new phi sequence after reinflation
             should_terminate(current_n_iter_reinflate);
 

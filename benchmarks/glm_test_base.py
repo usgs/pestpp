@@ -945,16 +945,16 @@ if __name__ == "__main__":
     #tenpar_superpar_restart_test()
     #freyberg_basic_restart_test()
     # jac_diff_invest()
-    #new_fmt_load_test()
+    new_fmt_load_test()
     #tenpar_hotstart_test()
     #tenpar_normalform_test()
     #freyberg_stress_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #tenpar_xsec_stress_test_2()
     #tenpar_xsec_stress_test_3()
-    tenpar_xsec_stress_test_5super()
+    #tenpar_xsec_stress_test_5super()
     
-    tenpar_xsec_stress_test_5()
+    #tenpar_xsec_stress_test_5()
 
     
 

@@ -494,6 +494,8 @@ public:
     void set_mou_use_multigen(bool _flag) {mou_use_multigen = _flag;}
     bool get_mou_shuffle_fixed_pars() const {return mou_shuffle_fixed_pars;}
     void set_mou_shuffle_fixed_pars(bool _flag) {mou_shuffle_fixed_pars = _flag;}
+	bool get_mou_debug_dv_handling() const { return mou_debug_dv_handling; }
+	void set_mou_debug_dv_handling(bool _flag) { mou_debug_dv_handling = _flag; }
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -621,8 +623,10 @@ public:
     vector<string> get_ies_aal_indicator_pars() const {return ies_aal_indicator_pars;}
     void set_ies_run_realname(string name) {ies_run_realname = name;}
     string get_ies_run_realname() const {return ies_run_realname;}
+	void set_ies_reinflate_num_reals(vector<int> _vec)  { ies_reinflate_num_reals = _vec;}
+	vector<int> get_ies_reinflate_num_reals() const {return ies_reinflate_num_reals;}
 
-    string get_gsa_method() const { return gsa_method; }
+	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
 	bool get_gsa_morris_pooled_obs() const { return gsa_morris_pooled_obs; }
 	void set_gsa_morris_pooled_obs(bool _flag) {gsa_morris_pooled_obs = _flag; }
@@ -880,6 +884,7 @@ private:
 	bool mou_simplex_mutation;
 	bool mou_use_multigen;
 	bool mou_shuffle_fixed_pars;
+	bool mou_debug_dv_handling;
 
 	int ies_subset_size;
 	string ies_par_csv;
@@ -945,6 +950,7 @@ private:
     bool ies_updatebyreals;
     vector<string> ies_aal_indicator_pars;
     string ies_run_realname;
+	vector<int> ies_reinflate_num_reals;
 
 
 
@@ -1033,7 +1039,7 @@ ostream& operator<< (ostream& os, const SVDInfo& val);
 
 double draw_standard_normal(std::mt19937& rand_gen);
 vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
-
+vector<int> uniform_int_draws(int num_reals, int lower_bound, int upper_bound, std::mt19937& rand_gen);
 
 
 

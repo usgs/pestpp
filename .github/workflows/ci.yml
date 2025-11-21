@@ -1,4 +1,4 @@
-name: pestpp continuous integration
+name: continuous integration
 
 on: 
   schedule:
@@ -16,8 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest] 
-        python-version: [3.10] # , 3.7, 3.6]
+        os: [windows-latest, ubuntu-latest]
+        # python-version: ["3.10"] # , 3.7, 3.6]
         run-type: [std]
         # test_repo: [""]
         # test_dir: [""]
@@ -48,12 +48,8 @@ jobs:
     env: ${{ matrix.env }}
 
     steps:
+      - uses:  actions/checkout@v5
 
-    - uses:  actions/checkout@v5
-    # - name: Setup Ninja
-      # if: ${{ runner.os == 'Windows' }} 
-    - uses: seanmiddleditch/gha-setup-ninja@master
-  
     # - name: Cache Miniconda
     #   uses: actions/cache@v2.1.0
     #   env:
@@ -61,13 +57,11 @@ jobs:
     #     CACHE_NUMBER: 0
     #   with:
     #     path: ~/conda_pkgs_dir
-    #     key: ${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.run-type }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('etc/environment.yml') }}
-    
-    - name: Set Windows ENV
-      if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1
+    #     key: ${{ runner.os }}-${{ matrix.run-type }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('etc/environment.yml') }}
 
-    
+      - name: Set Windows ENV
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
     # Standard python fails on windows without GDAL installation
     # Using custom bash shell ("shell: bash -l {0}") with Miniconda
@@ -92,12 +86,11 @@ jobs:
     #     # environment-file: etc/environment.yml
     #     # use-only-tar-bz2: true
 
-    - name: setup micromamba
-      uses: mamba-org/setup-micromamba@v2
-      with:
-        environment-file: etc/environment.yml
-        cache-environment: false
-        post-cleanup: 'all'
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: etc/environment.yml
+          cache-environment: false
+          post-cleanup: 'all'
 
     # - name: Add packages to pyemu environment using mamba or conda
     #   shell: bash -l {0}
@@ -139,52 +132,49 @@ jobs:
     #   if: ${{ runner.os == 'Windows' }} 
     #   uses: lukka/get-cmake@latest
 
-    - name: clone test repo ${{ env.test_repo }}
-      shell: bash -l {0}
-      run: |
-        git clone ${{ env.test_repo }}
+      - name: clone test repo ${{ env.test_repo }}
+        shell: bash -l {0}
+        run: |
+          git clone ${{ env.test_repo }}
 
-    - name: PESTPP exe install
-      shell: bash -l {0}
-      run: |
-        mkdir build && cd build
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
-            ninja
-        else
-            cmake -DCMAKE_BUILD_TYPE=Release ..
-            make -j2
-        fi
-        cd ..
+      - name: PESTPP exe install
+        shell: bash -l {0}
+        run: |
+          mkdir build && cd build
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
+              ninja
+          else
+              cmake -DCMAKE_BUILD_TYPE=Release ..
+              make -j2
+          fi
+          cd ..
 
-    
-    - name: aux bin path hackery
-      shell: bash -l {0}
-      run: |
-        cp -r benchmarks/test_bin/win $HOME/bin
-        echo "../../test_bin/win" >> $GITHUB_PATH
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp -r benchmarks/test_bin/win $HOME/bin
-            echo "../../test_bin/win" >> $GITHUB_PATH  
-        else
-            echo "../../test_bin/linux" >> $GITHUB_PATH
-            cp -r benchmarks/test_bin/win $HOME/bin
-        fi
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: aux bin path hackery
+        shell: bash -l {0}
+        run: |
+          cp -r benchmarks/test_bin/win $HOME/bin
+          echo "../../test_bin/win" >> $GITHUB_PATH
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cp -r benchmarks/test_bin/win $HOME/bin
+              echo "../../test_bin/win" >> $GITHUB_PATH
+          else
+              echo "../../test_bin/linux" >> $GITHUB_PATH
+              cp -r benchmarks/test_bin/win $HOME/bin
+          fi
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-    - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
-      shell: bash -l {0}
-      run: |
-        
-        ls -l
-        cd ${{ env.test_dir }}
-        nosetests -v ${{ env.test_script }}
-        status=$?
-        echo $status
+      - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
+        shell: bash -l {0}
+        run: |
+          ls -l
+          cd ${{ env.test_dir }}
+          nosetests -v ${{ env.test_script }}
+          status=$?
+          echo $status
 
-        if [ $status -eq 0 ]; then
-            exit 0
-        else
-            exit 127
-        fi
-        
+          if [ $status -eq 0 ]; then
+              exit 0
+          else
+              exit 127
+          fi

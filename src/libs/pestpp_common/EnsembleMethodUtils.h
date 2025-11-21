@@ -51,7 +51,7 @@ protected:
 class PhiThread
 {
 public:
-    PhiThread(vector<string> _oe_real_names);
+    explicit PhiThread(vector<string> _oe_real_names);
 
     void work(int thread_id, Eigen::MatrixXd& weights, Eigen::MatrixXd& resid, vector<string>& oe_real_names, map<string,map<string,double>>& phi_map);
 
@@ -224,7 +224,8 @@ public:
 	EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
 		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer,
 		Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
-		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
+		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names,
+		double _reg_factor);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
@@ -236,6 +237,7 @@ private:
 	FileManager& file_manager;
 	int iter, verbose_level;
 	bool use_localizer;
+	double reg_factor;
 	Pest& pest_scenario;
 	ParameterEnsemble& pe;
 	ObservationEnsemble& oe, base_oe, weights;
@@ -274,7 +276,7 @@ public:
                   unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
                   unordered_map<string, Eigen::VectorXd>& _obs_err_map,
                   unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
-                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases);
+                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor);
 
     void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
 
@@ -282,7 +284,7 @@ protected:
     PerformanceLog* performance_log;
     vector<string> keys;
     int count, total;
-
+	double reg_factor;
     unordered_map<string, pair<vector<string>, vector<string>>>& cases;
 
     ParameterEnsemble& pe_upgrade;
@@ -306,7 +308,7 @@ public:
 		Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map,
 		unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade,
 		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
-		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);
+		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how, double _reg_factor);
 
 	virtual void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names) { ; }
 
@@ -317,13 +319,13 @@ public:
                            const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                            Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                            const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-                           const vector<string>& act_obs_names,const vector<string>& act_par_names);
+                           const vector<string>& act_obs_names,const vector<string>& act_par_names, double _reg_factor);
 protected:
 	PerformanceLog* performance_log;
 	Localizer::How how;
 	vector<string> keys;
 	int count, total;
-
+	double reg_factor;
 	unordered_map<string, pair<vector<string>, vector<string>>>& cases;
 
 	ParameterEnsemble& pe_upgrade;
@@ -452,8 +454,6 @@ protected:
     bool reinflate_to_minphi_real;
     ObservationInfo org_obs_info;
     string dense_file_ext = ".bin";
-
-
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
 
 	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
@@ -503,7 +503,6 @@ protected:
 
     double get_lambda();
 
-    void reset_par_ensemble_to_prior_mean(double reinflate_factor);
-
+    void reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals);
 };
 #endif

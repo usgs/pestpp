@@ -7,6 +7,7 @@ target_compile_options(pestpp-sqp PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 target_link_libraries(pestpp-sqp
   rm_serial
   rm_yamr
+  rm_external
 )
 
 install(TARGETS pestpp-sqp RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

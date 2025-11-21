@@ -44,6 +44,7 @@ along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 #include "debug.h"
 #include "logger.h"
 #include "Jacobian.h"
+#include "RunManagerExternal.h"
 
 
 using namespace std;
@@ -447,7 +448,8 @@ int main(int argc, char* argv[])
 		cout << "             pestpp-swp - a parametric sweep utility, version " << version << endl;
 		cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                 by the PEST++ development team" << endl << endl << endl;
-
+		auto start = chrono::steady_clock::now();
+		string start_string = get_time_string();
 
 
 		CmdLine cmdline(argc, argv);
@@ -469,12 +471,7 @@ int main(int argc, char* argv[])
 		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
 		//run manager is specified on the command line.
-		
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "External run manager ('/e') not supported by sweep, please use panther instead" << endl;
-			exit(1);
-		}
+
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::GENIE)
 		{
 			cerr << "Genie run manager ('/e') deprecated, please use panther instead" << endl;
@@ -490,6 +487,8 @@ int main(int argc, char* argv[])
 				ofstream frec("panther_worker.rec");
 				if (frec.bad())
 					throw runtime_error("error opening 'panther_worker.rec'");
+				cmdline.startup_report(frec,start_string);
+				cmdline.startup_report(cout,start_string);
 				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
@@ -542,29 +541,12 @@ int main(int argc, char* argv[])
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
-        auto start = chrono::steady_clock::now();
-        string start_string = get_time_string();
-		if (!restart_flag || save_restart_rec_header)
-		{
-			fout_rec << "             pestpp-swp.exe - a parametric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
-			fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
-			fout_rec << endl;
-			fout_rec << endl << endl << "version: " << version << endl;
-			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
-            fout_rec << "started at " << start_string << endl << endl;
-		}
 
-		cout << endl;
-		cout << endl << endl << "version: " << version << endl;
-		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-
-        cout << "started at " << start_string << endl;
-		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-		cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+		fout_rec << "             pestpp-swp.exe - a parametric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
+		fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
+		fout_rec << endl;
+		cmdline.startup_report(fout_rec,start_string);
+		cmdline.startup_report(cout,start_string);
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -655,6 +637,15 @@ int main(int argc, char* argv[])
                     pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+		}
+		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+		{
+
+			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+			run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+			exi.tplfile_vec, exi.inpfile_vec,
+		   exi.insfile_vec, exi.outfile_vec,
+			rns_file);
 		}
 		else
 		{
