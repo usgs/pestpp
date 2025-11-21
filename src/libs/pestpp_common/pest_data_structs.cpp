@@ -1798,6 +1798,16 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_scale_down_factor);
 		return true;
 	}
+	else if (key == "SQP_HESS_MAX_COND_NUM")
+	{
+		convert_ip(value, sqp_hess_max_cond_num);
+		return true;
+	}
+	else if (key == "SQP_MAX_STEP_FACTOR")
+	{
+		convert_ip(value, sqp_max_step_factor);
+		return true;
+		}
 	return false;
 }
 
@@ -1980,6 +1990,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_max_reinflation_cond_num: " << sqp_max_reinflation_cond_num << endl;
 	os << "sqp_scale_up_factor: " << sqp_scale_up_factor << endl;
 	os << "sqp_scale_down_factor: " << sqp_scale_down_factor << endl;
+	os << "sqp_hess_max_cond_num: " << sqp_hess_max_cond_num << endl;
+	os << "sqp_max_step_factor: " << sqp_max_step_factor << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2224,6 +2236,8 @@ void PestppOptions::set_defaults()
 	set_sqp_max_reinflation_cond_num(500.0);
 	set_sqp_scale_up_factor(1.0);
 	set_sqp_scale_down_factor(1.0);
+	set_sqp_hess_max_cond_num(1E+10);
+	set_sqp_max_step_factor(1.0);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

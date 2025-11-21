@@ -257,13 +257,14 @@ private:
 	Jacobian_1to1 jco;
 	Covariance hessian;
 
-	SqpFilter filter, filter_stash;
+	SqpFilter filter;
 
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
 
 	bool update_hessian(string how);
 	void update_scaling(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
+	Eigen::MatrixXd regularize_hessian(const Eigen::MatrixXd& H, const string& context);
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
@@ -303,7 +304,7 @@ private:
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
-	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad);
+	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);

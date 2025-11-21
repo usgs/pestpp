@@ -869,6 +869,7 @@ void SeqQuadProgram::initialize()
 	MAX_CONSEC_INFEAS_IES = pest_scenario.get_pestpp_options().get_sqp_max_consec_infeas_ies();
 	SF_INC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_up_factor();
 	SF_DEC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_down_factor();
+	step_limit_factor = pest_scenario.get_pestpp_options().get_sqp_max_step_factor();
 
 	stringstream ss;
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -1288,7 +1289,7 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 				reset = false;
 			}
-			else if (is_base_infeas && !seek_ies)
+			/*else if (is_base_infeas && !seek_ies)
 			{
 				if(best_violations[best_violations.size()-2] == 0)
 				{
@@ -1296,7 +1297,7 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 					cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
 				}
 				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
-			}
+			}*/
 			else if (seek_ies)
 			{
 				seek_ies = false;
@@ -1787,45 +1788,36 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 		performance_log->log_event(ss.str());
 		return false;
 	}
-	H_new -= (Hs * Hs.transpose()) / denom;
+	
+	const double max_update_norm = 1E+6;
+	double hs_outer_norm = (Hs * Hs.transpose()).norm();
+	double y_outer_norm = (y_k * y_k.transpose()).norm();
 
+	if (hs_outer_norm / abs(denom) > max_update_norm) {
+		double scale_factor = max_update_norm * abs(denom) / hs_outer_norm;
+		ss << "scaling down first BFGS term by factor: " << scale_factor << endl;
+		Hs *= sqrt(scale_factor);
+	}
+
+	if (y_outer_norm / abs(s_dot_y) > max_update_norm) {
+		double scale_factor = max_update_norm * abs(s_dot_y) / y_outer_norm;
+		ss << "scaling down second BFGS term by factor: " << scale_factor << endl;
+		y_k *= sqrt(scale_factor);
+		s_dot_y = y_k.dot(s_k); 
+	}
+
+	H_new -= (Hs * Hs.transpose()) / denom;
 	// Second term: y_k*y_k^T/(y_k^T*s_k) from Eq. 6.19, Nocedal and Wright, p. 140
 	H_new += (y_k * y_k.transpose()) / s_dot_y;
 
 	double hessian_norm = H_new.norm();
-	if (hessian_norm > max_hessian_norm)
-	{
-		ss << "rescaling Hessian norm from " << hessian_norm << " to " << max_hessian_norm << endl;
-		H_new *= (max_hessian_norm / hessian_norm);
+
+	if (hessian_norm > max_hessian_norm) {
+		ss << "BFGS update created very large Hessian norm: " << hessian_norm << endl;
+		message(1, ss.str());
 	}
 
-	// Check condition number per Nocedal and Wright p. 117. This is required to maintain stability
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(H_new);
-	double cond = eigensolver.eigenvalues().maxCoeff() /
-		eigensolver.eigenvalues().minCoeff();
-
-	if (cond > max_condition)
-	{
-		ss << "warning: condition number too large: " << cond << endl;
-
-		double min_eig = eigensolver.eigenvalues().minCoeff();
-		double max_eig = eigensolver.eigenvalues().maxCoeff();
-
-		if (min_eig < eps)
-		{
-			double reg = eps - min_eig;
-			H_new += reg * Eigen::MatrixXd::Identity(H_new.rows(), H_new.cols());
-			ss << "applying regularization: " << reg << endl;
-			message(2, "applying regularization: ", reg);
-		}
-
-		if (max_eig > 1E+6)
-		{
-			ss << "rescaling Hessian to limit maximum eigenvalue: " << max_eig << endl;
-			double scale_down = 1E6 / max_eig;
-			H_new *= scale_down;
-		}
-	}
+	H_new = regularize_hessian(H_new, "BFGS update");
 
 	if (seek_ies)
 	{
@@ -1992,6 +1984,67 @@ void SeqQuadProgram::update_scaling(const Eigen::VectorXd& step, const Eigen::Ve
 	}
 
 	message(2, "Updated adaptive Hessian scaling");
+}
+
+Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, const string& context)
+{
+	stringstream ss;
+
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_H(H);
+	double min_eig_H = eig_H.eigenvalues().minCoeff();
+	const double min_allowed_eig = 1E-6;
+
+	const double max_condition_critical = pest_scenario.get_pestpp_options().get_sqp_hess_max_cond_num();
+	const double max_condition_action = max_condition_critical * 1E-1;
+	const double max_condition_warning = max_condition_action * 1E-1;
+
+	Eigen::MatrixXd H_reg = H;
+	double cond_H = eig_H.eigenvalues().maxCoeff() / eig_H.eigenvalues().minCoeff();
+
+	if (cond_H > max_condition_critical) {
+		ss.str("");
+		ss << "Hessian condition number extremely large";
+		if (!context.empty()) 
+			ss << " (" << context << ")";
+		ss << ": " << cond_H << ", using identity";
+		message(2, ss.str());
+		H_reg = Eigen::MatrixXd::Identity(H.rows(), H.cols());
+	}
+	else if (cond_H > max_condition_action) {
+		ss.str("");
+		ss << "Hessian condition number very large";
+
+		if (!context.empty()) 
+			ss << " (" << context << ")";
+		ss << ": " << cond_H << ", applying strong regularization";
+		message(2, ss.str());
+		double reg_factor = 1.0 / sqrt(cond_H);
+		H_reg += reg_factor * Eigen::MatrixXd::Identity(H.rows(), H.cols());
+	}
+	else if (cond_H > max_condition_warning) {
+		if (min_eig_H < min_allowed_eig) {
+			double delta = min_allowed_eig - min_eig_H + 1e-6;
+			H_reg += delta * Eigen::MatrixXd::Identity(H.rows(), H.cols());
+			ss.str("");
+			ss << "applied regularization to Hessian";
+			if (!context.empty()) 
+				ss << " (" << context << ")";
+			ss << ", delta = " << delta;
+			message(2, ss.str());
+		}
+	}
+	else if (min_eig_H < min_allowed_eig) {
+		double delta = min_allowed_eig - min_eig_H + 1e-6;
+		H_reg += delta * Eigen::MatrixXd::Identity(H.rows(), H.cols());
+		ss.str("");
+		ss << "applied regularization to Hessian";
+		if (!context.empty()) 
+			ss << " (" << context << ")";
+		ss << ", delta = " << delta;
+		message(2, ss.str());
+	}
+
+	return H_reg;
 }
 
 bool SeqQuadProgram::isfullrank(const Eigen::MatrixXd& mat)
@@ -2308,7 +2361,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	return pgrad;
 }
 
-pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::MatrixXd& G, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad)
+pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eigen::MatrixXd& G, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad)
 {
 	stringstream ss;
 	ss.str("");
@@ -2343,9 +2396,20 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	else
 		Z = Eigen::MatrixXd::Zero(n, 0);
 
+	Eigen::MatrixXd G_reg = regularize_hessian(G, "null space solve");
+	const double max_condition_warning = pest_scenario.get_pestpp_options().get_sqp_hess_max_cond_num() * 1E-4;
+	const double min_allowed_eig = 1E-6;
+
 	// solve p_range_space
 	Eigen::VectorXd p_y, rhs;
 	Eigen::MatrixXd AY = _constraint_jco * Y; // A*Y is m×m, should be full rank
+
+	// Check condition number of A*Y
+	Eigen::JacobiSVD<Eigen::MatrixXd> svd_AY(AY);
+	double cond_AY = svd_AY.singularValues()(0) / svd_AY.singularValues()(svd_AY.singularValues().size() - 1);
+	if (cond_AY > max_condition_warning) {
+		message(1, "WARNING: A*Y condition number very large: ", cond_AY);
+	}
 
 	Eigen::LDLT<Eigen::MatrixXd> ldlt_AY(AY);
 	if (ldlt_AY.info() != Eigen::Success)
@@ -2359,13 +2423,37 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 		p_y = ldlt_AY.solve(-constraint_diff); //from Eq 18.19a pp. 538 Nocedal and Wright
 	}
 	
+	// Check magnitude of p_y
+	const double max_p_norm = 1E+6;
+	ss.str("");
+	if (p_y.norm() > max_p_norm) 
+	{
+		ss << "WARNING: p_y norm too large: " << p_y.norm() << ", scaling down to " << max_p_norm;
+		message(1, ss.str());
+		p_y *= (max_p_norm / p_y.norm());
+	}
+
 	// solve p_null_space
 	bool simplified_null_space_approach = false; //TODO: add as ++arg; too much to be an arg?
 	Eigen::VectorXd p_z;
 
 	if (Z.cols() > 0)
 	{
-		Eigen::MatrixXd red_hess = Z.transpose() * G * Z; 
+		Eigen::MatrixXd red_hess = Z.transpose() * G_reg * Z; 
+
+		// Check condition number of reduced Hessian
+		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_red(red_hess);
+		double cond_red = eig_red.eigenvalues().maxCoeff() / eig_red.eigenvalues().minCoeff();
+		if (cond_red > max_condition_warning) {
+			message(2, "WARNING: Reduced Hessian condition number very large: ", cond_red);
+			// Apply regularization
+			double min_eig_red = eig_red.eigenvalues().minCoeff();
+			if (min_eig_red < min_allowed_eig) {
+				double delta_red = min_allowed_eig - min_eig_red + 1e-6;
+				red_hess += delta_red * Eigen::MatrixXd::Identity(red_hess.rows(), red_hess.cols());
+				message(2, "Applied regularization to reduced Hessian, delta = ", delta_red);
+			}
+		}
 
 		//check if positive definite
 		Eigen::LDLT<Eigen::MatrixXd> ldlt(red_hess);
@@ -2375,7 +2463,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 		bool cholesky = false; //TODO: add as ++arg; too much to be an arg?
 		if (simplified_null_space_approach)
 		{
-			message(1, "using simplified approach in KKT null space solve...");
+			message(2, "using simplified approach in KKT null space solve...");
 			rhs = - Z.transpose() * curved_grad;
 			// simplify by removing cross term (or ``partial hessian'') matrix (zTgy), which is approp when approximating hessian (zTgz) (as p_y goes to zero faster than p_z)
 			if (cholesky)
@@ -2408,6 +2496,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 				p_z = ldlt.solve(rhs); //From Eq 18.19b pp. 538 Nocedal and Wright
 			}
 		}
+
+		ss.str("");
+		if (p_z.norm() > max_p_norm)
+		{
+			ss << "WARNING: p_z norm too large: " << p_z.norm() << ", scaling down";
+			message(2, ss.str());
+			p_z *= (max_p_norm / p_z.norm());
+		}
 	}
 	else
 	{
@@ -2419,6 +2515,15 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	else
 		search_d = Y * p_y;
 	
+	const double max_search_d_norm = 1E+8; //TODO: rethink about hardcoding this value
+	if (search_d.norm() > max_search_d_norm) 
+	{
+		ss.str("");
+		ss << "WARNING: search_d norm too large: " << search_d.norm() << ", scaling down";
+		message(2, ss.str());
+		search_d *= (max_search_d_norm / search_d.norm());
+	}
+
 	if (search_d.size() != curved_grad.size())
 	{
 		throw_sqp_error("search direction vector computation error (in null space KKT solve method)!");
@@ -3671,8 +3776,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 	if (Cnames.size() > 0)
 	{
-		//message(0, "current working set:", Cnames);
-
 		Eigen::VectorXd constraint_diff(Cnames.size());
 		pair<Eigen::VectorXd, Eigen::VectorXd> p = constraints.get_obs_resid_constraint_vectors(_current_dv_values, _current_obs_values, Cnames);
 		constraint_diff = p.second;
@@ -3693,11 +3796,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 			Eigen::MatrixXd U = cod.matrixQ();
 			Eigen::MatrixXd reduced_constr_jco = U.leftCols(effective_rank);
-
-			Eigen::VectorXd reduced_constraint_diff = U.leftCols(effective_rank).transpose() * (-constraint_diff);
-
 			constr_jco = reduced_constr_jco;
-			constraint_diff = -reduced_constraint_diff;
+
+			Eigen::VectorXd reduced_constraint_diff = U.leftCols(effective_rank).transpose() * constraint_diff;
+			constraint_diff = reduced_constraint_diff;
 		}
 		
 		if ((constraint_diff.array().abs() > filter.get_viol_tol()).any()) 
@@ -3732,61 +3834,102 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	}
 	else  // solve unconstrained QP subproblem
 	{
-		Eigen::MatrixXd H = *hessian.e_ptr();
-		search_d = H.ldlt().solve(-grad_vector); //Eq 7.9, Nocedal and Wright p. 169
-		double dir_dot_grad = search_d.dot(grad_vector);
-		if (dir_dot_grad > 0) {
+		Eigen::MatrixXd H_reg = regularize_hessian(*hessian.e_ptr(), "unconstrained");
+		Eigen::LDLT<Eigen::MatrixXd> ldlt_H(H_reg);
+
+		if (ldlt_H.info() != Eigen::Success || !ldlt_H.isPositive()) {
+			// Fallback to steepest descent if LDLT fails
+			message(1, "WARNING: LDLT failed for unconstrained case, using steepest descent");
 			search_d = -grad_vector;
 		}
-		lm = Eigen::VectorXd::Zero(0);
-
-	}
-
-	ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
-	Parameters lbnd = par_info.get_low_bnd(dv_names);
-	Parameters ubnd = par_info.get_up_bnd(dv_names);
-	ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
-	par_transform.ctl2numeric_ip(lbnd);
-	par_transform.ctl2numeric_ip(ubnd);
-
-	Eigen::VectorXd current_dv = _current_dv_values.get_data_eigen_vec(dv_names);
-	double max_step_factor = 1.0;
-	bool would_exceed_bound = false;
-
-	for (int i = 0; i < dv_names.size(); i++)
-	{
-		double x = current_dv(i);
-		double d = search_d(i);
-		double lb = lbnd[dv_names[i]];
-		double ub = ubnd[dv_names[i]];
-
-		if (abs(d) > 1e-10)
-		{
-			if (d > 0 && (x + d) > ub) 
-			{
-				double step_factor_i = (ub - x) / d;
-				max_step_factor = min(max_step_factor, step_factor_i);
-				would_exceed_bound = true;
-			}
-			else if (d < 0 && (x + d) < lb) 
-			{
-				double step_factor_i = (x - lb) / (-d);
-				max_step_factor = min(max_step_factor, step_factor_i);
-				would_exceed_bound = true;
+		else {
+			search_d = ldlt_H.solve(-grad_vector);
+			double dir_dot_grad = search_d.dot(grad_vector);
+			if (dir_dot_grad > 0) {
+				message(2, "WARNING: search direction not descent, using steepest descent");
+				search_d = -grad_vector;
 			}
 		}
+
+		//const double max_search_d_norm = 1E+8;
+		//if (search_d.norm() > max_search_d_norm) {
+		//	ss.str("");
+		//	ss << "WARNING: unconstrained search_d norm too large: " << search_d.norm()
+		//		<< ", scaling down to " << max_search_d_norm;
+		//	message(2, ss.str());
+		//	search_d *= (max_search_d_norm / search_d.norm());
+		//}
+
+		lm = Eigen::VectorXd::Zero(0);
 	}
 
-	ss.str("");
-	if (would_exceed_bound && max_step_factor < 1.0)
-	{
-		ss << "   actual step length: " << search_d.norm() << endl;
-		ss << "   search direction would exceed bounds, limiting step by factor " << max_step_factor * step_limit_factor << endl;
-		adjust_step_control = true;
-		search_d *= (max_step_factor * step_limit_factor);
-		performance_log->log_event(ss.str());
-		frec << ss.str();
-	}
+	//ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
+	//Parameters lbnd = par_info.get_low_bnd(dv_names);
+	//Parameters ubnd = par_info.get_up_bnd(dv_names);
+	//ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
+	//par_transform.ctl2numeric_ip(lbnd);
+	//par_transform.ctl2numeric_ip(ubnd);
+
+	//Eigen::VectorXd current_dv = _current_dv_values.get_data_eigen_vec(dv_names);
+
+	//// Compute a scale vector based on parameter ranges and current values
+	//Eigen::VectorXd param_scale(dv_names.size());
+	//double max_relative_step = 0.0;
+
+	//for (int i = 0; i < dv_names.size(); i++)
+	//{
+	//	double x = current_dv(i);
+	//	double lb = lbnd[dv_names[i]];
+	//	double ub = ubnd[dv_names[i]];
+	//	double range = ub - lb;
+
+	//	// Scale based on parameter range (if range is reasonable)
+	//	if (range > 1e-10)
+	//	{
+	//		param_scale(i) = range;
+	//	}
+	//	else
+	//	{
+	//		// Fallback: use absolute value of current parameter or 1.0
+	//		param_scale(i) = max(abs(x), 1.0);
+	//	}
+
+	//	// Also check relative step size
+	//	if (abs(search_d(i)) > 1e-10)
+	//	{
+	//		double relative_step = abs(search_d(i)) / param_scale(i);
+	//		max_relative_step = max(max_relative_step, relative_step);
+	//	}
+	//}
+
+	//// Limit the maximum relative step size
+	//// This ensures no single parameter moves more than a fraction of its range
+	//const double max_relative_step_limit = 10.0; // Maximum relative step (as fraction of parameter range)
+
+	//if (max_relative_step > max_relative_step_limit)
+	//{
+	//	double scale_factor = max_relative_step_limit / max_relative_step;
+	//	ss.str("");
+	//	ss << "WARNING: search_d relative step too large: " << max_relative_step
+	//		<< ", scaling down by factor " << scale_factor;
+	//	message(2, ss.str());
+	//	search_d *= scale_factor;
+	//}
+
+	//// Also apply a dimension-aware absolute norm limit
+	//// In high dimensions, allow larger norms, but still cap them reasonably
+	//const double base_max_norm = 1E+4; // Base limit for norm
+	//const double dim_factor = sqrt(static_cast<double>(dv_names.size())); // Scale with sqrt(dimension)
+	//const double max_search_d_norm = base_max_norm * dim_factor;
+
+	//if (search_d.norm() > max_search_d_norm)
+	//{
+	//	ss.str("");
+	//	ss << "WARNING: search_d norm too large: " << search_d.norm()
+	//		<< " (dimension: " << dv_names.size() << "), scaling down to " << max_search_d_norm;
+	//	message(2, ss.str());
+	//	search_d *= (max_search_d_norm / search_d.norm());
+	//}
 
 	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);
 }
@@ -3796,7 +3939,7 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 
-	if ((lm_en[rname].array() > 0).any())
+	if ((lm_en[rname].array() < 0).any())
 	{
 		constraint_mat_en[rname] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, &lm_en[rname], cnames_en[rname]);
 		if (constraint_mat_en[rname].first.get_row_names() != cnames_en[rname])
@@ -3811,7 +3954,7 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			}
 
 			ss.str("");
-			ss << "...recalculating active set for realization " << rname << endl;
+			ss << "   recalculating active set for realization " << rname << endl;
 			frec << ss.str();
 			performance_log->log_event(ss.str());
 
@@ -3823,16 +3966,17 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			search_d_en[rname] = x.first;
 			lm_en[rname] = x.second;
 
-			Eigen::VectorXd delta_sd = prior_sd - search_d_en[rname];
+			Eigen::VectorXd delta_sd = search_d_en[rname] - prior_sd;
 
 			ss.str("");
 			if (dropped_cnames.size() == 0)
-				ss << "   constraints dropped: NONE" << endl;
+				ss << "   constraint dropped: NONE" << endl;
 			else
 			{
-				ss << endl << "   constraints dropped: " << endl;
+				ss << "   constraint dropped:";
 				for (auto d : dropped_cnames)
-					ss << "         " << d << endl;
+					ss << "  " << d;
+				ss << endl;
 				if (cnames_en[rname].size() == 0)
 				{
 					ss << "   new working set: EMPTY" << endl;
@@ -3856,14 +4000,14 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			ss << "   summary of search direction change: " << endl;
 			ss << "      max abs decvar step length change: " << delta_sd.cwiseAbs().maxCoeff() << endl;
 			ss << "      min abs decvar step length change: " << delta_sd.cwiseAbs().minCoeff() << endl;
-			ss << "      change in unscaled step length: " << prior_search_d_norm - search_d_en[rname].norm() << endl;
+			ss << "      change in unscaled step length: " << search_d_en[rname].norm() - prior_search_d_norm << endl;
 
 			frec << ss.str() << endl;
 
-			return true;
+			return (lm_en[rname].array() < 0).any();
 		}
 		else
-			return false;
+			throw_sqp_error("negative multipliers exist but working set didnt change for " + rname);
 	}
 	else
 		return false;
@@ -3941,7 +4085,7 @@ bool SeqQuadProgram::solve_new()
 	//			if (constraint_mat.first.get_row_names() != cnames) {
 	//				current_constraint_mat = constraint_mat.first;
 	//				cnames = constraint_mat.first.get_row_names();
-	//				message(1, "constraints dropped due to negative multipliers:", cnames);
+	//				message(1, "constraint dropped due to negative multipliers:", cnames);
 	//				continue;
 	//			}
 	//		}
@@ -4185,11 +4329,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 		pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
 		search_d_en[d] = x.first;
 		lm_en[d] = x.second;
-		if (adjust_step_control)
-		{
-			step_limit_factor = min(1.0, step_limit_factor * SF_INC_FAC);
-			adjust_step_control = false;
-		}
 
 		ss.str("");
 		if (cnames_en[d].size() == 0)
@@ -4212,8 +4351,18 @@ bool SeqQuadProgram::solve_new_ensemble()
 		}
 		frec << ss.str() << endl;
 
-		//recalc_search_direction_vector(d, dv_vals, obs_vals, grad);
+		while (true)
+		{
+			bool changed = recalc_search_direction_vector(d, dv_vals, obs_vals, grad);
+			if (!changed)
+				break;
+		}
 	}
+	//if (adjust_step_control)
+	//{
+	//	step_limit_factor = min(1.0, step_limit_factor * SF_INC_FAC);
+	//	adjust_step_control = false;
+	//}
 
 	FilterRec search = run_search_routine(grad, &_drawn_dvs);
 	constraint_jco = constraint_mat_en["BASE"].first.e_ptr()->toDense();
@@ -4223,17 +4372,17 @@ bool SeqQuadProgram::solve_new_ensemble()
 
 	if (search.viol_val == 0.0)
 	{
-		//BASE_SCALE_FACTOR = max(0.10, BASE_SCALE_FACTOR * SF_DEC_FAC);
+		BASE_SCALE_FACTOR = max(0.10, BASE_SCALE_FACTOR * SF_DEC_FAC);
 		is_base_infeas = false;
 		cma_reset_archive = true;
 	}
 	else
 	{
-		//BASE_SCALE_FACTOR = min(2.0, BASE_SCALE_FACTOR * SF_DEC_FAC);
+		BASE_SCALE_FACTOR = min(2.0, BASE_SCALE_FACTOR * SF_DEC_FAC);
 		is_base_infeas = true;
 		cma_reset_archive = false;
 	}
-	
+
 	message(1, "new base scale factor: ", BASE_SCALE_FACTOR);
 	return (search.viol_val == 0.0);
 }
@@ -4591,9 +4740,7 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 	ss << string(80, '-') << endl;
 
 	SqpFilter candidate_filter;
-	if (recalc)
-		candidate_filter = filter_stash;
-	else
+	if (!recalc)
 		candidate_filter = filter;
 
 
@@ -4616,7 +4763,7 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		bool filter_accept = candidate_filter.accept(obj_vec[i], infeas_sum_nom, par_map[real_names[i]], obs_map[real_names[i]], real_names[i], iter, true);
 		string accept_reject = filter_accept ? "accept" : "reject";
 
-		ss << setw(20) << infeas_sum
+		ss << setw(20) << infeas_sum_nom
 			<< setw(15) << accept_reject
 			<< endl;
 
@@ -4717,116 +4864,72 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 		}
 		else
 		{
-			message(1, "filter found no better solutions...dropping some constraints in working set");
-			vector<string> reals_to_recalc;
-			bool new_active_set;
+			message(1, "still no better solution...selecting next least infeasible candidate from filter");
+			vector<FilterRec> filterset = candidate_filter.get_filter_members();
 
-			while (true)
-			{
-				message(0, "starting active set recalculation attempt ", recalc_attempt + 1);
-				cout << "...calculating new search direction for each realization (see .rec file for more details)" << endl;
-
-				filter_stash = candidate_filter;
-				reals_to_recalc.clear();
-				Parameters dv_vals = current_ctl_dv_values;
-				Observations obs_vals = current_obs;
-				map<string, vector<string>> prev_cnames_en = cnames_en;
-
-				new_active_set = false;
-				for (auto d : dvs_subset->get_real_names())
+			// Sort by violation (lowest first) - candidates with better objective will be selected first
+			sort(filterset.begin(), filterset.end(),
+				[](const FilterRec& a, const FilterRec& b)
 				{
+					return a.viol_val < b.viol_val;
+				});
 
-					Eigen::VectorXd real_dv_vec = dv.get_real_vector(d);
-					dv_vals.update_without_clear(dv_names, real_dv_vec);
-					Eigen::VectorXd real_obs_vec = oe.get_real_vector(d);
-					obs_vals.update_without_clear(oe.get_var_names(), real_obs_vec);
-					Eigen::VectorXd gvec = current_grad_vector.get_data_eigen_vec(dv_names);
-					if (recalc_search_direction_vector(d, dv_vals, obs_vals, gvec))
-						new_active_set = true;
+			auto it = filterset.begin();
+			bool found = false;
 
-					if (prev_cnames_en[d] != cnames_en[d])
-						reals_to_recalc.push_back(d);
+			while (it != filterset.end())
+			{
+				bool better_obj = false;
+				if (obj_sense == "minimize")
+				{
+					better_obj = (it->obj_val < last_best);
+				}
+				else
+				{
+					better_obj = (it->obj_val > last_best);
 				}
 
-				if (!new_active_set || reals_to_recalc.size() == 0)
+				if (better_obj && it->obj_val != last_best &&  find(best_phis.begin(), best_phis.end(), it->obj_val) == best_phis.end())
 				{
-					message(1, "nothing to drop from current active sets");
+					selected = *it;
+					found = true;
 					break;
 				}
-
-
-				ParameterEnsemble recalc_subset(&pest_scenario, &rand_gen);
-				for (auto r : reals_to_recalc)
-				{
-					ParameterEnsemble t;
-					t.reserve(vector<string>{ r }, dv_names);
-					t.add_2_row_ip(r, dv_candidates.get_real_vector(r));
-					if (recalc_subset.shape().first == 0)
-						recalc_subset = t;
-					else
-						recalc_subset.append_other_rows(t, true);
-				}
-				Eigen::VectorXd gvec = current_grad_vector.get_data_eigen_vec(dv_names);
-				selected = run_search_routine(gvec, &recalc_subset, true);
-
-				if (selected.obj_val != last_best)
-					break;
+				it++;
 			}
 
-			if (!new_active_set || reals_to_recalc.size() == 0)
+			if (!found)
 			{
-				message(1, "still no better solution...selecting next least infeasible candidate from filter");
-				vector<FilterRec> filterset = filter_stash.get_filter_members();
-				sort(filterset.begin(), filterset.end(),
-					[](const FilterRec& a, const FilterRec& b)
-					{
-						return a.viol_val < b.viol_val;
-					});
+				message(1, "WARNING: no unselected candidate found with better objective than last_best");
+			}
 
-				auto it = filterset.begin();
-				while (it != filterset.end())
+			if (selected.obj_val == last_best && selected.viol_val == last_viol && candidate_filter.get_filter_members().size() > 0)
+			{
+				message(1, "resorting to global filter by merit");
+				selected = pick_from_filter_by_merit(candidate_filter);
+				reset = true;
+
+				if (selected.obj_val == last_best && selected.viol_val == last_viol && filter.get_filter_members().size() > 0)
 				{
-
-					if (obj_sense == "minimize")
-					{
-						if (it->obj_val < last_best)
-						{
-							if (find(best_phis.begin(), best_phis.end(), it->obj_val) == best_phis.end())
-							{
-								selected = *it;
-								break;
-							}
-						}
-					}
-
-					else if (obj_sense == "maximize")
-					{
-						if (it->obj_val > last_best)
-						{
-							if (find(best_phis.begin(), best_phis.end(), it->obj_val) == best_phis.end())
-							{
-								selected = *it;
-								break;
-							}
-						}
-					}
-					it++;
-
-				}
-
-				if (selected.obj_val == last_best && selected.viol_val == last_viol && filter_stash.get_filter_members().size() > 0)
-				{
-					message(1, "still no better solution...resorting to selection from filter by merit function");
-					selected = pick_from_filter_by_merit(filter_stash);
-					reset = true;
-
-					if (selected.obj_val == last_best && selected.viol_val == last_viol && filter.get_filter_members().size() > 0)
-					{
-						message(1, "still no better solution...selecting best global filter candidate");
-						selected = filter.get_knee();
-					}
+					message(1, "still no better solution...selecting best global filter candidate");
+					selected = filter.get_knee();
 				}
 			}
+
+			//Eigen::VectorXd current_dv = current_ctl_dv_values.get_data_eigen_vec(dv_names);
+			//Eigen::VectorXd selected_dv = selected.dp_val.get_data_eigen_vec(dv_names);
+			//Eigen::VectorXd step = selected_dv - current_dv;
+			//double step_norm = step.norm();
+			//double relative_step = step_norm / (1.0 + current_dv.norm());
+
+			//const double significant_step_threshold = 0.1;  // 10% relative change
+			//if (relative_step > significant_step_threshold)
+			//{
+			//	message(1, "overriding SQP direction, resetting Hessian to identity matrix (significant step change)");
+			//	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+			//	h.setIdentity();
+			//	hessian = Covariance(dv_names, h);
+			//}
 		}
 	}
 
