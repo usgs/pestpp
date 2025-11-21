@@ -3236,22 +3236,25 @@ pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& worki
 	vector<string> working_set_ineq_names = get_working_set_ineq_names(working_set);
 
 	// Find most negative Lagrange multiplier for inequality constraints
-	double lm_max = -9999;
+	double lm_min = 0.0;
 	int idx = -1;
+	vector<int> idxs;
 	set<string> working_set_ineq_set(working_set_ineq_names.begin(), working_set_ineq_names.end());
 
 	for (int i = 0; i < working_set.size(); i++)
 	{
 		if (working_set_ineq_set.find(working_set[i]) == working_set_ineq_set.end())
 			continue;
-		if ((lagrange_mults[i] > 0.0) && (lagrange_mults[i] > lm_max))
+		if ((lagrange_mults[i] < 0.0) && (lagrange_mults[i] < lm_min))
 		{
 			idx = i;
-			lm_max = lagrange_mults[i];
+			lm_min = lagrange_mults[i];
 		}
+		/*if (lagrange_mults[i] > 0.0)
+			idxs.push_back(i);*/
 	}
 
-	if (lm_max == 0.0)
+	if (lm_min <= 1E-10 && lm_min >= -1E-10)
 	{
 		return pair<vector<string>, bool>(working_set, true);
 		//throw_constraints_error("optimal solution detected at solve EQP step (lagrangian multiplier for all ineq constraints in working set is non-neg)");
@@ -3263,12 +3266,27 @@ pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& worki
 		working_set.erase(working_set.begin() + idx);
 	}
 
+	//if (idxs.size() > 0)
+	//{
+	//	//drop all constraints with positive lagrange multipliers
+	//	//starting from back to avoid index shifting
+	//	sort(idxs.begin(), idxs.end(), greater<int>());
+	//	for (auto i : idxs)
+	//	{
+	//		string to_drop = working_set[i];
+	//		working_set.erase(working_set.begin() + i);
+	//	}
+	//}
+
 	return pair<vector<string>, bool>(working_set, false);
 }
 
-pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, double working_set_tol)
+pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, vector<string> curr_ws, double working_set_tol)
 {
     pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+	if (curr_ws.size() > 0)
+		working_set.first = curr_ws;
+
     Mat mat;
 	bool converged = false;
     if (working_set.first.size() > 0) {
@@ -3281,10 +3299,10 @@ pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_a
 		}
 
         Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
+        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies("BASE").transpose();
 
         cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
+        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies("BASE").transpose();
         //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
         Eigen::MatrixXd s, s_, V, U;
         Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
@@ -3363,28 +3381,36 @@ pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par
     for (auto &name : ctl_ord_obs_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set.push_back(name);
-		else if (abs(constraint_map[name]) < working_set_tol) {
-			working_set.push_back(name);
+		//else
+		//{
+		//	if (abs(constraint_map[name]) < working_set_tol)
+		//		working_set.push_back(name);
+		//}
+		else if (constraint_sense_map[name] == ConstraintSense::less_than) {
+			if (constraint_map[name] < working_set_tol)
+				working_set.push_back(name);
 		}
-		/*else if ((constraint_map[name] > -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
-            working_set.push_back(name);
-        }
-		else if ((constraint_map[name] < -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::greater_than)) {
-			working_set.push_back(name);
-		}*/
+		else if (constraint_sense_map[name] == ConstraintSense::greater_than) {
+			if (constraint_map[name] > -working_set_tol)
+				working_set.push_back(name);
+		}
     }
     for (auto &name : ctl_ord_pi_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set_pi.push_back(name);
-		else if (abs(constraint_map[name]) < working_set_tol) {
-			working_set.push_back(name);
+		//else
+		//{
+		//	if (abs(constraint_map[name]) < working_set_tol)
+		//		working_set_pi.push_back(name);
+		//}
+		else if (constraint_sense_map[name] == ConstraintSense::less_than) {
+			if (constraint_map[name] < working_set_tol)
+				working_set_pi.push_back(name);
 		}
-		/*else if ((constraint_map[name] > -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::less_than)) {
-			working_set_pi.push_back(name);
+		else if (constraint_sense_map[name] == ConstraintSense::greater_than) {
+			if (constraint_map[name] > -working_set_tol)
+				working_set_pi.push_back(name);
 		}
-		else if ((constraint_map[name] < -working_set_tol) && (constraint_sense_map[name] == ConstraintSense::greater_than)) {
-			working_set_pi.push_back(name);
-		}*/
     }
     return pair<vector<string>,vector<string>>(working_set,working_set_pi);
 }

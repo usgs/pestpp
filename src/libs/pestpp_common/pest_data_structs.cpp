@@ -1710,6 +1710,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_obs_restart_en = org_value;
 		return true;
 	}
+	else if (key == "SQP_SEARCH_METHOD")
+	{
+		sqp_search_method = org_value;
+		return true;
+	}
 	else if (key == "SQP_NUM_REALS")
 	{
 		convert_ip(value, sqp_num_reals);
@@ -1740,6 +1745,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_working_set_tol);
 		return true;
 	}
+	else if (key == "SQP_CMA_REINFLATION_FACTOR")
+	{
+		convert_ip(value, sqp_cma_reinflation_factor);
+		return true;
+	}
 	else if (key == "SQP_ALPHA_MULTS")
 	{
 		sqp_alpha_mults.clear();
@@ -1753,9 +1763,64 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		}
 		return true;
 	}
-	
+	else if (key == "SQP_CMA_C1")
+	{
+		convert_ip(value, sqp_cma_c1);
+		return true;
+	}
+	else if (key == "SQP_CMA_CMU")
+	{
+		convert_ip(value, sqp_cma_cmu);
+		return true;
+	}
+	else if (key == "SQP_CMA_CC")
+	{
+		convert_ip(value, sqp_cma_cc);
+		return true;
+	}
+	else if (key == "SQP_CMA_STEPSIZE_CONTROL")
+	{
+		sqp_cma_stepsize_control = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_MAX_CONSEC_INFEAS_IES")
+	{
+		convert_ip(value, sqp_max_consec_infeas_ies);
+		return true;
+	}
+	else if (key == "SQP_MAX_REINFLATION_COND_NUM")
+	{
+		convert_ip(value, sqp_max_reinflation_cond_num);
+		return true;
+	}
+	else if (key == "SQP_SCALE_UP_FACTOR")
+	{
+		convert_ip(value, sqp_scale_up_factor);
+		return true;
+	}
+	else if (key == "SQP_SCALE_DOWN_FACTOR")
+	{
+		convert_ip(value, sqp_scale_down_factor);
+		return true;
+	}
+	else if (key == "SQP_HESS_MAX_COND_NUM")
+	{
+		convert_ip(value, sqp_hess_max_cond_num);
+		return true;
+	}
+	else if (key == "SQP_SAVE_COV_EVERY")
+	{
+		convert_ip(value, sqp_save_cov_every);
+		return true;
+	}
+	else if (key == "SQP_ENFORCE_BOUNDS")
+	{
+		sqp_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+		}
 	return false;
 }
+
 
 void PestppOptions::summary(ostream& os) const
 {
@@ -1915,15 +1980,29 @@ void PestppOptions::summary(ostream& os) const
 	os << endl << "...pestpp-sqp options:" << endl;
 	os << "sqp_dv_en: " << sqp_dv_en << endl;
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
+	os << "sqp_search_method: " << sqp_search_method << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 	os << "sqp_subset_size: " << sqp_subset_size << endl;
 	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
+	os << "sqp_hessian_update_method: " << sqp_hessian_update_method << endl;
 	os << "sqp_solve_partial_step: " << sqp_solve_partial_step << endl;
 	os << "sqp_alpha_mults:" << endl;
 	for (auto m : sqp_alpha_mults)
 		os << "  " << m << endl;
 	os << "sqp_filter_tol: " << sqp_filter_tol << endl;
 	os << "sqp_working_set_tol: " << sqp_working_set_tol << endl;
+	os << "sqp_cma_c1: " << sqp_cma_c1 << endl;
+	os << "sqp_cma_cmu: " << sqp_cma_cmu << endl;
+	os << "sqp_cma_cc: " << sqp_cma_cc << endl;
+	os << "sqp_cma_stepsize_control: " << sqp_cma_stepsize_control << endl;
+	os << "sqp_cma_reinflation_factor: " << sqp_cma_reinflation_factor << endl;
+	os << "sqp_max_consec_infeas_ies: " << sqp_max_consec_infeas_ies << endl;
+	os << "sqp_max_reinflation_cond_num: " << sqp_max_reinflation_cond_num << endl;
+	os << "sqp_scale_up_factor: " << sqp_scale_up_factor << endl;
+	os << "sqp_scale_down_factor: " << sqp_scale_down_factor << endl;
+	os << "sqp_hess_max_cond_num: " << sqp_hess_max_cond_num << endl;
+	os << "sqp_save_cov_every: " << sqp_save_cov_every << endl;
+	os << "sqp_enforce_bounds: " << sqp_enforce_bounds << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2150,14 +2229,28 @@ void PestppOptions::set_defaults()
 
 	set_sqp_dv_en("");
 	set_sqp_obs_restart_en("");
+	set_sqp_search_method("LINE");
 	set_sqp_num_reals(-1);
 	set_sqp_subset_size(-10);
 	set_sqp_update_hessian(true);
+	set_sqp_hessian_update_method("BFGS");
 	set_sqp_solve_partial_step(true);
-	set_sqp_alpha_mults(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 0.75, 1.0,3.0, 5.0});
-	set_sqp_filter_tol(0.05);
+	set_sqp_alpha_mults(vector<double>{0.001, 0.005, 0.01, 0.1, 0.5, 1.0});
+	set_sqp_filter_tol(0.001);
 	set_sqp_working_set_tol(0.10);
-
+	set_sqp_cma_c1(-1);
+	set_sqp_cma_cmu(-1);
+	set_sqp_cma_cc(-1);
+	set_sqp_cma_stepsize_control(false);
+	set_sqp_cma_reinflation_factor(-1.0);
+	set_sqp_max_consec_infeas_ies(3);
+	set_sqp_max_reinflation_cond_num(500.0);
+	set_sqp_scale_up_factor(1.0);
+	set_sqp_scale_down_factor(1.0);
+	set_sqp_hess_max_cond_num(1E+5);
+	set_sqp_save_cov_every(-1);
+	set_sqp_enforce_bounds(true);
+	
 	set_mou_generator("PSO");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
