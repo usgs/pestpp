@@ -1803,6 +1803,16 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_hess_max_cond_num);
 		return true;
 	}
+	else if (key == "SQP_SAVE_COV_EVERY")
+	{
+		convert_ip(value, sqp_save_cov_every);
+		return true;
+	}
+	else if (key == "SQP_ENFORCE_BOUNDS")
+	{
+		sqp_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+		}
 	return false;
 }
 
@@ -1986,6 +1996,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_scale_up_factor: " << sqp_scale_up_factor << endl;
 	os << "sqp_scale_down_factor: " << sqp_scale_down_factor << endl;
 	os << "sqp_hess_max_cond_num: " << sqp_hess_max_cond_num << endl;
+	os << "sqp_save_cov_every: " << sqp_save_cov_every << endl;
+	os << "sqp_enforce_bounds: " << sqp_enforce_bounds << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2231,7 +2243,9 @@ void PestppOptions::set_defaults()
 	set_sqp_scale_up_factor(1.0);
 	set_sqp_scale_down_factor(1.0);
 	set_sqp_hess_max_cond_num(1E+5);
-
+	set_sqp_save_cov_every(-1);
+	set_sqp_enforce_bounds(true);
+	
 	set_mou_generator("PSO");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");

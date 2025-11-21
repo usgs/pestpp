@@ -413,7 +413,11 @@ public:
 	void set_sqp_scale_down_factor(double val) { sqp_scale_down_factor = val; }
 	double get_sqp_hess_max_cond_num() const { return sqp_hess_max_cond_num; }
 	void set_sqp_hess_max_cond_num(double val) { sqp_hess_max_cond_num = val; }
-
+	int get_sqp_save_cov_every()const { return sqp_save_cov_every; }
+	void set_sqp_save_cov_every(int _every) { sqp_save_cov_every = _every; }
+	bool get_sqp_enforce_bounds()const { return sqp_enforce_bounds; }
+	void set_sqp_enforce_bounds(bool _flag) { sqp_enforce_bounds = _flag; }
+	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
 	int get_mou_population_size() const { return mou_population_size; }
@@ -835,6 +839,8 @@ private:
 	bool sqp_cma_stepsize_control;
 	double sqp_cma_reinflation_factor;
 	double sqp_hess_max_cond_num;
+	int sqp_save_cov_every;
+	bool sqp_enforce_bounds;
 
 	int mou_population_size;
 	string mou_generator; 

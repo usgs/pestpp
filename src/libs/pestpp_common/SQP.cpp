@@ -2093,7 +2093,24 @@ void SeqQuadProgram::iterate_2_solution()
 		if (use_cmaes && !seek_ies)
 		{
 			message(1, "updating CMA-ES with approximate gradient");
-			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);		
+			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
+
+			if (pest_scenario.get_pestpp_options().get_sqp_save_cov_every() > 0)
+			{
+				if (iter % pest_scenario.get_pestpp_options().get_sqp_save_cov_every() == 0)
+				{
+					ss.str("");
+					ss << file_manager.get_base_filename() << "." << iter << ".cov";
+					Covariance cmaes_cov(dv_names, cmaes.get_covariance_matrix().sparseView());
+					cmaes_cov.to_ascii(ss.str());
+					message(1, "CMA-ES covariance for this iteration saved to: ", ss.str());
+				}
+			}
+			ss.str("");
+			ss << file_manager.get_base_filename() << ".cov";
+			Covariance cmaes_cov(dv_names, cmaes.get_covariance_matrix().sparseView());
+			cmaes_cov.to_ascii(ss.str());
+			message(1, "CMA-ES covariance saved to: ", ss.str());
 		}
 
 		make_gradient_runs(current_ctl_dv_values, current_obs);
@@ -2361,6 +2378,8 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eigen::MatrixXd& G, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad)
 {
 	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+
 	ss.str("");
 	ss << "starting KKT null space solve";
 	performance_log->log_event(ss.str());
@@ -2391,11 +2410,12 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	}
 
 	ss.str("");
-	ss << "Applied constraint Jacobian scaling:";
+	ss << "   applied constraint Jacobian scaling:";
 	ss << " min_scale=" << row_scales.minCoeff();
 	ss << " max_scale=" << row_scales.maxCoeff();
-	ss << " condition_improvement=" << (row_scales.maxCoeff() / row_scales.minCoeff());
-	message(2, ss.str());
+	ss << " condition_improvement=" << (row_scales.maxCoeff() / row_scales.minCoeff()) << endl;
+	frec << ss.str();
+	performance_log->log_event(ss.str());
 
 
 	Eigen::VectorXd search_d, lm;
@@ -2439,13 +2459,20 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	double cond_AY = svd_AY.singularValues()(0) / svd_AY.singularValues()(svd_AY.singularValues().size() - 1);
 	if (cond_AY > max_condition_warning) 
 	{
-		message(2, "WARNING: A*Y condition number very large: ", cond_AY);
+		ss.str("");
+		ss << "   WARNING: A*Y condition number very large: " << cond_AY << endl;
+		frec << ss.str();
+		performance_log->log_event(ss.str());
 	}
 
 	Eigen::LDLT<Eigen::MatrixXd> ldlt_AY(AY);
 	if (ldlt_AY.info() != Eigen::Success)
 	{
-		message(2, "WARNING: LDLT failed for A*Y, falling back to SVD");
+		ss.str("");
+		ss << "   WARNING: LDLT failed for A*Y, falling back to SVD" << endl;
+		frec << ss.str();
+		performance_log->log_event(ss.str());
+
 		Eigen::BDCSVD<Eigen::MatrixXd> svd_AY(AY, Eigen::ComputeThinU | Eigen::ComputeThinV);
 		p_y = svd_AY.solve(scaled_constraint_diff);
 	}
@@ -2459,8 +2486,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	ss.str("");
 	if (p_y.norm() > max_p_norm) 
 	{
-		ss << "WARNING: p_y norm too large: " << p_y.norm() << ", scaling down to " << max_p_norm;
-		message(2, ss.str());
+		ss.str("");
+		ss << "   WARNING: p_y norm too large: " << p_y.norm() << ", scaling down to " << max_p_norm << endl;
+		frec << ss.str();
+		performance_log->log_event(ss.str());
 		p_y *= (max_p_norm / p_y.norm());
 	}
 
@@ -2477,13 +2506,20 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		double cond_red = eig_red.eigenvalues().maxCoeff() / eig_red.eigenvalues().minCoeff();
 		if (cond_red > max_condition_warning) 
 		{
-			message(2, "WARNING: Reduced Hessian condition number very large: ", cond_red);
-			// Apply regularization
+			ss.str("");
+			ss << "   WARNING: Reduced Hessian condition number very large: " << cond_red << endl;
+			frec << ss.str();
+			performance_log->log_event(ss.str());
+
 			double min_eig_red = eig_red.eigenvalues().minCoeff();
-			if (min_eig_red < min_allowed_eig) {
+			if (min_eig_red < min_allowed_eig) 
+			{
 				double delta_red = min_allowed_eig - min_eig_red + 1e-6;
 				red_hess += delta_red * Eigen::MatrixXd::Identity(red_hess.rows(), red_hess.cols());
-				message(2, "Applied regularization to reduced Hessian, delta = ", delta_red);
+				ss.str("");
+				ss << "   applied regularization to reduced Hessian, delta = " << delta_red << endl;
+				frec << ss.str();
+				performance_log->log_event(ss.str());
 			}
 		}
 
@@ -2495,7 +2531,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		bool cholesky = false; //TODO: add as ++arg; too much to be an arg?
 		if (simplified_null_space_approach)
 		{
-			message(2, "using simplified approach in KKT null space solve...");
+			ss.str("");
+			ss << "   using simplified approach in KKT null space solve..." << endl;
+			frec << ss.str();
+			performance_log->log_event(ss.str());
 			rhs = - Z.transpose() * curved_grad;
 			// simplify by removing cross term (or ``partial hessian'') matrix (zTgy), which is approp when approximating hessian (zTgz) (as p_y goes to zero faster than p_z)
 			if (cholesky)
@@ -2532,8 +2571,9 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		ss.str("");
 		if (p_z.norm() > max_p_norm)
 		{
-			ss << "WARNING: p_z norm too large: " << p_z.norm() << ", scaling down";
-			message(2, ss.str());
+			ss << "   WARNING: p_z norm too large: " << p_z.norm() << ", scaling down" << endl;
+			frec << ss.str();
+			performance_log->log_event(ss.str());
 			p_z *= (max_p_norm / p_z.norm());
 		}
 	}
@@ -2551,8 +2591,9 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	if (search_d.norm() > max_search_d_norm) 
 	{
 		ss.str("");
-		ss << "WARNING: search_d norm too large: " << search_d.norm() << ", scaling down";
-		message(2, ss.str());
+		ss << "   WARNING: search_d norm too large: " << search_d.norm() << ", scaling down" << endl;
+		frec << ss.str();
+		performance_log->log_event(ss.str());
 		search_d *= (max_search_d_norm / search_d.norm());
 	}
 
@@ -3602,13 +3643,6 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		{
 			Eigen::VectorXd current_dv = dvs_subset->get_real_vector(sd.first);
 
-			ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
-			Parameters lbnd = par_info.get_low_bnd(dv_names);
-			Parameters ubnd = par_info.get_up_bnd(dv_names);
-			ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
-			par_transform.ctl2numeric_ip(lbnd);
-			par_transform.ctl2numeric_ip(ubnd);
-
 			scale_search_d[sd.first] = sd.second * scale_val;
 			if (scale_search_d[sd.first].squaredNorm() < 1.0E-10)
 				short_upgrades.push_back(sd.first);
@@ -3636,13 +3670,9 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 
 	}
 
-	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
-	{
-		message(0, "ies_debug_upgrade_only is true, exiting");
-		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
-	}
+	if (pest_scenario.get_pestpp_options().get_sqp_enforce_bounds())
+		dv_candidates.enforce_bounds(performance_log, false);
 
-	dv_candidates.enforce_bounds(performance_log, false);
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 	
