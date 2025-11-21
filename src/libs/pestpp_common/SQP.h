@@ -181,7 +181,6 @@ private:
     double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
     double par_sigma_max = 100;
-	double step_limit_factor = 0.05;
 
     double par_sigma_min = 10;
 	double eigthresh;

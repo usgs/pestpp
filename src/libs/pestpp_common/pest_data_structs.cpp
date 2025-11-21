@@ -1803,11 +1803,6 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_hess_max_cond_num);
 		return true;
 	}
-	else if (key == "SQP_MAX_STEP_FACTOR")
-	{
-		convert_ip(value, sqp_max_step_factor);
-		return true;
-		}
 	return false;
 }
 
@@ -1991,7 +1986,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_scale_up_factor: " << sqp_scale_up_factor << endl;
 	os << "sqp_scale_down_factor: " << sqp_scale_down_factor << endl;
 	os << "sqp_hess_max_cond_num: " << sqp_hess_max_cond_num << endl;
-	os << "sqp_max_step_factor: " << sqp_max_step_factor << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2224,7 +2218,7 @@ void PestppOptions::set_defaults()
 	set_sqp_update_hessian(true);
 	set_sqp_hessian_update_method("BFGS");
 	set_sqp_solve_partial_step(true);
-	set_sqp_alpha_mults(vector<double>{-0.05, 0.01, 0.1, 0.5, 1.0});
+	set_sqp_alpha_mults(vector<double>{0.001, 0.005, 0.01, 0.1, 0.5, 1.0});
 	set_sqp_filter_tol(0.001);
 	set_sqp_working_set_tol(0.10);
 	set_sqp_cma_c1(-1);
@@ -2236,8 +2230,7 @@ void PestppOptions::set_defaults()
 	set_sqp_max_reinflation_cond_num(500.0);
 	set_sqp_scale_up_factor(1.0);
 	set_sqp_scale_down_factor(1.0);
-	set_sqp_hess_max_cond_num(1E+10);
-	set_sqp_max_step_factor(1.0);
+	set_sqp_hess_max_cond_num(1E+5);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

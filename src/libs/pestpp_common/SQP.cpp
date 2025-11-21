@@ -152,10 +152,8 @@ void SqpFilter::report(ofstream& frec, int iter)
     ss << "...filter summary with " << obj_viol_pairs.size() << " pairs for iteration " << iter << ":" << endl;
     ss << "          obj min: " <<  setw(10) << omin << endl;
     ss << "          obj max: " << setw(10) << omax << endl;
-	ss << "         obj knee: " << setw(10) << knee.obj_val << endl;
     ss << "    violation min: " << setw(10) << vmin << endl;
     ss << "    violation max: " << setw(10) << vmax << endl;
-	ss << "   violation knee: " << setw(10) << knee.viol_val << endl;
     ss << endl;
 
     frec << ss.str();
@@ -869,7 +867,6 @@ void SeqQuadProgram::initialize()
 	MAX_CONSEC_INFEAS_IES = pest_scenario.get_pestpp_options().get_sqp_max_consec_infeas_ies();
 	SF_INC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_up_factor();
 	SF_DEC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_down_factor();
-	step_limit_factor = pest_scenario.get_pestpp_options().get_sqp_max_step_factor();
 
 	stringstream ss;
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -2368,11 +2365,44 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	ss << "starting KKT null space solve";
 	performance_log->log_event(ss.str());
 
+	// 1. Create copies for scaling (don't modify originals)
+	Eigen::MatrixXd scaled_constraint_jco = _constraint_jco;
+	Eigen::VectorXd scaled_constraint_diff = constraint_diff;
+
+	// 2. Compute row-wise scaling factors
+	Eigen::VectorXd row_scales(scaled_constraint_jco.rows());
+	const double min_scale = 1e-12;  // Prevent division by zero
+
+	for (int i = 0; i < scaled_constraint_jco.rows(); i++) 
+	{
+		double row_norm = scaled_constraint_jco.row(i).norm();
+		if (row_norm > min_scale) 
+			row_scales[i] = 1.0 / row_norm;
+		else
+			row_scales[i] = 1.0;  // Don't scale if row is essentially zero
+		
+	}
+
+	// 3. Apply scaling to constraint Jacobian and RHS
+	for (int i = 0; i < scaled_constraint_jco.rows(); i++) 
+	{
+		scaled_constraint_jco.row(i) *= row_scales[i];
+		scaled_constraint_diff[i] *= row_scales[i];
+	}
+
+	ss.str("");
+	ss << "Applied constraint Jacobian scaling:";
+	ss << " min_scale=" << row_scales.minCoeff();
+	ss << " max_scale=" << row_scales.maxCoeff();
+	ss << " condition_improvement=" << (row_scales.maxCoeff() / row_scales.minCoeff());
+	message(2, ss.str());
+
+
 	Eigen::VectorXd search_d, lm;
 	
-	int m = _constraint_jco.rows(); 
-	int n = _constraint_jco.cols(); 
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(_constraint_jco.transpose());
+	int m = scaled_constraint_jco.rows();  
+	int n = scaled_constraint_jco.cols();  
+	Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(scaled_constraint_jco.transpose());
 
 	int rank = qr.rank();
 
@@ -2397,30 +2427,31 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		Z = Eigen::MatrixXd::Zero(n, 0);
 
 	Eigen::MatrixXd G_reg = regularize_hessian(G, "null space solve");
-	const double max_condition_warning = pest_scenario.get_pestpp_options().get_sqp_hess_max_cond_num() * 1E-4;
+	const double max_condition_warning = pest_scenario.get_pestpp_options().get_sqp_hess_max_cond_num() * 1E-2;
 	const double min_allowed_eig = 1E-6;
 
 	// solve p_range_space
 	Eigen::VectorXd p_y, rhs;
-	Eigen::MatrixXd AY = _constraint_jco * Y; // A*Y is m×m, should be full rank
+	Eigen::MatrixXd AY = scaled_constraint_jco * Y; // A*Y is m×m, should be full rank
 
 	// Check condition number of A*Y
 	Eigen::JacobiSVD<Eigen::MatrixXd> svd_AY(AY);
 	double cond_AY = svd_AY.singularValues()(0) / svd_AY.singularValues()(svd_AY.singularValues().size() - 1);
-	if (cond_AY > max_condition_warning) {
-		message(1, "WARNING: A*Y condition number very large: ", cond_AY);
+	if (cond_AY > max_condition_warning) 
+	{
+		message(2, "WARNING: A*Y condition number very large: ", cond_AY);
 	}
 
 	Eigen::LDLT<Eigen::MatrixXd> ldlt_AY(AY);
 	if (ldlt_AY.info() != Eigen::Success)
 	{
-		message(1, "WARNING: LDLT failed for A*Y, falling back to SVD");
+		message(2, "WARNING: LDLT failed for A*Y, falling back to SVD");
 		Eigen::BDCSVD<Eigen::MatrixXd> svd_AY(AY, Eigen::ComputeThinU | Eigen::ComputeThinV);
-		p_y = svd_AY.solve(-constraint_diff);
+		p_y = svd_AY.solve(scaled_constraint_diff);
 	}
 	else
 	{
-		p_y = ldlt_AY.solve(-constraint_diff); //from Eq 18.19a pp. 538 Nocedal and Wright
+		p_y = ldlt_AY.solve(scaled_constraint_diff); //from Eq 18.19a pp. 538 Nocedal and Wright
 	}
 	
 	// Check magnitude of p_y
@@ -2429,7 +2460,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	if (p_y.norm() > max_p_norm) 
 	{
 		ss << "WARNING: p_y norm too large: " << p_y.norm() << ", scaling down to " << max_p_norm;
-		message(1, ss.str());
+		message(2, ss.str());
 		p_y *= (max_p_norm / p_y.norm());
 	}
 
@@ -2444,7 +2475,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		// Check condition number of reduced Hessian
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_red(red_hess);
 		double cond_red = eig_red.eigenvalues().maxCoeff() / eig_red.eigenvalues().minCoeff();
-		if (cond_red > max_condition_warning) {
+		if (cond_red > max_condition_warning) 
+		{
 			message(2, "WARNING: Reduced Hessian condition number very large: ", cond_red);
 			// Apply regularization
 			double min_eig_red = eig_red.eigenvalues().minCoeff();
@@ -2532,14 +2564,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	// compute lagrangian multipliers
 	if (simplified_null_space_approach)
 	{
-		Eigen::BDCSVD<Eigen::MatrixXd> svd_AAT(_constraint_jco* _constraint_jco.transpose(),Eigen::ComputeThinU | Eigen::ComputeThinV);
-		lm = svd_AAT.solve(_constraint_jco * curved_grad);
+		Eigen::BDCSVD<Eigen::MatrixXd> svd_AAT(scaled_constraint_jco* scaled_constraint_jco.transpose(),Eigen::ComputeThinU | Eigen::ComputeThinV);
+		lm = svd_AAT.solve(scaled_constraint_jco * curved_grad);
 	}
 	else
 	{
 		// Nocedal and Wright pg. 457 and 538
 		rhs = Y.transpose() * (curved_grad + G * search_d);
-		Eigen::MatrixXd AY_transpose = (_constraint_jco * Y).transpose(); // (A*Y)^T, also m×m
+		Eigen::MatrixXd AY_transpose = (scaled_constraint_jco * Y).transpose(); // (A*Y)^T, also m×m
 		Eigen::LDLT<Eigen::MatrixXd> ldlt_AYT(AY_transpose);
 		if (ldlt_AYT.info() != Eigen::Success)
 		{
@@ -2551,6 +2583,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 			lm = ldlt_AYT.solve(rhs);
 		}
 	}
+
+	for (int i = 0; i < lm.size(); i++) 
+		lm[i] /= row_scales[i];
+	
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, lm);
 }
 
@@ -4007,7 +4043,10 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			return (lm_en[rname].array() < 0).any();
 		}
 		else
+		{
 			throw_sqp_error("negative multipliers exist but working set didnt change for " + rname);
+			return false;
+		}
 	}
 	else
 		return false;
@@ -4358,11 +4397,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 				break;
 		}
 	}
-	//if (adjust_step_control)
-	//{
-	//	step_limit_factor = min(1.0, step_limit_factor * SF_INC_FAC);
-	//	adjust_step_control = false;
-	//}
 
 	FilterRec search = run_search_routine(grad, &_drawn_dvs);
 	constraint_jco = constraint_mat_en["BASE"].first.e_ptr()->toDense();
@@ -4372,13 +4406,11 @@ bool SeqQuadProgram::solve_new_ensemble()
 
 	if (search.viol_val == 0.0)
 	{
-		BASE_SCALE_FACTOR = max(0.10, BASE_SCALE_FACTOR * SF_DEC_FAC);
 		is_base_infeas = false;
 		cma_reset_archive = true;
 	}
 	else
 	{
-		BASE_SCALE_FACTOR = min(2.0, BASE_SCALE_FACTOR * SF_DEC_FAC);
 		is_base_infeas = true;
 		cma_reset_archive = false;
 	}
@@ -4915,23 +4947,20 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 					selected = filter.get_knee();
 				}
 			}
-
-			//Eigen::VectorXd current_dv = current_ctl_dv_values.get_data_eigen_vec(dv_names);
-			//Eigen::VectorXd selected_dv = selected.dp_val.get_data_eigen_vec(dv_names);
-			//Eigen::VectorXd step = selected_dv - current_dv;
-			//double step_norm = step.norm();
-			//double relative_step = step_norm / (1.0 + current_dv.norm());
-
-			//const double significant_step_threshold = 0.1;  // 10% relative change
-			//if (relative_step > significant_step_threshold)
-			//{
-			//	message(1, "overriding SQP direction, resetting Hessian to identity matrix (significant step change)");
-			//	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-			//	h.setIdentity();
-			//	hessian = Covariance(dv_names, h);
-			//}
 		}
 	}
+
+	bool is_violated = (selected.viol_val >= 1E-10);
+	bool is_recycled = (find(best_phis.begin(), best_phis.end(), selected.obj_val) != best_phis.end());
+
+	if (is_violated && is_recycled) //violated and recycled
+		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
+	else if (is_violated && !is_recycled) //violated but new
+		BASE_SCALE_FACTOR = 1.0;
+	else if (!is_violated && is_recycled) //feasible but recycled
+		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
+	else //feasible and new
+		BASE_SCALE_FACTOR = min(2.0, BASE_SCALE_FACTOR * SF_INC_FAC);
 
 	filter.update(selected.obj_val, selected.viol_val, selected.dp_val, selected.oe_val, selected.real_name, iter);
 	filter.report(frec, iter);
