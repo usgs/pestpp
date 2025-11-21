@@ -801,7 +801,7 @@ def tenpar_fixed_test2():
 def tenpar_fixed_test3():
     """tenpar fixed test 2"""
     model_d = "ies_10par_xsec"
-    test_d = os.path.join(model_d, "master_fixed2")
+    test_d = os.path.join(model_d, "master_fixed3")
     template_d = os.path.join(model_d, "template")
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     pst.control_data.noptmax = 2
@@ -818,9 +818,9 @@ def tenpar_fixed_test3():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options.pop("ies_par_en",None)
     pst.pestpp_options["ies_par_en"] = "par_fixed.csv"
-
+    scale = 10
     pst.parameter_data.loc["k_01","partrans"] = "fixed"
-    pst.parameter_data.loc["k_01","scale"] = 10.0
+    pst.parameter_data.loc["k_01","scale"] = scale
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.pestpp_options["ies_save_binary"] = False
@@ -854,7 +854,7 @@ def tenpar_fixed_test3():
         #df = df.iloc[:-1, :]
         #df.index = pe.index
         print(itr,pe.loc[:,"k_01"].values,oe.loc[:,"k_01"].values)
-        d = pe.loc[:,"k_01"].values - oe.loc[:,"k_01"].values
+        d = (pe.loc[:,"k_01"].values * scale) - oe.loc[:,"k_01"].values
         assert np.abs(d.max()) < 1e-6
         if prev is not None:
             d = prev - oe.loc[:,"k_01"].values
@@ -862,7 +862,7 @@ def tenpar_fixed_test3():
 
         prev = oe.loc[:,"k_01"].values
 
-    test_d = os.path.join(model_d, "master_fixed2")
+    test_d = os.path.join(model_d, "master_fixed3")
     template_d = os.path.join(model_d, "template")
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     pst.control_data.noptmax = 2
@@ -881,7 +881,7 @@ def tenpar_fixed_test3():
     pst.pestpp_options["ies_par_en"] = "par_fixed.csv"
 
     pst.parameter_data.loc["k_01","partrans"] = "fixed"
-    pst.parameter_data.loc["k_01","scale"] = 10.0
+    pst.parameter_data.loc["k_01","scale"] = scale
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.pestpp_options["ies_save_binary"] = False
@@ -915,7 +915,7 @@ def tenpar_fixed_test3():
         #df = df.iloc[:-1, :]
         #df.index = pe.index
         print(itr,pe.loc[:,"k_01"].values,oe.loc[:,"k_01"].values)
-        d = pe.loc[:,"k_01"].values - oe.loc[:,"k_01"].values
+        d = (pe.loc[:,"k_01"].values*scale)- oe.loc[:,"k_01"].values
         assert np.abs(d.max()) < 1e-6
         if prev is not None:
             d = prev - oe.loc[:,"k_01"].values
@@ -2502,9 +2502,9 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win","pestpp-ies.exe"))
     #invest()
-    tenpar_ineq_test()
+    #tenpar_ineq_test()
     #tenpar_restart_similar_test()
-    #tenpar_fixed_test()
+    tenpar_fixed_test3()
     # tenpar_full_cov_test()
     # eval_freyberg_full_cov_reorder()
     #test_freyberg_full_cov_reorder()

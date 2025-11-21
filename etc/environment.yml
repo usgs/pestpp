@@ -1,6 +1,7 @@
 name: pestpp_tester
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
   # required
   - python<=3.11

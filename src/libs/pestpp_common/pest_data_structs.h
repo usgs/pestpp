@@ -623,8 +623,10 @@ public:
     vector<string> get_ies_aal_indicator_pars() const {return ies_aal_indicator_pars;}
     void set_ies_run_realname(string name) {ies_run_realname = name;}
     string get_ies_run_realname() const {return ies_run_realname;}
+	void set_ies_reinflate_num_reals(vector<int> _vec)  { ies_reinflate_num_reals = _vec;}
+	vector<int> get_ies_reinflate_num_reals() const {return ies_reinflate_num_reals;}
 
-    string get_gsa_method() const { return gsa_method; }
+	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
 	bool get_gsa_morris_pooled_obs() const { return gsa_morris_pooled_obs; }
 	void set_gsa_morris_pooled_obs(bool _flag) {gsa_morris_pooled_obs = _flag; }
@@ -948,6 +950,7 @@ private:
     bool ies_updatebyreals;
     vector<string> ies_aal_indicator_pars;
     string ies_run_realname;
+	vector<int> ies_reinflate_num_reals;
 
 
 

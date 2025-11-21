@@ -2,15 +2,14 @@
 
 ## Introduction
 
-CMake is a cross-platform tool used to build software on most operating systems and compilers. CMake can be installed using one of several methods, such as from [official sources](https://cmake.org/download/), from Anaconda/Miniconda (`conda install cmake`), or from PyPI (`pip install cmake`). Newest versions are recommended, with a minimum 3.9 enforced for PEST++.
+CMake is a cross-platform tool used to build software on most operating systems and compilers. CMake can be installed using one of several methods, such as from [official sources](https://cmake.org/download/), from Anaconda/Miniconda (`conda install cmake`), or from PyPI (`pip install cmake`). Newest versions are recommended, with a minimum 3.15 enforced for PEST++.
 
 ## General guidance
 
-The normal approach to compile a project with CMake is outside of the source tree, in a directory named `build` (or similar). Therefore, before running `cmake`, ensure this is done in an empty directory (above the base directory):
+The normal approach to compile a project with CMake is outside of the source tree, in a directory named `_build` (or similar). It's good practice to "clear out" and old `_build` directory before configuring a new build:
 
-    mkdir build
-    cd build
-    cmake ..
+    rm -rf _build
+    cmake -B _build -S .
 
 Variables and options are passed to CMake using `-D<var>=<value>` options to the command-line interface.
 
@@ -29,43 +28,36 @@ If a generator (`-G`) is not specified, the default for Linux is Makefile, which
 
 ### Basic usage
 
-Create an empty directory:
-
-    mkdir build && cd build
-
 Configure a release build using the default C++ compiler:
 
-    cmake -DCMAKE_BUILD_TYPE=Release ..
+    cmake -B _build -S . -DCMAKE_BUILD_TYPE=Release
 
 Build all targets with (e.g.) 8 cores:
 
-    make -j8
+    cmake --build _build -j8
 
 Or build a single executable, and any dependencies for that target:
 
-    make pestpp-ies
+    cmake --build _build -j8 -t pestpp-ies
 
 Package the binaries into a tar.gz archive file with:
 
+    cd _build
     cpack -G TGZ
 
 Optionally, install to `CMAKE_INSTALL_PREFIX` (default usually `/usr/local`) with:
 
-    make install
+    cmake --install _build
 
 ### Configure for different compilers
 
-The configure step can be re-run, but CMake usually requires a "clean" build directory when switching compilers:
-
-    cd .. && rm -rf build && mkdir build && cd build
-
 To configure with Intel C++ and Fortran:
 
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc -DCMAKE_Fortran_COMPILER=ifort ..
+    cmake -S . -B _build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc -DCMAKE_Fortran_COMPILER=ifort
 
-Or Clang++ version 8:
+Or Clang version 18:
 
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++-8 ..
+    cmake -S . -B _build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++-18
 
 ## Windows
 
@@ -77,22 +69,23 @@ Ninja needs to be run from a command prompt that has been configured for a parti
 
 For instance, from a "x64 Native Tools Command Prompt for VS2017", configure with a specified generator:
 
-    cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
+    cmake -S . -B _build -GNinja -DCMAKE_BUILD_TYPE=Release
 
 Or to configure for Intel C++/Fortran using an Intel Compiler prompt:
 
-    cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icl -DCMAKE_Fortran_COMPILER=ifort
+    cmake -S . -B _build -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icl -DCMAKE_Fortran_COMPILER=ifort
 
 Build with Ninja normally takes advantage of as many cores as are available:
 
-    ninja
+    cmake --build _build
 
 Or specify a number of cores to use, e.g. 5:
 
-    ninja -j5
+    cmake --build _build -j5
 
 And package the executables to a ZIP file:
 
+    cd _build
     cpack -G ZIP
 
 ### Visual Studio
@@ -101,38 +94,40 @@ Visual Studio generators create a project that can be opened with the Visual Stu
 
 Configure using Visual Studio 2019:
 
-    cmake -G"Visual Studio 16 2019" -A x64 ..
+    cmake -B _build -S . -G"Visual Studio 16 2019" -A x64
 
 Or configure using Visual Studio 2017:
 
-    cmake -G"Visual Studio 15 2017 Win64" ..
+    cmake -B _build -S . -G"Visual Studio 15 2017 Win64"
 
 Build all targets with "Release" configuration:
 
-    cmake --build . --config Release
+    cmake --build _build --config Release
 
 If you have CMake version 3.12 or later, parallel builds can be specified using either `-j` to use maximum number of concurrent processes or (e.g.) `-j5` for 5 jobs:
 
-    cmake --build . --config Release -j5
+    cmake --build _build --config Release -j5
 
 Or choose only one target to compile:
 
-    cmake --build . --config Release --target pestpp-ies
+    cmake --build _build --config Release --target pestpp-ies
 
 And package the executables to a ZIP file:
 
+    cd _build
     cpack -G ZIP -C Release
 
 ### NMake Makefiles
 
 If Ninja is not available, a basic generator that works for both Visual Studio and Intel compilers is to specify "NMake Makefiles". This method is the slowest, as it cannot be parallelized. For example, configure for Intel C++/Fortran:
 
-    cmake -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icl -DCMAKE_Fortran_COMPILER=ifort ..
+    cmake -B _build -S . -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icl -DCMAKE_Fortran_COMPILER=ifort
 
 Then follow similar steps to build:
 
-    cmake --build .
+    cmake --build _build
 
 And package the executables to a ZIP file:
 
+    cd _build
     cpack -G ZIP -C Release

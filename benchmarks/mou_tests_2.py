@@ -2156,7 +2156,27 @@ def zdt1_fixed_scaleoffset_test():
 
     print(df.loc[others,:])
     assert np.all(df.loc[others,"val"].values <= 0)
+    dv0 = pd.read_csv(os.path.join(t_d,"zdt1.0.dv_pop.csv"),index_col=0)
+    assert dv0.shape == pe.shape
+    diff = np.abs(dv0.values - pe._df.loc[dv0.index,dv0.columns].values)
+    print(diff)
+    print(diff.sum())
+    assert diff.max() < 1e-10
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(t_d,"zdt1.pst"))
     
+    pyemu.os_utils.run("{0} {1}".format(exe_path,"zdt1.pst"),cwd=t_d)
+    dv1 = pd.read_csv(os.path.join(t_d,"zdt1.1.dv_pop.csv"),index_col=0)
+    for other in others:
+        #print(dv1.loc[:,other])
+        assert np.all(dv1.loc[:,other].values > 0)
+        #make sure that the values in the fixed columns are also in the initial pe
+        min_diff = 1e10
+        for val in dv1.loc[:,other].values:
+            min_diff = min(min_diff,np.abs((pe.loc[:,others] - val).values).min())
+            print(min_diff)
+            assert min_diff < 1e-10
+
 
 def zdt1_fixedtied_stack_test():
     t_d = mou_suite_helper.setup_problem("zdt1",True,True)
@@ -2695,7 +2715,7 @@ def mou_bound_handling_test():
 
 
 if __name__ == "__main__":
-    mou_bound_handling_test()
+    #mou_bound_handling_test()
     #basic_pso_test()
     #test_restart_all()
     #chance_consistency_test()
@@ -2709,7 +2729,7 @@ if __name__ == "__main__":
     #plot_hosaki(m_d=os.path.join("mou_tests","hosaki_empcov_master_risk"))
     #basic_pso_test()
     #zdt1_fixedtied_stack_test()
-    #zdt1_fixed_scaleoffset_test()
+    zdt1_fixed_scaleoffset_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #invest()
     #plot()
@@ -2777,4 +2797,4 @@ if __name__ == "__main__":
 
     #pop_sched_test()
     #simplex_invest_1()
-    pi_output_test()
+    #pi_output_test()

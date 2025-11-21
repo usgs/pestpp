@@ -30,6 +30,7 @@
 #include "Ensemble.h"
 #include "EnsembleSmoother.h"
 #include "DataAssimilator.h"
+#include "RunManagerExternal.h"
 
 
 using namespace std;
@@ -91,11 +92,7 @@ int main(int argc, char* argv[])
 		string rns_file = file_manager.build_filename("rns");
 		int flag = remove(rns_file.c_str());
 
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "External run manager ('/e') not supported by pestpp-da, please use panther instead" << endl;
-			exit(1);
-		}
+
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::GENIE)
 		{
 			cerr << "genie run manager ('/g') not supported by pestpp-da, please use panther instead" << endl;
@@ -487,6 +484,15 @@ int main(int argc, char* argv[])
                 pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
+        else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+        {
+
+        	const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+        	run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+			exi.tplfile_vec, exi.inpfile_vec,
+		   exi.insfile_vec, exi.outfile_vec,
+			rns_file);
+        }
 		else
 		{
 			performance_log.log_event("starting basic model IO error checking");

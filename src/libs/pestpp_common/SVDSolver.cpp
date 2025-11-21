@@ -1360,31 +1360,29 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
 	double lambda_spacing_factor = 10.0; // doing powers of 10 for now
 	bool extended = false;
-
-	if (best_lambda == last_lambda)
-	{
-		// Add a new larger lambda
-		double new_lambda = last_lambda * lambda_spacing_factor;
-		if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
-		{
-			lambda_vec.push_back(new_lambda);
-			extended = true;
-			file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
+	if (pest_scenario.get_pestpp_options().get_lambda_scale_vec().size() > 1) {
+		if (best_lambda == last_lambda) {
+			// Add a new larger lambda
+			double new_lambda = last_lambda * lambda_spacing_factor;
+			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end()) {
+				lambda_vec.push_back(new_lambda);
+				extended = true;
+				file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda
+											<< std::endl;
+			}
+		} else if (best_lambda == first_lambda) {
+			// Add a new smaller lambda
+			double new_lambda = first_lambda / lambda_spacing_factor;
+			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end()) {
+				lambda_vec.push_back(new_lambda);
+				extended = true;
+				file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda
+											<< std::endl;
+			}
 		}
+		std::sort(lambda_vec.begin(), lambda_vec.end());
+		pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 	}
-	else if (best_lambda == first_lambda)
-	{
-		// Add a new smaller lambda
-		double new_lambda = first_lambda / lambda_spacing_factor;
-		if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
-		{
-			lambda_vec.push_back(new_lambda);
-			extended = true;
-			file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
-		}
-	}
-	std::sort(lambda_vec.begin(), lambda_vec.end());
-	pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 
 	return best_upgrade_run;
 }

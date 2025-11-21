@@ -27,6 +27,7 @@
 #include "PerformanceLog.h"
 #include "debug.h"
 #include "DifferentialEvolution.h"
+#include "RunManagerExternal.h"
 
 #include "linear_analysis.h"
 #include "logger.h"
@@ -122,12 +123,7 @@ int main(int argc, char* argv[])
 			exit(1);
 
 		}
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "external run manager ('/e') no longer supported, please use PANTHER instead" << endl;
-			exit(1);
 
-		}
 
 		RestartController restart_ctl;
 
@@ -221,6 +217,16 @@ int main(int argc, char* argv[])
                 pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 		}
 
+		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+		{
+			string rns_file = file_manager.build_filename("rns");
+			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+			run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+			exi.tplfile_vec, exi.inpfile_vec,
+		   exi.insfile_vec, exi.outfile_vec,
+			rns_file);
+		}
+		
 		else
 		{
 			performance_log.log_event("starting basic model IO error checking");

@@ -115,7 +115,7 @@ template void tokenize(const std::string& str, list<string>& tokens, const std::
 
 bool invalidChar (char c)
 {
-	return !(c>=0 && c <128);
+	return !(c>=0 && (unsigned char)c<128);
 }
 
 void strip_nonascii_ip(string &s) {
@@ -1893,6 +1893,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		//check for double quotes
 		tokenize(next_line, quote_tokens, "\"", false);
         bool stripped_last = false;
+
         if (quote_tokens[quote_tokens.size()-1].size() == 0)
         {
             quote_tokens.pop_back();
@@ -1904,6 +1905,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 			if ((!stripped_last) && (nqt % 2 == 0))
 				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
 			tokens.clear();
+        	bool last_empty_with_delim = false;
 			for (int i = 0; i < nqt; i++)
 			{
 				
@@ -1917,8 +1919,12 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 					tokenize(strip_cp(quote_tokens[i]), temp_tokens, ddelim,false);
 					
 					last_size = quote_tokens[i].size();
-					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
-						temp_tokens.pop_back();
+					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim) {
+						if (quote_tokens[i].substr(last_size-2,1) == ddelim) {
+							temp_tokens.pop_back();
+							last_empty_with_delim = true;
+						}
+					}
 					for (auto& t : temp_tokens)
                     {
                         if (t.empty())
@@ -1929,6 +1935,10 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 				}
 				else if (quote_tokens[i].size() > 0)
 					tokens.push_back(quote_tokens[i]);
+				if (last_empty_with_delim) {
+					tokens.push_back("");
+					last_empty_with_delim = false;
+				}
 
 			}
 
@@ -2234,7 +2244,8 @@ for (int i = 0; i < argc; ++i)
     }
 	if ((lower_cmdline_vec.size() == 3) || (lower_cmdline_vec.size() > 4))
 	{
-		throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
+		if (lower_cmdline_vec[2] != "/e")
+			throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
 	}
 	
 	//serial run mgr...done
@@ -2266,8 +2277,7 @@ for (int i = 0; i < argc; ++i)
 		throw_cmdline_error("unrecognized commandline arg '" + third_arg + "', expecting '/h','/e','/g'");
 	}
 
-	if (runmanagertype == RunManagerType::PANTHER_WORKER)
-	{
+	if (runmanagertype == RunManagerType::PANTHER_WORKER) {
 		string forth_arg = org_cmdline_vec[3];
 		if (forth_arg.find(":") == string::npos)
 		{
@@ -2308,13 +2318,12 @@ for (int i = 0; i < argc; ++i)
 			cout << "...using panther run manager in worker mode using hostname '" << panther_host_name << "' and port " << panther_port << endl;
 		}
 	}
-	return;
-
 }
  
 
 void CmdLine::throw_cmdline_error(string message)
 {
+	startup_report(cerr,"");
 	cerr << "--------------------------------------------------------" << endl;
 	cerr << "COMMAND LINE ERROR: " << message << endl;
 	cerr << "usage:" << endl << endl;
@@ -2334,12 +2343,18 @@ void CmdLine::startup_report(std::ostream &s, string start_string) {
 
 	string version = PESTPP_VERSION;
 	s << endl << endl << "version: " << version << endl;
-	s << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	s << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl;
 	s << "using control file: \"" << ctl_file_name << "\"" << endl;
 	s << "in directory: \"" << cwd << "\"" << endl;
 	s << "on host: \"" << w_get_hostname() << "\"" << endl;
 	s << "on a(n) " << opersys << " operating system" << endl;
-	s << "started at " << start_string << endl << endl;
+#ifdef _DEBUG
+	s << "with debugging configuration" << endl;
+#else
+	s << "with release configuration" << endl;
+#endif
+	if (start_string.size() > 0)
+		s << "started at " << start_string << endl << endl;
 }
 
 // end of namespace pest_utils

@@ -38,6 +38,8 @@
 #include "RunManagerSerial.h"
 #include "OutputFileWriter.h"
 #include "PantherAgent.h"
+#include "RunManagerExternal.h"
+#include "RunManagerPanther.h"
 #include "Serialization.h"
 #include "system_variables.h"
 
@@ -119,12 +121,12 @@ int main(int argc, char* argv[])
 		exit(1);
 
 	}
-	if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+	/*if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 	{
 		cerr << "external run manager ('/e') no longer supported, please use PANTHER instead" << endl;
 		exit(1);
 
-	}
+	}*/
 
 	ofstream &fout_rec = file_manager.open_ofile_ext("rec");
 	fout_rec << "             pestpp-sen: a tool for global sensitivity analysis" << endl << endl;
@@ -180,6 +182,15 @@ int main(int argc, char* argv[])
             pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
             pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
             pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+	}
+	else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+	{
+		string rns_file = file_manager.build_filename("rns");
+		const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+		run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+		exi.tplfile_vec, exi.inpfile_vec,
+	   exi.insfile_vec, exi.outfile_vec,
+		rns_file);
 	}
 	else
 	{

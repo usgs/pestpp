@@ -305,10 +305,10 @@ int main(int argc, char* argv[])
 		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+			string rns_file = file_manager.build_filename("rns");
 			run_manager_ptr = new RunManagerExternal(exi.comline_vec,
 				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-				file_manager.build_filename("rns"), file_manager.build_filename("ext"),
-				file_manager.build_filename("exi"),
+				rns_file,
 				pest_scenario.get_pestpp_options().get_max_run_fail());
 		}
 		else

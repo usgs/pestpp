@@ -44,6 +44,7 @@ along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 #include "debug.h"
 #include "logger.h"
 #include "Jacobian.h"
+#include "RunManagerExternal.h"
 
 
 using namespace std;
@@ -470,12 +471,7 @@ int main(int argc, char* argv[])
 		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
 		//run manager is specified on the command line.
-		
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "External run manager ('/e') not supported by sweep, please use panther instead" << endl;
-			exit(1);
-		}
+
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::GENIE)
 		{
 			cerr << "Genie run manager ('/e') deprecated, please use panther instead" << endl;
@@ -641,6 +637,15 @@ int main(int argc, char* argv[])
                     pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+		}
+		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+		{
+
+			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+			run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+			exi.tplfile_vec, exi.inpfile_vec,
+		   exi.insfile_vec, exi.outfile_vec,
+			rns_file);
 		}
 		else
 		{

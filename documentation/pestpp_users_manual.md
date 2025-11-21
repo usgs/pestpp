@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.22
+# <a id='s1' />Version 5.2.24
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-August 2025
+October 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -2468,6 +2468,11 @@ in a command line window to ascertain the hostname of a machine.
 
 If, for some reason, a agent ceases execution, or the computer on which it resides loses its connection with the manager, it should be re-started using the above command. A agent does not have to be restarted using the “/r” switch as its tasks are repetitive and simple, namely to receive parameters, run the model, and then send model outputs to the PESTPP-XXX manager.
 
+All fo the PEST++ tools also support an "external" run manager, which as the name suggests, relies on some external scheme to process model runs.  The external run manager expects this external scheme to interact with the run-storage file (namely, *case*.rns).  When the external run manager is being used, the "model command(s)" in the pest control file are called only one time per batch of runs to be completed.  In this way, users can call their external run management scheme(s) programmatically.  pyEMU has support for reading and updating the (binary) run storage file.  The external run mananger is invoked with the "/e" command line switch:
+
+| pestpp-xxx case /e|
+|-------------------|
+
 ### <a id='s9-3-4' />5.3.4 Run Management Record File
 
 The PESTPP-XXX manager records all communications between it and its agents in a run management record file. This file is named *case.rmr* where *case* is the filename base of the PEST control file. The agent that execute runs write all information related to communications with the master to the *panther_agent.rec* file, which is written in the local agent directory.
@@ -3634,6 +3639,8 @@ In highly nonlinear problems, the gradient between parameters and simulated equi
 
 To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “covariance reinflation”. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations or “anomalies”) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
 
+Figure 9.3 shows how the reinflation cycles can mitigate variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
+
 This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Note this argument can be a single integer or a sequence of integers like 2,5,9, in which case PESTPP-IES will reinflate the ensemble after the 2<sup>nd</sup> , 7<sup>th</sup>, and 16<sup>th</sup> iterations. Some other behavioural characteristics of using parameter covariance reinflation:
 
 - The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit when using the *ies_n_iter_reinflate* option.
@@ -3646,7 +3653,11 @@ This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. 
 
 - During a reinflation cycle, all realizations that have either failed or have been removed for poor performance will be brought back into the current parameter ensemble. If restarting, supplying the previous prior parameter ensemble along with the restart parameter ensemble will enable PESTPP-IES to bring all the prior realizations lost during the previous analysis back into the current ensemble.
 
-Figure 9.3 shows how the reinflation cycles can mitigate variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
+- Through the use of *ies_reinflate_num_reals*, which is supplied as a sequence of positive integers, users can adjust the number of realizations used during each reinflation cycle.  For example, a user can supply "10,1000", which results in 10 realizations being used before the first reinflation (including the prior), and them 1000 realizations being used after the first reinflation.  The *ies_reinflate_num_reals* maximum value is limited by the *ies_num_reals* and/or by the number of realizations supplied in an existing parameter ensemble. 
+
+- In an effort to minimize the number of model evaluations required to apply PESTPP-IES, users may want to use a small(er) ensemble for a few iterations to hone in an acceptable mean parameter vector, then expand the ensemble to use more realizations, centered on the location of that mean vector.  Standard reinflation resets to the prior parameter variances and correlations (as described in the prior parameter ensemble), this prior reinflation can and should result in a large increase in phi for the reinflated realizations.  In some cases, where users want to better maintain the phi of the ensemble (that is keep the realizations more calibrated), new realiztions can be generated from the current ensemble, such that the variances and correlations in the current ensemble are preserved, which, depending on the linearity of the inverse problem, can result in the newly generated ensemble maintaining a lower phi value, that is, the new realizations are somewhat "calibrated".  This optional g behavior is actived by supplying the *ies_reinflation_num_reals* value as negative.  Note that any new realization generated from this operation is essentially a linear combination of the current parameter realizations, which means at most the new realizations will occupy a limited dimensional subspace (at most, the dimensions occupied will be equal to the number of realziations in the current ensemble).  To help expand the subset dimensions of the new ensemble, users can supply *ies_reinflation_factor* as a negative value ranging from less than zero to -1.0 (inclusive).  With a negative *ies_reinflation_factor*, a randomly selected scaled, centered prior ensemble realization is added to each new realization, where the scaling amount is the absolute value of *ies_reinflation_factor*.  
+
+
 
 <img src="./media/image6.emf" style="width:6.28022in;height:3.83791in" />
 
@@ -3724,7 +3735,7 @@ In some contexts, a more heuristic approach may be taken to balancing goodness o
 
 In addition to its role in generating initial parameter realizations, the prior parameter probability distribution supports the following aspects of PESTPP-IES calculations.
 
-1.  It features in equation 18 of Chen and Oliver (2013). This term of the equation is omitted if equation 19 is used for parameter field adjustment in its stead; as stated above, this occurs if *ies_use_approx()* is set to *true*.
+1.  It features in equation 18 of Chen and Oliver (2013). This term of the equation is omitted if equation 19 is used for parameter field adjustment in its stead; as stated above, this occurs if *ies_use_approx()* is set to *true*.  Note users can supply *ies_regularization_factor* as a negative value when *ies_use_approx* is *true*.  In this case, the prior component of the full solution upgrade equation 19 of Chen and Oliver is scaled by the absolute value of the regularization factor.  This allows users to apply a portion of the prior component rather than the full prior component
 
 2.  It provides weights to individual “regularization observations” that measure departures of adjusted parameter fields from initial parameter fields. This occurs if *ies_reg_factor()* is set to a value greater than zero.
 
