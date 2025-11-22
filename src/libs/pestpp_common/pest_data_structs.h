@@ -417,6 +417,12 @@ public:
 	void set_sqp_save_cov_every(int _every) { sqp_save_cov_every = _every; }
 	bool get_sqp_enforce_bounds()const { return sqp_enforce_bounds; }
 	void set_sqp_enforce_bounds(bool _flag) { sqp_enforce_bounds = _flag; }
+	void set_sqp_viol_pad(double val) { sqp_viol_pad = val; }
+	double get_sqp_viol_pad() const { return sqp_viol_pad; }
+	int get_sqp_reset_hessian_every()const { return sqp_reset_hessian_every; }
+	void set_sqp_reset_hessian_every(int _every) { sqp_reset_hessian_every = _every; }
+	int get_sqp_wset_level()const { return sqp_wset_level; }
+	void set_sqp_wset_level(int _level) { sqp_wset_level = _level; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -845,6 +851,9 @@ private:
 	double sqp_hess_max_cond_num;
 	int sqp_save_cov_every;
 	bool sqp_enforce_bounds;
+	double sqp_viol_pad;
+	int sqp_reset_hessian_every;
+	int sqp_wset_level;
 
 	int mou_population_size;
 	string mou_generator; 

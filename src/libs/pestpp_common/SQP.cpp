@@ -1814,7 +1814,7 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 		message(1, ss.str());
 	}
 
-	H_new = regularize_hessian(H_new, "BFGS update");
+	//H_new = regularize_hessian(H_new, "BFGS update");
 
 	if (seek_ies)
 	{
@@ -1855,7 +1855,8 @@ bool SeqQuadProgram::update_hessian(string how)
 	//check if there's an active constraint for the current dv then compute constraint jco and update y_k
 	vector<string> prev_cnames, curr_cnames;
 	prev_cnames = prev_constraint_mat.get_row_names();
-	current_constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs, (working_set_tol)).first;
+	int wset_lvl = pest_scenario.get_pestpp_options().get_sqp_wset_level();
+	current_constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs, (working_set_tol), wset_lvl).first;
 	curr_cnames = current_constraint_mat.get_row_names();
 	
 	set<string> all_constraint_names;
@@ -2136,7 +2137,20 @@ void SeqQuadProgram::iterate_2_solution()
 			break;
 
 		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian())
-			update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
+		{
+			if (pest_scenario.get_pestpp_options().get_sqp_reset_hessian_every() > 0)
+			{
+				if ((iter + 1) % pest_scenario.get_pestpp_options().get_sqp_reset_hessian_every() == 0)
+				{
+					message(1, "resetting hessian to identity");
+					Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+					h.setIdentity();
+					hessian = Covariance(dv_names, h);
+				}
+			}
+			else
+				update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
+		}
 	}
 }
 
@@ -2384,45 +2398,11 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	ss << "starting KKT null space solve";
 	performance_log->log_event(ss.str());
 
-	// 1. Create copies for scaling (don't modify originals)
-	Eigen::MatrixXd scaled_constraint_jco = _constraint_jco;
-	Eigen::VectorXd scaled_constraint_diff = constraint_diff;
-
-	// 2. Compute row-wise scaling factors
-	Eigen::VectorXd row_scales(scaled_constraint_jco.rows());
-	const double min_scale = 1e-12;  // Prevent division by zero
-
-	for (int i = 0; i < scaled_constraint_jco.rows(); i++) 
-	{
-		double row_norm = scaled_constraint_jco.row(i).norm();
-		if (row_norm > min_scale) 
-			row_scales[i] = 1.0 / row_norm;
-		else
-			row_scales[i] = 1.0;  // Don't scale if row is essentially zero
-		
-	}
-
-	// 3. Apply scaling to constraint Jacobian and RHS
-	for (int i = 0; i < scaled_constraint_jco.rows(); i++) 
-	{
-		scaled_constraint_jco.row(i) *= row_scales[i];
-		scaled_constraint_diff[i] *= row_scales[i];
-	}
-
-	ss.str("");
-	ss << "   applied constraint Jacobian scaling:";
-	ss << " min_scale=" << row_scales.minCoeff();
-	ss << " max_scale=" << row_scales.maxCoeff();
-	ss << " condition_improvement=" << (row_scales.maxCoeff() / row_scales.minCoeff()) << endl;
-	frec << ss.str();
-	performance_log->log_event(ss.str());
-
-
 	Eigen::VectorXd search_d, lm;
-	
-	int m = scaled_constraint_jco.rows();  
-	int n = scaled_constraint_jco.cols();  
-	Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(scaled_constraint_jco.transpose());
+
+	int m = _constraint_jco.rows();
+	int n = _constraint_jco.cols();
+	Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(_constraint_jco.transpose());
 
 	int rank = qr.rank();
 
@@ -2452,12 +2432,12 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 
 	// solve p_range_space
 	Eigen::VectorXd p_y, rhs;
-	Eigen::MatrixXd AY = scaled_constraint_jco * Y; // A*Y is m×m, should be full rank
+	Eigen::MatrixXd AY = _constraint_jco * Y; // A*Y is m×m, should be full rank
 
 	// Check condition number of A*Y
 	Eigen::JacobiSVD<Eigen::MatrixXd> svd_AY(AY);
 	double cond_AY = svd_AY.singularValues()(0) / svd_AY.singularValues()(svd_AY.singularValues().size() - 1);
-	if (cond_AY > max_condition_warning) 
+	if (cond_AY > max_condition_warning)
 	{
 		ss.str("");
 		ss << "   WARNING: A*Y condition number very large: " << cond_AY << endl;
@@ -2474,17 +2454,17 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		performance_log->log_event(ss.str());
 
 		Eigen::BDCSVD<Eigen::MatrixXd> svd_AY(AY, Eigen::ComputeThinU | Eigen::ComputeThinV);
-		p_y = svd_AY.solve(scaled_constraint_diff);
+		p_y = svd_AY.solve(constraint_diff);
 	}
 	else
 	{
-		p_y = ldlt_AY.solve(scaled_constraint_diff); //from Eq 18.19a pp. 538 Nocedal and Wright
+		p_y = ldlt_AY.solve(constraint_diff); //from Eq 18.19a pp. 538 Nocedal and Wright
 	}
-	
+
 	// Check magnitude of p_y
 	const double max_p_norm = 1E+6;
 	ss.str("");
-	if (p_y.norm() > max_p_norm) 
+	if (p_y.norm() > max_p_norm)
 	{
 		ss.str("");
 		ss << "   WARNING: p_y norm too large: " << p_y.norm() << ", scaling down to " << max_p_norm << endl;
@@ -2499,12 +2479,12 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 
 	if (Z.cols() > 0)
 	{
-		Eigen::MatrixXd red_hess = Z.transpose() * G_reg * Z; 
+		Eigen::MatrixXd red_hess = Z.transpose() * G_reg * Z;
 
 		// Check condition number of reduced Hessian
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_red(red_hess);
 		double cond_red = eig_red.eigenvalues().maxCoeff() / eig_red.eigenvalues().minCoeff();
-		if (cond_red > max_condition_warning) 
+		if (cond_red > max_condition_warning)
 		{
 			ss.str("");
 			ss << "   WARNING: Reduced Hessian condition number very large: " << cond_red << endl;
@@ -2512,7 +2492,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 			performance_log->log_event(ss.str());
 
 			double min_eig_red = eig_red.eigenvalues().minCoeff();
-			if (min_eig_red < min_allowed_eig) 
+			if (min_eig_red < min_allowed_eig)
 			{
 				double delta_red = min_allowed_eig - min_eig_red + 1e-6;
 				red_hess += delta_red * Eigen::MatrixXd::Identity(red_hess.rows(), red_hess.cols());
@@ -2535,7 +2515,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 			ss << "   using simplified approach in KKT null space solve..." << endl;
 			frec << ss.str();
 			performance_log->log_event(ss.str());
-			rhs = - Z.transpose() * curved_grad;
+			rhs = -Z.transpose() * curved_grad;
 			// simplify by removing cross term (or ``partial hessian'') matrix (zTgy), which is approp when approximating hessian (zTgz) (as p_y goes to zero faster than p_z)
 			if (cholesky)
 			{
@@ -2586,9 +2566,9 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		search_d = Y * p_y + Z * p_z; // Eq. 18.18 p. 539 Nocedal and Wright 
 	else
 		search_d = Y * p_y;
-	
+
 	const double max_search_d_norm = 1E+8; //TODO: rethink about hardcoding this value
-	if (search_d.norm() > max_search_d_norm) 
+	if (search_d.norm() > max_search_d_norm)
 	{
 		ss.str("");
 		ss << "   WARNING: search_d norm too large: " << search_d.norm() << ", scaling down" << endl;
@@ -2605,14 +2585,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	// compute lagrangian multipliers
 	if (simplified_null_space_approach)
 	{
-		Eigen::BDCSVD<Eigen::MatrixXd> svd_AAT(scaled_constraint_jco* scaled_constraint_jco.transpose(),Eigen::ComputeThinU | Eigen::ComputeThinV);
-		lm = svd_AAT.solve(scaled_constraint_jco * curved_grad);
+		Eigen::BDCSVD<Eigen::MatrixXd> svd_AAT(_constraint_jco * _constraint_jco.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
+		lm = svd_AAT.solve(_constraint_jco * curved_grad);
 	}
 	else
 	{
 		// Nocedal and Wright pg. 457 and 538
 		rhs = Y.transpose() * (curved_grad + G * search_d);
-		Eigen::MatrixXd AY_transpose = (scaled_constraint_jco * Y).transpose(); // (A*Y)^T, also m×m
+		Eigen::MatrixXd AY_transpose = (_constraint_jco * Y).transpose(); // (A*Y)^T, also m×m
 		Eigen::LDLT<Eigen::MatrixXd> ldlt_AYT(AY_transpose);
 		if (ldlt_AYT.info() != Eigen::Success)
 		{
@@ -2625,9 +2605,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		}
 	}
 
-	for (int i = 0; i < lm.size(); i++) 
-		lm[i] /= row_scales[i];
-	
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, lm);
 }
 
@@ -2757,15 +2734,15 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::Matrix
 //	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);
 //}
 
-pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, const Eigen::VectorXd* lm, vector<string> curr_ws)
+pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, int wset_lvl, const Eigen::VectorXd* lm, vector<string> curr_ws)
 {
 	if (use_ensemble_grad) {
-		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol));
+		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol), wset_lvl);
 	}
 	else
 	{
 		message(2, "getting working set constraint matrix");
-		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, jco, true, lm, (working_set_tol));
+		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, jco, true, lm, (working_set_tol), wset_lvl);
 	}
 }
 
@@ -3855,17 +3832,49 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		}
 
 		if ((constr_jco.rows() > 0) && (!isfullrank(constr_jco)))
-        {
-			message(0, "WARNING: constraint_jco is not full rank. Using complete orthogonal decomposition.");
-			Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod(constr_jco);
-			int effective_rank = cod.rank();
+		{
+			frec << "   WARNING: constraint_jco is not full rank. Identifying independent constraints.";
+			performance_log->log_event("   WARNING: constraint_jco is not full rank. Identifying independent constraints.");
+			Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(constr_jco.transpose());
+			int effective_rank = qr.rank();
 
-			Eigen::MatrixXd U = cod.matrixQ();
-			Eigen::MatrixXd reduced_constr_jco = U.leftCols(effective_rank);
-			constr_jco = reduced_constr_jco;
+			if (effective_rank < constr_jco.rows())
+			{
+				Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> perm = qr.colsPermutation();
+				Eigen::VectorXi perm_indices = perm.indices();
 
-			Eigen::VectorXd reduced_constraint_diff = U.leftCols(effective_rank).transpose() * constraint_diff;
-			constraint_diff = reduced_constraint_diff;
+				vector<string> reduced_Cnames;
+				Eigen::MatrixXd reduced_constr_jco(effective_rank, constr_jco.cols());
+				Eigen::VectorXd reduced_constraint_diff(effective_rank);
+
+				for (int i = 0; i < effective_rank; i++)
+				{
+					int orig_idx = perm_indices(i);
+					reduced_Cnames.push_back(Cnames[orig_idx]);
+					reduced_constr_jco.row(i) = constr_jco.row(orig_idx);
+					reduced_constraint_diff(i) = constraint_diff(orig_idx);
+				}
+
+				constr_jco = reduced_constr_jco;
+				constraint_diff = reduced_constraint_diff;
+				Cnames = reduced_Cnames;
+
+				if (_cnames != nullptr)
+					*_cnames = reduced_Cnames;
+				
+
+				ss.str("");
+				ss << "   reduced constraint matrix from rank " << constr_jco.rows() + (Cnames.size() - effective_rank)
+					<< " to rank " << effective_rank << ". Kept constraints: ";
+				for (size_t i = 0; i < reduced_Cnames.size(); i++)
+				{
+					if (i > 0) ss << ", ";
+					ss << reduced_Cnames[i];
+				}
+				ss << endl;
+				frec << ss.str();
+				performance_log->log_event(ss.str());
+			}
 		}
 		
 		if ((constraint_diff.array().abs() > filter.get_viol_tol()).any()) 
@@ -3917,15 +3926,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 			}
 		}
 
-		//const double max_search_d_norm = 1E+8;
-		//if (search_d.norm() > max_search_d_norm) {
-		//	ss.str("");
-		//	ss << "WARNING: unconstrained search_d norm too large: " << search_d.norm()
-		//		<< ", scaling down to " << max_search_d_norm;
-		//	message(2, ss.str());
-		//	search_d *= (max_search_d_norm / search_d.norm());
-		//}
-
 		lm = Eigen::VectorXd::Zero(0);
 	}
 
@@ -3948,6 +3948,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	//	double lb = lbnd[dv_names[i]];
 	//	double ub = ubnd[dv_names[i]];
 	//	double range = ub - lb;
+	//}
 
 	//	// Scale based on parameter range (if range is reasonable)
 	//	if (range > 1e-10)
@@ -4007,7 +4008,8 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 
 	if ((lm_en[rname].array() < 0).any())
 	{
-		constraint_mat_en[rname] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, &lm_en[rname], cnames_en[rname]);
+		int wset_lvl = pest_scenario.get_pestpp_options().get_sqp_wset_level();
+		constraint_mat_en[rname] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, wset_lvl, &lm_en[rname], cnames_en[rname]);
 		if (constraint_mat_en[rname].first.get_row_names() != cnames_en[rname])
 		{
 			vector<string> prev_cnames = cnames_en[rname];
@@ -4389,7 +4391,8 @@ bool SeqQuadProgram::solve_new_ensemble()
 		Eigen::VectorXd real_obs_vec = oe.get_real_vector(d);
 		obs_vals.update_without_clear(oe.get_var_names(), real_obs_vec);
 		
-		constraint_mat_en[d] = get_constraint_mat(dv_vals, obs_vals, working_set_tol);
+		int wset_lvl = pest_scenario.get_pestpp_options().get_sqp_wset_level();
+		constraint_mat_en[d] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, wset_lvl);
 		Mat current_cmat = constraint_mat_en[d].first;
 		cnames_en[d] = constraint_mat_en[d].first.get_row_names();
 		constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
@@ -4752,15 +4755,6 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
 	double oext, oviol = 0.0, nviol = 0.0;
 
-	double viol_pad;
-	if (best_violations.size() == 0)
-		viol_pad = working_set_tol;
-	else
-	{
-		double lviol = *min_element(best_violations.begin(), best_violations.end());
-		viol_pad = min(lviol, working_set_tol);
-	}
-
 	vector<string> real_names = dv_candidates.get_real_names();
 
 	map<string, Parameters> par_map;
@@ -4777,10 +4771,9 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		o.update_without_clear(_oe.get_var_names(), t);
 		obs_map[d] = o;
 	}
-
-	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, working_set_tol, true);
+	double viol_pad = pest_scenario.get_pestpp_options().get_sqp_viol_pad();
+	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
-	map<string, map<string, double>> feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
 
 	vector<string> onames = _oe.get_var_names();
 	vector<string> vnames = dv_candidates.get_var_names();
@@ -4820,10 +4813,7 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 			infeas_sum_nom += v.second;
 		nviol_vec.push_back(infeas_sum_nom);
 		total_viol_map[real_names[i]] = infeas_sum_nom;
-		for (auto& f : feasible_distance[real_names[i]])
-			feas_dist -= f.second;
-		feas_dist_map.push_back(feas_dist);
-		bool filter_accept = candidate_filter.accept(obj_vec[i], infeas_sum_nom, par_map[real_names[i]], obs_map[real_names[i]], real_names[i], iter, true);
+		bool filter_accept = candidate_filter.accept(obj_vec[i], infeas_sum, par_map[real_names[i]], obs_map[real_names[i]], real_names[i], iter, true);
 		string accept_reject = filter_accept ? "accept" : "reject";
 
 		ss << setw(20) << infeas_sum_nom
