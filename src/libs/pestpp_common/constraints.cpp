@@ -3405,22 +3405,25 @@ pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par
     for (auto &name : ctl_ord_pi_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set_pi.push_back(name);
-		if (wset_lvl == 1)
-		{
-			if (abs(constraint_map[name]) < working_set_tol)
-				working_set_pi.push_back(name);
-		}
 		else
 		{
-			if (constraint_sense_map[name] == ConstraintSense::less_than)
+			if (wset_lvl == 1)
 			{
-				if (constraint_map[name] < working_set_tol)
+				if (abs(constraint_map[name]) < working_set_tol)
 					working_set_pi.push_back(name);
 			}
-			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+			else
 			{
-				if (constraint_map[name] > -working_set_tol)
-					working_set_pi.push_back(name);
+				if (constraint_sense_map[name] == ConstraintSense::less_than)
+				{
+					if (constraint_map[name] < working_set_tol)
+						working_set_pi.push_back(name);
+				}
+				else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+				{
+					if (constraint_map[name] > -working_set_tol)
+						working_set_pi.push_back(name);
+				}
 			}
 		}
     }

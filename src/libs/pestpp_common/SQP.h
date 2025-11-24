@@ -30,7 +30,7 @@ struct FilterRec
 	Parameters dp_val;
 	Observations oe_val;
 	string real_name;
-	double eff_viol;
+	double viol_padded;
     friend bool operator<(const FilterRec &k1, const FilterRec &k2) {
         if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
             return true;
@@ -44,25 +44,21 @@ public:
 	SqpFilter(bool _minimize=true,double _obj_tol = 0.001, double _viol_tol = 0.001) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
-	bool accept(double obj_val, double violation_val, Parameters p, Observations o, string rname, int iter=0, bool keep=false);
-	bool update(double obj_val, double violation_val, Parameters p, Observations o, string rname, int iter=0);
-
-	FilterRec get_knee() { return knee; }
+	bool accept(double obj_val, double violation_val, double violation_padded, Parameters p, Observations o, string rname, int iter=0, bool keep=false);
+	bool update(double obj_val, double violation_val, double violation_padded, Parameters p, Observations o, string rname, int iter=0);
     void report(ofstream& frec,int iter);
     double get_viol_tol() {return viol_tol;}
 	void set_tol(double tol) { 
 		obj_tol = tol; 
 		viol_tol = tol;}
-	vector<FilterRec> get_feasible_solutions() const;
+	vector<FilterRec> get_feasible_solutions(bool padded = false) const;
 	vector<FilterRec> get_filter_members() const;
 
 private:
 	bool minimize;
 	double obj_tol;
 	double viol_tol;
-	FilterRec knee;
 	multiset<FilterRec> obj_viol_pairs;
-	void compute_knee();
 	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
     bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
 
@@ -181,6 +177,8 @@ private:
     double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
     double par_sigma_max = 100;
+	bool reset_corr = false;
+	int fcount = 0;
 
     double par_sigma_min = 10;
 	double eigthresh;
@@ -303,7 +301,7 @@ private:
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
-	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad);
+	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);

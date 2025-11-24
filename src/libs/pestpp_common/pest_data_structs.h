@@ -423,6 +423,8 @@ public:
 	void set_sqp_reset_hessian_every(int _every) { sqp_reset_hessian_every = _every; }
 	int get_sqp_wset_level()const { return sqp_wset_level; }
 	void set_sqp_wset_level(int _level) { sqp_wset_level = _level; }
+	bool get_sqp_rescale_search_dir()const { return sqp_rescale_search_dir; }
+	void set_sqp_rescale_search_dir(bool _flag) { sqp_rescale_search_dir = _flag; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -854,6 +856,7 @@ private:
 	double sqp_viol_pad;
 	int sqp_reset_hessian_every;
 	int sqp_wset_level;
+	bool sqp_rescale_search_dir;
 
 	int mou_population_size;
 	string mou_generator; 
