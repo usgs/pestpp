@@ -1849,6 +1849,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_rescale_search_dir = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SQP_SEEK_FEAS_MAX_ITER")
+	{
+		convert_ip(value, sqp_seek_feas_max_iter);
+		return true;
+	}
 	return false;
 }
 
@@ -2038,6 +2043,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_reset_hessian_every: " << sqp_reset_hessian_every << endl;
 	os << "sqp_wset_level: " << sqp_wset_level << endl;
 	os << "sqp_rescale_search_dir: " << sqp_rescale_search_dir << endl;
+	os << "sqp_seek_feas_max_iter: " << sqp_seek_feas_max_iter << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2293,6 +2299,7 @@ void PestppOptions::set_defaults()
 	set_sqp_reset_hessian_every(-1);
 	set_sqp_wset_level(1);
 	set_sqp_rescale_search_dir(true);
+	set_sqp_seek_feas_max_iter(3);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

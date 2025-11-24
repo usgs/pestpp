@@ -2109,6 +2109,32 @@ bool SeqQuadProgram::should_terminate()
 		          << right << setw(12) << "phi"
 		          << setw(15) << "violation" << endl;
 
+	ss << "   " << left << setw(5) << "iter"
+		<< right << setw(12) << "phi"
+		<< setw(15) << "violation" << endl;
+
+	//save phi and violation data to CSV file
+	ss.str("");
+	ss << file_manager.get_base_filename() << ".phi_viol.summary.csv";
+	string csv_filename = ss.str();
+	ofstream csv_file(csv_filename);
+	if (!csv_file.good())
+	{
+		stringstream err_ss;
+		err_ss << "error opening csv file for writing: " << csv_filename;
+		throw_sqp_error(err_ss.str());
+	}
+
+	csv_file << "iter,phi,violation" << endl;
+	for (int i = 0; i < best_phis.size(); i++)
+	{
+		csv_file << i << "," << fixed << setprecision(10) << best_phis[i]
+			<< "," << fixed << setprecision(10) << best_violations[i] << endl;
+	}
+	csv_file.close();
+	message(1, "saved phi and violation summary to: ", csv_filename);
+
+
     for (int i=0;i<best_phis.size();i++)
     {
         phi = best_phis[i];
@@ -3045,9 +3071,9 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 		v1 = dv_candidates.get_real_vector(i);
 		for (int j = i + 1; j < dv_candidates.shape().first; ++j)
 		{
-			v2 = (dv_candidates.get_real_vector(j) - v1).array() / v1.array().cwiseAbs();
-			d = v2.transpose() * v2;
-			if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end()))
+			v2 = dv_candidates.get_real_vector(j);
+			d = (v2 - v1).squaredNorm();
+			if ((abs(d) < 1E-12) && (jvals.find(j) == jvals.end()))
 			{
 				message(1, "duplicate trust-region candidates:",
 					vector<string>{ dv_candidates.get_real_names()[i],
@@ -3461,11 +3487,12 @@ bool SeqQuadProgram::line_search(Eigen::VectorXd& search_d, const Parameters& _c
 	double d;
 	vector<string> drop;
 	set<int> jvals;
+	const double epsilon = 1e-10;
 	for (int i = 0; i < dv_candidates.shape().first; i++)
 	{
 		v1 = dv_candidates.get_real_vector(i);
 		for (int j = i + 1; j < dv_candidates.shape().first; j++) {
-			v2 = (dv_candidates.get_real_vector(j) - v1).array() / v1.array().cwiseAbs();
+			v2 = (dv_candidates.get_real_vector(j) - v1).array() / (v1.array().cwiseAbs() + epsilon);
 			d = v2.transpose() * v2;
 			if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end())) {
 				message(1, "duplicate candidates:", vector<string>{real_names[i], real_names[j]});
@@ -3473,7 +3500,6 @@ bool SeqQuadProgram::line_search(Eigen::VectorXd& search_d, const Parameters& _c
 				jvals.emplace(j);
 			}
 		}
-
 	}
 	if (drop.size() > 0)
 	{
@@ -3659,15 +3685,16 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	double d;
 	vector<string> drop;
 	set<int> jvals;
+	vector<string> current_real_names = dv_candidates.get_real_names();
 	for (int i = 0;i < dv_candidates.shape().first; i++)
 	{
 		v1 = dv_candidates.get_real_vector(i);
 		for (int j = i + 1;j < dv_candidates.shape().first; j++) {
-			v2 = (dv_candidates.get_real_vector(j) - v1).array() / v1.array().cwiseAbs();
-			d = v2.transpose() * v2;
-			if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end())) {
-				message(1, "duplicate candidates:", vector<string>{real_names[i], real_names[j]});
-				drop.push_back(real_names[j]);
+			v2 = dv_candidates.get_real_vector(j);
+			d = (v2 - v1).squaredNorm();
+			if ((abs(d) < 1E-12) && (jvals.find(j) == jvals.end())) {
+				message(1, "duplicate candidates:", vector<string>{current_real_names[i], current_real_names[j]});
+				drop.push_back(current_real_names[j]);
 				jvals.emplace(j);
 			}
 		}
@@ -4355,9 +4382,9 @@ bool SeqQuadProgram::solve_new_ensemble()
 				rangesq += pow(ub - lb, 2);
 			}
 			rangesq = pow(rangesq, 0.5);
-			if (search_d_en[d].norm() > 2 * rangesq)
+			if (search_d_en[d].norm() > rangesq)
 			{
-				search_d_en[d] = 2 * rangesq * search_d_en[d] / search_d_en[d].norm();
+				search_d_en[d] = rangesq * search_d_en[d] / search_d_en[d].norm();
 			}
 		}
 
@@ -4522,7 +4549,7 @@ bool SeqQuadProgram::seek_feasible()
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_restart_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_restart_csv("");
-    ies_pest_scenario.get_control_info_4_mod().noptmax = 3;
+    ies_pest_scenario.get_control_info_4_mod().noptmax = pest_scenario.get_pestpp_options().get_sqp_seek_feas_max_iter();
     ss.str("");
     string org_base = file_manager.get_base_filename();
 	string safe_base = org_base;
@@ -4741,8 +4768,8 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 
 	vector<string> onames = _oe.get_var_names();
 	vector<string> vnames = dv_candidates.get_var_names();
-	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
-	map<string, double> total_viol_map;
+	obj_map = get_obj_map(dv_candidates, _oe);
+	
 	vector<double> infeas_vec, nviol_vec, feas_dist_map;
 	vector<int> accept_idxs, feas_idxs;
 
@@ -4832,10 +4859,6 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 			}
 		}
 	}
-	if(recalc)
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter) + "_" + to_string(recalc_attempt), true);
-	else
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 
 	return { selected, candidate_filter };
 }
@@ -4975,11 +4998,11 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 			}
 		}
 	}
+	
+	if (selected.viol_val > 0.0 || find(best_phis.begin(), best_phis.end(), selected.obj_val) == best_phis.end())
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), false);
 	else
-		fcount = 0;
-
-	/*if (fcount != 0  && fcount % 2 == 0)
-		reset_corr = true;*/
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 
 	bool is_violated = (selected.viol_val >= 1E-10);
 	bool is_recycled = (find(best_phis.begin(), best_phis.end(), selected.obj_val) != best_phis.end());
@@ -6232,7 +6255,7 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 		feas_dp_archive.reorder(sorted_names_from_obj, curr_pe.get_var_names(), true);
 	}
 
-		if (sorted_viol_map.size() > 0)
+	if (sorted_viol_map.size() > 0)
 	{
 		vector<pair<string, double>> sorted_viol_map_vec(sorted_viol_map.begin(), sorted_viol_map.end());
 		sort(sorted_viol_map_vec.begin(), sorted_viol_map_vec.end(),

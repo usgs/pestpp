@@ -209,6 +209,9 @@ private:
 	double best_violation_yet;
 	double working_set_tol;
 
+	map<string, double> obj_map;
+	map<string, double> total_viol_map;
+
 	int warn_min_reals, error_min_reals;
 
 	vector<string> oe_org_real_names, pe_org_real_names;
