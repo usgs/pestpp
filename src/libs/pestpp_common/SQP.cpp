@@ -959,7 +959,7 @@ void SeqQuadProgram::initialize()
 	initialize_parcov();
 	if (use_cmaes)
 	{
-		cmaes = CovMatAdapES(&pest_scenario, &rand_gen);
+		cmaes = CovMatAdapES(&pest_scenario, &rand_gen, &file_manager);
 		
 		cmaes.initialize(dv_names.size(), ppo->get_sqp_num_reals());
 		cmaes.set_covariance(parcov.get_matrix());
@@ -5000,9 +5000,28 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 	}
 	
 	if (selected.viol_val > 0.0 || find(best_phis.begin(), best_phis.end(), selected.obj_val) == best_phis.end())
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), false);
-	else
+	{
+		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
+		{
+			int curr_parent_num = cmaes.get_parent_num();
+			int ratio = pest_scenario.get_pestpp_options().get_sqp_num_reals() / curr_parent_num + 1;
+			int new_parent_num = max(5, pest_scenario.get_pestpp_options().get_sqp_num_reals() / ratio);
+			cmaes.set_parent_num(new_parent_num);
+			
+		}
+		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
 		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
+	}
+	else
+	{
+		
+		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
+		{
+			cmaes.set_parent_num(pest_scenario.get_pestpp_options().get_sqp_num_reals() / 4);
+		}
+		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
+	}
 
 	bool is_violated = (selected.viol_val >= 1E-10);
 	bool is_recycled = (find(best_phis.begin(), best_phis.end(), selected.obj_val) != best_phis.end());
@@ -5924,7 +5943,11 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 void CovMatAdapES::initialize(int n_params, int _num_reals)
 {
 	lambda = _num_reals;
-	mu = lambda / 4;
+	if (pest_scenario_ptr->get_pestpp_options().get_sqp_cma_parent_num() <= 0)
+		mu = lambda / 4;
+	else
+		mu = pest_scenario_ptr->get_pestpp_options().get_sqp_cma_parent_num();
+
 	sigma = 1.0;
 
 	m = Eigen::VectorXd::Zero(n_params);
@@ -5983,6 +6006,7 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 
 void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter) 
 {
+	ofstream& frec = file_manager->rec_ofstream();
 	CovMetrics metrics_prior = compute_cov_metrics();
 	if (iter == 1)
 		metrics_init = metrics_prior;
@@ -6064,14 +6088,37 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 		}
 	}
 	else
+	{
+		frec << "...nothing to learn for covariance here...skipping CMA-ES update" << endl;
 		cout << "...nothing to learn for covariance here...skipping CMA-ES update" << endl;
+	}
 
 	CovMetrics metrics_post = compute_cov_metrics();
-	if ((metrics_post.condition_number > pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num()) || (metrics_post.determinant < 1E-5))
+	if ((metrics_post.condition_number > pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num()))
 	{
-		double factor = metrics_post.determinant / pow(10.0, floor(log10(fabs(metrics_post.determinant))));
+
+		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_C(C);
+		Eigen::VectorXd eigenvals = eig_C.eigenvalues();
+		double lambda_max = eigenvals.maxCoeff();
+		double lambda_min = eigenvals.minCoeff();
+
+		double target_cond = pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num();
+		double min_eig_floor = lambda_max / target_cond;
+
+		double delta = 0.0;
+		if (lambda_min < min_eig_floor) 
+		{
+			delta = min_eig_floor - lambda_min + 1E-12;
+			C += delta * Eigen::MatrixXd::Identity(C.rows(), C.cols());
+		}
+
+		ofstream& frec = file_manager->rec_ofstream();
+		frec << "...WARNING: ensemble is shrinking too much. Regularizing covariance by delta: " << delta << endl;
+		cout << "...WARNING: ensemble is shrinking too much. Regularizing covariance by delta: " << delta << endl;
+		/*double factor = metrics_post.determinant / pow(10.0, floor(log10(fabs(metrics_post.determinant))));
 		cout << "...WARNING: ensemble is shrinking too much. Reinflating cov matrix by: " << factor << endl;
-		reinflate_C(factor, false, pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num());
+		reinflate_C(factor, false, pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num());*/
+
 		metrics_post = compute_cov_metrics();
 	}
 	cma_update_summary = report_cmaes_metrics(metrics_prior, metrics_post, iter); 
@@ -6219,16 +6266,18 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 
 	for (auto o : unique_obj_map)
 	{
-		if (viol_map[o.first] == 0)
-		{
-			sorted_obj_map[tag + "|" + o.first] = o.second;
-			feas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
-		}
-		else
-		{
-			sorted_viol_map[tag + "|" + o.first] = o.second;
-			infeas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
-		}
+		sorted_obj_map[tag + "|" + o.first] = o.second;
+		feas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
+		//if (viol_map[o.first] == 0)
+		//{
+		//	sorted_obj_map[tag + "|" + o.first] = o.second;
+		//	feas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
+		//}
+		//else
+		//{
+		//	sorted_viol_map[tag + "|" + o.first] = o.second;
+		//	infeas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
+		//}
 	}
 
 	if (sorted_obj_map.size() > 0)
@@ -6255,27 +6304,27 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 		feas_dp_archive.reorder(sorted_names_from_obj, curr_pe.get_var_names(), true);
 	}
 
-	if (sorted_viol_map.size() > 0)
-	{
-		vector<pair<string, double>> sorted_viol_map_vec(sorted_viol_map.begin(), sorted_viol_map.end());
-		sort(sorted_viol_map_vec.begin(), sorted_viol_map_vec.end(),
-			[](const pair<string, double>& a, const pair<string, double>& b) {
-				return a.second < b.second;
-			});
-		vector<string> sorted_names_from_viol;
-		sorted_viol_map.clear();
-		int i = 0;
-		for (const auto& pair : sorted_viol_map_vec)
-		{
-			i++;
-			if (i > lambda)
-				break;
-			sorted_names_from_viol.push_back(pair.first);
-			sorted_viol_map[pair.first] = pair.second;
-		}
-		infeas_dp_archive.keep_rows(sorted_names_from_viol, true);
-		infeas_dp_archive.reorder(sorted_names_from_viol, curr_pe.get_var_names(), true);
-	}
+	//if (sorted_viol_map.size() > 0)
+	//{
+	//	vector<pair<string, double>> sorted_viol_map_vec(sorted_viol_map.begin(), sorted_viol_map.end());
+	//	sort(sorted_viol_map_vec.begin(), sorted_viol_map_vec.end(),
+	//		[](const pair<string, double>& a, const pair<string, double>& b) {
+	//			return a.second < b.second;
+	//		});
+	//	vector<string> sorted_names_from_viol;
+	//	sorted_viol_map.clear();
+	//	int i = 0;
+	//	for (const auto& pair : sorted_viol_map_vec)
+	//	{
+	//		i++;
+	//		if (i > lambda)
+	//			break;
+	//		sorted_names_from_viol.push_back(pair.first);
+	//		sorted_viol_map[pair.first] = pair.second;
+	//	}
+	//	infeas_dp_archive.keep_rows(sorted_names_from_viol, true);
+	//	infeas_dp_archive.reorder(sorted_names_from_viol, curr_pe.get_var_names(), true);
+	//}
 
 	if (sorted_obj_map.size() + sorted_viol_map.size() == 0)
 		throw runtime_error("no members in sorted obj or viol maps after CovMatAdapES::update_archives()");

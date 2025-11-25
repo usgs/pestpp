@@ -3287,52 +3287,80 @@ pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_a
 	if (curr_ws.size() > 0)
 		working_set.first = curr_ws;
 
-    Mat mat;
 	bool converged = false;
-    if (working_set.first.size() > 0) {
+	if (lagrange_mults != nullptr)
+	{
+		auto result = reduce_working_set(working_set.first, *lagrange_mults);
+		working_set.first = result.first;
+		converged = result.second;
+	}
 
-		if (lagrange_mults != nullptr)
-		{
-			auto result = reduce_working_set(working_set.first, *lagrange_mults);
-			working_set.first = result.first;
-			converged = result.second;
-		}
+    Mat mat;
+    if (working_set.first.size() > 0) 
+	{
+		// StoSAG method: compute sample dec var cov matrix and its pseudo inverse
+		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dec_var_names, "BASE");
+		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
-        Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies("BASE").transpose();
+		// Compute pseudoinverse using SVD (same method as objective gradient)
+		Eigen::MatrixXd s, V, U;
+		SVD_REDSVD rsvd;
+		rsvd.set_performance_log(&pfm);
+		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
-        cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies("BASE").transpose();
-        //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
-        Eigen::MatrixXd s, s_, V, U;
-        Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
-                                                         Eigen::DecompositionOptions::ComputeFullV);
-        s = svd_fac.singularValues();
-        U = svd_fac.matrixU();
-        V = svd_fac.matrixV();
-        s_ = s.asDiagonal().inverse();
-        Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
-        full_s_inv.setZero();
-		for (int i = 0; i < s.size(); i++)
-			full_s_inv(i, i) = s_(i,i);
-        delta_dv = V * full_s_inv * U.transpose();
-        //delta_oe.transposeInPlace();
-        //delta_dv.transposeInPlace();
-        Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
-        delta_dv.resize(0, 0);
-        delta_oe.resize(0, 0);
-        V.resize(0, 0);
-        U.resize(0, 0);
-        full_s_inv.resize(0, 0);
-        Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
-        oe.update_var_map();
-        map<string, int> vmap = oe.get_var_map();
-        int i = 0;
-        for (auto &n : working_set.first) {
-            working_mat.row(i) = approx_jco.row(vmap[n]);
-            i++;
-        }
-        mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
+		// Get constraint observation anomalies for all working set constraints
+		Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), working_set.first, "BASE");
+
+		// Compute StoSAG Jacobian: for each constraint i, compute grad_i = dv_cov_pseudoinv * cross_cov_vector_i
+		// where cross_cov_vector_i = 1.0 / (N-1) * (dv_anoms.transpose() * constraint_anoms_i)
+		// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd cross_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * constraint_anoms);
+
+		// Now compute Jacobian matrix: each row is the gradient of a constraint
+		Eigen::MatrixXd approx_jco = dv_cov_pseudoinv * cross_cov_matrix;
+		Eigen::MatrixXd working_mat = approx_jco.transpose();
+
+		mat = Mat(working_set.first, dec_var_names, working_mat.sparseView());
+
+		  // this is the EnOpt method
+  //      Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
+  //      Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
+
+  //      cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
+  //      Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
+  //      //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
+  //      Eigen::MatrixXd s, s_, V, U;
+  //      Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
+  //                                                       Eigen::DecompositionOptions::ComputeFullV);
+  //      s = svd_fac.singularValues();
+  //      U = svd_fac.matrixU();
+  //      V = svd_fac.matrixV();
+  //      s_ = s.asDiagonal().inverse();
+  //      Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
+  //      full_s_inv.setZero();
+		//for (int i = 0; i < s.size(); i++)
+		//	full_s_inv(i, i) = s_(i,i);
+  //      delta_dv = V * full_s_inv * U.transpose();
+  //      //delta_oe.transposeInPlace();
+  //      //delta_dv.transposeInPlace();
+  //      Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
+  //      delta_dv.resize(0, 0);
+  //      delta_oe.resize(0, 0);
+  //      V.resize(0, 0);
+  //      U.resize(0, 0);
+  //      full_s_inv.resize(0, 0);
+
+        //Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
+        //oe.update_var_map();
+        //map<string, int> vmap = oe.get_var_map();
+        //int i = 0;
+        //for (auto &n : working_set.first) {
+        //    working_mat.row(i) = approx_jco.row(vmap[n]);
+        //    i++;
+        //}
+        //mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
     }
     if (working_set.second.size() > 0)
     {

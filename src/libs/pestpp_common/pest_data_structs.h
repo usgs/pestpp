@@ -427,6 +427,8 @@ public:
 	void set_sqp_rescale_search_dir(bool _flag) { sqp_rescale_search_dir = _flag; }
 	int get_sqp_seek_feas_max_iter()const { return sqp_seek_feas_max_iter; }
 	void set_sqp_seek_feas_max_iter(int _nmax) { sqp_seek_feas_max_iter = _nmax; }
+	int get_sqp_cma_parent_num()const { return sqp_cma_parent_num; }
+	void set_sqp_cma_parent_num(int _num) { sqp_cma_parent_num = _num; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -850,6 +852,7 @@ private:
 	double sqp_cma_c1;
 	double sqp_cma_cmu;
 	double sqp_cma_cc;
+	int sqp_cma_parent_num;
 	bool sqp_cma_stepsize_control;
 	double sqp_cma_reinflation_factor;
 	double sqp_hess_max_cond_num;

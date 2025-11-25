@@ -1789,6 +1789,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_cma_cc);
 		return true;
 	}
+	else if (key == "SQP_CMA_PARENT_NUM")
+	{
+		convert_ip(value, sqp_cma_parent_num);
+		return true;
+	}
 	else if (key == "SQP_CMA_STEPSIZE_CONTROL")
 	{
 		sqp_cma_stepsize_control = pest_utils::parse_string_arg_to_bool(value);
@@ -2030,6 +2035,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_cma_c1: " << sqp_cma_c1 << endl;
 	os << "sqp_cma_cmu: " << sqp_cma_cmu << endl;
 	os << "sqp_cma_cc: " << sqp_cma_cc << endl;
+	os << "sqp_cma_parent_num: " << sqp_cma_parent_num << endl;
 	os << "sqp_cma_stepsize_control: " << sqp_cma_stepsize_control << endl;
 	os << "sqp_cma_reinflation_factor: " << sqp_cma_reinflation_factor << endl;
 	os << "sqp_max_consec_infeas_ies: " << sqp_max_consec_infeas_ies << endl;
@@ -2286,6 +2292,7 @@ void PestppOptions::set_defaults()
 	set_sqp_cma_c1(-1);
 	set_sqp_cma_cmu(-1);
 	set_sqp_cma_cc(-1);
+	set_sqp_cma_parent_num(-1);
 	set_sqp_cma_stepsize_control(false);
 	set_sqp_cma_reinflation_factor(-1.0);
 	set_sqp_max_consec_infeas_ies(3);

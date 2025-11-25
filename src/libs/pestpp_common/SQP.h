@@ -68,7 +68,7 @@ class CovMatAdapES
 {
 
 public:
-	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen) {}
+	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen, FileManager* file_mgr) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen), file_manager(file_mgr) {}
 	CovMatAdapES() {}
 
 	void initialize(int n_params, int _num_reals);
@@ -80,6 +80,8 @@ public:
 	void set_mean(const Eigen::VectorXd& _m) { m = _m; }
 	Eigen::VectorXd get_mean() const { return m; }
 	double get_sigma() const { return sigma; }
+	int get_parent_num() { return mu; }
+	void set_parent_num(int mu_new) { mu = mu_new; }
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
 	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear = true);
@@ -128,6 +130,7 @@ protected:
 	std::mt19937* rand_gen_ptr;
 	Pest* pest_scenario_ptr;
 	Eigen::MatrixXd reals;
+	FileManager* file_manager;
 
 };
 
