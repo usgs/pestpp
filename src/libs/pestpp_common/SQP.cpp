@@ -242,43 +242,113 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	bool drawn = false;
 	if (dv_file.size() == 0)
 	{
-		//only draw for dv names
-		Covariance dv_cov = cov.get(dv_names);
 		ofstream& frec = file_manager.rec_ofstream();
-		message(1, "drawing decision variable realizations: ", num_reals);
-		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
-		Parameters draw_par = pest_scenario.get_ctl_parameters().get_subset(dv_names.begin(),dv_names.end());
-		if (par_means.size() > 0)
+		ParameterEnsemble dv_ensemble(&pest_scenario, &rand_gen);
+		if (dv_names.size() > 0)
 		{
-			
-			frec << "Note: the following decision variables contain 'mean' value information that will be used in place of " << endl;
-			frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
-			double lb, ub;
-			for (auto par_mean : par_means)
+			Covariance dv_cov = cov.get(dv_names);
+			map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
+			Parameters draw_dv_par = pest_scenario.get_ctl_parameters().get_subset(dv_names.begin(), dv_names.end());
+
+			if (par_means.size() > 0)
 			{
-				if (draw_par.find(par_mean.first) != draw_par.end())
+				frec << "Note: the following decision variables contain 'mean' value information that will be used in place of " << endl;
+				frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
+				double lb, ub;
+				for (auto par_mean : par_means)
 				{
-					lb = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->lbnd;
-					ub = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->ubnd;
-					if (par_mean.second < lb)
+					if (draw_dv_par.find(par_mean.first) != draw_dv_par.end())
 					{
-						frec << "Warning: 'mean' value for decision variable " << par_mean.first << " less than lower bound, using 'parval1'";
+						lb = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->lbnd;
+						ub = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->ubnd;
+						if (par_mean.second < lb)
+						{
+							frec << "Warning: 'mean' value for decision variable " << par_mean.first << " less than lower bound, using 'parval1'";
+						}
+						else if (par_mean.second > ub)
+						{
+							frec << "Warning: 'mean' value for decision variable " << par_mean.first << " greater than upper bound, using 'parval1'";
+						}
+						else
+						{
+							draw_dv_par[par_mean.first] = par_mean.second;
+							frec << par_mean.first << " " << par_mean.second << endl;
+						}
 					}
-					else if (par_mean.second > ub)
-					{
-						frec << "Warning: 'mean' value for decision variable " << par_mean.first << " greater than upper bound, using 'parval1'";
-					}
-					else
-					{
-						draw_par[par_mean.first] = par_mean.second;
-						frec << par_mean.first << " " << par_mean.second << endl;
-					}
-					
 				}
+			}
+
+			message(1, "drawing decision variable realizations: ", num_reals);
+			dv_ensemble.draw(num_reals, draw_dv_par, dv_cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+		}
+
+		ParameterEnsemble uncertain_ensemble(&pest_scenario, &rand_gen);
+		if (adj_par_names.size() > 0)
+		{
+			Covariance unc_cov = uncertain_parcov.get(adj_par_names);
+			map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
+			Parameters draw_unc_par = pest_scenario.get_ctl_parameters().get_subset(adj_par_names.begin(), adj_par_names.end());
+
+			if (par_means.size() > 0)
+			{
+				double lb, ub;
+				for (auto par_mean : par_means)
+				{
+					if (draw_unc_par.find(par_mean.first) != draw_unc_par.end())
+					{
+						lb = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->lbnd;
+						ub = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->ubnd;
+						if (par_mean.second < lb)
+						{
+							frec << "Warning: 'mean' value for uncertain parameter " << par_mean.first << " less than lower bound, using 'parval1'";
+						}
+						else if (par_mean.second > ub)
+						{
+							frec << "Warning: 'mean' value for uncertain parameter " << par_mean.first << " greater than upper bound, using 'parval1'";
+						}
+						else
+						{
+							draw_unc_par[par_mean.first] = par_mean.second;
+							frec << par_mean.first << " " << par_mean.second << endl;
+						}
+					}
+				}
+			}
+
+			message(1, "drawing uncertain parameter realizations: ", num_reals);
+			uncertain_ensemble.draw(num_reals, draw_unc_par, unc_cov, performance_log,
+				pest_scenario.get_pestpp_options().get_ies_verbose_level(),
+				file_manager.rec_ofstream());
+		}
+
+		if (dv_names.size() > 0 && adj_par_names.size() > 0)
+		{
+			vector<string> real_names = dv_ensemble.get_real_names();
+			uncertain_ensemble.reorder(real_names, vector<string>());
+
+			vector<string> all_par_names = dv_names;
+			all_par_names.insert(all_par_names.end(), adj_par_names.begin(), adj_par_names.end());
+
+			dv.reserve(real_names, all_par_names);
+			dv.set_trans_status(dv_ensemble.get_trans_status());
+
+			for (auto& real_name : real_names)
+			{
+				Eigen::VectorXd dv_vec = dv_ensemble.get_real_vector(real_name);
+				Eigen::VectorXd unc_vec = uncertain_ensemble.get_real_vector(real_name);
+
+				Eigen::VectorXd combined_vec(dv_vec.size() + unc_vec.size());
+				combined_vec << dv_vec, unc_vec;
+				dv.update_real_ip(real_name, combined_vec);
 
 			}
 		}
-		dv.draw(num_reals, draw_par, dv_cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+		else if (dv_names.size() > 0)
+			dv = dv_ensemble;
+		
+		else if (adj_par_names.size() > 0)
+			dv = uncertain_ensemble;
+
 		drawn = true;
 	}
 	else
@@ -764,9 +834,56 @@ void SeqQuadProgram::initialize_parcov()
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
 		return;
-	string how = parcov.try_from(pest_scenario, file_manager);
-	message(1, "parcov loaded ", how);
-	parcov = parcov.get(dv_names);
+
+	string cov_fname = pest_scenario.get_pestpp_options().get_parcov_filename();
+	ofstream& frec = file_manager.rec_ofstream();
+
+	if (!cov_fname.empty())
+	{
+		Covariance full_parcov;
+		string how = full_parcov.try_from(pest_scenario, file_manager);
+		message(1, "parcov loaded ", how);
+
+		if (dv_names.size() > 0)
+		{
+			parcov = full_parcov.get(dv_names);
+			ss.str("");
+			ss << "cov for " << dv_names.size() << " decision variables";
+			message(1, ss.str());
+		}
+
+		if (adj_par_names.size() > 0)
+		{
+			uncertain_parcov = full_parcov.get(adj_par_names);
+			ss.str("");
+			ss << "cov for " << adj_par_names.size() << " uncertain parameters";
+			message(1, ss.str());
+		}
+	}
+	else
+	{
+		map<string, double> par_std = pest_scenario.get_ext_file_double_map("parameter data external", "standard_deviation");
+		const ParameterInfo& par_info = pest_scenario.get_ctl_parameter_info();
+
+		double default_sigma_range = pest_scenario.get_pestpp_options().get_par_sigma_range();
+		if (dv_names.size() > 0)
+		{
+			parcov.from_parameter_bounds(frec, dv_names, par_info, par_std, default_sigma_range);
+			ss.str("");
+			ss << "created cov for " << dv_names.size() << " decision variables using par_sigma_range = " << default_sigma_range;
+			message(1, ss.str());
+		}
+
+		double uncpar_sigma_range = 4.0;
+		if (adj_par_names.size() > 0)
+		{
+			uncertain_parcov.from_parameter_bounds(frec, adj_par_names, par_info, par_std, uncpar_sigma_range);
+			ss.str("");
+			ss << "created cov for " << adj_par_names.size() << " uncertain parameters using par_sigma_range = " << uncpar_sigma_range;
+			message(1, ss.str());
+		}
+	}
+
 }
 
 void SeqQuadProgram::initialize()
@@ -855,9 +972,23 @@ void SeqQuadProgram::initialize()
 				icol = 0;
 			}
 		}
-	}
 
-	//otherwise, just use all adjustable parameters as dec vars
+		adj_par_names.clear();
+		set<string> dv_set(dv_names.begin(), dv_names.end());
+		for (auto& par_name : act_par_names)
+		{
+			if (dv_set.find(par_name) == dv_set.end())
+			{
+				adj_par_names.push_back(par_name);
+			}
+		}
+		if (adj_par_names.size() > 0)
+		{
+			ss.str("");
+			ss << "identified " << adj_par_names.size() << " uncertain model parameters";
+			message(2, ss.str());
+		}
+	}
 	else
 	{
 		message(2, "using all adjustable parameters as decision variables: ", act_par_names.size());
@@ -1187,53 +1318,45 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		ParameterEnsemble _dv(&pest_scenario, &rand_gen);
 		ofstream& frec = file_manager.rec_ofstream();
 
-		if (use_cmaes)
+		message(1, "generating new dv and pars ensemble at current best phi via CMA-ES");
+		if (reset)
 		{
-			message(1, "generating new dv ensemble at current best phi via CMA-ES");
-			if (reset)
-			{
-				message(1, "resetting Hessian to identity");
-				Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-				h.setIdentity();
-				hessian = Covariance(dv_names, h);
+			message(1, "resetting Hessian to identity");
+			Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+			h.setIdentity();
+			hessian = Covariance(dv_names, h);
 
-				cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-				cmaes.clear_archives();
+			cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+			cmaes.clear_archives();
 
-				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
-				reset = false;
-			}
-			else if (reset_corr)
-			{
-				message(1, "dropping covariance elements in C");
-				cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
-				reset_corr = false;
-				fcount = 0;
+			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			reset = false;
+		}
+		else if (reset_corr)
+		{
+			message(1, "dropping covariance elements in C");
+			cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			reset_corr = false;
+			fcount = 0;
 				
-			}
-			else if (seek_ies)
-			{
-				seek_ies = false;
-				cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
-			}
-			else
-				_dv = cmaes.generate_population(current_ctl_dv_values, dv);
-
-			ss.str("");
-			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
-			frec << ss.str();
-
-			message(0, "CMA-ES metrics summary");
-			message(2, cmaes.get_cma_update_summary());
+		}
+		else if (seek_ies)
+		{
+			seek_ies = false;
+			cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 		}
 		else
-		{
-			message(1, "generating new dv ensemble at current best phi");
-			_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), _current_dv_vals, parcov, performance_log, 0, frec);
-		}
+			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 
+		ss.str("");
+		ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+		frec << ss.str();
+
+		message(0, "CMA-ES metrics summary");
+		message(2, cmaes.get_cma_update_summary());
+		
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
 		add_current_as_bases(_dv, _oe);
@@ -2262,54 +2385,58 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
 	if (!_center_on.empty())
-	    center_on = _center_on;
-	
+		center_on = _center_on;
+
 	if (use_ensemble_grad)
 	{
-			// compute sample dec var cov matrix and its pseudo inverse
-			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		// compute sample dec var cov matrix and its pseudo inverse
+		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 
-			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, "BASE"); 
-			Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, "BASE");
+		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
-			// compute dec var-phi cross-cov vector
-			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd s, V, U, st;
+		SVD_REDSVD rsvd;
+		rsvd.set_performance_log(performance_log);
+		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
-            Eigen::MatrixXd s, V, U, st;
-            SVD_REDSVD rsvd;
-            rsvd.set_performance_log(performance_log);
-            rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-			Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
-			Eigen::MatrixXd obj_anoms(dv.shape().first,1);
-            if (use_obj_obs) {
-                obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},"BASE");
-            }
-            else
-            {
-                dv.update_var_map();
-                map<string,int> vmap = dv.get_var_map();
-                Eigen::VectorXd real;
-                double oval;
-                int i =0;
-                for (auto& real_name: dv.get_real_names())
-                {
-                    oval = 0;
-                    real = dv.get_real_vector(real_name);
-                    for (auto& dv :dv_names)
-                    {
-                        oval += obj_func_coef_map.at(dv) * real(vmap.at(dv));
-                    }
-                    obj_anoms(i,0) = oval;
-                    i++;
-                }
-                obj_anoms.array() -= obj_anoms.mean();
+		//objective function anomalies
+		//Note: These objective values already reflect the effect of uncertain parameters
+		//because each real includes both dec vars and uncertain params
+		Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
+		if (use_obj_obs) {
+			obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},"BASE");
+		}
+		else
+		{
+			dv.update_var_map();
+			map<string,int> vmap = dv.get_var_map();
+			Eigen::VectorXd real;
+			double oval;
+			int i =0;
+			for (auto& real_name: dv.get_real_names())
+			{
+				oval = 0;
+				real = dv.get_real_vector(real_name);
+				for (auto& dv_name : dv_names)
+				{
+					oval += obj_func_coef_map.at(dv_name) * real(vmap.at(dv_name));
+				}
+				obj_anoms(i, 0) = oval;
+				i++;
+			}
+			obj_anoms.array() -= obj_anoms.mean();
+		}
 
-            }
-			Eigen::VectorXd cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
+		//cross-covariance between decvar and obj
+		//this cross-cov naturally accounts for the effect of uncertain params
+		//bc the obj values in obj_anoms already reflect their variability
+		// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::VectorXd cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
 
-			// now compute grad vector: Chen et al. (2009) and Fonseca et al. (2015) 
-			grad = dv_cov_pseudoinv * cross_cov_vector;
-			
+		// now compute grad vector: Chen et al. (2009) and Fonseca et al. (2015) 
+		grad = dv_cov_pseudoinv * cross_cov_vector;
 	}
 	else
 	{
@@ -2326,6 +2453,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	}
 	Parameters pgrad = _current_dv_values;
 	pgrad.update_without_clear(dv_names, grad);
+	ss.str("");
 	ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
 	frec << ss.str();
 
@@ -2740,8 +2868,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::Matrix
 
 pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, int wset_lvl, const Eigen::VectorXd* lm, vector<string> curr_ws)
 {
-	if (use_ensemble_grad) {
-		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol), wset_lvl);
+	if (use_ensemble_grad) 
+	{
+		Parameters decvar = _dv_vals.get_subset(dv_names.begin(), dv_names.end());
+		return constraints.get_working_set_constraint_matrix(decvar, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol), wset_lvl);
 	}
 	else
 	{

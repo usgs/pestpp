@@ -158,7 +158,7 @@ private:
 	RunManagerAbstract* run_mgr_ptr;
 
 	ParChangeSummarizer pcs;
-	Covariance parcov, obscov;
+	Covariance parcov, obscov, uncertain_parcov;
 	CovMatAdapES cmaes;
 	chancePoints chancepoints;
 	string obj_func_str;
@@ -220,6 +220,7 @@ private:
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
+	vector<string> adj_par_names;
 	bool use_subset, use_cmaes = true, adjust_step_control = false;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
