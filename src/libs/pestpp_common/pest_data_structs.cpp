@@ -1859,6 +1859,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_seek_feas_max_iter);
 		return true;
 	}
+	else if (key == "SQP_RISK")
+	{
+		convert_ip(value, sqp_risk);
+		return true;
+	}
 	return false;
 }
 
@@ -2050,6 +2055,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_wset_level: " << sqp_wset_level << endl;
 	os << "sqp_rescale_search_dir: " << sqp_rescale_search_dir << endl;
 	os << "sqp_seek_feas_max_iter: " << sqp_seek_feas_max_iter << endl;
+	os << "sqp_risk: " << sqp_risk << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2307,6 +2313,7 @@ void PestppOptions::set_defaults()
 	set_sqp_wset_level(1);
 	set_sqp_rescale_search_dir(true);
 	set_sqp_seek_feas_max_iter(3);
+	set_sqp_risk(0.50);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

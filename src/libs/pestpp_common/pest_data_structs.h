@@ -429,6 +429,8 @@ public:
 	void set_sqp_seek_feas_max_iter(int _nmax) { sqp_seek_feas_max_iter = _nmax; }
 	int get_sqp_cma_parent_num()const { return sqp_cma_parent_num; }
 	void set_sqp_cma_parent_num(int _num) { sqp_cma_parent_num = _num; }
+	double get_sqp_risk() const { return sqp_risk; }
+	void set_sqp_risk(double val) { sqp_risk = val; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -863,6 +865,7 @@ private:
 	int sqp_wset_level;
 	bool sqp_rescale_search_dir;
 	int sqp_seek_feas_max_iter;
+	double sqp_risk;
 
 	int mou_population_size;
 	string mou_generator; 

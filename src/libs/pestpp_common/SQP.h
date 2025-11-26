@@ -211,6 +211,7 @@ private:
 	double best_phi_yet;
 	double best_violation_yet;
 	double working_set_tol;
+	double sqp_risk;
 
 	map<string, double> obj_map;
 	map<string, double> total_viol_map;

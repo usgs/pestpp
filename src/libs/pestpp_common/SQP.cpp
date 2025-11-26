@@ -459,6 +459,7 @@ void SeqQuadProgram::add_current_as_bases(ParameterEnsemble& _dv, ObservationEns
 {
 	//check that 'base' isn't already in ensemble
 	vector<string> rnames = _dv.get_real_names();
+
 	bool inpar = false;
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
@@ -1107,9 +1108,10 @@ void SeqQuadProgram::initialize()
 		prep_4_fd_grad();
 	}
 
+	sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
 	if (constraints.get_use_chance())
 	{
-		constraints.presolve_chance_report(iter, current_obs, true, "initial chance constraint report");
+		constraints.presolve_chance_report(iter, current_obs, &oe, sqp_risk, true, "initial chance constraint report");
 	}
 	working_set_tol = pest_scenario.get_pestpp_options().get_sqp_working_set_tol();
 
@@ -2871,6 +2873,28 @@ pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observa
 	if (use_ensemble_grad) 
 	{
 		Parameters decvar = _dv_vals.get_subset(dv_names.begin(), dv_names.end());
+
+		if (constraints.get_use_chance() && (pest_scenario.get_pestpp_options().get_sqp_risk() != 0.5))
+		{
+			Observations base_obs = _obs_vals;
+			if (oe.shape().first > 0)
+			{
+				vector<string> obs_names = oe.get_var_names();
+				Eigen::VectorXd base_vec = oe.get_real_vector("BASE");
+				base_obs.update_without_clear(obs_names, base_vec);
+			}
+
+			Observations shifted_obs = constraints.get_chance_shifted_constraints(base_obs, oe, sqp_risk);
+			vector<string> constraint_names = constraints.get_obs_constraint_names();
+			for (auto& name : constraint_names)
+			{
+				if (shifted_obs.find(name) != shifted_obs.end())
+				{
+					_obs_vals.update_rec(name, shifted_obs.get_rec(name));
+				}
+			}
+		}
+
 		return constraints.get_working_set_constraint_matrix(decvar, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol), wset_lvl);
 	}
 	else
@@ -4635,7 +4659,7 @@ bool SeqQuadProgram::seek_feasible()
 	    shifted = constraints.get_chance_shifted_constraints(current_obs);
     }
 	Observations& ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
-	map<string,double> viol_map = constraints.get_unsatified_obs_constraints(current_obs,filter.get_viol_tol());
+	map<string,double> viol_map = constraints.get_unsatified_obs_constraints(current_obs,filter.get_viol_tol(), true);
 	for (auto& name : ies_pest_scenario.get_ctl_ordered_obs_names())
 	{
 		if (snames.find(name) == send)
@@ -4893,8 +4917,17 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		obs_map[d] = o;
 	}
 	double viol_pad = pest_scenario.get_pestpp_options().get_sqp_viol_pad();
-	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
-	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
+	map<string, map<string, double>> violations, violations_nominal;
+	if (constraints.get_use_chance() && (sqp_risk != 0.5))
+	{
+		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true, &_oe, sqp_risk);
+		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true, &_oe, sqp_risk);
+	}
+	else
+	{
+		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
+		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
+	}
 
 	vector<string> onames = _oe.get_var_names();
 	vector<string> vnames = dv_candidates.get_var_names();
@@ -5260,9 +5293,20 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		obs_map[d] = o;
 	}
 
-	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe,filter.get_viol_tol(),true);
-	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
-	map<string, map<string, double>> feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
+	map<string, map<string, double>> violations, violations_nominal, feasible_distance;
+	if (constraints.get_use_chance() && (sqp_risk != 0.5))
+	{
+		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, filter.get_viol_tol(), true, &_oe, sqp_risk);
+		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true, &_oe, sqp_risk);
+		feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true, &_oe, sqp_risk);
+	}
+	else
+	{
+		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, filter.get_viol_tol(), true);
+		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
+		feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
+	}
+
 	Parameters cand_dv_values = current_ctl_dv_values;
 	Observations cand_obs_values = current_obs;
 	Eigen::VectorXd t;
@@ -5401,7 +5445,14 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		double infeas_sum_nom = 0.0;
 		for (int i = 0; i < obj_vec.size(); i++)
 		{
-			violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1.0, true);
+			if (constraints.get_use_chance() && (sqp_risk != 0.5))
+			{
+				violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1.0, true, &_oe, sqp_risk);
+			}
+			else
+			{
+				violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1.0, true);
+			}
 			for (auto& v : violations_nominal[real_names[i]])
 				infeas_sum_nom += v.second;
 			nviol_vec.push_back(infeas_sum_nom);
