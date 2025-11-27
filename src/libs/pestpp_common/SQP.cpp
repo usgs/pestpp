@@ -5913,7 +5913,7 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 	B = Eigen::MatrixXd::Identity(n_params, n_params);
 	D = Eigen::VectorXd::Ones(n_params);
 
-	weights.resize(_num_reals);
+	weights.resize(max(0,_num_reals));
 	for (int i = 0; i < mu; i++) {
 		weights[i] = log(mu + 0.5) - log(i + 1.0);
 	}
