@@ -953,7 +953,7 @@ bool RunManagerPanther::ping(int i_sock)
 	if ((!FD_ISSET(i_sock, &read_fds)) && agent_info_iter->get_ping())
 	{
 		int fails = agent_info_iter->add_failed_ping();
-		report("failed to receive ping response from agent: " + sock_hostname + "$" + agent_info_iter->get_work_dir(), true);
+		report("failed to receive ping response from agent: " + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 		if (fails >= MAX_FAILED_PINGS)
 		{
 			ping_sent = true;
