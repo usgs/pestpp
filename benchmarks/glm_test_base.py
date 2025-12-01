@@ -940,12 +940,55 @@ def tenpar_xsec_stress_test_5super():
     if len(violations) > 0:
         raise Exception("the following pars are out of bounds in ipar:"+",".join(violations))
 
+def tenpar_fosm_external_stdev_test():
+    """tenpar basic test"""
+
+    model_d = "glm_10par_xsec"
+    test_d = os.path.join(model_d, "master_ext_stdev")
+    template_d = os.path.join(model_d, "template")
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    # shutil.copytree(template_d, test_d)
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+    obs = pst.observation_data
+    obs["standard_deviation"] = np.nan
+    #obs.loc[pst.nnz_obs_names,"standard_deviation"] = 0.1
+
+    par = pst.parameter_data
+    par["standard_deviation"] = np.nan
+    par.loc[pst.adj_par_names[::2],"standard_deviation"] = 2
+
+    pst.control_data.noptmax = 2
+    pst.write(pst_name,version=2)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=template_d)
+
+    df = pd.read_csv(os.path.join(template_d,"pest.par.usum.csv"),index_col=0)
+    print(df.loc[pst.adj_par_names[::2],"prior_stdev"])
+    assert np.all(df.loc[pst.adj_par_names[::2],"prior_stdev"].values==2)
+
+    df1 = pd.read_csv(os.path.join(template_d,"pest.pred.usum.csv"),index_col=0)
+    
+    obs.loc[pst.nnz_obs_names,"standard_deviation"] = 0.001
+    pst.control_data.noptmax = 2
+    pst.write(pst_name,version=2)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=template_d)
+    df2 = pd.read_csv(os.path.join(template_d,"pest.pred.usum.csv"),index_col=0)
+
+    diff = df1["post_stdev"] - df2["post_stdev"]
+    print(diff)
+    assert np.abs(diff.values).sum() > 1e-6
+
+
 if __name__ == "__main__":
     #tenpar_base_test()
+    tenpar_fosm_external_stdev_test()
     #tenpar_superpar_restart_test()
     #freyberg_basic_restart_test()
     # jac_diff_invest()
-    new_fmt_load_test()
+    #new_fmt_load_test()
     #tenpar_hotstart_test()
     #tenpar_normalform_test()
     #freyberg_stress_test()
