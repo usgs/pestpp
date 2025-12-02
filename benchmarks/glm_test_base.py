@@ -979,7 +979,7 @@ def tenpar_fosm_external_stdev_test():
 
     diff = df1["post_stdev"] - df2["post_stdev"]
     print(diff)
-    assert np.abs(diff.values).sum() > 1e-6
+    assert np.abs(diff.values).sum() < 1e-6
 
 
 if __name__ == "__main__":
