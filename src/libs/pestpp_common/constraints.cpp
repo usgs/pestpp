@@ -266,7 +266,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		use_fosm = false;
 	}
 	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
-	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0) || (!use_stosag)))
+	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
 	//initialize the stack containers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);

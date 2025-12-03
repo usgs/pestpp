@@ -2394,9 +2394,9 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameter
 			pert_val = dv_val + pert;
 		pert_dv_values.update_rec(dv,pert_val);
 		pert_obj_val = 0.0;
-		for (auto& ddv_val : pert_dv_values)
+		for (auto& dv_name : dv_names) 
 		{
-			pert_obj_val += obj_func_coef_map[ddv_val.first] * ddv_val.second;
+			pert_obj_val += obj_func_coef_map.at(dv_name) * pert_dv_values.get_rec(dv_name);
 		}
 		derv = (current_obj_val - pert_obj_val) / (dv_val - pert_val);
 		grad[i] = derv;
