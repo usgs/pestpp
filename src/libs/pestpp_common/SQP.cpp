@@ -1116,13 +1116,18 @@ void SeqQuadProgram::initialize()
 		echo = true;
 
 	initialize_parcov();
-	if (use_cmaes)
+	if (use_cmaes && ppo->get_sqp_num_reals() > 0)
 	{
 		cmaes = CovMatAdapES(&pest_scenario, &rand_gen, &file_manager);
-		
 		cmaes.initialize(dv_names.size(), ppo->get_sqp_num_reals());
 		cmaes.set_covariance(parcov.get_matrix());
 	}
+	else if (use_cmaes && ppo->get_sqp_num_reals() <= 0)
+	{
+		message(1, "WARNING: CMA-ES requires sqp_num_reals > 0, disabling CMA-ES for finite-difference mode");
+		use_cmaes = false;
+	}
+	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_obs = pest_scenario.get_ctl_observations();
 
