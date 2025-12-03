@@ -640,6 +640,19 @@ void SeqQuadProgram::initialize_objfunc()
 			throw_sqp_error("objective function obs has non-zero weight and chance constraints are active");
 		}
 		message(1, "using observation '" + obj_func_str + "' as the objective function");
+
+		string obs_group = pest_scenario.get_ctl_observation_info().get_group(obj_func_str);
+		pair<Constraints::ConstraintSense, string> sense = constraints.get_sense_from_group_name(obs_group);
+		if (sense.first == Constraints::ConstraintSense::greater_than)
+		{
+			obj_sense = "maximize";
+			message(1, "observation group '" + obs_group + "' indicates maximize objective");
+		}
+		else if (sense.first == Constraints::ConstraintSense::less_than)
+		{
+			obj_sense = "minimize";
+			message(1, "observation group '" + obs_group + "' indicates minimize objective");
+		}
 	}
 
 	else
@@ -666,6 +679,20 @@ void SeqQuadProgram::initialize_objfunc()
 			message(1, "using prior information equation '" + obj_func_str + "' as the objective function");
 			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_atom_factors();
 			use_obj_pi = true;
+
+			string pi_group = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_group();
+			pair<Constraints::ConstraintSense, string> sense = constraints.get_sense_from_group_name(pi_group);
+			if(sense.first == Constraints::ConstraintSense::greater_than)
+			{
+				obj_sense = "maximize";
+				message(1, "prior info equation group '" + pi_group + "' indicates maximize objective");
+			}
+			else if (sense.first == Constraints::ConstraintSense::less_than)
+			{
+				obj_sense = "minimize";
+				message(1, "prior info equation group '" + pi_group + "' indicates minimize objective");
+			}
+				
 		}
 
 		else
@@ -4990,9 +5017,9 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 	vector<FilterRec> feasible = candidate_filter.get_feasible_solutions();
 
 	if (obj_sense == "minimize")
-		oext = numeric_limits<double>::max();
+		oext = 1E+30;
 	else
-		oext = numeric_limits<double>::min();
+		oext = -1E+30;
 
 	if (feasible.size() > 0)
 	{
@@ -5013,6 +5040,7 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 	else
 	{
 		vector<FilterRec> filterset = candidate_filter.get_filter_members();
+		oext = 1E+30;
 		for (const auto f : filterset)
 		{
 			if (f.viol_val < oext)
@@ -5876,19 +5904,68 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 		ss << "the following dv candidate runs failed -->";
 		for (auto& i : failed_real_indices)
 		{
-			pname = par_real_names[i];
-			oname = obs_real_names[i];
-			failed_par_names.push_back(pname);
-			failed_obs_names.push_back(oname);
-			ss << pname << ":" << oname << ',';
+			if (i >= 0 && i < par_real_names.size() && i < obs_real_names.size())
+			{
+				pname = par_real_names[i];
+				oname = obs_real_names[i];
+
+				bool par_exists = (find(par_real_names.begin(), par_real_names.end(), pname) != par_real_names.end());
+				bool obs_exists = (find(obs_real_names.begin(), obs_real_names.end(), oname) != obs_real_names.end());
+
+				if (par_exists && obs_exists)
+				{
+					failed_par_names.push_back(pname);
+					failed_obs_names.push_back(oname);
+					ss << pname << ":" << oname << ',';
+				}
+				else
+				{
+					message(1, "WARNING: failed index " + to_string(i) + " name mismatch, skipping drop");
+				}
+			}
+			else
+			{
+				message(1, "WARNING: failed index " + to_string(i) + " out of bounds (par_size=" +
+					to_string(par_real_names.size()) + ", obs_size=" + to_string(obs_real_names.size()) + "), skipping");
+			}
 		}
 		string s = ss.str();
 		message(1, s);
-		if (failed_real_indices.size() == _oe.shape().first)
+		if (failed_par_names.size() > 0 && failed_obs_names.size() > 0)
 		{
-			message(0, "WARNING: all dv candidate runs failed");
-			_oe = ObservationEnsemble(&pest_scenario);
-
+			if (failed_real_indices.size() == _oe.shape().first)
+			{
+				message(0, "WARNING: all dv candidate runs failed");
+				_oe = ObservationEnsemble(&pest_scenario);
+			}
+			else
+			{
+				if (failed_par_names.size() > 0 && failed_obs_names.size() > 0 &&
+					failed_par_names.size() == failed_obs_names.size())
+				{
+					performance_log->log_event("dropping failed realizations");
+					try
+					{
+						_oe.drop_rows(failed_obs_names);
+						dv_candidates.drop_rows(failed_par_names);
+					}
+					catch (const exception& e)
+					{
+						message(0, "ERROR dropping failed runs: " + string(e.what()));
+						throw_sqp_error("error dropping failed realizations: " + string(e.what()));
+					}
+					catch (...)
+					{
+						message(0, "ERROR dropping failed runs: unknown exception");
+						throw_sqp_error("error dropping failed realizations: unknown exception");
+					}
+				}
+				else
+				{
+					message(1, "WARNING: cannot drop failed runs - name vectors empty or mismatched (par_size=" +
+						to_string(failed_par_names.size()) + ", obs_size=" + to_string(failed_obs_names.size()) + ")");
+				}
+			}
 		}
 		else
 		{
@@ -6618,17 +6695,136 @@ ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, Paramet
 	vector<string> rnames;
 	vector<string> parnames = _dv.get_var_names();
 	ParameterEnsemble new_reals = _dv;
+
 	rnames = new_reals.get_real_names();
 	auto it = find(rnames.begin(), rnames.end(), BASE_REAL_NAME);
-	if (it != rnames.end()) {
+	if (it != rnames.end())
 		rnames.erase(it);
-	}
 	new_reals.keep_rows(rnames, true);
 
 	const ParameterInfo& par_info = pest_scenario_ptr->get_ctl_parameter_info();
+	
+	vector<string> target_rnames = new_reals.get_generic_real_names(lambda);
+	vector<string> missing_rnames;
+	set<string> current_rnames_set(rnames.begin(), rnames.end());
+	for (const auto& target_name : target_rnames)
+	{
+		if (current_rnames_set.find(target_name) == current_rnames_set.end())
+		{
+			missing_rnames.push_back(target_name);
+		}
+	}
 
-	for (int i = 0; i < lambda; i++) {
-		Eigen::VectorXd x;
+	for (const auto& missing_name : missing_rnames)
+	{
+		Eigen::VectorXd x(parnames.size());
+		int draws = 1;
+		const int max_draws = 1000;
+		bool found = false;
+
+		while (!found)
+		{
+			if (draws > max_draws) 
+			{
+				for (int j = 0; j < parnames.size(); ++j) 
+				{
+					const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(parnames[j]);
+					double lbnd = par_rec->lbnd;
+					double ubnd = par_rec->ubnd;
+
+					if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG) 
+					{
+						lbnd = log10(lbnd);
+						ubnd = log10(ubnd);
+					}
+
+					x(j) = max(lbnd, min(ubnd, x(j)));
+				}
+				break;
+			}
+
+			Eigen::VectorXd z(m.size());
+			for (int j = 0; j < m.size(); j++) 
+			{
+				z(j) = draw_standard_normal(*rand_gen_ptr);
+			}
+
+			Eigen::VectorXd y = B * (D.cwiseSqrt().asDiagonal() * z);
+			x = _curr_m.get_data_eigen_vec(parnames) + sigma * y;
+
+			found = true;
+			for (int j = 0; j < parnames.size(); j++) 
+			{
+				const ParameterRec* par_rec = par_info.get_parameter_rec_ptr(parnames[j]);
+				double lbnd = par_rec->lbnd;
+				double ubnd = par_rec->ubnd;
+
+				if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG) 
+				{
+					lbnd = log10(lbnd);
+					ubnd = log10(ubnd);
+				}
+
+				if (x(j) < lbnd || x(j) > ubnd) {
+					found = false;
+					break;
+				}
+			}
+			draws++;
+		}
+
+		new_reals.append(missing_name, x);
+		rnames.push_back(missing_name);
+	}
+
+	if (rnames.size() != target_rnames.size() || rnames != target_rnames)
+	{
+		set<string> current_set(rnames.begin(), rnames.end());
+		for (const auto& target_name : target_rnames)
+		{
+			if (current_set.find(target_name) == current_set.end())
+			{
+				stringstream ss;
+				ss << "generate_population() error: target name '" << target_name
+					<< "' not found after restoration. Current size: " << rnames.size()
+					<< ", target size: " << lambda;
+				throw runtime_error(ss.str());
+			}
+		}
+
+		new_reals.reorder(target_rnames, vector<string>());
+		rnames = target_rnames;
+	}
+
+	if (rnames.size() != lambda)
+	{
+		stringstream ss;
+		ss << "generate_population() error: rnames.size()=" << rnames.size()
+			<< " != lambda=" << lambda << " after restoration";
+		throw runtime_error(ss.str());
+	}
+
+	
+	if (new_reals.shape().first != lambda)
+	{
+		stringstream ss;
+		ss << "generate_population() error: new_reals.shape().first="
+			<< new_reals.shape().first << " != lambda=" << lambda;
+		throw runtime_error(ss.str());
+	}
+
+
+	for (int i = 0; i < lambda; i++) 
+	{
+		if (i >= rnames.size())
+		{
+			stringstream ss;
+			ss << "generate_population() error: index " << i
+				<< " >= rnames.size()=" << rnames.size();
+			throw runtime_error(ss.str());
+		}
+
+		Eigen::VectorXd x(parnames.size());
 		int draws = 1;
 		const int max_draws = 1000;
 
