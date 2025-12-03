@@ -70,12 +70,6 @@ int main(int argc, char* argv[])
 		string next_item;
 		string socket_str = "";
 		
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "External run manager ('/e') not supported, please use panther instead" << endl;
-			exit(1);
-		}
-		
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER)
 		{
 			
@@ -289,7 +283,7 @@ int main(int argc, char* argv[])
 
 		if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS)
 		{
-			run_manager_ptr->initialize_restart(file_manager.build_filename("rnj"));
+			run_manager_ptr->initialize_restart(file_manager.build_filename("rns"));
 		}
 		else
 		{

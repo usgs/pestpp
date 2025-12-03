@@ -275,7 +275,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 	RunManagerAbstract &run_manager, set<string> &out_of_bound_par, bool phiredswh_flag, bool calc_init_obs)
 {
 
-	run_manager.reinitialize(file_manager.build_filename("rnj"));
+	run_manager.reinitialize(file_manager.build_filename("rns"));
 	failed_parameter_names.clear();
 
 	debug_msg("Jacobian::build_runs method: begin");
