@@ -23,7 +23,7 @@ bin_path = os.path.join("..","..","..","bin")
 exe = ""
 if "windows" in platform.platform().lower():
     exe = ".exe"
-exe_path = os.path.abspath(os.path.join(bin_path, "pestpp-sqp" + exe))
+exe_path = os.path.join(bin_path, "pestpp-sqp" + exe)
 
 
 noptmax = 4
