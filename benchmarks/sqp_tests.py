@@ -23,7 +23,7 @@ bin_path = os.path.join("..","..","..","bin")
 exe = ""
 if "windows" in platform.platform().lower():
     exe = ".exe"
-exe_path = os.path.join(bin_path, "pestpp-sqp" + exe)
+exe_path = os.path.abspath(os.path.join(bin_path, "pestpp-sqp" + exe))
 
 
 noptmax = 4
@@ -64,10 +64,10 @@ def basic_sqp_test():
 
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_sqp.0.par.csv"))
     df = pd.read_csv(os.path.join(m_d,"freyberg6_run_sqp.0.par.csv"),index_col=0)
-    assert df.shape == (pst.pestpp_options["sqp_num_reals"],pst.npar),str(df.shape)
+    assert df.shape == (pst.pestpp_options["sqp_num_reals"] + 1,pst.npar),str(df.shape)
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_sqp.0.obs.csv"))
     df = pd.read_csv(os.path.join(m_d,"freyberg6_run_sqp.0.obs.csv"),index_col=0)
-    assert df.shape == (pst.pestpp_options["sqp_num_reals"],pst.nobs),str(df.shape)
+    assert df.shape == (pst.pestpp_options["sqp_num_reals"] + 1,pst.nobs),str(df.shape)
 
 
 def rosenbrock_setup(version,initial_decvars=1.6,constraints=False,constraint_exp="one_linear"):
@@ -379,7 +379,7 @@ def dewater_slp_opt_test():
     pst.pestpp_options["base_jacobian"] = "test_opt.1.jcb"
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d,"test_sqp.pst"))
-    pyemu.os_utils.run("{0} {1}.pst".format(exe_path, "test_sqp.pst"), cwd=t_d)
+    pyemu.os_utils.run("{0} {1}.pst".format(exe_path, "test_sqp"), cwd=t_d)
 
 
 def rosenc_test():
