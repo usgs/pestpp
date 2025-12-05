@@ -67,7 +67,7 @@ def basic_sqp_test():
     assert df.shape == (pst.pestpp_options["sqp_num_reals"] + 1,pst.npar),str(df.shape)
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_sqp.0.obs.csv"))
     df = pd.read_csv(os.path.join(m_d,"freyberg6_run_sqp.0.obs.csv"),index_col=0)
-    assert df.shape == (pst.pestpp_options["sqp_num_reals"] + 1,pst.nobs),str(df.shape)
+    assert df.shape == (pst.pestpp_options["sqp_num_reals"] + 1,pst.nobs + pst.nprior),str(df.shape)
 
 
 def rosenbrock_setup(version,initial_decvars=1.6,constraints=False,constraint_exp="one_linear"):
