@@ -4829,12 +4829,12 @@ bool SeqQuadProgram::seek_feasible()
 			vpad = 0.0;
 		filter.update(obj_val, viol_val, vpad, p, o, real_name, -iter);  
 	}
-
-	if (last_viol < filter.get_viol_tol())
-		cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
-	else
-		cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
-
+	if (iter > 0) {
+		if (last_viol < filter.get_viol_tol())
+			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
+		else
+			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
+	}
 	return false;
 }
 
