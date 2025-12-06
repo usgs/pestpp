@@ -1918,7 +1918,7 @@ bool SeqQuadProgram::update_hessian(string how)
 	}
 
 	Covariance old_hessian = hessian;
-	
+
 	Eigen::VectorXd prev_grad = grad_vector_map[iter-1].get_data_eigen_vec(dv_names);
 	Eigen::VectorXd curr_grad = grad_vector_map[iter].get_data_eigen_vec(dv_names);
 	
@@ -2222,7 +2222,7 @@ void SeqQuadProgram::iterate_2_solution()
 					hessian = Covariance(dv_names, h);
 				}
 			}
-			else
+			else if (iter > 0)
 				update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
 		}
 	}
@@ -4835,6 +4835,7 @@ bool SeqQuadProgram::seek_feasible()
 		else
 			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
 	}
+
 	return false;
 }
 
