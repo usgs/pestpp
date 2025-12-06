@@ -2140,6 +2140,7 @@ void SeqQuadProgram::iterate_2_solution()
 	n_consec_infeas = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{ 		
+		iter++;
 		if (use_ensemble_grad)
 			accept = solve_new_ensemble();
 		else
@@ -4236,38 +4237,27 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 
 bool SeqQuadProgram::solve_new()
 {
-	//stringstream ss;
-	//ofstream& frec = file_manager.rec_ofstream();
-	//if ((use_ensemble_grad) && (dv.shape().first <= error_min_reals))
-	//{
-	//	message(0, "too few active realizations:", oe.shape().first);
-	//	message(1, "need more than ", error_min_reals);
-	//	throw_sqp_error(string("too few active realizations, cannot continue"));
-	//}
-	//else if ((use_ensemble_grad) && (dv.shape().first < warn_min_reals))
-	//{
-	//	ss.str("");
-	//	ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
-	//	string s = ss.str();
-	//	message(1, s);
-	//}
+	//TODO: need to rethink about FD capability for SQP
 
-	//Parameters _current_num_dv_values = current_ctl_dv_values;  // make copy
-	//ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-	//pts.ctl2numeric_ip(_current_num_dv_values); 
-	//_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end()); 
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
 
-	//pair<Mat, bool> constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs,(working_set_tol));
-	//current_constraint_mat = constraint_mat.first;
-	//cnames = constraint_mat.first.get_row_names();
+	Parameters _current_num_dv_values = current_ctl_dv_values; 
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	pts.ctl2numeric_ip(_current_num_dv_values); 
+	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end()); 
 
-	//prev_ctl_dv_values = current_ctl_dv_values; 
-	//prev_constraint_mat = current_constraint_mat;
+	pair<Mat, bool> constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs,(working_set_tol));
+	current_constraint_mat = constraint_mat.first;
+	cnames = constraint_mat.first.get_row_names();
 
-	//Eigen::VectorXd search_d, lm;
-	//Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
-	//bool successful = false;
-	//Covariance old_hessian = hessian;
+	prev_ctl_dv_values = current_ctl_dv_values; 
+	prev_constraint_mat = current_constraint_mat;
+
+	Eigen::VectorXd search_d, lm;
+	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
+	bool successful = false;
+	Covariance old_hessian = hessian;
 
 	//int line_search_attempts = 0;
 	//while (!successful && line_search_attempts < max_line_search_attempts)
@@ -4433,7 +4423,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 
 	prev_ctl_dv_values = current_ctl_dv_values;
 
-	iter++;
 	message(0, "starting solve for iteration:", iter);
 	cout << "...calculating search direction for each realization (see .rec file for more details)" << endl;
 
@@ -4831,7 +4820,9 @@ bool SeqQuadProgram::seek_feasible()
 			vpad = 0.0;
 		filter.update(obj_val, viol_val, vpad, p, o, real_name, -iter);  
 	}
-	if (iter > 0) {
+
+	if ((iter > 0) && (use_cmaes))
+	{
 		if (last_viol < filter.get_viol_tol())
 			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
 		else

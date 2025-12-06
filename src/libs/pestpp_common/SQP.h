@@ -69,7 +69,7 @@ class CovMatAdapES
 
 public:
 	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen, FileManager* file_mgr) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen), file_manager(file_mgr) {}
-	CovMatAdapES() {}
+	CovMatAdapES() : pest_scenario_ptr(nullptr), rand_gen_ptr(nullptr), file_manager(nullptr) {}
 
 	void initialize(int n_params, int _num_reals);
 	void update(Parameters prev_m, Parameters curr_m, int iter);
