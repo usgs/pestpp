@@ -3983,7 +3983,7 @@ ObservationEnsemble SeqQuadProgram::combine_obs_and_pi(ObservationEnsemble& _oe,
 		Ensemble pi_oe = get_pi_ensemble(_pe, pinames);
 
 		Eigen::MatrixXd obs_mat = _oe.get_eigen();
-		Eigen::MatrixXd pi_mat = pi_oe.get_eigen();
+		Eigen::MatrixXd pi_mat = pi_oe.get_eigen(_oe.get_real_names(),pinames);
 
 		Eigen::MatrixXd combined_mat(obs_mat.rows(), obs_mat.cols() + pi_mat.cols());
 		combined_mat << obs_mat, pi_mat;
