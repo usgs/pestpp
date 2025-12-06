@@ -337,7 +337,7 @@ def dewater_basic_test():
     # assert os.path.exists(os.path.join(m_d, case + ".2.jcb"))
     
     pst.pestpp_options["sqp_num_reals"] = 50
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 2
     pst.write(os.path.join(t_d, case + ".pst"))
     # pyemu.os_utils.run("{0} {1}.pst".format(exe_path,case),cwd=t_d)
     m_d = os.path.join(model_d, "master2_enopt")

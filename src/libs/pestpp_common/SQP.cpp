@@ -2291,7 +2291,8 @@ bool SeqQuadProgram::should_terminate()
 	csv_file.close();
 	message(1, "saved phi and violation summary to: ", csv_filename);
 
-
+	ss.str("");
+	ss << " --- phi and violation sequence --- " << endl;
     for (int i=0;i<best_phis.size();i++)
     {
         phi = best_phis[i];
@@ -2307,7 +2308,8 @@ bool SeqQuadProgram::should_terminate()
 			          << right << setw(12) << fixed << setprecision(3) << phi
 			          << setw(15) << fixed << setprecision(6) << viol << endl;
     }
-    message(0, ss.str());
+     cout << ss.str() << endl;
+	file_manager.rec_ofstream() << ss.str() << endl;
 
     message(0, "phi-based termination criteria check");
     message(2, "phiredstp: ", phiredstp);
@@ -2329,7 +2331,7 @@ bool SeqQuadProgram::should_terminate()
         message(1, "number of iterations since best yet mean phi > nphinored");
         nphinored_sat = true;
     }
-    if (best_phis[best_phis.size() - 1] == 0.0)
+    if (best_phis[best_phis.size() - 1] < numeric_limits<double>::denorm_min())
     {
         message(1, "phi is zero, all done");
         return true;
