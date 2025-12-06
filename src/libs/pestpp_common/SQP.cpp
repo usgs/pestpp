@@ -1063,7 +1063,7 @@ void SeqQuadProgram::initialize()
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", current_ctl_dv_values);
+		_pe.append(BASE_REAL_NAME, current_ctl_dv_values);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -1071,7 +1071,7 @@ void SeqQuadProgram::initialize()
 		dv_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		message(1, "running control file parameter values");
@@ -1169,7 +1169,7 @@ void SeqQuadProgram::initialize()
 		vpad = v;
 	filter = SqpFilter((obj_sense == "minimize") ? true : false);
 	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
-	filter.update(last_best, v, vpad, current_ctl_dv_values, current_obs, "BASE", 0);
+	filter.update(last_best, v, vpad, current_ctl_dv_values, current_obs, BASE_REAL_NAME, 0);
 
 	if ((v > 0.0) && !use_ensemble_grad)
 	{
@@ -1670,8 +1670,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	vals = oe.get_mean_stl_var_vector();
 	names = oe.get_var_names();
 	current_obs.update(names, vals);*/
-	current_ctl_dv_values.update(dv.get_var_names(), dv.get_real_vector("BASE"));
-	current_obs.update(oe.get_var_names(), oe.get_real_vector("BASE"));
+	current_ctl_dv_values.update(dv.get_var_names(), dv.get_real_vector(BASE_REAL_NAME));
+	current_obs.update(oe.get_var_names(), oe.get_real_vector(BASE_REAL_NAME));
 
 }
 
@@ -2429,7 +2429,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		// compute sample dec var cov matrix and its pseudo inverse
 		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 
-		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, "BASE");
+		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
 		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
 		Eigen::MatrixXd s, V, U, st;
@@ -2443,7 +2443,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		//because each real includes both dec vars and uncertain params
 		Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
 		if (use_obj_obs) {
-			obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},"BASE");
+			obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},BASE_REAL_NAME);
 		}
 		else
 		{
@@ -2915,7 +2915,7 @@ pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observa
 			if (oe.shape().first > 0)
 			{
 				vector<string> obs_names = oe.get_var_names();
-				Eigen::VectorXd base_vec = oe.get_real_vector("BASE");
+				Eigen::VectorXd base_vec = oe.get_real_vector(BASE_REAL_NAME);
 				base_obs.update_without_clear(obs_names, base_vec);
 			}
 
@@ -3112,10 +3112,10 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 		{
 			ParameterEnsemble d;
 			const auto& names = dvs_subset->get_real_names();
-			if (find(names.begin(), names.end(), "BASE") == names.end() && !recalc)
+			if (find(names.begin(), names.end(), BASE_REAL_NAME) == names.end() && !recalc)
 			{
-				d.reserve(vector<string>{ "BASE" }, dv_names);
-				d.add_2_row_ip("BASE", dv.get_real_vector("BASE"));
+				d.reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
+				d.add_2_row_ip(BASE_REAL_NAME, dv.get_real_vector(BASE_REAL_NAME));
 				dvs_subset->append_other_rows(d);
 			}
 
@@ -3774,10 +3774,10 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		{
 			ParameterEnsemble d;
 			const auto& names = dvs_subset->get_real_names();
-			if ((find(names.begin(), names.end(), "BASE") == names.end()) && !recalc)
+			if ((find(names.begin(), names.end(), BASE_REAL_NAME) == names.end()) && !recalc)
 			{
-				d.reserve(vector<string>{ "BASE" }, dv_names);
-				d.add_2_row_ip("BASE", dv.get_real_vector("BASE"));
+				d.reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
+				d.add_2_row_ip(BASE_REAL_NAME, dv.get_real_vector(BASE_REAL_NAME));
 				dvs_subset->append_other_rows(d);
 			}
 			
@@ -4430,7 +4430,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 	dv.reorder(vector<string>(), dv_names);
 	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	ParameterEnsemble _dvs = dv;
-	_dvs.drop_rows(vector<string>{"BASE"}, true);
+	_dvs.drop_rows(vector<string>{BASE_REAL_NAME}, true);
 
 	int local_subset_size = pest_scenario.get_pestpp_options().get_sqp_subset_size();
 	if (local_subset_size < 0)
@@ -4597,9 +4597,9 @@ bool SeqQuadProgram::solve_new_ensemble()
 	}
 
 	FilterRec search = run_search_routine(grad, &_drawn_dvs);
-	constraint_jco = constraint_mat_en["BASE"].first.e_ptr()->toDense();
-	current_constraint_mat = constraint_mat_en["BASE"].first;
-	cnames = constraint_mat_en["BASE"].first.get_row_names();
+	constraint_jco = constraint_mat_en[BASE_REAL_NAME].first.e_ptr()->toDense();
+	current_constraint_mat = constraint_mat_en[BASE_REAL_NAME].first;
+	cnames = constraint_mat_en[BASE_REAL_NAME].first.get_row_names();
 	prev_constraint_mat = current_constraint_mat;
 
 	if (search.viol_val == 0.0)
