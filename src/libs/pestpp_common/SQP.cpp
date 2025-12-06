@@ -1918,7 +1918,7 @@ bool SeqQuadProgram::update_hessian(string how)
 	}
 
 	Covariance old_hessian = hessian;
-	
+
 	Eigen::VectorXd prev_grad = grad_vector_map[iter-1].get_data_eigen_vec(dv_names);
 	Eigen::VectorXd curr_grad = grad_vector_map[iter].get_data_eigen_vec(dv_names);
 	
@@ -2223,7 +2223,7 @@ void SeqQuadProgram::iterate_2_solution()
 					hessian = Covariance(dv_names, h);
 				}
 			}
-			else
+			else if (iter > 0)
 				update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
 		}
 	}
@@ -2292,7 +2292,8 @@ bool SeqQuadProgram::should_terminate()
 	csv_file.close();
 	message(1, "saved phi and violation summary to: ", csv_filename);
 
-
+	ss.str("");
+	ss << " --- phi and violation sequence --- " << endl;
     for (int i=0;i<best_phis.size();i++)
     {
         phi = best_phis[i];
@@ -2308,7 +2309,8 @@ bool SeqQuadProgram::should_terminate()
 			          << right << setw(12) << fixed << setprecision(3) << phi
 			          << setw(15) << fixed << setprecision(6) << viol << endl;
     }
-    message(0, ss.str());
+     cout << ss.str() << endl;
+	file_manager.rec_ofstream() << ss.str() << endl;
 
     message(0, "phi-based termination criteria check");
     message(2, "phiredstp: ", phiredstp);
@@ -2330,7 +2332,7 @@ bool SeqQuadProgram::should_terminate()
         message(1, "number of iterations since best yet mean phi > nphinored");
         nphinored_sat = true;
     }
-    if (best_phis[best_phis.size() - 1] == 0.0)
+    if (best_phis[best_phis.size() - 1] < numeric_limits<double>::denorm_min())
     {
         message(1, "phi is zero, all done");
         return true;
@@ -3984,7 +3986,7 @@ ObservationEnsemble SeqQuadProgram::combine_obs_and_pi(ObservationEnsemble& _oe,
 		Ensemble pi_oe = get_pi_ensemble(_pe, pinames);
 
 		Eigen::MatrixXd obs_mat = _oe.get_eigen();
-		Eigen::MatrixXd pi_mat = pi_oe.get_eigen();
+		Eigen::MatrixXd pi_mat = pi_oe.get_eigen(_oe.get_real_names(),pinames);
 
 		Eigen::MatrixXd combined_mat(obs_mat.rows(), obs_mat.cols() + pi_mat.cols());
 		combined_mat << obs_mat, pi_mat;
@@ -4819,7 +4821,7 @@ bool SeqQuadProgram::seek_feasible()
 		filter.update(obj_val, viol_val, vpad, p, o, real_name, -iter);  
 	}
 
-	if (use_cmaes)
+	if ((iter > 0) && (use_cmaes))
 	{
 		if (last_viol < filter.get_viol_tol())
 			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);

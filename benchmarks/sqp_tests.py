@@ -328,22 +328,28 @@ def dewater_basic_test():
     pst.write(os.path.join(t_d,case+".pst"))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,case),cwd=t_d)
     m_d = os.path.join(model_d, "master2")
-    pyemu.os_utils.start_workers(t_d, exe_path, case + ".pst", num_workers=10, worker_root=model_d,
-                                 master_dir=m_d)
-    assert os.path.exists(os.path.join(m_d, case + ".base.par"))
-    assert os.path.exists(os.path.join(m_d, case + ".base.rei"))
-    assert os.path.exists(os.path.join(m_d, case + ".0.jcb"))
-    assert os.path.exists(os.path.join(m_d, case + ".1.jcb"))
-    assert os.path.exists(os.path.join(m_d, case + ".2.jcb"))
+    #pyemu.os_utils.start_workers(t_d, exe_path, case + ".pst", num_workers=10, worker_root=model_d,
+    #                             master_dir=m_d)
+    # assert os.path.exists(os.path.join(m_d, case + ".base.par"))
+    # assert os.path.exists(os.path.join(m_d, case + ".base.rei"))
+    # assert os.path.exists(os.path.join(m_d, case + ".0.jcb"))
+    # assert os.path.exists(os.path.join(m_d, case + ".1.jcb"))
+    # assert os.path.exists(os.path.join(m_d, case + ".2.jcb"))
     
     pst.pestpp_options["sqp_num_reals"] = 50
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 2
     pst.write(os.path.join(t_d, case + ".pst"))
     # pyemu.os_utils.run("{0} {1}.pst".format(exe_path,case),cwd=t_d)
     m_d = os.path.join(model_d, "master2_enopt")
     pyemu.os_utils.start_workers(t_d, exe_path, case + ".pst", num_workers=20, worker_root=model_d,
                                  master_dir=m_d)
 
+    for i in range(pst.control_data.noptmax+1):
+        assert os.path.exists(os.path.join(m_d, case + ".{0}.base.par".format(i)))
+        assert os.path.exists(os.path.join(m_d, case + ".{0}.base.rei".format(i)))
+        assert os.path.exists(os.path.join(m_d, case + ".{0}.obs.csv".format(i)))
+        assert os.path.exists(os.path.join(m_d, case + ".{0}.par.csv".format(i)))
+        
 
 
 def dewater_slp_opt_test():
@@ -576,9 +582,9 @@ if __name__ == "__main__":
     #if not os.path.exists(os.path.join("..","bin")):
     #    os.mkdir(os.path.join("..","bin"))
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sqp.exe"),os.path.join("..","bin","pestpp-sqp.exe"))
-    basic_sqp_test()
+    #basic_sqp_test()
     #rosenbrock_single_linear_constraint(nit=1)
-    #dewater_basic_test()
+    dewater_basic_test()
     #dewater_slp_opt_test()
     #rosenc_test()
     #m_d = rosenc_test()
