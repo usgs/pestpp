@@ -4947,10 +4947,96 @@ def tenpar_fixed_transform_test():
     print(diff.sum())
     assert diff.sum() < 1e-6
     
+
+
+
+def run_chenoliver_model():
+    import numpy as np
+    import pyemu
+    def _eval_chenoliver_model(x):
+        results = np.zeros((4,x.shape[0]))
+        results[0,:] = x * 8.0
+        results[1,:] = ((2./12.)*(x**3)) - (x**2) + (8.0*x)
+        results[2,:] = ((7./12.)*(x**3)) - ((7./2.)*x**2) + (8.*x)
+        results[3,:] = ((20./12.)*x**3) - ((20.0/2.0)*x**2) + (8.*x)
+        return results
+    fname = "pest.rns"
+    rs = pyemu.utils.helpers.RunStor(fname)
+    df = rs.get_data()
+    results = _eval_chenoliver_model(df.x.values)
+    
+    df.loc[:,"lin"] = results[0,:]
+    df.loc[:,"weak"] = results[1,:]
+    df.loc[:,"mod"] = results[2,:]
+    df.loc[:,"high"] = results[3,:]
+    df.loc[:,"xout"] = df.x.values
+    df.to_csv("temp.csv")
+    rs.update(df)
+    
+    
+def chenoliver_test():
+    ws = os.path.join("chenoliver_test","working")
+    if os.path.exists(ws):
+        shutil.rmtree(ws)
+    os.makedirs(ws)
+    # tpl_fname = os.path.join(ws,"pest.in.tpl")
+    # with open(tpl_file,"w") as f:
+    #     f.write("ptf ~\n")
+    #     f.write("x, ~     x     ~\n")
+    # ins_file = os.path.join(ws,"pest.out.ins")
+    # with open(ins_file,'w') as f:
+
+    pst = pyemu.Pst.from_par_obs_names(par_names=["x"],obs_names=["lin","weak","mod","high","xout"])
+    par = pst.parameter_data
+    par["parubnd"] = 10
+    par["parlbnd"] = -10
+    par["partrans"] = "none"
+    par["parval1"] = -2
+    par["standard_deviation"] = 1
+
+    obs = pst.observation_data
+    obs["obsval"] = 48
+    obs["weight"] = 0.0
+    obs["standard_deviation"] = 1
+    obs.loc["xout","obsval"] = -2
+
+    obs.loc["high","weight"] = 1
+    obs.loc["xout","weight"] = 0
+    obs.loc["xout","standard_deviation"] = 1
+
+    pst.pestpp_options["ies_num_reals"] = 500
+    pst.pestpp_options["ies_n_iter_reinflate"] = [-3,-1,-1,-1,9999]
+    #pst.pestpp_options["ies_reinflate_factor"] = [2,1,1]
+    pst.pestpp_options["ies_reinflate_num_reals"] = [50,100,-50]
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.1
+    pst.pestpp_options["ies_lambda_dec_fac"] = 1.0
+
+    pst.model_command = "python run_chenoliver_model.py"
+    pst.pestpp_options["ies_use_approx"] = False
+    import inspect
+    lines = inspect.getsource(run_chenoliver_model)
+    with open(os.path.join(ws,"run_chenoliver_model.py"),'w') as f:
+        for line in lines:
+            f.write(line)
+        f.write("if __name__ == '__main__':\n")
+        f.write("   run_chenoliver_model()\n\n")
+
+    pst.control_data.noptmax = 20
+    pst.write(os.path.join(ws,"pest.pst"),version=2)
+    pyemu.os_utils.run("{0} pest.pst /e".format(exe_path),cwd=ws)
+
+
+
+    
     
 
+
+
 if __name__ == "__main__":
-    tenpar_fixed_transform_test()
+
+    chenoliver_test()
+
+    #tenpar_fixed_transform_test()
 
     #tenpar_ext_run_mgr_test()
     #freyberg_pdc_test()

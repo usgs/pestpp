@@ -333,6 +333,7 @@ public:
 	vector<string> get_row_vector(string key, string col_name, vector<string> include_cols = vector<string>());
 	vector<string> get_col_string_vector(string col_name);
 	void set_index_col_name(string& _col_name);
+	void set_data_value(const string& row_name, const string& col_name, const string& value, bool forgive=false);
 	string get_index_col_name() { return index_col_name; }
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);

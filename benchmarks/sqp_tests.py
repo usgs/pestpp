@@ -577,6 +577,36 @@ def plot_rosen(m_d):
                        "-i iter_%03d.png -vf scale=480X480  -y out.gif",cwd=m_d)
 
 
+def mf6_phiobs_invest():
+    model_d = "mf6_freyberg"
+
+    org_t_d = os.path.join("..","benchmarks",model_d,"template")
+    t_d = os.path.join(model_d,"master_mf6freyberg_sqp")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    shutil.copytree(org_t_d,t_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"pest.pst"),version=2)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-sqp","-ies")),cwd=t_d)
+    pst = pyemu.helpers.add_phi_as_obs("pest.pst",pst_path=t_d)
+
+    pst.pestpp_options["opt_objective_function"] = "composite"
+    pst.observation_data.loc["composite","obgnme"] = "less_than"
+    lbdf = pst.add_pars_as_obs(pst_path=t_d,par_sigma_range=4,name_prefix="parlbnd-")
+
+    ubdf = pst.add_pars_as_obs(pst_path=t_d,par_sigma_range=4,name_prefix="parubnd-")
+    print(lbdf)
+    obs = pst.observation_data
+    obs.loc[lbdf.index,"obgnme"] = "greater_than_parbound"
+    obs.loc[lbdf.index,"obgnme"] = "less_than_parbound"
+    
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"pest.pst"),version=2)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=t_d)
+    
+
+
 if __name__ == "__main__":
 
     #if not os.path.exists(os.path.join("..","bin")):
@@ -590,3 +620,5 @@ if __name__ == "__main__":
     #m_d = rosenc_test()
     #m_d = os.path.join("mou_tests","master_rosenc_enopt")
     #plot_rosen(m_d)
+    #mf6_freyberg_test()
+    mf6_phiobs_invest()
