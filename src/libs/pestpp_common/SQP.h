@@ -30,7 +30,7 @@ struct FilterRec
 	Parameters dp_val;
 	Observations oe_val;
 	string real_name;
-	double eff_viol;
+	double viol_padded;
     friend bool operator<(const FilterRec &k1, const FilterRec &k2) {
         if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
             return true;
@@ -44,25 +44,21 @@ public:
 	SqpFilter(bool _minimize=true,double _obj_tol = 0.001, double _viol_tol = 0.001) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
-	bool accept(double obj_val, double violation_val, Parameters p, Observations o, string rname, int iter=0, bool keep=false);
-	bool update(double obj_val, double violation_val, Parameters p, Observations o, string rname, int iter=0);
-
-	FilterRec get_knee() { return knee; }
+	bool accept(double obj_val, double violation_val, double violation_padded, Parameters p, Observations o, string rname, int iter=0, bool keep=false);
+	bool update(double obj_val, double violation_val, double violation_padded, Parameters p, Observations o, string rname, int iter=0);
     void report(ofstream& frec,int iter);
     double get_viol_tol() {return viol_tol;}
 	void set_tol(double tol) { 
 		obj_tol = tol; 
 		viol_tol = tol;}
-	vector<FilterRec> get_feasible_solutions() const;
+	vector<FilterRec> get_feasible_solutions(bool padded = false) const;
 	vector<FilterRec> get_filter_members() const;
 
 private:
 	bool minimize;
 	double obj_tol;
 	double viol_tol;
-	FilterRec knee;
 	multiset<FilterRec> obj_viol_pairs;
-	void compute_knee();
 	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
     bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
 
@@ -72,8 +68,8 @@ class CovMatAdapES
 {
 
 public:
-	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen) {}
-	CovMatAdapES() {}
+	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen, FileManager* file_mgr) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen), file_manager(file_mgr) {}
+	CovMatAdapES() : pest_scenario_ptr(nullptr), rand_gen_ptr(nullptr), file_manager(nullptr) {}
 
 	void initialize(int n_params, int _num_reals);
 	void update(Parameters prev_m, Parameters curr_m, int iter);
@@ -84,6 +80,8 @@ public:
 	void set_mean(const Eigen::VectorXd& _m) { m = _m; }
 	Eigen::VectorXd get_mean() const { return m; }
 	double get_sigma() const { return sigma; }
+	int get_parent_num() { return mu; }
+	void set_parent_num(int mu_new) { mu = mu_new; }
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
 	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear = true);
@@ -132,6 +130,7 @@ protected:
 	std::mt19937* rand_gen_ptr;
 	Pest* pest_scenario_ptr;
 	Eigen::MatrixXd reals;
+	FileManager* file_manager;
 
 };
 
@@ -159,7 +158,7 @@ private:
 	RunManagerAbstract* run_mgr_ptr;
 
 	ParChangeSummarizer pcs;
-	Covariance parcov, obscov;
+	Covariance parcov, obscov, uncertain_parcov;
 	CovMatAdapES cmaes;
 	chancePoints chancepoints;
 	string obj_func_str;
@@ -181,6 +180,8 @@ private:
     double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
     double par_sigma_max = 100;
+	bool reset_corr = false;
+	int fcount = 0;
 
     double par_sigma_min = 10;
 	double eigthresh;
@@ -210,12 +211,17 @@ private:
 	double best_phi_yet;
 	double best_violation_yet;
 	double working_set_tol;
+	double sqp_risk;
+
+	map<string, double> obj_map;
+	map<string, double> total_viol_map;
 
 	int warn_min_reals, error_min_reals;
 
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
+	vector<string> adj_par_names;
 	bool use_subset, use_cmaes = true, adjust_step_control = false;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
@@ -267,7 +273,6 @@ private:
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
-	bool solve_new();
 	bool solve_new_ensemble();
 
 	bool seek_feasible();
@@ -297,13 +302,13 @@ private:
 	
 	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
-	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>());
+	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, int wset_lvl = 1, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>());
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
-	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad);
+	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);

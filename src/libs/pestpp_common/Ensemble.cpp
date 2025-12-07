@@ -797,11 +797,13 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 		map<string,int>::iterator end = real_map.end();
 		//set<string> real_set(real_names.begin(), end = real_names.end());
 		//set<string>::iterator end = real_set.end();
-		for (auto &name : row_names)
+		for (auto& name : row_names)
 		{
-			if (real_map.find(name) == end)
+			auto it = real_map.find(name);
+			if (it == end)
 				missing.push_back(name);
-			row_idxs.push_back(real_map[name]);
+			else
+				row_idxs.push_back(it->second);
 		}
 		if (missing.size() > 0)
 			throw_ensemble_error("Ensemble.get_eigen() error: the following realization names were not found:", missing);
@@ -816,11 +818,13 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 
 		//set<string> var_set(var_names.begin(), var_names.end());
 		map<string,int>::iterator end = var_map.end();
-		for (auto &name : col_names)
+		for (auto& name : col_names)
 		{
-			if (var_map.find(name) == end)
+			auto it = var_map.find(name);
+			if (it == end)
 				missing.push_back(name);
-			col_idxs.push_back(var_map[name]);
+			else
+				col_idxs.push_back(it->second);
 		}
 		if (missing.size() > 0)
 			throw_ensemble_error("Ensemble.get_eigen() error: the following variable names were not found:", missing);
@@ -2100,8 +2104,8 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 	pfinfo.set_fixed_names(f);
 	if (!same)
 	{
-
-		reorder(vector<string>(), pest_scenario_ptr->get_ctl_ordered_adj_par_names());
+		reorder(vector<string>(), var_names);
+		//reorder(vector<string>(), pest_scenario_ptr->get_ctl_ordered_adj_par_names());
 	}
 	map<string, double> norm_map;
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())

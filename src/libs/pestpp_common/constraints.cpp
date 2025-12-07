@@ -254,9 +254,17 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	string par_stack_name = pest_scenario.get_pestpp_options().get_opt_par_stack();
 	//maybe even an existing observations (e.g. constraints) stack!
 	string obs_stack_name = pest_scenario.get_pestpp_options().get_opt_obs_stack();
+	//check for sqp risk
+	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
 	//by default, we want to use fosm for chances, but it any
 	//of those stack options were passed, then use stacks instead
 	use_fosm = true;
+	use_stosag = false;
+	if (sqp_risk != 0.50)
+	{
+		use_stosag = true;
+		use_fosm = false;
+	}
 	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
 	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
@@ -503,7 +511,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//------------------------------------------
 	//  ---  chance constraints  ---
 	//------------------------------------------
-	risk = pest_scenario.get_pestpp_options().get_opt_risk();
+	if (use_stosag)
+		risk = pest_scenario.get_pestpp_options().get_sqp_risk();
+	else
+		risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)
 	{
 		pfm.log_event("initializing chance constraints/objectives");
@@ -582,6 +593,13 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
 				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}
+		}
+		else if (use_stosag)
+		{
+			// StoSAG mode: no stack setup needed, will use existing ensemble for risk shifting
+			f_rec << "  using chance constraints/objectives with risk = " << risk << endl;
+			f_rec << "  using existing ensemble for constraint shifting, no separate stack needed" << endl;
+			// No stack operations needed - the ensemble will be provided by SQP when needed
 		}
 		//otherwise, stack time baby!
 		else
@@ -1437,6 +1455,15 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			shifted_obs.insert(name, new_constraint_val);
 		}
 	}
+	else if (use_stosag)
+	{
+		for (auto& name : ctl_ord_obs_constraint_names)
+		{
+			shifted_obs.insert(name, current_obs.get_rec(name));
+		}
+		f_rec << "  warning: get_chance_shifted_constraints called without ensemble in StoSAG mode - returning unshifted constraints" << endl;
+		f_rec << "  consider using ensemble-based overload for proper risk shifting" << endl;
+	}
 	else
 	{
 		if (!stack_runs_processed)
@@ -1629,6 +1656,11 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
 		shifted_obs[name] = new_constraint_val;
 	}
 	return shifted_obs;
+}
+
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& ensemble_oe, double _risk)
+{
+	return get_stack_shifted_chance_constraints(current_obs, ensemble_oe, _risk, false, false);
 }
 
 vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
@@ -2329,6 +2361,63 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	
 }
 
+void Constraints::presolve_chance_report(int iter, Observations& current_obs, ObservationEnsemble* ensemble_oe, double risk_val, bool echo, string header)
+{
+	/* write chance info to the rec file before undertaking the current iteration process
+	 * This overload uses ensemble-based risk shifting for SQP */
+	if (!use_chance)
+		return;
+
+	if (ensemble_oe != nullptr && ensemble_oe->shape().first > 0 && !use_fosm)
+	{
+		Observations base_obs = current_obs;
+		
+		vector<string> obs_names = ensemble_oe->get_var_names();
+		Eigen::VectorXd base_vec = ensemble_oe->get_real_vector("BASE");
+		base_obs.update_without_clear(obs_names, base_vec);
+		
+		Observations current_constraints_chance = get_chance_shifted_constraints(base_obs, *ensemble_oe, risk_val);
+
+		int nsize = 20;
+		for (auto o : ctl_ord_obs_constraint_names)
+			nsize = max(nsize, int(o.size()));
+
+		stringstream ss;
+		ss << endl << "   ";
+		if (header.size() == 0)
+			ss << "Chance constraint/objective information at start of iteration " << iter;
+		else
+			ss << header;
+		ss << endl;
+
+		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(12) << "sim value";
+		ss << setw(12) << "risk" << setw(14) << "new sim value" << endl;
+
+		for (int i = 0; i < num_obs_constraints(); ++i)
+		{
+			string name = ctl_ord_obs_constraint_names[i];
+			ss << setw(nsize) << left << name;
+			ss << setw(14) << right << constraint_sense_name[name];
+			ss << setw(12) << constraints_obs[name];
+			ss << setw(12) << current_obs.get_rec(name);
+			ss << setw(12) << risk_val;
+			ss << setw(14) << current_constraints_chance[name] << endl;
+		}
+		ss << "  note: constraint values shifted using ensemble distribution with risk = " << risk_val << endl;
+
+		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+		f_rec << ss.str();
+		if (echo)
+			cout << ss.str();
+		return;
+	}
+	else
+	{
+		// Fall back to original implementation
+		presolve_chance_report(iter, current_obs, echo, header);
+	}
+}
+
 
 bool Constraints::should_update_chance(int iter)
 {
@@ -2934,6 +3023,10 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
+	else if (use_stosag)
+	{
+		//do nothing -- we don't need stacks here
+	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
 	//with the current dec var values.
 	else
@@ -3093,27 +3186,61 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	return unsatisfied;
 }
 
-map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol, bool include_weight)
+map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol, bool include_weight, ObservationEnsemble* shift_ensemble_oe, double risk_val)
 {
 	//make sure pe and oe share realizations
 	vector<string> pe_names = pe.get_real_names();
 	vector<string> oe_names = oe.get_real_names();
 	if (pe_names.size() != oe_names.size())
 		throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
-	for (int i=0;i<pe_names.size();i++)
+	for (int i = 0; i < pe_names.size(); i++)
 		if (pe_names[i] != oe_names[i])
 			throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
-	
+
+	// Check if we should use ensemble-based risk shifting
+	bool use_ensemble_risk_shift = (shift_ensemble_oe != nullptr) && (risk_val != 0.5) && (risk_val >= 0.0) && (risk_val <= 1.0) && use_chance;
+
+	Observations shifted_constraints;
+	if (use_ensemble_risk_shift && shift_ensemble_oe->shape().first > 0)
+	{
+		// Compute shifted constraint thresholds based on ensemble distribution
+		Observations base_obs = pest_scenario.get_ctl_observations();
+		vector<string> obs_names = shift_ensemble_oe->get_var_names();
+		const auto& obs_rnames = shift_ensemble_oe->get_real_names();
+		if (find(obs_rnames.begin(), obs_rnames.end(), "BASE") != obs_rnames.end())
+		{
+			Eigen::VectorXd base_vec = shift_ensemble_oe->get_real_vector("BASE");
+			base_obs.update_without_clear(obs_names, base_vec);
+		}
+		else
+		{
+			vector<double> mean_vec = shift_ensemble_oe->get_mean_stl_var_vector();
+			base_obs.update_without_clear(obs_names, mean_vec);
+		}
+		shifted_constraints = get_chance_shifted_constraints(base_obs, *shift_ensemble_oe, risk_val);
+	}
+
 	Observations obs = pest_scenario.get_ctl_observations();
 	Eigen::VectorXd v;
 	vector<string> vnames = oe.get_var_names();
 	map<string, double> vmap;
 	map<string, map<string, double>> violations;
+
 	for (auto& name : oe_names)
 	{
 		v = oe.get_real_vector(name);
 		obs.update_without_clear(vnames, v);
-		vmap = get_unsatified_obs_constraints(obs,tol,true,include_weight);
+
+		if (use_ensemble_risk_shift)
+		{
+			// Use pre-computed shifted thresholds
+			vmap = get_unsatified_obs_constraints_vs_shifted(obs, shifted_constraints, tol, include_weight);
+		}
+		else
+		{
+			// Use standard approach (with internal state-based shifting if use_chance)
+			vmap = get_unsatified_obs_constraints(obs, tol, true, include_weight);
+		}
 		violations[name] = vmap;
 	}
 
@@ -3132,6 +3259,45 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 	return violations;
 }
 
+map<string, double> Constraints::get_unsatified_obs_constraints_vs_shifted(Observations& constraints_sim, Observations& shifted_constraints, double tol, bool include_weight)
+{
+	map<string, double> unsatisfied;
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	double weight, sim_val, shifted_val, scaled_diff;
+
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		sim_val = constraints_sim[name];
+		shifted_val = shifted_constraints.get_rec(name); 
+
+		weight = 1.0;
+		if (include_weight)
+			weight = oi.get_weight(name);
+
+		if (tol >= 0)
+		{
+			scaled_diff = (shifted_val != 0) ? abs((shifted_val - sim_val) / shifted_val) : abs(shifted_val - sim_val);
+
+			if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > shifted_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * (sim_val - shifted_val);
+			else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < shifted_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * (shifted_val - sim_val);
+			else if ((constraint_sense_map[name] == ConstraintSense::equal_to) && (sim_val != shifted_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * abs(sim_val - shifted_val);
+		}
+		else
+		{
+			if (constraint_sense_map[name] == ConstraintSense::less_than)
+				unsatisfied[name] = weight * (sim_val - shifted_val);
+			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+				unsatisfied[name] = weight * (shifted_val - sim_val);
+			else if (constraint_sense_map[name] == ConstraintSense::equal_to)
+				unsatisfied[name] = weight * abs(sim_val - shifted_val);
+		}
+	}
+	return unsatisfied;
+}
 
 map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift, bool include_weight)
 {
@@ -3281,58 +3447,86 @@ pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& worki
 	return pair<vector<string>, bool>(working_set, false);
 }
 
-pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, vector<string> curr_ws, double working_set_tol)
+pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, vector<string> curr_ws, double working_set_tol, int wset_lvl)
 {
-    pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+    pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol, wset_lvl);
 	if (curr_ws.size() > 0)
 		working_set.first = curr_ws;
 
-    Mat mat;
 	bool converged = false;
-    if (working_set.first.size() > 0) {
+	if (lagrange_mults != nullptr)
+	{
+		auto result = reduce_working_set(working_set.first, *lagrange_mults);
+		working_set.first = result.first;
+		converged = result.second;
+	}
 
-		if (lagrange_mults != nullptr)
-		{
-			auto result = reduce_working_set(working_set.first, *lagrange_mults);
-			working_set.first = result.first;
-			converged = result.second;
-		}
+    Mat mat;
+    if (working_set.first.size() > 0) 
+	{
+		// StoSAG method: compute sample dec var cov matrix and its pseudo inverse
+		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dec_var_names, "BASE");
+		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
-        Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies("BASE").transpose();
+		// Compute pseudoinverse using SVD (same method as objective gradient)
+		Eigen::MatrixXd s, V, U;
+		SVD_REDSVD rsvd;
+		rsvd.set_performance_log(&pfm);
+		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
-        cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies("BASE").transpose();
-        //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
-        Eigen::MatrixXd s, s_, V, U;
-        Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
-                                                         Eigen::DecompositionOptions::ComputeFullV);
-        s = svd_fac.singularValues();
-        U = svd_fac.matrixU();
-        V = svd_fac.matrixV();
-        s_ = s.asDiagonal().inverse();
-        Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
-        full_s_inv.setZero();
-		for (int i = 0; i < s.size(); i++)
-			full_s_inv(i, i) = s_(i,i);
-        delta_dv = V * full_s_inv * U.transpose();
-        //delta_oe.transposeInPlace();
-        //delta_dv.transposeInPlace();
-        Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
-        delta_dv.resize(0, 0);
-        delta_oe.resize(0, 0);
-        V.resize(0, 0);
-        U.resize(0, 0);
-        full_s_inv.resize(0, 0);
-        Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
-        oe.update_var_map();
-        map<string, int> vmap = oe.get_var_map();
-        int i = 0;
-        for (auto &n : working_set.first) {
-            working_mat.row(i) = approx_jco.row(vmap[n]);
-            i++;
-        }
-        mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
+		// Get constraint observation anomalies for all working set constraints
+		Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), working_set.first, "BASE");
+
+		// Compute StoSAG Jacobian: for each constraint i, compute grad_i = dv_cov_pseudoinv * cross_cov_vector_i
+		// where cross_cov_vector_i = 1.0 / (N-1) * (dv_anoms.transpose() * constraint_anoms_i)
+		// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd cross_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * constraint_anoms);
+
+		// Now compute Jacobian matrix: each row is the gradient of a constraint
+		Eigen::MatrixXd approx_jco = dv_cov_pseudoinv * cross_cov_matrix;
+		Eigen::MatrixXd working_mat = approx_jco.transpose();
+
+		mat = Mat(working_set.first, dec_var_names, working_mat.sparseView());
+
+		  // this is the EnOpt method
+  //      Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
+  //      Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
+
+  //      cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
+  //      Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
+  //      //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
+  //      Eigen::MatrixXd s, s_, V, U;
+  //      Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
+  //                                                       Eigen::DecompositionOptions::ComputeFullV);
+  //      s = svd_fac.singularValues();
+  //      U = svd_fac.matrixU();
+  //      V = svd_fac.matrixV();
+  //      s_ = s.asDiagonal().inverse();
+  //      Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
+  //      full_s_inv.setZero();
+		//for (int i = 0; i < s.size(); i++)
+		//	full_s_inv(i, i) = s_(i,i);
+  //      delta_dv = V * full_s_inv * U.transpose();
+  //      //delta_oe.transposeInPlace();
+  //      //delta_dv.transposeInPlace();
+  //      Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
+  //      delta_dv.resize(0, 0);
+  //      delta_oe.resize(0, 0);
+  //      V.resize(0, 0);
+  //      U.resize(0, 0);
+  //      full_s_inv.resize(0, 0);
+
+        //Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
+        //oe.update_var_map();
+        //map<string, int> vmap = oe.get_var_map();
+        //int i = 0;
+        //for (auto &n : working_set.first) {
+        //    working_mat.row(i) = approx_jco.row(vmap[n]);
+        //    i++;
+        //}
+        //mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
     }
     if (working_set.second.size() > 0)
     {
@@ -3344,10 +3538,9 @@ pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_a
 
 
 
-pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& _jco, bool do_shift, const Eigen::VectorXd* lagrange_mults, double working_set_tol)
+pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& _jco, bool do_shift, const Eigen::VectorXd* lagrange_mults, double working_set_tol, int wset_lvl)
 {
-	//double wset_tol = max(0.05, working_set_tol);
-	pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift, working_set_tol);
+	pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift, working_set_tol, wset_lvl);
 	Mat mat;
 	bool converged = false;
     if (working_set.first.size() > 0) 
@@ -3375,41 +3568,57 @@ void Constraints::augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_na
 
 }
 
-pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol) {
+pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol, int wset_lvl) {
     map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
     vector<string> working_set,working_set_pi;
     for (auto &name : ctl_ord_obs_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set.push_back(name);
-		//else
-		//{
-		//	if (abs(constraint_map[name]) < working_set_tol)
-		//		working_set.push_back(name);
-		//}
-		else if (constraint_sense_map[name] == ConstraintSense::less_than) {
-			if (constraint_map[name] < working_set_tol)
-				working_set.push_back(name);
-		}
-		else if (constraint_sense_map[name] == ConstraintSense::greater_than) {
-			if (constraint_map[name] > -working_set_tol)
-				working_set.push_back(name);
+		else
+		{
+			if (wset_lvl == 1)
+			{
+				if (abs(constraint_map[name]) < working_set_tol)
+					working_set.push_back(name);
+			}
+			else
+			{
+				if (constraint_sense_map[name] == ConstraintSense::less_than) 
+				{
+					if (constraint_map[name] < working_set_tol)
+						working_set.push_back(name);
+				}
+				else if (constraint_sense_map[name] == ConstraintSense::greater_than) 
+				{
+					if (constraint_map[name] > -working_set_tol)
+						working_set.push_back(name);
+				}
+			}
 		}
     }
     for (auto &name : ctl_ord_pi_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set_pi.push_back(name);
-		//else
-		//{
-		//	if (abs(constraint_map[name]) < working_set_tol)
-		//		working_set_pi.push_back(name);
-		//}
-		else if (constraint_sense_map[name] == ConstraintSense::less_than) {
-			if (constraint_map[name] < working_set_tol)
-				working_set_pi.push_back(name);
-		}
-		else if (constraint_sense_map[name] == ConstraintSense::greater_than) {
-			if (constraint_map[name] > -working_set_tol)
-				working_set_pi.push_back(name);
+		else
+		{
+			if (wset_lvl == 1)
+			{
+				if (abs(constraint_map[name]) < working_set_tol)
+					working_set_pi.push_back(name);
+			}
+			else
+			{
+				if (constraint_sense_map[name] == ConstraintSense::less_than)
+				{
+					if (constraint_map[name] < working_set_tol)
+						working_set_pi.push_back(name);
+				}
+				else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+				{
+					if (constraint_map[name] > -working_set_tol)
+						working_set_pi.push_back(name);
+				}
+			}
 		}
     }
     return pair<vector<string>,vector<string>>(working_set,working_set_pi);
