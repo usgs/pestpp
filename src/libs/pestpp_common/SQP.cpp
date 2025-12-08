@@ -247,7 +247,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		if (dv_names.size() > 0)
 		{
 			Covariance dv_cov = cov.get(dv_names);
-			map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
+			map<string, double> par_means = pest_scenario.get_ext_file_double_map("PARAMETER DATA EXTERNAL", MEAN_REAL_NAME);
 			Parameters draw_dv_par = pest_scenario.get_ctl_parameters().get_subset(dv_names.begin(), dv_names.end());
 
 			if (par_means.size() > 0)
@@ -286,7 +286,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		if (adj_par_names.size() > 0)
 		{
 			Covariance unc_cov = uncertain_parcov.get(adj_par_names);
-			map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
+			map<string, double> par_means = pest_scenario.get_ext_file_double_map("PARAMETER DATA EXTERNAL", MEAN_REAL_NAME);
 			Parameters draw_unc_par = pest_scenario.get_ctl_parameters().get_subset(adj_par_names.begin(), adj_par_names.end());
 
 			if (par_means.size() > 0)
@@ -424,8 +424,8 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
-				//dv.enforce_bounds(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
-			    message(1, "TODO");
+				dv.enforce_bounds(performance_log, false);
+			    //throw_sqp_error("not implemented");
 		}
 
 	}
@@ -1104,7 +1104,7 @@ void SeqQuadProgram::initialize()
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 	use_ensemble_grad = false;
-	if (ppo->get_sqp_num_reals() > 0)
+	if ((ppo->get_sqp_num_reals() > 0) || (ppo->get_sqp_dv_en().size() > 0))
 	{
 		use_ensemble_grad = true;
 		sampling_tracking_initialized = false;
@@ -1122,7 +1122,7 @@ void SeqQuadProgram::initialize()
 		cmaes.initialize(dv_names.size(), ppo->get_sqp_num_reals());
 		cmaes.set_covariance(parcov.get_matrix());
 	}
-	else if (use_cmaes && ppo->get_sqp_num_reals() <= 0)
+	else if (use_cmaes && (ppo->get_sqp_num_reals() <= 0) && (ppo->get_sqp_dv_en().size() > 0))
 	{
 		message(1, "WARNING: CMA-ES requires sqp_num_reals > 0, disabling CMA-ES for finite-difference mode");
 		use_cmaes = false;
@@ -1582,7 +1582,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), dv.get_var_names());
 		_pe.set_trans_status(dv.get_trans_status());
-		_pe.append("mean", pars);
+		_pe.append(MEAN_REAL_NAME, pars);
 		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
 		message(1, "saving mean dv values to ", par_csv);
 		_pe.to_csv(par_csv);
@@ -1590,7 +1590,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		dv_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), oe.get_var_names());
-		_oe.append("mean", pest_scenario.get_ctl_observations());
+		_oe.append(MEAN_REAL_NAME, pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 
@@ -1607,7 +1607,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		_oe.to_csv(obs_csv);
 
 
-        Eigen::VectorXd o = _oe.get_real_vector("mean");
+        Eigen::VectorXd o = _oe.get_real_vector(MEAN_REAL_NAME);
         current_obs = pest_scenario.get_ctl_observations();
         current_obs.update_without_clear(_oe.get_var_names(), o);
         save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean");
@@ -2437,19 +2437,27 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	{
 		// compute sample dec var cov matrix and its pseudo inverse
 		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
-
+		performance_log->log_event("form dv cov matrix");
 		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
 		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
+		performance_log->log_event("svd of dv cov matrix");
 		Eigen::MatrixXd s, V, U, st;
 		SVD_REDSVD rsvd;
 		rsvd.set_performance_log(performance_log);
 		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
 		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
+		// Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod(dv_cov_matrix);
+		// Eigen::MatrixXd dv_cov_pseudoinv = cod.pseudoInverse();
+
+
+
 		//objective function anomalies
 		//Note: These objective values already reflect the effect of uncertain parameters
 		//because each real includes both dec vars and uncertain params
+		performance_log->log_event("filling obj fxn anomalies");
+
 		Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
 		if (use_obj_obs) {
 			obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},BASE_REAL_NAME);

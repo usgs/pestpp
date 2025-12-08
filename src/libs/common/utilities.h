@@ -385,11 +385,15 @@ inline void ExternalCtlFile::fill_col_vector(string col_name, vector<t>& col_vec
 	}
 }
 
+
+
 string get_time_string();
 string get_time_string_short();
+bool cmp_pair(pair<string,double>& first, pair<string,double>& second);
 
 int quit_file_found();
 bool try_remove_quit_file();
+
 
 
 

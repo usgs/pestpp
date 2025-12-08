@@ -1513,6 +1513,11 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 	jout.close();
 }
 
+bool cmp_pair(pair<string,double>& first, pair<string,double>& second)
+{
+	return first.second > second.second;
+}
+
 void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data)
 {
     if (!out.good())

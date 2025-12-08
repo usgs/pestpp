@@ -1841,14 +1841,50 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 	{
 		nsize = max(nsize, int(name.size()));
 	}
+
 	ss << endl << "  observation constraint information at iteration " << iter;
 	if (tag.size() > 0)
 		ss << " for " << tag;
 	ss << endl;
 	ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
-
+	f_rec << ss.str();
+	string header = ss.str();
 	infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+	if (echo) {
+		if (infeas_dist.size() > 0) {
+			cout << header << endl;
+			vector<pair<string,double>> pairs;
+			for (auto& it : infeas_dist)
+				pairs.push_back(it);
+			sort(pairs.begin(),pairs.end(),pest_utils::cmp_pair);
+			int c = 0;
+			ss.str("");
+			for (auto& pair : pairs) {
+				string name = pair.first;
+				ss << setw(nsize) << left << name;
+				ss << setw(14) << right << constraint_sense_name[name];
+				ss << setw(12) << constraints_obs.get_rec(name);
+				ss << setw(15) << current_obs.get_rec(name);
+				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				ss << endl;
+				c++;
+				if (c >= 10)
+					break;
+			}
+			cout << ss.str() << endl;
+			if (c >= 10) {
+				cout << "Note: only the first 10 most infeasible observation constraints are shown, see rec file for full listing" << endl;
+			}
+			else {
+				cout << "Note: only infeasible observation constraints are shown, see rec file for full listing" << endl;
+			}
+		}
+		else {
+			cout << "Note: all observation constraints satisfied, see rec file for full listing" << endl;
+		}
+	}
+	ss.str("");
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
@@ -1867,10 +1903,12 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		ss << endl;
 
 	}
+	ss << endl;
+	f_rec << ss.str();
+	ss.str("");
 	
 	if (ctl_ord_pi_constraint_names.size() > 0)
 	{
-
 
 		nsize = 20;
 		for (auto name : ctl_ord_pi_constraint_names)
@@ -1886,6 +1924,44 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		ss << " --- " <<  endl;
 		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+		header = ss.str();
+		f_rec << header;
+		ss.str("");
+		if (echo) {
+			if (infeas_dist.size() > 0) {
+				cout << header << endl;
+				vector<pair<string,double>> pairs;
+				for (auto& it : infeas_dist)
+					pairs.push_back(it);
+				sort(pairs.begin(),pairs.end(),pest_utils::cmp_pair);
+				int c = 0;
+				for (auto& pair : pairs) {
+					string name = pair.first;
+					PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
+					ss << setw(nsize) << left << name;
+					ss << setw(14) << right << constraint_sense_name[name];
+					ss << setw(12) << pi_rec.get_obs_value();
+					ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+					ss << setw(11) << "false" << setw(15) << pair.second;
+					ss << endl;
+					c++;
+					if (c >= 10) {
+						break;
+					}
+				}
+				cout << ss.str() << endl;
+				if (c >= 10) {
+					cout << "Note: only the first 10 most infeasible prior info constraints are shown, see rec file for full listing" << endl;
+				}
+				else {
+					cout << "Note: only infeasible prior info constraints are shown, see rec file for full listing" << endl;
+				}
+			}
+			else {
+				cout << "Note: all prior info constraints satisfied, see rec file for full listing" << endl;
+			}
+		}
+		ss.str("");
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
 			string name = ctl_ord_pi_constraint_names[i];
@@ -1905,13 +1981,12 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 			ss << endl;
 		}
 	}
-	ss << endl;
-	f_rec << ss.str();
-	if (echo)
-		cout << ss.str();
+
+
 
 	return;
 }
+
 
 void Constraints::mou_report(int iter, Parameters& current_pars, Observations& current_obs, const vector<string>& obs_obj_names,
 	const vector<string>& pi_obj_names, bool echo)

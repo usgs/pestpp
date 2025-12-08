@@ -581,7 +581,7 @@ def mf6_phiobs_invest():
     model_d = "mf6_freyberg"
 
     org_t_d = os.path.join("..","benchmarks",model_d,"template")
-    t_d = os.path.join(model_d,"master_mf6freyberg_sqp")
+    t_d = os.path.join(model_d,"template")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     shutil.copytree(org_t_d,t_d)
@@ -594,16 +594,47 @@ def mf6_phiobs_invest():
     pst.pestpp_options["opt_objective_function"] = "composite"
     pst.observation_data.loc["composite","obgnme"] = "less_than"
     lbdf = pst.add_pars_as_obs(pst_path=t_d,par_sigma_range=4,name_prefix="parlbnd-")
-
     ubdf = pst.add_pars_as_obs(pst_path=t_d,par_sigma_range=4,name_prefix="parubnd-")
-    print(lbdf)
     obs = pst.observation_data
+    print(obs.loc[lbdf.index,"greater_than"])
     obs.loc[lbdf.index,"obgnme"] = "greater_than_parbound"
-    obs.loc[lbdf.index,"obgnme"] = "less_than_parbound"
+    wpar = [w for w in lbdf.index if "wel" in w ]
+    obs.loc[wpar,"weight"] = 0
+
+    obs.loc[lbdf.index,"obsval"] = obs.loc[lbdf.index,"greater_than"]
+    obs.loc[ubdf.index,"obgnme"] = "less_than_parbound"
+    wpar = [w for w in ubdf.index if "wel" in w ]
+    obs.loc[wpar,"weight"] = 0
+    
+    obs.loc[ubdf.index,"obsval"] = obs.loc[ubdf.index,"less_than"]
+    par = pst.parameter_data
+    org_parval1 = par.parval1.copy()
+    par["parval1"] = par["parlbnd"]
+    pyemu.helpers.zero_order_tikhonov(pst)
+    par = pst.parameter_data
+    par["parval1"] = org_parval1
+    pi = pst.prior_information
+    pi["weight"] = 0
+    wpi = [w for w in pi.index if "wel" in w]
+    assert len(wpi) > 0
+    pi.loc[wpi,"weight"] = 1.0
+    pi.loc[wpi,"obgnme"] = 'greater_than'
+    #pi.loc[wpi,"obsval"] = np.log10(par.loc[wpi,"parlbnd"].values)
+
+    pst.dialate_par_bounds(1.5)
     
     pst.control_data.noptmax = 0
     pst.write(os.path.join(t_d,"pest.pst"),version=2)
     pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=t_d)
+
+    pst.control_data.noptmax = 10
+    pst.pestpp_options["sqp_num_reals"] = 10
+    pst.write(os.path.join(t_d,"pest.pst"),version=2)
+    m_d = os.path.join(model_d,"master_sqp")
+    pyemu.os_utils.start_workers(t_d,exe_path,"pest.pst",num_workers=10,
+                                 master_dir=m_d,
+                                 worker_root=model_d)
+
     
 
 
@@ -614,7 +645,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sqp.exe"),os.path.join("..","bin","pestpp-sqp.exe"))
     #basic_sqp_test()
     #rosenbrock_single_linear_constraint(nit=1)
-    dewater_basic_test()
+    #dewater_basic_test()
     #dewater_slp_opt_test()
     #rosenc_test()
     #m_d = rosenc_test()
