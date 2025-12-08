@@ -352,40 +352,40 @@ def dewater_basic_test():
         
 
 
-def dewater_slp_opt_test():
-    model_d = "dewater"
-    local = True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        # print("travis_prep")
-        # prep_for_travis(model_d)
-        local = False
+# def dewater_slp_opt_test():
+#     model_d = "dewater"
+#     local = True
+#     if "linux" in platform.platform().lower() and "10par" in model_d:
+#         # print("travis_prep")
+#         # prep_for_travis(model_d)
+#         local = False
 
-    t_d = os.path.join(model_d, "template")
+#     t_d = os.path.join(model_d, "template")
 
-    case = "dewater_pest.base"
-    pst = pyemu.Pst(os.path.join(t_d, case + ".pst"))
-    par = pst.parameter_data
-    dv_pars = par.loc[par.pargp == "q", "parnme"].tolist()[:3]
+#     case = "dewater_pest.base"
+#     pst = pyemu.Pst(os.path.join(t_d, case + ".pst"))
+#     par = pst.parameter_data
+#     dv_pars = par.loc[par.pargp == "q", "parnme"].tolist()[:3]
     
-    pst.add_pi_equation(par_names=dv_pars, pilbl="eq3", rhs=1000, obs_group="less_than")
-    pst.pestpp_options = {}
-    pst.pestpp_options["opt_dec_var_groups"] = "q"
-    pst.control_data.noptmax = 1
-    print(pst.prior_information)
-    pst.write(os.path.join(t_d, "test_opt.pst"))
-    pyemu.os_utils.run("{0} {1}.pst".format(exe_path.replace("-sqp", "-opt"), "test_opt"), cwd=t_d)
+#     pst.add_pi_equation(par_names=dv_pars, pilbl="eq3", rhs=1000, obs_group="less_than")
+#     pst.pestpp_options = {}
+#     pst.pestpp_options["opt_dec_var_groups"] = "q"
+#     pst.control_data.noptmax = 1
+#     print(pst.prior_information)
+#     pst.write(os.path.join(t_d, "test_opt.pst"))
+#     pyemu.os_utils.run("{0} {1}.pst".format(exe_path.replace("-sqp", "-opt"), "test_opt"), cwd=t_d)
 
-    pst = pyemu.Pst(os.path.join(t_d, case + ".pst"))
-    pst.add_pi_equation(par_names=dv_pars, pilbl="eq3", rhs=1000, obs_group="less_than")
-    pst.pestpp_options = {}
-    pst.pestpp_options["opt_dec_var_groups"] = "q"
+#     pst = pyemu.Pst(os.path.join(t_d, case + ".pst"))
+#     pst.add_pi_equation(par_names=dv_pars, pilbl="eq3", rhs=1000, obs_group="less_than")
+#     pst.pestpp_options = {}
+#     pst.pestpp_options["opt_dec_var_groups"] = "q"
 
-    pst.parrep(os.path.join(t_d,"test_opt.par"))
-    pst.pestpp_options["hotstart_resfile"] = "test_opt.1.sim.rei"
-    pst.pestpp_options["base_jacobian"] = "test_opt.1.jcb"
-    pst.control_data.noptmax = 1
-    pst.write(os.path.join(t_d,"test_sqp.pst"))
-    pyemu.os_utils.run("{0} {1}.pst".format(exe_path, "test_sqp"), cwd=t_d)
+#     pst.parrep(os.path.join(t_d,"test_opt.par"))
+#     pst.pestpp_options["hotstart_resfile"] = "test_opt.1.sim.rei"
+#     pst.pestpp_options["base_jacobian"] = "test_opt.1.jcb"
+#     pst.control_data.noptmax = 1
+#     pst.write(os.path.join(t_d,"test_sqp.pst"))
+#     pyemu.os_utils.run("{0} {1}.pst".format(exe_path, "test_sqp"), cwd=t_d)
 
 
 def rosenc_test():
@@ -646,10 +646,10 @@ if __name__ == "__main__":
     #basic_sqp_test()
     #rosenbrock_single_linear_constraint(nit=1)
     #dewater_basic_test()
-    #dewater_slp_opt_test()
+    dewater_slp_opt_test()
     #rosenc_test()
     #m_d = rosenc_test()
     #m_d = os.path.join("mou_tests","master_rosenc_enopt")
     #plot_rosen(m_d)
     #mf6_freyberg_test()
-    mf6_phiobs_invest()
+    #mf6_phiobs_invest()
