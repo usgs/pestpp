@@ -18,6 +18,7 @@
 
 const string BASE_REAL_NAME = "BASE";
 const string MEDIAN_CENTER_ON_NAME = "_MEDIAN_";
+const string MEAN_REAL_NAME = "MEAN";
 
 class Ensemble
 {

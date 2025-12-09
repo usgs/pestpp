@@ -273,7 +273,6 @@ private:
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
-	bool solve_new();
 	bool solve_new_ensemble();
 
 	bool seek_feasible();
@@ -345,6 +344,7 @@ private:
 
 	vector<int> get_subset_idxs(int size, int nreal_subset);
 };
+
 
 
 

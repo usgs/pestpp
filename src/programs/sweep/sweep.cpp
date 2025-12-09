@@ -676,7 +676,7 @@ int main(int argc, char* argv[])
 
 		if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS)
 		{
-			run_manager_ptr->initialize_restart(file_manager.build_filename("rnj"));
+			run_manager_ptr->initialize_restart(file_manager.build_filename("rns"));
 		}
 		else
 		{

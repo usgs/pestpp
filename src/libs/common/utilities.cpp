@@ -1513,6 +1513,11 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 	jout.close();
 }
 
+bool cmp_pair(pair<string,double>& first, pair<string,double>& second)
+{
+	return first.second > second.second;
+}
+
 void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data)
 {
     if (!out.good())
@@ -1750,6 +1755,34 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string 
 {
 	int idx = get_row_idx(key, col_name);
 	return get_row_map(idx,include_cols);
+}
+void ExternalCtlFile::set_data_value(const string& row_name, const string &col_name, const string &value, bool forgive) {
+	map<string,int> idx_map;
+	vector<string> col_vector = get_col_string_vector(index_col_name);
+	for (int i=0;i<col_vector.size();i++) {
+		idx_map[col_vector[i]] = i;
+	}
+	if (idx_map.find(row_name) == idx_map.end()) {
+		if (forgive) {
+			return;
+		}
+		else {
+			throw_externalctrlfile_error("row_name '" + row_name + "' not found");
+		}
+	}
+	int row_idx = idx_map[row_name];
+
+
+	set<string> col_names = get_col_set();
+	if (col_names.find(col_name) == col_names.end()) {
+		if (forgive) {
+			return;
+		}
+		else {
+			throw_externalctrlfile_error("set_data_value(): col_name '"+col_name + "' not found");
+		}
+	}
+	data.at(row_idx).at(col_name) = value;
 }
 
 map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<string> include_cols)

@@ -2668,10 +2668,6 @@ string L2PhiHandler::get_summary_header()
 	return ss.str();
 }
 
-bool cmp_pair(pair<string,double>& first, pair<string,double>& second)
-{
-    return first.second > second.second;
-}
 
 vector<string> L2PhiHandler::detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag) {
     vector<string> in_conflict;
@@ -2883,7 +2879,7 @@ void L2PhiHandler::report_group(bool echo) {
         pairs.push_back(it);
 
 
-    sort(pairs.begin(),pairs.end(),cmp_pair);
+    sort(pairs.begin(),pairs.end(),pest_utils::cmp_pair);
 
     c = 0;
     int nzc = 0;

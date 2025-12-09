@@ -721,18 +721,23 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 
 bool RunManagerPanther::ping(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
+	vector<int> keys;
+	for (auto& i : socket_to_iter_map)
+		keys.push_back(i.first);
 	bool ping_sent = false;
-	for (auto &i : socket_to_iter_map)
+	//for (auto i : socket_to_iter_map)
+	for (auto k : keys)
 	{
 		if (terminate && terminate->get())
 		{
 			break;
 		}
-
-		if (ping(i.first))
-		{
-			ping_sent = true;
-	}
+		if (socket_to_iter_map.find(k) != socket_to_iter_map.end()) {
+			if (ping(k))
+			{
+				ping_sent = true;
+			}
+		}
 	}
 	return ping_sent;
 }
@@ -952,7 +957,7 @@ bool RunManagerPanther::ping(int i_sock)
 		if (fails >= MAX_FAILED_PINGS)
 		{
 			ping_sent = true;
-			report("max failed ping communications since last successful run form agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + "  -> terminating", false);
+			report("max failed ping communications since last successful run form agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + "  -> terminating", true);
 			close_agent(i_sock);
 			return ping_sent;
 		}

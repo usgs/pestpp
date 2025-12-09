@@ -388,7 +388,7 @@ int main(int argc, char* argv[])
 
 		if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS)
 		{
-			run_manager_ptr->initialize_restart(file_manager.build_filename("rnj"));
+			run_manager_ptr->initialize_restart(file_manager.build_filename("rns"));
 		}
 		else
 		{
@@ -811,7 +811,7 @@ int main(int argc, char* argv[])
 				j.drop_rows(pi_names);
 			}
 			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov,&rand_gen);
-			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
+			la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
 				cout << endl << "...drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;

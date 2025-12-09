@@ -56,7 +56,7 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 	Parameters model_parameters(par_transform.ctl2model_cp(ctl_pars));
 	base_numeric_parameters = par_transform.ctl2numeric_cp(ctl_pars);
 	if (reinitiailize)
-		run_manager.reinitialize(file_manager.build_filename("rnj"));
+		run_manager.reinitialize(file_manager.build_filename("rns"));
 	debug_msg("Jacobian_1to1::build_runs begin");
 
 	failed_parameter_names.clear();
