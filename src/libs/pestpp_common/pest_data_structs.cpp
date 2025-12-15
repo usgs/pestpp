@@ -1741,6 +1741,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_update_hessian = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SQP_HESSIAN_UPDATE_METHOD")
+	{
+		sqp_hessian_update_method = org_value;
+		return true;
+	}
 	else if (key == "SQP_SOLVE_PARTIAL_STEP")
 	{
 		sqp_solve_partial_step = pest_utils::parse_string_arg_to_bool(value);

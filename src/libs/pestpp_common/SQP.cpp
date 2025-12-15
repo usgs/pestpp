@@ -929,6 +929,12 @@ void SeqQuadProgram::initialize()
 	stringstream ss;
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
+	int subset_size = pest_scenario.get_pestpp_options().get_sqp_subset_size();
+	if (subset_size >= 0)
+		use_subset = true;
+	else 
+		use_subset = false;
+	
 	if (pp_args.find("PAR_SIGMA_RANGE") == pp_args.end())
 	{
 		message(1, "resetting par_sigma_range to 20.0");
@@ -1855,32 +1861,17 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 
 	// First term: H_k*s_k*s_k^T*H_k from Eq. 6.19, Nocedal and Wright, p. 140
 	Eigen::VectorXd Hs = H_new * s_k;
-	double denom = s_k.dot(Hs);
-	if (abs(denom) < eps) {
-		ss << "skipping BFGS update - s^T H s too small";
+	double s_dot_Hs = s_k.dot(Hs); 
+	if (abs(s_dot_Hs) < eps) {
+		ss << "skipping BFGS update - s^T H s too small" << endl;
 		performance_log->log_event(ss.str());
 		return false;
 	}
-	
-	const double max_update_norm = 1E+6;
-	double hs_outer_norm = (Hs * Hs.transpose()).norm();
-	double y_outer_norm = (y_k * y_k.transpose()).norm();
 
-	if (hs_outer_norm / abs(denom) > max_update_norm) {
-		double scale_factor = max_update_norm * abs(denom) / hs_outer_norm;
-		ss << "scaling down first BFGS term by factor: " << scale_factor << endl;
-		Hs *= sqrt(scale_factor);
-	}
+	// First term: subtract (H_k s_k s_k^T H_k) / (s_k^T H_k s_k)
+	H_new -= (Hs * Hs.transpose()) / s_dot_Hs;
 
-	if (y_outer_norm / abs(s_dot_y) > max_update_norm) {
-		double scale_factor = max_update_norm * abs(s_dot_y) / y_outer_norm;
-		ss << "scaling down second BFGS term by factor: " << scale_factor << endl;
-		y_k *= sqrt(scale_factor);
-		s_dot_y = y_k.dot(s_k); 
-	}
-
-	H_new -= (Hs * Hs.transpose()) / denom;
-	// Second term: y_k*y_k^T/(y_k^T*s_k) from Eq. 6.19, Nocedal and Wright, p. 140
+	// Second term: add (y_k y_k^T) / (y_k^T s_k) from Eq. 6.19, Nocedal and Wright, p. 140
 	H_new += (y_k * y_k.transpose()) / s_dot_y;
 
 	double hessian_norm = H_new.norm();
@@ -3795,9 +3786,18 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 			//if ((find(names.begin(), names.end(), BASE_REAL_NAME) == names.end()) && !recalc)
 			if ((rmap.find(BASE_REAL_NAME) == rmap.end()) && !recalc)
 			{
-				d.reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
-				d.add_2_row_ip(BASE_REAL_NAME, dv.get_real_vector(BASE_REAL_NAME));
-				dvs_subset->append_other_rows(d);
+				if (dvs_subset->get_real_names().size() == 0)
+				{
+					dvs_subset->reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
+					Eigen::VectorXd real_vec = dv.get_real_vector(BASE_REAL_NAME);
+					dvs_subset->update_real_ip(BASE_REAL_NAME, real_vec);
+				}
+				else
+				{
+					d.reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
+					d.add_2_row_ip(BASE_REAL_NAME, dv.get_real_vector(BASE_REAL_NAME));
+					dvs_subset->append_other_rows(d);
+				}
 			}
 			
 			for (auto& real_name : dvs_subset->get_real_names()) 
@@ -4118,7 +4118,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		{
 			throw_sqp_error("eqp_solve_method not implemented");
 		}
-		lambda = lm;
 	}
 	else  // solve unconstrained QP subproblem
 	{
@@ -4370,9 +4369,16 @@ bool SeqQuadProgram::solve_new_ensemble()
 	Observations obs_vals = current_obs;
 
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
+	vector<string> drawn_real_names = _drawn_dvs.get_real_names();
 
 	for (auto d : dv.get_real_names())
 	{
+		if (find(drawn_real_names.begin(), drawn_real_names.end(), d) == drawn_real_names.end() && d != BASE_REAL_NAME)
+		{
+			message(2, "skipping search direction calc for realization ", d);
+			continue;
+		}
+
 		ss.str("");
 		ss << "...calculating search direction for realization " << d << endl;
 		frec << ss.str();
@@ -4393,6 +4399,9 @@ bool SeqQuadProgram::solve_new_ensemble()
 		pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
 		search_d_en[d] = x.first;
 		lm_en[d] = x.second;
+
+		if (d == BASE_REAL_NAME)
+			lambda = lm_en[d];
 
 		Eigen::VectorXd unscaled_search_d = search_d_en[d];
 		if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
