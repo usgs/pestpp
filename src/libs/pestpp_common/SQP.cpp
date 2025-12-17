@@ -1156,6 +1156,16 @@ void SeqQuadProgram::initialize()
 	message(2, "calculating initial objective function gradient");
 	current_grad_vector = calc_gradient_vector(current_ctl_dv_values);
 	grad_vector_map[0] = current_grad_vector;
+
+	if (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG")
+	{
+		message(2, "calculating initial objective function hessian");
+		calc_objective_hessian();
+		ss.str("");
+		ss << "StoSAG-approx hessian: " << endl << hessian << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << ss.str() << endl;
+	}
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
@@ -1794,6 +1804,226 @@ bool SeqQuadProgram::hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k
 
 }
 
+bool SeqQuadProgram::calc_objective_hessian()
+{
+	message(1, "starting StoSAG hessian approximation for iteration ", iter);
+
+	if (!use_ensemble_grad)
+	{
+		message(1, "StoSAG Hessian requires ensemble gradient mode - skipping");
+		return false;
+	}
+
+	
+	if (dv.shape().first < 2)
+	{
+		message(1, "insufficient ensemble size for StoSAG Hessian - need at least 2 realizations");
+		return false;
+	}
+
+	// get decvar anomalies
+	performance_log->log_event("computing StoSAG Hessian from ensemble covariance");
+	Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
+	Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+
+	// Get obj func anomalies
+	Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
+	if (use_obj_obs) 
+	{
+		obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, BASE_REAL_NAME);
+	}
+	else
+	{
+		dv.update_var_map();
+		map<string, int> vmap = dv.get_var_map();
+		Eigen::VectorXd real;
+		double oval;
+		int i = 0;
+		for (auto& real_name : dv.get_real_names())
+		{
+			oval = 0;
+			real = dv.get_real_vector(real_name);
+			for (auto& dv_name : dv_names)
+			{
+				oval += obj_func_coef_map.at(dv_name) * real(vmap.at(dv_name));
+			}
+			obj_anoms(i, 0) = oval;
+			i++;
+		}
+		obj_anoms.array() -= obj_anoms.mean();
+	}
+
+	// Compute objective variance for scaling
+	double obj_variance = obj_anoms.squaredNorm() / (dv.shape().first - 1.0);
+
+	// use inverse of decvar cov scaled by obj var
+	// H ~ (1/σ^2_obj) * C_dv^(-1)
+	// this assumes the Hessian is proportional to the inv cov
+	Eigen::MatrixXd s, V, U;
+	SVD_REDSVD rsvd;
+	rsvd.set_performance_log(performance_log);
+	rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+
+	
+	Eigen::MatrixXd dv_cov_inv = V * s.asDiagonal().inverse() * U.transpose();
+	double scale_factor = 1.0;
+	if (obj_variance > 1E-10)
+	{
+		scale_factor = 1.0 / obj_variance;
+	}
+	else
+	{
+		message(1, "warning: very small objective variance, using unscaled Hessian");
+	}
+
+	Eigen::MatrixXd H_stosag = scale_factor * dv_cov_inv;
+
+	// ensure positive definiteness
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(H_stosag);
+	if (eigensolver.info() != Eigen::Success)
+	{
+		message(1, "eigenvalue decomposition failed for StoSAG Hessian");
+		return false;
+	}
+
+	Eigen::VectorXd eigenvalues = eigensolver.eigenvalues();
+	double min_eig = eigenvalues.minCoeff();
+	const double min_allowed_eig = 1e-3;
+
+	if (min_eig < min_allowed_eig)
+	{
+		double tau = 2 * abs(min_eig) + min_allowed_eig;
+		H_stosag += tau * Eigen::MatrixXd::Identity(H_stosag.rows(), H_stosag.cols());
+		message(1, "Modified StoSAG Hessian to ensure positive definiteness. tau = ", tau);
+	}
+
+	hessian = Covariance(dv_names, H_stosag.sparseView());
+
+	double cond = eigenvalues.maxCoeff() / eigenvalues.minCoeff();
+	message(1, "StoSAG Hessian condition number: ", cond);
+
+	return true;
+	
+	
+}
+
+bool SeqQuadProgram::recompute_hessian(vector<string> wset, Eigen::VectorXd lgrg_mults)
+{
+	stringstream ss;
+	if (!pest_scenario.get_pestpp_options().get_sqp_update_hessian())
+		return false;
+
+
+	if (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() != "STOSAG")
+		return false;
+
+	performance_log->log_event("recomputing Hessian using ensemble member Lagrange multipliers");
+	Eigen::MatrixXd H_obj = *hessian.e_ptr();
+
+	if (wset.empty() || lgrg_mults.size() == 0)
+	{
+		performance_log->log_event("no constraints, using objective Hessian");
+		return true;
+	}
+
+	// get decvar anomalies for StoSAG constraint grad calc
+	Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
+	if (dv_anoms.rows() < 2) 
+	{
+		throw_sqp_error("recompute_hessian: insufficient ensemble size");
+	}
+
+	Eigen::MatrixXd dv_cov = 1.0 / (dv_anoms.rows() - 1.0) * (dv_anoms.transpose() * dv_anoms);
+	Eigen::MatrixXd s, V, U;
+	SVD_REDSVD rsvd;
+	rsvd.set_performance_log(performance_log);
+	rsvd.solve_ip(dv_cov, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	Eigen::MatrixXd dv_cov_inv = V * s.asDiagonal().inverse() * U.transpose();
+	Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), wset, BASE_REAL_NAME);
+	Eigen::MatrixXd cross_cov_c = 1.0 / (dv_anoms.rows() - 1.0) * (dv_anoms.transpose() * constraint_anoms);
+	Eigen::MatrixXd constraint_grads = dv_cov_inv * cross_cov_c;  // Each column is ∇c_i
+
+	// Lagrangian Hessian: H_L = H_f + Σ λ_i · H_c_i
+	// we don't have H_c_i (constraint Hessians)... approximate using: H_L ~ H_f + correction_term
+
+	Eigen::MatrixXd H_lagrangian = H_obj; //objective hessian equals lagrangian hessian if unconstrained
+
+	// simple approx: Add a rank-1 update based on constraint gradients
+	// H_L ~ H_f + Σ λ_i · (∇c_i · ∇c_i^T)
+	//for (int i = 0; i < lgrg_mults.size() && i < constraint_grads.cols(); i++)
+	//{
+	//	if (lgrg_mults(i) > 0) 
+	//	{
+	//		Eigen::VectorXd grad_c_i = constraint_grads.col(i);
+	//		H_lagrangian += lgrg_mults(i) * (grad_c_i * grad_c_i.transpose());
+	//	}
+	//}
+
+	// H_L ~ H_f + C_dv^(-1) * C_constraint * diag(λ) * C_constraint^T * C_dv^(-1)
+	if (lgrg_mults.size() > 0 && constraint_anoms.cols() > 0)
+	{
+		Eigen::VectorXd lambda_pos = lgrg_mults.cwiseMax(0.0);
+
+		if (lambda_pos.sum() > 1e-10)
+		{
+			// C_constraint * diag(λ) * C_constraint^T = Σ_i λ_i * (cross_cov_c.col(i) * cross_cov_c.col(i)^T)
+			Eigen::MatrixXd constraint_contribution = Eigen::MatrixXd::Zero(dv_names.size(), dv_names.size());
+			for (int i = 0; i < lambda_pos.size() && i < cross_cov_c.cols(); i++)
+			{
+				if (lambda_pos(i) > 1e-10)
+				{
+					Eigen::VectorXd c_i = cross_cov_c.col(i);
+					constraint_contribution += lambda_pos(i) * (c_i * c_i.transpose());
+				}
+			}
+
+			Eigen::MatrixXd temp = dv_cov_inv * constraint_contribution;
+			Eigen::MatrixXd constraint_hessian_correction = temp * dv_cov_inv;
+
+			H_lagrangian += constraint_hessian_correction;
+		}
+	}
+
+	H_lagrangian = 0.5 * (H_lagrangian + H_lagrangian.transpose());
+
+	// ensure positive definiteness
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(H_lagrangian);
+	if (eig.info() == Eigen::Success) {
+		Eigen::VectorXd eigenvalues = eig.eigenvalues();
+		double min_eig = eigenvalues.minCoeff();
+		const double min_allowed = 1e-3;
+
+		if (min_eig < min_allowed) {
+			double tau = std::max(min_allowed - min_eig, min_allowed);
+			H_lagrangian += tau * Eigen::MatrixXd::Identity(H_lagrangian.rows(), H_lagrangian.cols());
+			ss.str("");
+			ss << "recompute_hessian: PD fix, min_eig= " << min_eig << ", tau=" << tau;
+			performance_log->log_event(ss.str());
+			
+			eig.compute(H_lagrangian);
+			if (eig.info() != Eigen::Success) 
+			{
+				performance_log->log_event("recompute_hessian: eig recomputation failed after PD fix");
+				return false;
+			}
+			eigenvalues = eig.eigenvalues();
+		}
+
+		hessian = Covariance(dv_names, H_lagrangian.sparseView());
+
+		double cond = eigenvalues.maxCoeff() / eigenvalues.minCoeff();
+		ss.str("");
+		ss << "recompute_hessian: updated Lagrangian Hessian, cond= " << cond << ", min_eig= " << eigenvalues.minCoeff();
+		performance_log->log_event(ss.str());
+		return true;
+	}
+	else 
+	{
+		message(1, "WARNING: recompute_hessian failed");
+		return false;
+	}
+}
+
 bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian)
 {
 	stringstream ss;
@@ -1909,6 +2139,9 @@ bool SeqQuadProgram::update_hessian(string how)
 		message(2, "hessian_update is false...");
 		return false;
 	}
+
+	if (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG")
+		return false;
 
 	Covariance old_hessian = hessian;
 
@@ -2198,6 +2431,17 @@ void SeqQuadProgram::iterate_2_solution()
 
 		grad_vector_map[iter] = calc_gradient_vector(current_ctl_dv_values);
 		current_grad_vector = grad_vector_map.at(iter);
+
+		
+		if (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG")
+		{
+			//approx hessian here using the ensemble
+			message(2, "calculating objective function hessian");
+			calc_objective_hessian();
+			ss.str("");
+			ss << "StoSAG-approx hessian: " << endl << hessian << endl;
+			frec << ss.str() << endl;
+		}
 
         constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
@@ -4069,6 +4313,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 				}
 
 				constr_jco = reduced_constr_jco;
+				if (_constraint_jco != nullptr)
+				{
+					*_constraint_jco = constr_jco;
+				}
 				constraint_diff = reduced_constraint_diff;
 				Cnames = reduced_Cnames;
 
@@ -4172,8 +4420,8 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			Eigen::VectorXd prior_sd = search_d_en[rname];
 			double prior_search_d_norm = search_d_en[rname].norm();
 
-			constraint_jco = constraint_mat_en[rname].first.e_ptr()->toDense();
-			pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco, &cnames_en[rname]);
+			constraint_jco_en[rname] = constraint_mat_en[rname].first.e_ptr()->toDense();
+			pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[rname], &cnames_en[rname]);
 			search_d_en[rname] = x.first;
 			lm_en[rname] = x.second;
 
@@ -4364,7 +4612,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 		_avail_dvs.drop_rows({ par_name }, true);
 	}
 
-	Covariance old_hessian = hessian;
+	base_hessian = hessian;
 	Parameters dv_vals = current_ctl_dv_values;
 	Observations obs_vals = current_obs;
 
@@ -4396,12 +4644,37 @@ bool SeqQuadProgram::solve_new_ensemble()
 		constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
 		current_obj_en[d] = get_obj_value(dv_vals, obs_vals);
 
+		//first pass: Compute initial lambda with approx obj hessian (equal to lagrangian hess if unconstrained)
 		pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
 		search_d_en[d] = x.first;
 		lm_en[d] = x.second;
 
 		if (d == BASE_REAL_NAME)
 			lambda = lm_en[d];
+
+		//need to drop negative mults
+		while (true)
+		{
+			bool changed = recalc_search_direction_vector(d, dv_vals, obs_vals, grad);
+			if (!changed)
+				break;
+		}
+		// now, lm_en[d] has non-negative lambdas with correct working set and cnames_en[d] reflects a more accurate active constraints
+
+		// recompute hessian but tis time with lagrange correction to account for active constraints at each ensemble member
+		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian() &&
+			pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG")
+		{
+			message(2, "recomputing Hessian for realization ", d);
+			recompute_hessian(cnames_en[d], lm_en[d]);
+		}
+
+		// second pass: now compute search dir using an approximate Lagrangian hessian
+		x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
+		search_d_en[d] = x.first;
+		lm_en[d] = x.second;
+
+		// thinking this can be done for many iterative passes, but could be expensive - would be cool to try tho?
 
 		Eigen::VectorXd unscaled_search_d = search_d_en[d];
 		if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
@@ -4455,6 +4728,12 @@ bool SeqQuadProgram::solve_new_ensemble()
 			bool changed = recalc_search_direction_vector(d, dv_vals, obs_vals, grad);
 			if (!changed)
 				break;
+		}
+
+		if (d == BASE_REAL_NAME)
+		{
+			lambda = lm_en[d];
+			base_hessian = hessian;
 		}
 	}
 
@@ -5103,6 +5382,8 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 	ss << "   phi: " << last_best << ", violation: " << last_viol;
 	message(1, ss.str());
 
+	cnames_base = cnames_en[selected.real_name];
+	lm_base = lm_en[selected.real_name];
 	Parameters p;
 	Observations o;
 

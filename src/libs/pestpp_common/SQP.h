@@ -226,7 +226,7 @@ private:
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;
-
+	
 	Parameters current_grad_vector;
 	map<int, Parameters> grad_vector_map;
 
@@ -244,6 +244,8 @@ private:
 	map<string, Eigen::VectorXd> search_d_en, lm_en;
 	map<string, double> current_obj_en;
 	map<string, Eigen::MatrixXd> constraint_jco_en;
+	vector<string> cnames_base;
+	Eigen::VectorXd lm_base;
 
 	void save_current_dv_obs();
 
@@ -260,7 +262,7 @@ private:
 	bool seek_ies = false;
 
 	Jacobian_1to1 jco;
-	Covariance hessian;
+	Covariance hessian, base_hessian;
 
 	SqpFilter filter;
 
@@ -273,6 +275,8 @@ private:
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
+	bool calc_objective_hessian();
+	bool recompute_hessian(vector<string> wset, Eigen::VectorXd lgrg_mults);
 	bool solve_new_ensemble();
 
 	bool seek_feasible();
