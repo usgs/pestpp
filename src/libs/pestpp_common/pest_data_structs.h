@@ -381,6 +381,8 @@ public:
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 	int get_sqp_subset_size()const { return sqp_subset_size; }
 	void set_sqp_subset_size(int _num_reals) { sqp_subset_size = _num_reals; }
+	string get_sqp_subset_how() const { return sqp_subset_how; }
+	void set_sqp_subset_how(string _how) { sqp_subset_how = _how; }
 	bool get_sqp_update_hessian()const { return sqp_update_hessian; }
 	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
 	string get_sqp_hessian_update_method()const { return sqp_hessian_update_method; }
@@ -431,6 +433,8 @@ public:
 	void set_sqp_cma_parent_num(int _num) { sqp_cma_parent_num = _num; }
 	double get_sqp_risk() const { return sqp_risk; }
 	void set_sqp_risk(double val) { sqp_risk = val; }
+	double get_sqp_powell_damping_factor() const { return sqp_powell_damping_factor; }
+	void set_sqp_powell_damping_factor(double val) { sqp_powell_damping_factor = val; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -837,6 +841,7 @@ private:
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
 	string sqp_search_method;
+	string sqp_subset_how;
 	int sqp_num_reals;
 	int sqp_subset_size;
 	bool sqp_update_hessian;
@@ -866,6 +871,7 @@ private:
 	bool sqp_rescale_search_dir;
 	int sqp_seek_feas_max_iter;
 	double sqp_risk;
+	double sqp_powell_damping_factor;
 
 	int mou_population_size;
 	string mou_generator; 

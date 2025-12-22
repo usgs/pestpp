@@ -263,6 +263,8 @@ private:
 
     void initialize_chance_schedule(ofstream& frec);
 
+	pair<Eigen::MatrixXd, Eigen::VectorXd> compute_constraint_aware_covariance(ParameterEnsemble& dv, ObservationEnsemble& oe,	const vector<string>& working_set_constraints, const Eigen::MatrixXd& objective_cov);
+	Eigen::VectorXd compute_constraint_weights(ObservationEnsemble& oe, const vector<string>& working_set_constraints, int n_reals);
 
 };
 #endif

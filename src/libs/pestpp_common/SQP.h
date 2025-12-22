@@ -181,7 +181,6 @@ private:
     bool SOLVE_EACH_REAL = false;
     double par_sigma_max = 100;
 	bool reset_corr = false;
-	int fcount = 0;
 
     double par_sigma_min = 10;
 	double eigthresh;
@@ -213,8 +212,10 @@ private:
 	double working_set_tol;
 	double sqp_risk;
 
-	map<string, double> obj_map;
-	map<string, double> total_viol_map;
+	map<string, double> obj_map, total_viol_map;
+	map<string, Eigen::VectorXd>  step_length_map;
+	map<string, string> ls_parent_map;
+	bool is_good_search = false;
 
 	int warn_min_reals, error_min_reals;
 
@@ -244,6 +245,7 @@ private:
 	map<string, Eigen::VectorXd> search_d_en, lm_en;
 	map<string, double> current_obj_en;
 	map<string, Eigen::MatrixXd> constraint_jco_en;
+	map<string, Covariance> hessian_en;
 	vector<string> cnames_base;
 	Eigen::VectorXd lm_base;
 
@@ -262,7 +264,9 @@ private:
 	bool seek_ies = false;
 
 	Jacobian_1to1 jco;
-	Covariance hessian, base_hessian;
+	Covariance hessian, used_hessian;
+	Eigen::VectorXd step_k;
+	string selected_ls_parent;
 
 	SqpFilter filter;
 
@@ -275,15 +279,12 @@ private:
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
-	bool calc_objective_hessian();
-	bool recompute_hessian(vector<string> wset, Eigen::VectorXd lgrg_mults);
+	Covariance calc_objective_hessian();
 	bool solve_new_ensemble();
 
 	bool seek_feasible();
-	bool line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad);
 	FilterRec line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	bool iterative_partial_step(const string& _blocking_constraint);
-	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
 	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool recalc = true);
 	FilterRec pick_from_filter_by_merit(SqpFilter _filtered);

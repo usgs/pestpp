@@ -1731,6 +1731,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_num_reals);
 		return true;
 	}
+	else if (key == "SQP_SUBSET_HOW")
+	{
+		convert_ip(value, sqp_subset_how);
+		return true;
+	}
 	else if (key == "SQP_SUBSET_SIZE")
 	{
 		convert_ip(value, sqp_subset_size);
@@ -1867,6 +1872,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	else if (key == "SQP_RISK")
 	{
 		convert_ip(value, sqp_risk);
+		return true;
+	}
+	else if (key == "SQP_POWELL_DAMPING_FACTOR")
+	{
+		convert_ip(value, sqp_powell_damping_factor);
 		return true;
 	}
 	return false;
@@ -2033,6 +2043,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
 	os << "sqp_search_method: " << sqp_search_method << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
+	os << "sqp_subset_how: " << sqp_subset_how << endl;
 	os << "sqp_subset_size: " << sqp_subset_size << endl;
 	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
 	os << "sqp_hessian_update_method: " << sqp_hessian_update_method << endl;
@@ -2061,6 +2072,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_rescale_search_dir: " << sqp_rescale_search_dir << endl;
 	os << "sqp_seek_feas_max_iter: " << sqp_seek_feas_max_iter << endl;
 	os << "sqp_risk: " << sqp_risk << endl;
+	os << "sqp_powell_damping_factor: " << sqp_powell_damping_factor << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2293,6 +2305,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_search_method("LINE");
 	set_sqp_num_reals(-1);
+	set_sqp_subset_how("FIRST");
 	set_sqp_subset_size(-10);
 	set_sqp_update_hessian(true);
 	set_sqp_hessian_update_method("BFGS");
@@ -2310,7 +2323,7 @@ void PestppOptions::set_defaults()
 	set_sqp_max_reinflation_cond_num(500.0);
 	set_sqp_scale_up_factor(1.0);
 	set_sqp_scale_down_factor(1.0);
-	set_sqp_hess_max_cond_num(1E+5);
+	set_sqp_hess_max_cond_num(1E+8);
 	set_sqp_save_cov_every(-1);
 	set_sqp_enforce_bounds(false);
 	set_sqp_viol_pad(1E-4);
@@ -2319,6 +2332,7 @@ void PestppOptions::set_defaults()
 	set_sqp_rescale_search_dir(true);
 	set_sqp_seek_feas_max_iter(3);
 	set_sqp_risk(0.50);
+	set_sqp_powell_damping_factor(0.2);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

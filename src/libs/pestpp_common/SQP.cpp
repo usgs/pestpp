@@ -1156,16 +1156,6 @@ void SeqQuadProgram::initialize()
 	message(2, "calculating initial objective function gradient");
 	current_grad_vector = calc_gradient_vector(current_ctl_dv_values);
 	grad_vector_map[0] = current_grad_vector;
-
-	if (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG")
-	{
-		message(2, "calculating initial objective function hessian");
-		calc_objective_hessian();
-		ss.str("");
-		ss << "StoSAG-approx hessian: " << endl << hessian << endl;
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << ss.str() << endl;
-	}
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
@@ -1193,10 +1183,20 @@ void SeqQuadProgram::initialize()
 		seek_feasible();
 	}
 	
-	message(2, "initializing hessian matrix with identity");
+
+	message(2, "calculating initial objective function hessian");
+	hessian = calc_objective_hessian();
+	ss.str("");
+	ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;
+	Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
+	ss << hessian_dense << endl;
+	ofstream& frec = file_manager.rec_ofstream();
+	frec << ss.str() << endl;
+
+	/*message(2, "initializing hessian matrix with identity");
 	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
 	h.setIdentity();
-	hessian = Covariance(dv_names, h);
+	hessian = Covariance(dv_names, h);*/
 	message(0, "initialization complete");
 }
 
@@ -1387,9 +1387,7 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 			message(1, "dropping covariance elements in C");
 			cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
 			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
-			reset_corr = false;
-			fcount = 0;
-				
+			reset_corr = false;				
 		}
 		else if (seek_ies)
 		{
@@ -1804,29 +1802,27 @@ bool SeqQuadProgram::hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k
 
 }
 
-bool SeqQuadProgram::calc_objective_hessian()
+Covariance SeqQuadProgram::calc_objective_hessian()
 {
 	message(1, "starting StoSAG hessian approximation for iteration ", iter);
 
 	if (!use_ensemble_grad)
 	{
 		message(1, "StoSAG Hessian requires ensemble gradient mode - skipping");
-		return false;
+		return Covariance();
 	}
 
 	
 	if (dv.shape().first < 2)
 	{
 		message(1, "insufficient ensemble size for StoSAG Hessian - need at least 2 realizations");
-		return false;
+		return Covariance();
 	}
 
-	// get decvar anomalies
 	performance_log->log_event("computing StoSAG Hessian from ensemble covariance");
 	Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
 	Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
-	// Get obj func anomalies
 	Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
 	if (use_obj_obs) 
 	{
@@ -1878,12 +1874,11 @@ bool SeqQuadProgram::calc_objective_hessian()
 
 	Eigen::MatrixXd H_stosag = scale_factor * dv_cov_inv;
 
-	// ensure positive definiteness
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(H_stosag);
 	if (eigensolver.info() != Eigen::Success)
 	{
 		message(1, "eigenvalue decomposition failed for StoSAG Hessian");
-		return false;
+		return Covariance();
 	}
 
 	Eigen::VectorXd eigenvalues = eigensolver.eigenvalues();
@@ -1897,131 +1892,12 @@ bool SeqQuadProgram::calc_objective_hessian()
 		message(1, "Modified StoSAG Hessian to ensure positive definiteness. tau = ", tau);
 	}
 
-	hessian = Covariance(dv_names, H_stosag.sparseView());
+	Covariance obj_hessian = Covariance(dv_names, H_stosag.sparseView());
 
 	double cond = eigenvalues.maxCoeff() / eigenvalues.minCoeff();
 	message(1, "StoSAG Hessian condition number: ", cond);
 
-	return true;
-	
-	
-}
-
-bool SeqQuadProgram::recompute_hessian(vector<string> wset, Eigen::VectorXd lgrg_mults)
-{
-	stringstream ss;
-	if (!pest_scenario.get_pestpp_options().get_sqp_update_hessian())
-		return false;
-
-
-	if (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() != "STOSAG")
-		return false;
-
-	performance_log->log_event("recomputing Hessian using ensemble member Lagrange multipliers");
-	Eigen::MatrixXd H_obj = *hessian.e_ptr();
-
-	if (wset.empty() || lgrg_mults.size() == 0)
-	{
-		performance_log->log_event("no constraints, using objective Hessian");
-		return true;
-	}
-
-	// get decvar anomalies for StoSAG constraint grad calc
-	Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
-	if (dv_anoms.rows() < 2) 
-	{
-		throw_sqp_error("recompute_hessian: insufficient ensemble size");
-	}
-
-	Eigen::MatrixXd dv_cov = 1.0 / (dv_anoms.rows() - 1.0) * (dv_anoms.transpose() * dv_anoms);
-	Eigen::MatrixXd s, V, U;
-	SVD_REDSVD rsvd;
-	rsvd.set_performance_log(performance_log);
-	rsvd.solve_ip(dv_cov, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	Eigen::MatrixXd dv_cov_inv = V * s.asDiagonal().inverse() * U.transpose();
-	Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), wset, BASE_REAL_NAME);
-	Eigen::MatrixXd cross_cov_c = 1.0 / (dv_anoms.rows() - 1.0) * (dv_anoms.transpose() * constraint_anoms);
-	Eigen::MatrixXd constraint_grads = dv_cov_inv * cross_cov_c;  // Each column is ∇c_i
-
-	// Lagrangian Hessian: H_L = H_f + Σ λ_i · H_c_i
-	// we don't have H_c_i (constraint Hessians)... approximate using: H_L ~ H_f + correction_term
-
-	Eigen::MatrixXd H_lagrangian = H_obj; //objective hessian equals lagrangian hessian if unconstrained
-
-	// simple approx: Add a rank-1 update based on constraint gradients
-	// H_L ~ H_f + Σ λ_i · (∇c_i · ∇c_i^T)
-	//for (int i = 0; i < lgrg_mults.size() && i < constraint_grads.cols(); i++)
-	//{
-	//	if (lgrg_mults(i) > 0) 
-	//	{
-	//		Eigen::VectorXd grad_c_i = constraint_grads.col(i);
-	//		H_lagrangian += lgrg_mults(i) * (grad_c_i * grad_c_i.transpose());
-	//	}
-	//}
-
-	// H_L ~ H_f + C_dv^(-1) * C_constraint * diag(λ) * C_constraint^T * C_dv^(-1)
-	if (lgrg_mults.size() > 0 && constraint_anoms.cols() > 0)
-	{
-		Eigen::VectorXd lambda_pos = lgrg_mults.cwiseMax(0.0);
-
-		if (lambda_pos.sum() > 1e-10)
-		{
-			// C_constraint * diag(λ) * C_constraint^T = Σ_i λ_i * (cross_cov_c.col(i) * cross_cov_c.col(i)^T)
-			Eigen::MatrixXd constraint_contribution = Eigen::MatrixXd::Zero(dv_names.size(), dv_names.size());
-			for (int i = 0; i < lambda_pos.size() && i < cross_cov_c.cols(); i++)
-			{
-				if (lambda_pos(i) > 1e-10)
-				{
-					Eigen::VectorXd c_i = cross_cov_c.col(i);
-					constraint_contribution += lambda_pos(i) * (c_i * c_i.transpose());
-				}
-			}
-
-			Eigen::MatrixXd temp = dv_cov_inv * constraint_contribution;
-			Eigen::MatrixXd constraint_hessian_correction = temp * dv_cov_inv;
-
-			H_lagrangian += constraint_hessian_correction;
-		}
-	}
-
-	H_lagrangian = 0.5 * (H_lagrangian + H_lagrangian.transpose());
-
-	// ensure positive definiteness
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(H_lagrangian);
-	if (eig.info() == Eigen::Success) {
-		Eigen::VectorXd eigenvalues = eig.eigenvalues();
-		double min_eig = eigenvalues.minCoeff();
-		const double min_allowed = 1e-3;
-
-		if (min_eig < min_allowed) {
-			double tau = std::max(min_allowed - min_eig, min_allowed);
-			H_lagrangian += tau * Eigen::MatrixXd::Identity(H_lagrangian.rows(), H_lagrangian.cols());
-			ss.str("");
-			ss << "recompute_hessian: PD fix, min_eig= " << min_eig << ", tau=" << tau;
-			performance_log->log_event(ss.str());
-			
-			eig.compute(H_lagrangian);
-			if (eig.info() != Eigen::Success) 
-			{
-				performance_log->log_event("recompute_hessian: eig recomputation failed after PD fix");
-				return false;
-			}
-			eigenvalues = eig.eigenvalues();
-		}
-
-		hessian = Covariance(dv_names, H_lagrangian.sparseView());
-
-		double cond = eigenvalues.maxCoeff() / eigenvalues.minCoeff();
-		ss.str("");
-		ss << "recompute_hessian: updated Lagrangian Hessian, cond= " << cond << ", min_eig= " << eigenvalues.minCoeff();
-		performance_log->log_event(ss.str());
-		return true;
-	}
-	else 
-	{
-		message(1, "WARNING: recompute_hessian failed");
-		return false;
-	}
+	return obj_hessian;
 }
 
 bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian)
@@ -2032,12 +1908,11 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 	message(2, "");
 	message(1, "starting BFGS hessian update for iteration ", iter);
 
-	const double eps = 1e-5;
-	const double max_condition = 1e8;
-	const double damping_factor = 0.2;
-	const double max_scale = 1e6;  
-	const double min_s_dot_y = 1e-8;  
-	const double max_hessian_norm = 1e10;
+	const double eps = 1E-5;
+	const double damping_factor = pest_scenario.get_pestpp_options().get_sqp_powell_damping_factor();
+	const double max_scale = 1E6;  
+	const double min_s_dot_y = 1E-8;  
+	const double max_hessian_norm = 1E10;
 
 	if (s_k.norm() < eps || y_k.norm() < eps)
 	{
@@ -2045,6 +1920,41 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 		message(1, "skipping BFGS update - step or gradient difference too small");
 		performance_log->log_event(ss.str());
 		return false;
+	}
+
+	if (seek_ies)
+	{
+		bool stosag_success = false;
+		if (use_ensemble_grad && dv.shape().first >= 2)
+		{
+			Covariance obj_hessian = calc_objective_hessian();
+			if (obj_hessian.get_col_names().empty())
+			{
+				stosag_success = true;
+				ss.str("");
+				ss << "successfully computed StoSAG-approximated Hessian" << endl;
+				message(1, ss.str());
+			}
+			else
+			{
+				ss.str("");
+				ss << "StoSAG Hessian computation failed, falling back to identity" << endl;
+				message(1, ss.str());
+			}
+		}
+
+		if (!stosag_success)
+		{
+			message(1, "resetting Hessian to identity");
+			Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+			h.setIdentity();
+			hessian = Covariance(dv_names, h);
+		}
+		ss.str("");
+		ss << "BFGS Hessian update skipped (seek_ies mode)" << endl;
+		message(2, "BFGS Hessian update skipped (seek_ies mode)");
+		performance_log->log_event(ss.str());
+		return true;
 	}
 
 	// Check curvature condition and apply Powell's damping if needed
@@ -2066,17 +1976,21 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 
 		if (s_dot_y < min_s_dot_y * s_k.norm() * y_k.norm())
 		{
+			ss.str("");
 			ss << "skipping BFGS update - s^T y too small even after damping" << endl;
+			message(1, ss.str());
 			return false;
 		}
 	}
 
 	// BFGS Update formula with scaling
-	Eigen::MatrixXd H = *old_hessian.e_ptr();
+	Eigen::MatrixXd H = regularize_hessian(*old_hessian.e_ptr(), "BFGS update");
 	Eigen::MatrixXd H_new = H;
 
 	// Initial scaling factor (Nocedal & Wright scaling)
-	if (iter == 1)
+	Eigen::MatrixXd H_identity = Eigen::MatrixXd::Identity(H.rows(), H.cols());
+	bool is_identity = H.isApprox(H_identity, 1E-6);
+	if (is_identity || iter == 1)
 	{
 		double scale = s_dot_y / (y_k.squaredNorm());
 		
@@ -2087,6 +2001,7 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 
 		H_new *= scale;
 		ss << "applying initial scaling factor: " << scale << endl;
+		performance_log->log_event(ss.str());
 	}
 
 	// First term: H_k*s_k*s_k^T*H_k from Eq. 6.19, Nocedal and Wright, p. 140
@@ -2106,25 +2021,27 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 
 	double hessian_norm = H_new.norm();
 
-	if (hessian_norm > max_hessian_norm) {
+	if (hessian_norm > max_hessian_norm) 
+	{
+		ss.str("");
 		ss << "BFGS update created very large Hessian norm: " << hessian_norm << endl;
 		message(1, ss.str());
 	}
 
-	H_new = regularize_hessian(H_new, "BFGS update");
-
-	if (seek_ies)
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_H(H_new);
+	double cond_H = eig_H.eigenvalues().maxCoeff() / eig_H.eigenvalues().minCoeff();
+	const double max_condition_warning = pest_scenario.get_pestpp_options().get_sqp_hess_max_cond_num() * 1E-2;
+	if (cond_H > max_condition_warning) 
 	{
-		message(1, "resetting Hessian to identity");
-		Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-		h.setIdentity();
-		hessian = Covariance(dv_names, h);
+		ss.str("");
+		ss << "WARNING: BFGS Hessian condition number large: " << cond_H << endl;
+		message(2, ss.str());
 	}
-	else
-		hessian = Covariance(dv_names, H_new.sparseView());
+	
+	hessian = Covariance(dv_names, H_new.sparseView());
+	ss.str("");
 	ss << "BFGS Hessian update complete" << endl;
 	message(2, "BFGS Hessian update complete");
-	performance_log->log_event(ss.str());
 
 	return true;
 }
@@ -2150,7 +2067,7 @@ bool SeqQuadProgram::update_hessian(string how)
 	
 	//compute gradient difference (y_k) and step (s_k): Eq. 18.13 Nocedal and Wright, p. 536; Eq. 15.25 Andrei, p. 529 
 	Eigen::VectorXd y_k = curr_grad - prev_grad; 
-	Eigen::VectorXd s_k = current_ctl_dv_values.get_data_eigen_vec(dv_names) - prev_ctl_dv_values.get_data_eigen_vec(dv_names);
+	//Eigen::VectorXd s_k = current_ctl_dv_values.get_data_eigen_vec(dv_names) - prev_ctl_dv_values.get_data_eigen_vec(dv_names);
 
 	//check if there's an active constraint for the current dv then compute constraint jco and update y_k
 	vector<string> prev_cnames, curr_cnames;
@@ -2224,19 +2141,38 @@ bool SeqQuadProgram::update_hessian(string how)
 			curr_full_lambda = svd_AAT.solve(curr_full_jco * curr_grad);
 		}
 
-		if (!prev_cnames.empty()) {
+		if (!prev_cnames.empty()) 
+		{
 			Eigen::MatrixXd previous_jco = prev_constraint_mat.e_ptr()->toDense();
-			for (int i = 0; i < prev_cnames.size(); i++) {
+			if (cnames_en.find(selected_ls_parent) == cnames_en.end()) 
+			{
+				ss.str("");
+				ss << "update_hessian error: selected_ls_parent '" << selected_ls_parent << "' not found in cnames_en";
+				throw_sqp_error(ss.str());
+			}
+
+			if (lm_en.find(selected_ls_parent) == lm_en.end())
+			{
+				ss.str("");
+				ss << "update_hessian error: selected_ls_parent '" << selected_ls_parent << "' not found in lm_en";
+				throw_sqp_error(ss.str());
+			}
+			
+			for (int i = 0; i < prev_cnames.size(); i++) 
+			{
 				int row = constraint_to_row[prev_cnames[i]];
 				prev_full_jco.row(row) = previous_jco.row(i);
 
-				if (i < lambda.size()) {
-					prev_full_lambda(row) = lambda(i);
+				auto lambda_it = find(cnames_en[selected_ls_parent].begin(), cnames_en[selected_ls_parent].end(), prev_cnames[i]);
+				if (lambda_it != cnames_en[selected_ls_parent].end()) 
+				{
+					int lambda_idx = distance(cnames_en[selected_ls_parent].begin(), lambda_it);
+					if (lambda_idx < lm_en[selected_ls_parent].size()) 
+						prev_full_lambda(row) = lm_en[selected_ls_parent](lambda_idx);
 				}
 
-				if (constraint_sense[prev_cnames[i]] == "less_than") {
+				if (constraint_sense[prev_cnames[i]] == "less_than") 
 					prev_full_jco.row(row) *= -1;
-				}
 			}
 		}
 
@@ -2252,10 +2188,18 @@ bool SeqQuadProgram::update_hessian(string how)
 		performance_log->log_event(ss.str());
 	}
 
+	if (step_k.size() != dv_names.size()) 
+	{
+		ss.str("");
+		ss << "step_k size mismatch: expected " << dv_names.size() << ", got " << step_k.size() << ", skipping BFGS update";
+		message(1, ss.str());
+		return false;
+	}
+
 	if (how == "BFGS")
-		return hessian_update_bfgs(s_k, y_k, old_hessian);
+		return hessian_update_bfgs(step_k, y_k, old_hessian);
 	else if (how == "SR1")
-		return hessian_update_sr1(s_k, y_k, old_hessian);
+		return hessian_update_sr1(step_k, y_k, old_hessian);
 	else
 		throw_sqp_error("unknown hessian update method: " + how);
 	return false;
@@ -2297,18 +2241,121 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 	const double max_condition_warning = max_condition_action * 1E-1;
 
 	Eigen::MatrixXd H_reg = H;
-	double cond_H = eig_H.eigenvalues().maxCoeff() / eig_H.eigenvalues().minCoeff();
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_H_reg = eig_H;
 
-	if (cond_H > max_condition_critical) {
+	bool report_regul = true;
+
+	if (min_eig_H < 0) {
+		double tau = abs(min_eig_H) + min_allowed_eig;
+		H_reg += tau * Eigen::MatrixXd::Identity(H.rows(), H.cols());
+		ss.str("");
+		ss << "Hessian has negative eigenvalue (" << min_eig_H << "), applying shift tau = " << tau;
+		if (!context.empty())
+			ss << " (" << context << ")";
+		message(1, ss.str());
+
+		eig_H_reg.compute(H_reg);
+		min_eig_H = eig_H_reg.eigenvalues().minCoeff();
+	}
+
+
+	double max_eig = eig_H_reg.eigenvalues().maxCoeff();
+	double cond_H = max_eig / min_eig_H;
+
+	if (min_eig_H < min_allowed_eig) 
+	{
+		double delta = min_allowed_eig - min_eig_H;
+		H_reg += delta * Eigen::MatrixXd::Identity(H.rows(), H.cols());
+		ss.str("");
+		ss << "Hessian minimum eigenvalue too small after shift, adding delta = " << delta;
+		if (!context.empty())
+			ss << " (" << context << ")";
+		message(2, ss.str());
+
+		eig_H_reg.compute(H_reg);
+		min_eig_H = eig_H_reg.eigenvalues().minCoeff();
+		max_eig = eig_H_reg.eigenvalues().maxCoeff();
+		cond_H = max_eig / min_eig_H;
+	}
+
+
+	if (cond_H > max_condition_critical) 
+	{
 		ss.str("");
 		ss << "Hessian condition number extremely large";
-		if (!context.empty()) 
+		if (!context.empty())
 			ss << " (" << context << ")";
-		ss << ": " << cond_H << ", using identity";
+		ss << ": " << cond_H;
 		message(2, ss.str());
-		H_reg = Eigen::MatrixXd::Identity(H.rows(), H.cols());
+
+		bool use_stosag = false;
+		Eigen::MatrixXd H_stosag;
+
+		if (use_ensemble_grad && dv.shape().first >= 2)
+		{
+			
+			Covariance obj_hessian = calc_objective_hessian();
+			if (!obj_hessian.get_col_names().empty())
+			{
+				H_stosag = obj_hessian.e_ptr()->toDense();
+				Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_stosag(H_stosag);
+				if (eig_stosag.info() == Eigen::Success)
+				{
+					Eigen::VectorXd eigvals_stosag = eig_stosag.eigenvalues();
+					double cond_stosag = eigvals_stosag.maxCoeff() / eigvals_stosag.minCoeff();
+					double min_eig_stosag = eigvals_stosag.minCoeff();
+
+					if (cond_stosag < max_condition_critical && min_eig_stosag >= min_allowed_eig)
+					{
+						H_reg = H_stosag;
+						use_stosag = true;
+						ss.str("");
+						ss << "using StoSAG-approximated Hessian, condition number: " << cond_stosag;
+						if (!context.empty())
+							ss << " (" << context << ")";
+						message(1, ss.str());
+					}
+					else
+					{
+						ss.str("");
+						ss << "StoSAG Hessian also ill-conditioned, condition number: " << cond_stosag;
+						if (!context.empty())
+							ss << " (" << context << ")";
+						message(2, ss.str());
+					}
+				}
+				else
+				{
+					ss.str("");
+					ss << "StoSAG Hessian eigenvalue decomposition failed";
+					if (!context.empty())
+						ss << " (" << context << ")";
+					message(2, ss.str());
+				}
+			}
+			else
+			{
+				ss.str("");
+				ss << "StoSAG Hessian computation failed, using identity";
+				if (!context.empty())
+					ss << " (" << context << ")";
+				message(2, ss.str());
+			}
+		}
+
+		if (!use_stosag)
+		{
+			H_reg = Eigen::MatrixXd::Identity(H.rows(), H.cols());
+			ss.str("");
+			ss << "using identity Hessian";
+			if (!context.empty())
+				ss << " (" << context << ")";
+			message(2, ss.str());
+		}
+
 	}
-	else if (cond_H > max_condition_action) {
+	else if (cond_H > max_condition_action) 
+	{
 		ss.str("");
 		ss << "Hessian condition number very large";
 
@@ -2319,7 +2366,8 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 		double reg_factor = 1.0 / sqrt(cond_H);
 		H_reg += reg_factor * Eigen::MatrixXd::Identity(H.rows(), H.cols());
 	}
-	else if (cond_H > max_condition_warning) {
+	else if (cond_H > max_condition_warning) 
+	{
 		if (min_eig_H < min_allowed_eig) {
 			double delta = min_allowed_eig - min_eig_H + 1e-6;
 			H_reg += delta * Eigen::MatrixXd::Identity(H.rows(), H.cols());
@@ -2341,7 +2389,18 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 		ss << ", delta = " << delta;
 		message(2, ss.str());
 	}
+	else
+		report_regul = false;
 
+	if (report_regul)
+	{
+		ss.str("");
+		ss << "   approx hessian after regularization " << "(" << context << "): " << endl;
+		ss << "   " << H_reg << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << ss.str() << endl;
+	}
+	used_hessian = Covariance(dv_names, H_reg.sparseView());
 	return H_reg;
 }
 
@@ -2437,7 +2496,7 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			//approx hessian here using the ensemble
 			message(2, "calculating objective function hessian");
-			calc_objective_hessian();
+			hessian = calc_objective_hessian();
 			ss.str("");
 			ss << "StoSAG-approx hessian: " << endl << hessian << endl;
 			frec << ss.str() << endl;
@@ -2452,7 +2511,7 @@ void SeqQuadProgram::iterate_2_solution()
             pcs.summarize(dv, ss.str());
         }
 
-		if (should_terminate())
+		if (should_terminate() && last_viol < 1E-10)
 			break;
 
 		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian())
@@ -2467,8 +2526,17 @@ void SeqQuadProgram::iterate_2_solution()
 					hessian = Covariance(dv_names, h);
 				}
 			}
-			else if (iter > 0)
+			else if (iter > 0 && is_good_search)
 				update_hessian(pest_scenario.get_pestpp_options().get_sqp_hessian_update_method());
+			else
+				message(1, "skipping hessian update");
+
+			ss.str("");
+			ss << endl << "approx hessian: " << endl << hessian << endl;
+			Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
+			ss << hessian_dense << endl;
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << ss.str() << endl;
 		}
 	}
 }
@@ -3798,177 +3866,6 @@ bool SeqQuadProgram::iterative_partial_step(const string& _blocking_constraint)
 	}
 }
 
-bool SeqQuadProgram::line_search(Eigen::VectorXd& search_d, const Parameters& _current_dv_values, Eigen::VectorXd& grad)
-{
-	double initial_obj = get_obj_value(current_ctl_dv_values, current_obs);
-	double initial_slope = grad.dot(search_d);
-
-	//handle non-descent direction
-	if (initial_slope >= 0.1)
-	{
-		message(1, "Warning: search direction is not a descent direction");
-		Covariance original_hessian = hessian;
-
-		// First try: Modify Hessian to make it positive definite
-		bool modified_success = try_modify_hessian();
-
-		if (modified_success) {
-			// Recompute search direction with modified Hessian
-			pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(current_ctl_dv_values, current_obs, grad, &base_constraint_jco);
-			search_d = x.first;
-			initial_slope = grad.dot(search_d);
-		}
-
-		// If modification fails or still gives non-descent direction
-		if (!modified_success || initial_slope >= 0) {
-			message(1, "Resetting Hessian to scaled identity matrix");
-			Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-			h.setIdentity();
-			update_scaling(search_d, grad);
-			for (int i = 0; i < dv_names.size(); i++) {
-				h.coeffRef(i, i) *= diagonal_scaling(i);
-			}
-
-			Covariance identity_hessian(dv_names, h);
-			hessian = identity_hessian;
-			pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(current_ctl_dv_values, current_obs, grad, &base_constraint_jco);
-			search_d = x.first;
-			initial_slope = grad.dot(search_d);
-
-			// If still not descent, use pure steepest descent and restore original Hessian
-			if (initial_slope >= 0) {
-				message(1, "Using pure steepest descent and restoring original Hessian");
-				search_d = -grad;
-				initial_slope = grad.dot(search_d);
-
-				hessian = original_hessian;
-				cout << endl << "hessian" << endl << hessian << endl;
-			}
-		}
-	}
-
-
-	stringstream ss;
-	ParameterEnsemble dv_candidates(&pest_scenario, &rand_gen);
-	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
-
-	vector<string> real_names;
-	vector<double> scale_vals;
-	scale_vals.clear();
-	for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_alpha_mults())
-	{
-		scale_vals.push_back(sf * BASE_SCALE_FACTOR);
-	}
-
-	if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
-	{
-		for (auto sv : scale_vals)
-		{
-			for (auto& real_name : dv.get_real_names())
-			{
-				ss.str("");
-				ss << "cand_" << real_name << "_sv:" << left << setw(8) << setprecision(3) << sv;
-				real_names.push_back(ss.str());
-			}
-		}
-
-	}
-	else {
-		for (auto sv : scale_vals) {
-			ss.str("");
-			ss << "cand_sv:" << left << setw(8) << setprecision(3) << sv;
-			real_names.push_back(ss.str());
-		}
-	}
-	dv_candidates.reserve(real_names, dv_names);
-	int ii = 0;
-	vector<double> used_scale_vals;
-	map<string, double> real_sf_map;
-	for (int i = 0; i < scale_vals.size(); i++)
-	{
-		double scale_val = scale_vals[i];
-		ss.str("");
-		ss << "starting calcs for scaling factor" << scale_val;
-		message(1, "starting lambda calcs for scaling factor", scale_val);
-
-		Parameters num_candidate = _current_dv_values;
-
-		Eigen::VectorXd scale_search_d = search_d * scale_val;
-		if (scale_search_d.squaredNorm() < 1.0 - 10)
-			message(1, "very short upgrade for scale value", scale_val);
-
-		Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
-		cvals.array() += (scale_search_d / search_d.norm()).array();
-		cvals.array() += scale_search_d.array();
-		num_candidate.update_without_clear(dv_names, cvals);
-
-		Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
-		dv_candidates.update_real_ip(real_names[i], vec);
-		used_scale_vals.push_back(scale_val);
-		real_sf_map[real_names[i]] = scale_val;
-		
-
-		ss.str("");
-		message(1, "finished calcs for scaling factor:", scale_val);
-
-	}
-
-	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
-	{
-		message(0, "ies_debug_upgrade_only is true, exiting");
-		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
-	}
-
-	dv_candidates.enforce_bounds(performance_log, false);
-	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
-	dv_candidates.to_csv(ss.str());
-
-	Eigen::VectorXd v1, v2;
-	double d;
-	vector<string> drop;
-	set<int> jvals;
-	const double epsilon = 1e-10;
-	for (int i = 0; i < dv_candidates.shape().first; i++)
-	{
-		v1 = dv_candidates.get_real_vector(i);
-		for (int j = i + 1; j < dv_candidates.shape().first; j++) {
-			v2 = (dv_candidates.get_real_vector(j) - v1).array() / (v1.array().cwiseAbs() + epsilon);
-			d = v2.transpose() * v2;
-			if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end())) {
-				message(1, "duplicate candidates:", vector<string>{real_names[i], real_names[j]});
-				drop.push_back(real_names[j]);
-				jvals.emplace(j);
-			}
-		}
-	}
-	if (drop.size() > 0)
-	{
-		message(1, "dropping the following duplicate candidates: ", drop);
-		dv_candidates.drop_rows(drop, true);
-		used_scale_vals.clear();
-		for (auto& real_name : dv_candidates.get_real_names())
-		{
-			used_scale_vals.push_back(real_sf_map.at(real_name));
-		}
-	}
-
-	message(0, "running candidate decision variable batch");
-	vector<double> passed_scale_vals = scale_vals;
-
-	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates);
-	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
-	oe_candidates.to_csv(ss.str());
-
-	map<string, double> sf_map;
-	for (int i = 0; i < dv_candidates.get_real_names().size(); i++)
-	{
-		sf_map[dv_candidates.get_real_names()[i]] = used_scale_vals[i];
-	}
-	return pick_candidate_and_update_current(dv_candidates, oe_candidates, sf_map);
-}
-
 FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset, bool recalc)
 {
 	stringstream ss;
@@ -4015,7 +3912,8 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 			{
 				ss.str("");
 				ss << "cand_" << real_name << "_sv:" << left << setw(8) << setprecision(3) << sv;
-				real_names.push_back(ss.str());
+				real_names.push_back(ss.str()); 
+				ls_parent_map[ss.str()] = real_name;
 			}
 		}
 
@@ -4025,9 +3923,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		if (dvs_subset != nullptr) 
 		{
 			ParameterEnsemble d;
-			//const auto& names = dvs_subset->get_real_names();
 			map<string,int> rmap = dvs_subset->get_real_map();
-			//if ((find(names.begin(), names.end(), BASE_REAL_NAME) == names.end()) && !recalc)
 			if ((rmap.find(BASE_REAL_NAME) == rmap.end()) && !recalc)
 			{
 				if (dvs_subset->get_real_names().size() == 0)
@@ -4052,6 +3948,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 					ss << "cand_" << real_name << "_sv:" << left << setw(8) << setprecision(3) << sv;
 					real_names.push_back(ss.str());
 					sv_real_map[sv][real_name] = ss.str();
+					ls_parent_map[ss.str()] = real_name;
 				}
 				search_dirs[real_name] = search_d.at(real_name);
 			}
@@ -4063,6 +3960,8 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 
 	vector<double> used_scale_vals;
 	map<string, double> real_sf_map;
+	step_length_map.clear();
+
 	for (int i = 0;i < scale_vals.size();i++)
 	{
 		double scale_val = scale_vals[i];
@@ -4074,8 +3973,6 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		vector<string> short_upgrades;
 		for (auto& sd : search_dirs)
 		{
-			Eigen::VectorXd current_dv = dvs_subset->get_real_vector(sd.first);
-
 			scale_search_d[sd.first] = sd.second * scale_val;
 			if (scale_search_d[sd.first].squaredNorm() < 1.0E-10)
 				short_upgrades.push_back(sd.first);
@@ -4094,6 +3991,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 			
 			string upgrade_rname = sv_real_map[scale_val][real_name];
 			dv_candidates.update_real_ip(upgrade_rname, dv_upgrade);
+			step_length_map[upgrade_rname] = scale_search_d[real_name];
 			real_sf_map[upgrade_rname] = scale_val;
 			used_scale_vals.push_back(scale_val);
 		}
@@ -4325,7 +4223,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 				
 
 				ss.str("");
-				ss << "   reduced constraint matrix from rank " << constr_jco.rows() + (Cnames.size() - effective_rank)
+				ss << endl << "   reduced constraint matrix from rank " << constr_jco.rows() + (Cnames.size() - effective_rank)
 					<< " to rank " << effective_rank << ". Kept constraints: ";
 				for (size_t i = 0; i < reduced_Cnames.size(); i++)
 				{
@@ -4373,7 +4271,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		Eigen::LDLT<Eigen::MatrixXd> ldlt_H(H_reg);
 
 		if (ldlt_H.info() != Eigen::Success || !ldlt_H.isPositive()) {
-			// Fallback to steepest descent if LDLT fails
 			message(1, "WARNING: LDLT failed for unconstrained case, using steepest descent");
 			search_d = -grad_vector;
 		}
@@ -4421,9 +4318,19 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			double prior_search_d_norm = search_d_en[rname].norm();
 
 			constraint_jco_en[rname] = constraint_mat_en[rname].first.e_ptr()->toDense();
+
+			Covariance backup_hessian = hessian;
+			hessian = hessian_en[rname];
+			used_hessian = Covariance();
+
 			pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[rname], &cnames_en[rname]);
 			search_d_en[rname] = x.first;
 			lm_en[rname] = x.second;
+
+			if (!used_hessian.get_col_names().empty())
+				hessian_en[rname] = used_hessian;
+
+			hessian = backup_hessian;
 
 			Eigen::VectorXd unscaled_search_d = search_d_en[rname];
 			if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
@@ -4443,9 +4350,9 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 					rangesq += pow(ub - lb, 2);
 				}
 				rangesq = pow(rangesq, 0.5);
-				if (search_d_en[rname].norm() > 2 * rangesq)
+				if (search_d_en[rname].norm() > rangesq)
 				{
-					search_d_en[rname] = 2 * rangesq * search_d_en[rname] / search_d_en[rname].norm();
+					search_d_en[rname] = rangesq * search_d_en[rname] / search_d_en[rname].norm();
 				}
 			}
 
@@ -4581,8 +4488,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 		sampling_tracking_initialized = true;
 	}
 
-	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
-
 	if (unselected_dv_indices.empty() || local_subset_size > unselected_dv_indices.size())
 	{
 		unselected_dv_indices.clear();
@@ -4612,18 +4517,17 @@ bool SeqQuadProgram::solve_new_ensemble()
 		_avail_dvs.drop_rows({ par_name }, true);
 	}
 
-	base_hessian = hessian;
 	Parameters dv_vals = current_ctl_dv_values;
 	Observations obs_vals = current_obs;
 
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
 	vector<string> drawn_real_names = _drawn_dvs.get_real_names();
 
+	hessian_en.clear();
 	for (auto d : dv.get_real_names())
 	{
 		if (find(drawn_real_names.begin(), drawn_real_names.end(), d) == drawn_real_names.end() && d != BASE_REAL_NAME)
 		{
-			message(2, "skipping search direction calc for realization ", d);
 			continue;
 		}
 
@@ -4644,37 +4548,21 @@ bool SeqQuadProgram::solve_new_ensemble()
 		constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
 		current_obj_en[d] = get_obj_value(dv_vals, obs_vals);
 
-		//first pass: Compute initial lambda with approx obj hessian (equal to lagrangian hess if unconstrained)
+		if (hessian_en.find(d) == hessian_en.end())
+			hessian_en[d] = hessian;
+		
+		Covariance backup_hessian = hessian;
+		hessian = hessian_en[d];
+		used_hessian = Covariance();
+
 		pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
 		search_d_en[d] = x.first;
 		lm_en[d] = x.second;
 
-		if (d == BASE_REAL_NAME)
-			lambda = lm_en[d];
-
-		//need to drop negative mults
-		while (true)
-		{
-			bool changed = recalc_search_direction_vector(d, dv_vals, obs_vals, grad);
-			if (!changed)
-				break;
-		}
-		// now, lm_en[d] has non-negative lambdas with correct working set and cnames_en[d] reflects a more accurate active constraints
-
-		// recompute hessian but tis time with lagrange correction to account for active constraints at each ensemble member
-		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian() &&
-			pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG")
-		{
-			message(2, "recomputing Hessian for realization ", d);
-			recompute_hessian(cnames_en[d], lm_en[d]);
-		}
-
-		// second pass: now compute search dir using an approximate Lagrangian hessian
-		x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
-		search_d_en[d] = x.first;
-		lm_en[d] = x.second;
-
-		// thinking this can be done for many iterative passes, but could be expensive - would be cool to try tho?
+		if (!used_hessian.get_col_names().empty())
+			hessian_en[d] = used_hessian;
+		
+		hessian = backup_hessian;
 
 		Eigen::VectorXd unscaled_search_d = search_d_en[d];
 		if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
@@ -4729,19 +4617,31 @@ bool SeqQuadProgram::solve_new_ensemble()
 			if (!changed)
 				break;
 		}
-
-		if (d == BASE_REAL_NAME)
-		{
-			lambda = lm_en[d];
-			base_hessian = hessian;
-		}
 	}
 
 	FilterRec search = run_search_routine(grad, &_drawn_dvs);
-	constraint_jco = constraint_mat_en[BASE_REAL_NAME].first.e_ptr()->toDense();
-	current_constraint_mat = constraint_mat_en[BASE_REAL_NAME].first;
-	cnames = constraint_mat_en[BASE_REAL_NAME].first.get_row_names();
-	prev_constraint_mat = current_constraint_mat;
+
+	//needed for bfgs hessian update
+	selected_ls_parent = ls_parent_map[search.real_name];
+	step_k = step_length_map[search.real_name];
+	if (step_k.size() != 0 && search.iter == iter)
+	{
+		is_good_search = true;
+		Eigen::VectorXd parent_dv_vec = dv.get_real_vector(selected_ls_parent);
+		prev_ctl_dv_values.update_without_clear(dv_names, parent_dv_vec);
+		constraint_jco = constraint_mat_en[selected_ls_parent].first.e_ptr()->toDense();
+		current_constraint_mat = constraint_mat_en[selected_ls_parent].first;
+		cnames = constraint_mat_en[selected_ls_parent].first.get_row_names();
+		prev_constraint_mat = current_constraint_mat;
+		lambda = lm_en[selected_ls_parent];
+		if (hessian_en.find(selected_ls_parent) != hessian_en.end())
+		{
+			hessian = hessian_en[selected_ls_parent];
+		}
+	}
+	else
+		is_good_search = false;
+
 
 	if (search.viol_val == 0.0)
 	{
@@ -5231,11 +5131,9 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 					break;
 				}
 			}
-
 		}
 		else
 		{
-			fcount++;
 			message(1, "still no better solution...allowing some violation");
 			vector<FilterRec> filterset = candidate_filter.get_feasible_solutions(true);
 			bool found = false;
@@ -5360,11 +5258,11 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 	if (is_violated && is_recycled) //violated and recycled
 		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
 	else if (is_violated && !is_recycled) //violated but new
-		BASE_SCALE_FACTOR = 1.0;
+		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
 	else if (!is_violated && is_recycled) //feasible but recycled
 		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
 	else //feasible and new
-		BASE_SCALE_FACTOR = min(2.0, BASE_SCALE_FACTOR * SF_INC_FAC);
+		BASE_SCALE_FACTOR = 1.0;
 
 	filter.update(selected.obj_val, selected.viol_val, selected.viol_padded, selected.dp_val, selected.oe_val, selected.real_name, iter);
 	filter.report(frec, iter);
@@ -5430,349 +5328,6 @@ FilterRec SeqQuadProgram::pick_from_filter_by_merit(SqpFilter _filtered)
 		}
 	}
 	return *best;
-}
-
-bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map)
-{
-	message(0, "selecting candidate via filter. current best phi:", last_best);
-
-	stringstream ss;
-	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
-	double oext,oviol = 0.0, nviol = 0.0, lviol = numeric_limits<double>::max();
-	if (obj_sense == "minimize")
-		oext = numeric_limits<double>::max();
-	else
-		oext = numeric_limits<double>::min();
-	int idx = -1, jdx = -1;
-	vector<string> real_names = dv_candidates.get_real_names();
-	map<string, double> total_viol_map;
-	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
-
-	map<string, Parameters> par_map;
-	map<string, Observations> obs_map;
-	for (auto d : real_names)
-	{
-		Parameters p = current_ctl_dv_values;
-		Eigen::VectorXd t = dv_candidates.get_real_vector(d);
-		p.update_without_clear(dv_names, t);
-		par_map[d] = p;
-
-		Observations o = current_obs;
-		t = _oe.get_real_vector(d);
-		o.update_without_clear(_oe.get_var_names(), t);
-		obs_map[d] = o;
-	}
-
-	map<string, map<string, double>> violations, violations_nominal, feasible_distance;
-	if (constraints.get_use_chance() && (sqp_risk != 0.5))
-	{
-		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, filter.get_viol_tol(), true, &_oe, sqp_risk);
-		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true, &_oe, sqp_risk);
-		feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true, &_oe, sqp_risk);
-	}
-	else
-	{
-		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, filter.get_viol_tol(), true);
-		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
-		feasible_distance = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1, true);
-	}
-
-	Parameters cand_dv_values = current_ctl_dv_values;
-	Observations cand_obs_values = current_obs;
-	Eigen::VectorXd t;
-	vector<string> onames = _oe.get_var_names();
-	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-	bool filter_accept;
-	string tag;
-	vector<double> infeas_vec, nviol_vec, feas_dist_map;
-	vector<int> accept_idxs;
-	int num_feas_filter_accepts = 0, num_infeas_filter_accepts = 0;
-	bool accept = false;
-
-	for (int i = 0; i < obj_vec.size(); i++)
-	{
-		ss.str("");
-		ss << "candidate: " << real_names[i] << ", scale factor: " << sf_map.at(real_names[i]);
-		tag = ss.str();
-		ss.str("");
-		ss << tag << " phi: " << obj_vec[i];
-		double infeas_sum = 0.0, infeas_sum_nom = 0.0, feas_dist = 0;
-		for (auto& v : violations[real_names[i]])
-			infeas_sum += v.second;
-		ss << " infeasibility total: " << infeas_sum << ", ";
-		infeas_vec.push_back(infeas_sum);
-		for (auto& v : violations_nominal[real_names[i]])
-			infeas_sum_nom += v.second;
-		nviol_vec.push_back(infeas_sum_nom);
-		total_viol_map[real_names[i]] = infeas_sum_nom;
-		for (auto& f : feasible_distance[real_names[i]])
-			feas_dist -= f.second;
-		feas_dist_map.push_back(feas_dist);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum_nom, infeas_sum, par_map[real_names[i]], obs_map[real_names[i]], real_names[idx], iter);
-		if (filter_accept)
-			ss << " filter accepted ";
-		else
-			ss << " filter rejected ";
-		message(1, ss.str());
-        if (filter_accept)
-        {
-            if ((best_violation_yet > 1e-7) && (infeas_vec[i] > (best_violation_yet * 2.0)))
-            {
-                ss << ", infeasibility exceeds previous best infeasibility threshold";
-            }
-            else{
-                accept_idxs.push_back(i);
-            }
-        }
-
-		if ((!use_ensemble_grad) && (obj_vec[i] < oext * 1.25))
-		{
-			idx = i;
-			oext = obj_vec[idx];
-			if (infeas_sum > 0)
-				is_blocking_constraint = true;
-		}
-
-		t = dv_candidates.get_real_vector(real_names[i]);
-		cand_dv_values = current_ctl_dv_values;
-		cand_dv_values.update_without_clear(dv_names, t);
-		pts.numeric2ctl_ip(cand_dv_values);
-		t = _oe.get_real_vector(real_names[i]);
-		cand_obs_values.update_without_clear(onames, t);
-		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false,tag);
-	}
-
-	cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), false);
-
-	if (obj_sense == "minimize")
-		oext = numeric_limits<double>::max();
-	else
-		oext = numeric_limits<double>::min();
-    if (accept_idxs.size() > 0)
-    {
-        accept = true;
-        ss.str("");
-        ss << "number of scale factors passing filter:" << accept_idxs.size();
-        message(1,ss.str());
-		double delta_feas = -999;
-		for (auto iidx : accept_idxs)
-        {
-			if (!use_ensemble_grad)
-			{
-				if ((accept_idxs.size() > 1) && (iidx > 0))
-					delta_feas = feas_dist_map[iidx] * feas_dist_map[iidx - 1];
-				else
-					delta_feas = feas_dist_map[iidx];
-			}
-			else
-				delta_feas = 999;
-
-			if (obj_vec[iidx] < oext)
-            {
-				if ((nviol_vec[iidx] <= 1E-6) && (delta_feas >= 0))
-				{
-					idx = iidx;
-					oext = obj_vec[iidx];
-					oviol = infeas_vec[iidx];
-					nviol = nviol_vec[iidx];
-				}
-				if (infeas_vec[iidx] <= 1E-6)
-					num_feas_filter_accepts++;
-            }
-			if (nviol_vec[iidx] > 1E-6)
-			{
-				if (nviol_vec[iidx] < lviol)
-				{
-					jdx = iidx;
-					lviol = nviol_vec[iidx];
-				}
-			}
-        }
-
-		if (jdx == -1)
-		{
-			for (int i = idx; i < obj_vec.size(); i++)
-			{
-				if (nviol_vec[i] > 1E-6)
-				{
-					if (nviol_vec[i] < lviol)
-					{
-						jdx = i;
-						lviol = nviol_vec[i];
-					}
-				}
-			}
-		}
-		
-		if (idx != -1)
-			filter.update(oext,infeas_vec[idx], infeas_vec[idx], par_map[real_names[idx]], obs_map[real_names[idx]], real_names[idx], iter);
-    }
-	else
-    {
-	    message(0,"filter failed, checking for feasible solutions....");
-	    double viol_tol = filter.get_viol_tol();
-		nviol_vec.clear();
-		double infeas_sum_nom = 0.0;
-		for (int i = 0; i < obj_vec.size(); i++)
-		{
-			if (constraints.get_use_chance() && (sqp_risk != 0.5))
-			{
-				violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1.0, true, &_oe, sqp_risk);
-			}
-			else
-			{
-				violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, -1.0, true);
-			}
-			for (auto& v : violations_nominal[real_names[i]])
-				infeas_sum_nom += v.second;
-			nviol_vec.push_back(infeas_sum_nom);
-		}
-
-        for (int i=0;i<nviol_vec.size();i++)
-        {
-            if (nviol_vec[i] < viol_tol)
-            {
-                if ((obj_sense=="minimize") && (obj_vec[i] < oext))
-                {
-                    idx = i;
-                    oext = obj_vec[i];
-                    oviol = infeas_vec[i];
-					nviol = nviol_vec[i];
-					num_feas_filter_accepts++;
-                }
-                else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
-                {
-                    idx = i;
-                    oext = obj_vec[i];
-                    oviol = infeas_vec[i];
-					nviol = nviol_vec[i];
-					num_feas_filter_accepts++;
-                }
-            }
-        }
-
-		if (idx != -1)
-			filter.update(oext, infeas_vec[idx], infeas_vec[idx], par_map[real_names[idx]], obs_map[real_names[idx]], real_names[idx], iter);
-		/*if (idx == -1)
-		{
-			message(0, "no feasible solutions, choosing lowest constraint violation...");
-			double viol_min = 1e+300;
-			for (int i = 0;i < infeas_vec.size();i++)
-			{
-				if (nviol_vec[i] < viol_min)
-				{
-					viol_min = infeas_vec[i];
-					idx = i;
-					jdx = i;
-					oext = obj_vec[i];
-					oviol = infeas_vec[i];
-				}
-			}
-		}
-		else
-			accept = true;*/
-
-		//message(0, "no feasible solutions, choosing lowest constraint violation...");
-		//double viol_min = 1e+300;
-		//for (int i = 0;i < infeas_vec.size();i++)
-		//{
-		//	if (nviol_vec[i] < viol_min)
-		//	{
-		//		viol_min = infeas_vec[i];
-		//		idx = i;
-		//		jdx = i;
-		//		oext = obj_vec[i];
-		//		oviol = infeas_vec[i];
-		//		num_feas_filter_accepts++;
-		//	}
-		//}
-		//if (idx != -1)
-		//	accept = true;
-
-    }
-
-	if (accept)
-	{
-		t = dv_candidates.get_real_vector(real_names[idx]);
-		cand_dv_values = current_ctl_dv_values;
-		cand_dv_values.update_without_clear(dv_names, t);
-		pts.numeric2ctl_ip(cand_dv_values);
-		t = _oe.get_real_vector(real_names[idx]);
-		cand_obs_values.update_without_clear(onames, t);
-
-		ss.str("");
-		ss << "best candidate (scale factor: " << setprecision(4) << sf_map.at(real_names[idx]) << ", phi: " << oext << ", infeas: " << oviol << ")";
-		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true, ss.str());
-		filter.report(file_manager.rec_ofstream(), iter);
-
-		if (num_feas_filter_accepts == 0)
-		{
-			BASE_SCALE_FACTOR = BASE_SCALE_FACTOR * SF_DEC_FAC;
-			return false;
-		}
-		if (infeas_vec[idx] > 1E-6)
-			n_consec_infeas++;
-		else {
-			n_consec_infeas = 0;
-			if (use_ensemble_grad) {
-				
-				double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
-				new_par_sigma = new_par_sigma * pow(PAR_SIGMA_INC_FAC, 1 / (static_cast<double>(iter)));
-				new_par_sigma = min(new_par_sigma, par_sigma_max);
-
-				message(1, "increasing par_sigma_range to", new_par_sigma);
-				message(1, "regenerating parcov");
-				pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
-				parcov.try_from(pest_scenario, file_manager);
-			}
-		}
-
-		message(0, "accepting upgrade", real_names[idx]);
-		t = dv_candidates.get_real_vector(idx);
-		vector<string> vnames = dv_candidates.get_var_names();
-		Parameters p;
-		p.update_without_clear(vnames, t);
-		
-		pts.numeric2ctl_ip(p);
-		
-		for (auto& d : dv_names)
-			current_ctl_dv_values[d] = p[d];
-		t = _oe.get_real_vector(idx);
-		current_obs.update_without_clear(onames, t);
-		last_best = oext;
-		last_viol = oviol;
-		message(0, "new best phi and infeas:", vector<double>{last_best,last_viol});
-        best_phis.push_back(oext);
-        best_violations.push_back(oviol);
-		if (last_viol == 0)
-			best_feas_phis.push_back(oext);
-
-		return true;
-		
-	}
-	else
-	{
-		message(0, "not accepting upgrade #sad");
-        best_phis.push_back(last_best);
-        best_violations.push_back(last_viol);
-        if (infeas_vec[idx] > filter.get_viol_tol())
-        {
-            n_consec_infeas++;
-        }
-        if (use_ensemble_grad) {
-            double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
-            new_par_sigma = new_par_sigma * PAR_SIGMA_DEC_FAC;
-            new_par_sigma = max(new_par_sigma, par_sigma_min);
-            message(1, "decreasing par_sigma_range to", new_par_sigma);
-            message(1, "regenerating parcov");
-            parcov.try_from(pest_scenario, file_manager);
-            pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
-            cout << "parcov: " << endl << parcov << endl;
-        }
-        //BASE_SCALE_FACTOR = BASE_SCALE_FACTOR * SF_DEC_FAC;
-        
-		return false;
-	}
 }
 
 bool SeqQuadProgram::pick_partial_step(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string, double>& sf_map)
@@ -6278,25 +5833,56 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 		return subset_idxs;
 	}
 
-	vector<string>::iterator bidx = find(dv_names.begin(), dv_names.end(), BASE_REAL_NAME);
-	if (bidx != dv_names.end())
-	{
+	vector<string> dv_real_names = dv.get_real_names();
 
-		subset_idxs.push_back(bidx - dv_names.begin());
-	}
-
-	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
+	string how = pest_scenario.get_pestpp_options().get_sqp_subset_how();
 	if (how == "FIRST")
 	{
-		for (int i = 0; i < size; i++)
+		map<string, map<string, double>> violations_nominal;
+		if (constraints.get_use_chance() && (sqp_risk != 0.5))
+		{
+			violations_nominal = constraints.get_ensemble_violations_map(dv, oe, 0.0, true, &oe, sqp_risk);
+		}
+		else
+		{
+			violations_nominal = constraints.get_ensemble_violations_map(dv, oe, 0.0, true);
+		}
+
+		vector<pair<int, double>> idx_vsum_pairs;
+		for (size_t i = 0; i < size; ++i)
+		{
+			const string& rname = dv_real_names[i];
+			if (rname == BASE_REAL_NAME)
+				continue;
+
+			double vsum = 0;
+			auto viol_it = violations_nominal.find(rname);
+			if (viol_it != violations_nominal.end())
+			{
+				for (const auto& v : viol_it->second)
+					vsum += v.second;
+			}
+
+			idx_vsum_pairs.push_back({ static_cast<int>(i), vsum });
+		}
+
+		sort(idx_vsum_pairs.begin(), idx_vsum_pairs.end(),
+			[](const pair<int, double>& a, const pair<int, double>& b) {
+				return a.second < b.second;
+			});
+
+		set<int> selected_set;
+
+		for (const auto& pair : idx_vsum_pairs)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-				continue;
 
-			subset_idxs.push_back(i);
-
+			if (selected_set.find(pair.first) == selected_set.end())
+			{
+				subset_idxs.push_back(pair.first);
+				selected_set.insert(pair.first);
+			}
 		}
 
 	}
