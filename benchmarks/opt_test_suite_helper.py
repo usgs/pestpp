@@ -135,6 +135,9 @@ def hosaki(x):
 def helper(func):
     pdf = pd.read_csv("dv.dat",sep='\s+',index_col=0, header=None, names=["parnme","parval1"])
     #obj1,obj2 = func(pdf.values)
+    x_vals = pdf.values
+    if x_vals.ndim == 2 and x_vals.shape[0] == 1:
+        x_vals = x_vals[0]
     objs,constrs = func(pdf.values)
     
     if os.path.exists("additive_par.dat"):
@@ -147,10 +150,18 @@ def helper(func):
 
     with open("obj.dat",'w') as f:
         for i,obj in enumerate(objs):
-            f.write("obj_{0} {1}\n".format(i+1,float(obj)))
+            if isinstance(obj, np.ndarray):
+                obj_value = float(obj.item()) if obj.size == 1 else float(obj[0])
+            else:
+                obj_value = float(obj)
+            f.write("obj_{0} {1}\n".format(i+1,obj_value))
         #f.write("obj_2 {0}\n".format(float(obj2)))
         for i,constr in enumerate(constrs):
-            f.write("constr_{0} {1}\n".format(i+1,float(constr)))
+            if isinstance(constr, np.ndarray):
+                constr_value = float(constr.item()) if constr.size == 1 else float(constr[0])
+            else:
+                constr_value = float(constr)
+            f.write("constr_{0} {1}\n".format(i+1,constr_value))
     return objs,constrs
 
 def setup_problem(name,additive_chance=False, risk_obj=False, self_adaptive=False):
