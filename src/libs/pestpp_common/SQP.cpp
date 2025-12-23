@@ -923,7 +923,6 @@ void SeqQuadProgram::initialize()
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 	MAX_CONSEC_INFEAS_IES = pest_scenario.get_pestpp_options().get_sqp_max_consec_infeas_ies();
-	SF_INC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_up_factor();
 	SF_DEC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_down_factor();
 
 	stringstream ss;
@@ -940,11 +939,8 @@ void SeqQuadProgram::initialize()
 		message(1, "resetting par_sigma_range to 20.0");
 		ppo->set_par_sigma_range(20.0);
 	}
-
-	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
-	//process dec var args
 	vector<string> dec_var_groups = ppo->get_opt_dec_var_groups();
 	if (dec_var_groups.size() != 0)
 	{
@@ -2072,8 +2068,7 @@ bool SeqQuadProgram::update_hessian(string how)
 	//check if there's an active constraint for the current dv then compute constraint jco and update y_k
 	vector<string> prev_cnames, curr_cnames;
 	prev_cnames = prev_constraint_mat.get_row_names();
-	int wset_lvl = pest_scenario.get_pestpp_options().get_sqp_wset_level();
-	current_constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs, (working_set_tol), wset_lvl).first;
+	current_constraint_mat = get_constraint_mat(current_ctl_dv_values, current_obs, (working_set_tol)).first;
 	curr_cnames = current_constraint_mat.get_row_names();
 	
 	set<string> all_constraint_names;
@@ -3223,7 +3218,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::Matrix
 //	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);
 //}
 
-pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, int wset_lvl, const Eigen::VectorXd* lm, vector<string> curr_ws)
+pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, const Eigen::VectorXd* lm, vector<string> curr_ws)
 {
 	if (use_ensemble_grad) 
 	{
@@ -3250,12 +3245,12 @@ pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observa
 			}
 		}
 
-		return constraints.get_working_set_constraint_matrix(decvar, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol), wset_lvl);
+		return constraints.get_working_set_constraint_matrix(decvar, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol));
 	}
 	else
 	{
 		message(2, "getting working set constraint matrix");
-		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, jco, true, lm, (working_set_tol), wset_lvl);
+		return constraints.get_working_set_constraint_matrix(_dv_vals, _obs_vals, jco, true, lm, (working_set_tol));
 	}
 }
 
@@ -4295,8 +4290,7 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 
 	if ((lm_en[rname].array() < 0).any())
 	{
-		int wset_lvl = pest_scenario.get_pestpp_options().get_sqp_wset_level();
-		constraint_mat_en[rname] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, wset_lvl, &lm_en[rname], cnames_en[rname]);
+		constraint_mat_en[rname] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, &lm_en[rname], cnames_en[rname]);
 		if (constraint_mat_en[rname].first.get_row_names() != cnames_en[rname])
 		{
 			vector<string> prev_cnames = cnames_en[rname];
@@ -4475,8 +4469,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 		cout << "  ---  " << ss.str() << endl;
 		local_subset_size = _dvs.shape().first;
 	}
-
-	ParameterEnsemble _avail_dvs = _dvs, _drawn_dvs(&pest_scenario, &rand_gen);
 		
 	if (!sampling_tracking_initialized)
 	{
@@ -4497,40 +4489,48 @@ bool SeqQuadProgram::solve_new_ensemble()
 	}
 
 	vector<int> subset_idxs = get_subset_idxs(_dvs.shape().first, local_subset_size);
-
+	vector<string> subset_real_names;
+	subset_real_names.reserve(subset_idxs.size());
 	for (int idx : subset_idxs)
 	{
 		unselected_dv_indices.erase(idx);
 		selected_dv_indices.insert(idx);
-
-		string par_name = _dvs.get_real_names()[idx];
-
-		ParameterEnsemble t;
-		t.reserve(vector<string>{ par_name }, dv_names);
-		t.add_2_row_ip(par_name, _dvs.get_real_vector(par_name));
-
-		if (_drawn_dvs.shape().first == 0) 
-			_drawn_dvs = t;
-		else
-			_drawn_dvs.append_other_rows(t, true);
-		
-		_avail_dvs.drop_rows({ par_name }, true);
+		subset_real_names.push_back(_dvs.get_real_names()[idx]);
 	}
+
+	ParameterEnsemble _drawn_dvs = _dvs;
+	_drawn_dvs.keep_rows(subset_real_names, true);
 
 	Parameters dv_vals = current_ctl_dv_values;
 	Observations obs_vals = current_obs;
 
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
 	vector<string> drawn_real_names = _drawn_dvs.get_real_names();
+	drawn_real_names.push_back(BASE_REAL_NAME);
+
+	double rangesq = -1.0;
+	if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
+	{
+		ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
+		Parameters lbnd = par_info.get_low_bnd(dv_names);
+		Parameters ubnd = par_info.get_up_bnd(dv_names);
+		ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
+		par_transform.ctl2numeric_ip(lbnd);
+		par_transform.ctl2numeric_ip(ubnd);
+
+		rangesq = 0.0;
+		for (int i = 0; i < dv_names.size(); i++)
+		{
+			double lb = lbnd[dv_names[i]];
+			double ub = ubnd[dv_names[i]];
+			rangesq += pow(ub - lb, 2);
+		}
+		rangesq = pow(rangesq, 0.5);
+	}
 
 	hessian_en.clear();
-	for (auto d : dv.get_real_names())
+	for (auto d : drawn_real_names)
 	{
-		if (find(drawn_real_names.begin(), drawn_real_names.end(), d) == drawn_real_names.end() && d != BASE_REAL_NAME)
-		{
-			continue;
-		}
-
 		ss.str("");
 		ss << "...calculating search direction for realization " << d << endl;
 		frec << ss.str();
@@ -4541,9 +4541,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 		Eigen::VectorXd real_obs_vec = oe.get_real_vector(d);
 		obs_vals.update_without_clear(oe.get_var_names(), real_obs_vec);
 		
-		int wset_lvl = pest_scenario.get_pestpp_options().get_sqp_wset_level();
-		constraint_mat_en[d] = get_constraint_mat(dv_vals, obs_vals, working_set_tol, wset_lvl);
-		Mat current_cmat = constraint_mat_en[d].first;
+		constraint_mat_en[d] = get_constraint_mat(dv_vals, obs_vals, working_set_tol);
 		cnames_en[d] = constraint_mat_en[d].first.get_row_names();
 		constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
 		current_obj_en[d] = get_obj_value(dv_vals, obs_vals);
@@ -4565,27 +4563,10 @@ bool SeqQuadProgram::solve_new_ensemble()
 		hessian = backup_hessian;
 
 		Eigen::VectorXd unscaled_search_d = search_d_en[d];
-		if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
+		double dir_norm = search_d_en[d].norm();
+		if (rangesq > 0.0 && dir_norm > rangesq)
 		{
-			ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
-			Parameters lbnd = par_info.get_low_bnd(dv_names);
-			Parameters ubnd = par_info.get_up_bnd(dv_names);
-			ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
-			par_transform.ctl2numeric_ip(lbnd);
-			par_transform.ctl2numeric_ip(ubnd);
-
-			double rangesq = 0.0;
-			for (int i = 0; i < dv_names.size(); i++)
-			{
-				double lb = lbnd[dv_names[i]];
-				double ub = ubnd[dv_names[i]];
-				rangesq += pow(ub - lb, 2);
-			}
-			rangesq = pow(rangesq, 0.5);
-			if (search_d_en[d].norm() > rangesq)
-			{
-				search_d_en[d] = rangesq * search_d_en[d] / search_d_en[d].norm();
-			}
+			search_d_en[d] = rangesq * search_d_en[d] / dir_norm;
 		}
 
 		ss.str("");
@@ -4629,9 +4610,9 @@ bool SeqQuadProgram::solve_new_ensemble()
 		is_good_search = true;
 		Eigen::VectorXd parent_dv_vec = dv.get_real_vector(selected_ls_parent);
 		prev_ctl_dv_values.update_without_clear(dv_names, parent_dv_vec);
-		constraint_jco = constraint_mat_en[selected_ls_parent].first.e_ptr()->toDense();
+		constraint_jco = constraint_jco_en[selected_ls_parent];
 		current_constraint_mat = constraint_mat_en[selected_ls_parent].first;
-		cnames = constraint_mat_en[selected_ls_parent].first.get_row_names();
+		cnames = cnames_en[selected_ls_parent];
 		prev_constraint_mat = current_constraint_mat;
 		lambda = lm_en[selected_ls_parent];
 		if (hessian_en.find(selected_ls_parent) != hessian_en.end())

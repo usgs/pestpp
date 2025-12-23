@@ -14,7 +14,6 @@
 #include "RunStorage.h"
 #include "covariance.h"
 #include "RunManagerAbstract.h"
-#include "ObjectiveFunc.h"
 #include "Localizer.h"
 #include "EnsembleMethodUtils.h"
 #include "constraints.h"
@@ -115,9 +114,7 @@ private:
 	double trace_ratio_0, det_ratio_0, frobenius_ratio_0, max_eigenval_ratio_0;
 	bool possibly_converged = false;
 	
-	ParameterEnsemble feas_dp_archive, infeas_dp_archive, _dp;
-	ObservationEnsemble feas_oe_archive, infeas_oe_archive, _op;
-
+	ParameterEnsemble feas_dp_archive, infeas_dp_archive;
 	map<string, double> sorted_obj_map, sorted_viol_map;
 	string cma_update_summary;
 	CovMetrics metrics_init;
@@ -129,9 +126,7 @@ private:
 protected:
 	std::mt19937* rand_gen_ptr;
 	Pest* pest_scenario_ptr;
-	Eigen::MatrixXd reals;
 	FileManager* file_manager;
-
 };
 
 class SeqQuadProgram
@@ -174,15 +169,9 @@ private:
 	int n_consec_infeas;
     int MAX_CONSEC_INFEAS_IES;
     double SF_DEC_FAC;
-    double SF_INC_FAC;
     double BASE_SCALE_FACTOR = 1.0;
-    double PAR_SIGMA_DEC_FAC = 0.9;
-    double PAR_SIGMA_INC_FAC = 2.0;
     bool SOLVE_EACH_REAL = false;
-    double par_sigma_max = 100;
 	bool reset_corr = false;
-
-    double par_sigma_min = 10;
 	double eigthresh;
 
 	//trust region parameters
@@ -307,7 +296,7 @@ private:
 	
 	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
-	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, int wset_lvl = 1, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>());
+	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>());
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);

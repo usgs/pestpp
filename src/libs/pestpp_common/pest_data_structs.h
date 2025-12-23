@@ -409,8 +409,6 @@ public:
 	void set_sqp_max_consec_infeas_ies(int _max) { sqp_max_consec_infeas_ies = _max; }
 	double get_sqp_max_reinflation_cond_num() const { return sqp_max_reinflation_cond_num; }
 	void set_sqp_max_reinflation_cond_num(double val) { sqp_max_reinflation_cond_num = val; }
-	double get_sqp_scale_up_factor() const { return sqp_scale_up_factor; }
-	void set_sqp_scale_up_factor(double val) { sqp_scale_up_factor = val; }
 	double get_sqp_scale_down_factor() const { return sqp_scale_down_factor; }
 	void set_sqp_scale_down_factor(double val) { sqp_scale_down_factor = val; }
 	double get_sqp_hess_max_cond_num() const { return sqp_hess_max_cond_num; }
@@ -423,8 +421,6 @@ public:
 	double get_sqp_viol_pad() const { return sqp_viol_pad; }
 	int get_sqp_reset_hessian_every()const { return sqp_reset_hessian_every; }
 	void set_sqp_reset_hessian_every(int _every) { sqp_reset_hessian_every = _every; }
-	int get_sqp_wset_level()const { return sqp_wset_level; }
-	void set_sqp_wset_level(int _level) { sqp_wset_level = _level; }
 	bool get_sqp_rescale_search_dir()const { return sqp_rescale_search_dir; }
 	void set_sqp_rescale_search_dir(bool _flag) { sqp_rescale_search_dir = _flag; }
 	int get_sqp_seek_feas_max_iter()const { return sqp_seek_feas_max_iter; }
@@ -854,7 +850,6 @@ private:
 	int sqp_max_consec_infeas;
 	int sqp_max_consec_infeas_ies;
 	int max_consec_phiinc;
-	double sqp_scale_up_factor;
 	double sqp_scale_down_factor;
 	double sqp_cma_c1;
 	double sqp_cma_cmu;
@@ -867,7 +862,6 @@ private:
 	bool sqp_enforce_bounds;
 	double sqp_viol_pad;
 	int sqp_reset_hessian_every;
-	int sqp_wset_level;
 	bool sqp_rescale_search_dir;
 	int sqp_seek_feas_max_iter;
 	double sqp_risk;

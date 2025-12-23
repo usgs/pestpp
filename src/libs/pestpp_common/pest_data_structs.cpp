@@ -1819,11 +1819,6 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_max_reinflation_cond_num);
 		return true;
 	}
-	else if (key == "SQP_SCALE_UP_FACTOR")
-	{
-		convert_ip(value, sqp_scale_up_factor);
-		return true;
-	}
 	else if (key == "SQP_SCALE_DOWN_FACTOR")
 	{
 		convert_ip(value, sqp_scale_down_factor);
@@ -1852,11 +1847,6 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	else if (key == "SQP_RESET_HESSIAN_EVERY")
 	{
 		convert_ip(value, sqp_reset_hessian_every);
-		return true;
-	}
-	else if (key == "SQP_WSET_LEVEL")
-	{
-		convert_ip(value, sqp_wset_level);
 		return true;
 	}
 	else if (key == "SQP_RESCALE_SEARCH_DIR")
@@ -2061,14 +2051,12 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_cma_reinflation_factor: " << sqp_cma_reinflation_factor << endl;
 	os << "sqp_max_consec_infeas_ies: " << sqp_max_consec_infeas_ies << endl;
 	os << "sqp_max_reinflation_cond_num: " << sqp_max_reinflation_cond_num << endl;
-	os << "sqp_scale_up_factor: " << sqp_scale_up_factor << endl;
 	os << "sqp_scale_down_factor: " << sqp_scale_down_factor << endl;
 	os << "sqp_hess_max_cond_num: " << sqp_hess_max_cond_num << endl;
 	os << "sqp_save_cov_every: " << sqp_save_cov_every << endl;
 	os << "sqp_enforce_bounds: " << sqp_enforce_bounds << endl;
 	os << "sqp_viol_pad: " << sqp_viol_pad << endl;
 	os << "sqp_reset_hessian_every: " << sqp_reset_hessian_every << endl;
-	os << "sqp_wset_level: " << sqp_wset_level << endl;
 	os << "sqp_rescale_search_dir: " << sqp_rescale_search_dir << endl;
 	os << "sqp_seek_feas_max_iter: " << sqp_seek_feas_max_iter << endl;
 	os << "sqp_risk: " << sqp_risk << endl;
@@ -2321,14 +2309,12 @@ void PestppOptions::set_defaults()
 	set_sqp_cma_reinflation_factor(-1.0);
 	set_sqp_max_consec_infeas_ies(3);
 	set_sqp_max_reinflation_cond_num(500.0);
-	set_sqp_scale_up_factor(1.0);
 	set_sqp_scale_down_factor(1.0);
 	set_sqp_hess_max_cond_num(1E+8);
 	set_sqp_save_cov_every(-1);
 	set_sqp_enforce_bounds(false);
 	set_sqp_viol_pad(1E-4);
 	set_sqp_reset_hessian_every(-1);
-	set_sqp_wset_level(1);
 	set_sqp_rescale_search_dir(true);
 	set_sqp_seek_feas_max_iter(3);
 	set_sqp_risk(0.50);
