@@ -255,7 +255,9 @@ private:
 	Jacobian_1to1 jco;
 	Covariance hessian, used_hessian;
 	Eigen::VectorXd step_k;
-	string selected_ls_parent;
+	string selected_ls_parent, selected_ls_child;
+	map<double, map<string, string>> sv_lineage_map;
+	map<string, double> cname_sf_map;
 
 	SqpFilter filter;
 
@@ -272,7 +274,7 @@ private:
 	bool solve_new_ensemble();
 
 	bool seek_feasible();
-	FilterRec line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
+	FilterRec line_search(map<string, Eigen::VectorXd>& search_d_map, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	bool iterative_partial_step(const string& _blocking_constraint);
 	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool recalc = true);
@@ -301,7 +303,7 @@ private:
 	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
-	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
+	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());

@@ -2401,14 +2401,12 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 
 bool SeqQuadProgram::isfullrank(const Eigen::MatrixXd& mat)
 {
-	Eigen::JacobiSVD<Eigen::MatrixXd> svd(mat, Eigen::ComputeThinU | Eigen::ComputeThinV);
-	Eigen::VectorXd singularValues = svd.singularValues();
-	double tol = 1e-5;
-	int rank = (singularValues.array() > tol).count();
-	if (rank == min(mat.rows(), mat.cols()))
+	if (mat.rows() == 0 || mat.cols() == 0) 
 		return true;
-	else
-		return false;
+
+	Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(mat.transpose());
+	int rank = qr.rank();
+	return (rank == min(mat.rows(), mat.cols()));
 }
 
 void SeqQuadProgram::iterate_2_solution()
@@ -3092,10 +3090,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, lm);
 }
 
-pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::MatrixXd& G, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames)
+pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(const Eigen::MatrixXd& G, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* cnames)
 {
 	// 1. Check if we can use a more efficient approach for special cases
-	if (cnames.empty()) {
+	if (cnames->empty()) {
 		// No constraints - just solve the unconstrained problem
 		Eigen::VectorXd search_d = G.ldlt().solve(-curved_grad);
 		return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, Eigen::VectorXd());
@@ -3103,7 +3101,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::Matrix
 
 	// 2. Form the KKT matrix with proper regularization
 	int n = dv_names.size();
-	int m = cnames.size();
+	int m = cnames->size();
 
 	// Apply regularization to G if needed to ensure positive definiteness
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(G);
@@ -3861,13 +3859,16 @@ bool SeqQuadProgram::iterative_partial_step(const string& _blocking_constraint)
 	}
 }
 
-FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset, bool recalc)
+FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset, bool recalc)
 {
 	stringstream ss;
+	const auto& dv_real_names = dv.get_real_names();
+	vector <string> subset_real_names = dvs_subset->get_real_names();
+
 	if (!recalc)
 	{
 		ss << "performing line search on ensemble subset:";
-		for (auto& n : dvs_subset->get_real_names())
+		for (auto& n : subset_real_names)
 			ss << " " << n << ",";
 		ss << " BASE" << endl;
 		message(1, ss.str());
@@ -3875,7 +3876,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	else
 	{
 		ss << "performing line search on realizations:";
-		const auto& n = dvs_subset->get_real_names();
+		const auto& n = subset_real_names;
 		for (size_t i = 0; i < n.size(); i++)
 		{
 			ss << ' ' << n[i];
@@ -3888,27 +3889,38 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	ParameterEnsemble dv_candidates(&pest_scenario, &rand_gen);
 	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
-	map<double, map<string, string>> sv_real_map;
-	map<string, Eigen::VectorXd> search_dirs;
+	
 	vector<string> real_names;
 	vector<double> scale_vals;
 	
-	scale_vals.clear();
-	for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_alpha_mults())
+	vector<double> alpha_mults = pest_scenario.get_pestpp_options().get_sqp_alpha_mults();
+	sort(alpha_mults.begin(), alpha_mults.end());
+
+	for (auto it = alpha_mults.begin(); it != alpha_mults.end(); it++)
 	{
-		scale_vals.push_back(sf * BASE_SCALE_FACTOR);
+		if (it == alpha_mults.begin())
+		{
+			scale_vals.push_back(*it * BASE_SCALE_FACTOR);
+		}
+		else
+		{
+			double prev = *(it - 1);
+			double curr = *it;
+			scale_vals.push_back(prev + (curr - prev) * BASE_SCALE_FACTOR);
+		}
 	}
 
+	sv_lineage_map.clear();
 	if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
 	{
 		for (auto sv : scale_vals)
 		{
-			for (auto& real_name : dv.get_real_names())
+			for (auto& rname : dv_real_names)
 			{
 				ss.str("");
-				ss << "cand_" << real_name << "_sv:" << left << setw(8) << setprecision(3) << sv;
+				ss << "cand_" << rname << "_sv:" << left << setw(8) << setprecision(3) << sv;
 				real_names.push_back(ss.str()); 
-				ls_parent_map[ss.str()] = real_name;
+				ls_parent_map[ss.str()] = rname;
 			}
 		}
 
@@ -3921,7 +3933,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 			map<string,int> rmap = dvs_subset->get_real_map();
 			if ((rmap.find(BASE_REAL_NAME) == rmap.end()) && !recalc)
 			{
-				if (dvs_subset->get_real_names().size() == 0)
+				if (subset_real_names.size() == 0)
 				{
 					dvs_subset->reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
 					Eigen::VectorXd real_vec = dv.get_real_vector(BASE_REAL_NAME);
@@ -3932,20 +3944,20 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 					d.reserve(vector<string>{ BASE_REAL_NAME }, dv_names);
 					d.add_2_row_ip(BASE_REAL_NAME, dv.get_real_vector(BASE_REAL_NAME));
 					dvs_subset->append_other_rows(d);
+					subset_real_names.push_back(BASE_REAL_NAME);
 				}
 			}
 			
-			for (auto& real_name : dvs_subset->get_real_names()) 
+			for (auto& rname : subset_real_names) 
 			{
 				for (auto sv : scale_vals) 
 				{
 					ss.str("");
-					ss << "cand_" << real_name << "_sv:" << left << setw(8) << setprecision(3) << sv;
+					ss << "cand_" << rname << "_sv:" << left << setw(8) << setprecision(3) << sv;
 					real_names.push_back(ss.str());
-					sv_real_map[sv][real_name] = ss.str();
-					ls_parent_map[ss.str()] = real_name;
+					sv_lineage_map[sv][rname] = ss.str();
+					ls_parent_map[ss.str()] = rname;
 				}
-				search_dirs[real_name] = search_d.at(real_name);
 			}
 		}
 		else
@@ -3954,7 +3966,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	dv_candidates.reserve(real_names, dv_names);
 
 	vector<double> used_scale_vals;
-	map<string, double> real_sf_map;
+	cname_sf_map.clear();
 	step_length_map.clear();
 
 	for (int i = 0;i < scale_vals.size();i++)
@@ -3964,12 +3976,12 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		ss << "starting calcs for scaling factor" << scale_val;
 		message(1, "starting lambda calcs for scaling factor", scale_val);
 
-		map<string, Eigen::VectorXd> scale_search_d;
+		map<string, Eigen::VectorXd> scaled_sdir_map;
 		vector<string> short_upgrades;
-		for (auto& sd : search_dirs)
+		for (auto& sd : search_d_map)
 		{
-			scale_search_d[sd.first] = sd.second * scale_val;
-			if (scale_search_d[sd.first].squaredNorm() < 1.0E-10)
+			scaled_sdir_map[sd.first] = sd.second * scale_val;
+			if (scaled_sdir_map[sd.first].squaredNorm() < 1.0E-10)
 				short_upgrades.push_back(sd.first);
 		}
 		if (short_upgrades.size() > 0)
@@ -3982,12 +3994,12 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		for (const auto& real_name : dvs_subset->get_real_names())
 		{
 			Eigen::VectorXd dv_upgrade = dvs_subset->get_real_vector(real_name);
-			dv_upgrade += scale_search_d[real_name];			
+			dv_upgrade += scaled_sdir_map[real_name];			
 			
-			string upgrade_rname = sv_real_map[scale_val][real_name];
-			dv_candidates.update_real_ip(upgrade_rname, dv_upgrade);
-			step_length_map[upgrade_rname] = scale_search_d[real_name];
-			real_sf_map[upgrade_rname] = scale_val;
+			string cand_rname = sv_lineage_map[scale_val][real_name];
+			dv_candidates.update_real_ip(cand_rname, dv_upgrade);
+			step_length_map[cand_rname] = scaled_sdir_map[real_name];
+			cname_sf_map[cand_rname] = scale_val;
 			used_scale_vals.push_back(scale_val);
 		}
 			
@@ -4002,12 +4014,13 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 	
+	const vector<string> cand_real_names = dv_candidates.get_real_names();
 	if (!recalc)
 		dv_to_save = dv_candidates;
 	else
 	{
 		auto save = dv_to_save.get_real_map();
-		for (const auto& rname : dv_candidates.get_real_names())
+		for (const auto& rname : cand_real_names)
 		{
 			Eigen::VectorXd row = dv_candidates.get_real_vector(rname);
 			if (save.find(rname) != save.end())
@@ -4017,8 +4030,6 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 			else
 			{
 				throw_sqp_error("active set recalc has new candidate not in original candidate set:" + rname);
-				//dv_to_save.append(rname, row);
-				//save[rname] = dv_to_save.get_real_map().at(rname);
 			}
 		}
 	}
@@ -4030,7 +4041,6 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	double d;
 	vector<string> drop;
 	set<int> jvals;
-	vector<string> current_real_names = dv_candidates.get_real_names();
 	for (int i = 0;i < dv_candidates.shape().first; i++)
 	{
 		v1 = dv_candidates.get_real_vector(i);
@@ -4038,8 +4048,8 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 			v2 = dv_candidates.get_real_vector(j);
 			d = (v2 - v1).squaredNorm();
 			if ((abs(d) < 1E-12) && (jvals.find(j) == jvals.end())) {
-				message(1, "duplicate candidates:", vector<string>{current_real_names[i], current_real_names[j]});
-				drop.push_back(current_real_names[j]);
+				message(1, "duplicate candidates:", vector<string>{cand_real_names[i], cand_real_names[j]});
+				drop.push_back(cand_real_names[j]);
 				jvals.emplace(j);
 			}
 		}
@@ -4050,11 +4060,10 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 		message(1, "dropping the following duplicate candidates: ", drop);
 		dv_candidates.drop_rows(drop, true);
 		used_scale_vals.clear();
-		for (auto& real_name : dv_candidates.get_real_names())
+		for (auto& rname : cand_real_names)
 		{
-			used_scale_vals.push_back(real_sf_map.at(real_name));
+			used_scale_vals.push_back(cname_sf_map.at(rname));
 		}
-
 	}
 	message(0, "running candidate dv/pars");
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates);
@@ -4091,7 +4100,6 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d, Ei
 	oe_all.append_other_rows(oe_candidates);
 	
 	return pick_upgrade_and_update_current(dv_all , oe_all, cma_reset_archive, true, dvs_subset, recalc);
-
 }
 
 Ensemble SeqQuadProgram::get_pi_ensemble(ParameterEnsemble& _dv, vector<string>& pinames)
@@ -4169,10 +4177,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 	if (Cnames.size() > 0)
 	{
-		Eigen::VectorXd constraint_diff(Cnames.size());
-		pair<Eigen::VectorXd, Eigen::VectorXd> p = constraints.get_obs_resid_constraint_vectors(_current_dv_values, _current_obs_values, Cnames);
-		constraint_diff = p.second;
-
+		Eigen::VectorXd constraint_diff = constraints.get_obs_resid_constraint_vectors(_current_dv_values, _current_obs_values, Cnames).second;
 		for (int i = 0;i < Cnames.size();i++) {
 			if (constraint_sense[Cnames[i]] == "less_than")
 			{
@@ -4181,15 +4186,17 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 			}
 		}
 
-		if ((constr_jco.rows() > 0) && (!isfullrank(constr_jco)))
-		{
-			frec << "   WARNING: constraint_jco is not full rank. Identifying independent constraints.";
-			performance_log->log_event("   WARNING: constraint_jco is not full rank. Identifying independent constraints.");
+		if (constr_jco.rows() > 0)
+		{	
 			Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(constr_jco.transpose());
 			int effective_rank = qr.rank();
+			int full_rank = min(constr_jco.rows(), constr_jco.cols());
 
-			if (effective_rank < constr_jco.rows())
+			if (effective_rank < full_rank)
 			{
+				frec << "   WARNING: constraint_jco is not full rank. Identifying independent constraints.";
+				performance_log->log_event("   WARNING: constraint_jco is not full rank. Identifying independent constraints.");
+
 				Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> perm = qr.colsPermutation();
 				Eigen::VectorXi perm_indices = perm.indices();
 
@@ -4239,7 +4246,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 			performance_log->log_event(ss.str());
 			frec << ss.str();
 		}
-		Eigen::MatrixXd G = *hessian.e_ptr();
+		const Eigen::MatrixXd& G = *hessian.e_ptr();
 
 		string eqp_solve_method; // probably too heavy to be a ++arg
 		eqp_solve_method = "null_space";
@@ -4251,7 +4258,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		}
 		else if (eqp_solve_method == "direct")
 		{
-			x = _kkt_direct(G, constr_jco, constraint_diff, grad_vector, Cnames);
+			x = _kkt_direct(G, constr_jco, constraint_diff, grad_vector, _cnames);
 			search_d = x.first;
 			lm = x.second;
 		}
@@ -4603,7 +4610,8 @@ bool SeqQuadProgram::solve_new_ensemble()
 	FilterRec search = run_search_routine(grad, &_drawn_dvs);
 
 	//needed for bfgs hessian update
-	selected_ls_parent = ls_parent_map[search.real_name];
+	selected_ls_child = search.real_name;
+	selected_ls_parent = ls_parent_map[selected_ls_child];
 	step_k = step_length_map[search.real_name];
 	if (step_k.size() != 0 && search.iter == iter)
 	{
@@ -4619,10 +4627,14 @@ bool SeqQuadProgram::solve_new_ensemble()
 		{
 			hessian = hessian_en[selected_ls_parent];
 		}
+		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
 	}
 	else
+	{
 		is_good_search = false;
-
+		BASE_SCALE_FACTOR = 1.0;
+	}
+	message(1, "new base scale factor: ", BASE_SCALE_FACTOR);
 
 	if (search.viol_val == 0.0)
 	{
@@ -4635,7 +4647,6 @@ bool SeqQuadProgram::solve_new_ensemble()
 		cma_reset_archive = false;
 	}
 
-	message(1, "new base scale factor: ", BASE_SCALE_FACTOR);
 	return (search.viol_val == 0.0);
 }
 
@@ -5235,15 +5246,6 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 
 	bool is_violated = (selected.viol_val >= 1E-10);
 	bool is_recycled = (find(best_phis.begin(), best_phis.end(), selected.obj_val) != best_phis.end());
-
-	if (is_violated && is_recycled) //violated and recycled
-		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
-	else if (is_violated && !is_recycled) //violated but new
-		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
-	else if (!is_violated && is_recycled) //feasible but recycled
-		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
-	else //feasible and new
-		BASE_SCALE_FACTOR = 1.0;
 
 	filter.update(selected.obj_val, selected.viol_val, selected.viol_padded, selected.dp_val, selected.oe_val, selected.real_name, iter);
 	filter.report(frec, iter);
