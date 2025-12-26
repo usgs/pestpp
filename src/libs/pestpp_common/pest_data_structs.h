@@ -376,6 +376,8 @@ public:
 	string get_sqp_obs_restart_en()const { return sqp_obs_restart_en; }
 	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
 	string get_sqp_search_method()const { return sqp_search_method; }
+	void set_sqp_solve_method(string _how) { sqp_solve_method = _how; }
+	string get_sqp_solve_method()const { return sqp_solve_method; }
 	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
@@ -838,6 +840,7 @@ private:
 	string sqp_obs_restart_en;
 	string sqp_search_method;
 	string sqp_subset_how;
+	string sqp_solve_method;
 	int sqp_num_reals;
 	int sqp_subset_size;
 	bool sqp_update_hessian;

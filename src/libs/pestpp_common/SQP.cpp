@@ -3092,129 +3092,101 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 
 pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(const Eigen::MatrixXd& G, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* cnames)
 {
-	// 1. Check if we can use a more efficient approach for special cases
-	if (cnames->empty()) {
-		// No constraints - just solve the unconstrained problem
-		Eigen::VectorXd search_d = G.ldlt().solve(-curved_grad);
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+
+	ss << "starting KKT direct solve";
+	performance_log->log_event(ss.str());
+
+	if (cnames == nullptr || cnames->empty()) 
+	{
+		Eigen::MatrixXd G_reg = regularize_hessian(G, "direct unconstrained");
+		Eigen::LDLT<Eigen::MatrixXd> ldlt(G_reg);
+		if (ldlt.info() != Eigen::Success || !ldlt.isPositive()) 
+		{
+			message(1, "WARNING: LDLT failed for unconstrained case in direct method, using steepest descent");
+			Eigen::VectorXd search_d = -curved_grad;
+			return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, Eigen::VectorXd());
+		}
+		Eigen::VectorXd search_d = ldlt.solve(-curved_grad);
 		return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, Eigen::VectorXd());
 	}
 
-	// 2. Form the KKT matrix with proper regularization
 	int n = dv_names.size();
 	int m = cnames->size();
 
-	// Apply regularization to G if needed to ensure positive definiteness
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(G);
-	double min_eig = eigensolver.eigenvalues().minCoeff();
-	const double min_allowed_eig = 1e-6;
-
-	Eigen::MatrixXd G_reg = G;
-	if (min_eig < min_allowed_eig) {
-		double delta = min_allowed_eig - min_eig + 1e-6;
-		G_reg += delta * Eigen::MatrixXd::Identity(n, n);
-		message(1, "Applied regularization to Hessian, delta = ", delta);
+	if (_constraint_jco.rows() != m || _constraint_jco.cols() != n)
+	{
+		ss.str("");
+		ss << "ERROR: Constraint Jacobian dimension mismatch. Expected " << m << "x" << n << ", got " << _constraint_jco.rows() << "x" << _constraint_jco.cols() << endl;
+		throw_sqp_error(ss.str());
 	}
 
-	// Form the KKT matrix with proper scaling
-	// Following Nocedal & Wright Eq. 16.62
-	double constraint_scaling = 1.0;
-	if (G_reg.norm() > 1e-8) {
-		constraint_scaling = sqrt(G_reg.norm());
+	if (constraint_diff.size() != m)
+	{
+		ss.str("");
+		ss << "ERROR: constraint_diff size mismatch. Expected " << m << ", got " << constraint_diff.size() << endl;
+		throw_sqp_error(ss.str());
 	}
 
-	Eigen::MatrixXd scaled_constraint_jco = constraint_scaling * _constraint_jco;
+	Eigen::MatrixXd G_reg = regularize_hessian(G, "direct solve");
 
+	//KKT matrix according to Nocedal & Wright Eq. 16.4:
 	Eigen::MatrixXd kkt_matrix(n + m, n + m);
 	kkt_matrix.topLeftCorner(n, n) = G_reg;
-	kkt_matrix.topRightCorner(n, m) = scaled_constraint_jco.transpose();
-	kkt_matrix.bottomLeftCorner(m, n) = scaled_constraint_jco;
+	kkt_matrix.topRightCorner(n, m) = _constraint_jco.transpose();
+	kkt_matrix.bottomLeftCorner(m, n) = _constraint_jco;
 	kkt_matrix.bottomRightCorner(m, m) = Eigen::MatrixXd::Zero(m, m);
 
-	// 3. Form the right-hand side
-	// Following Nocedal & Wright Eq. 16.4
+	// form the rhs vector
+	// RHS = [-∇f; -c] where c is constraint_diff
 	Eigen::VectorXd rhs(n + m);
-	rhs.head(n) = -curved_grad;
-	rhs.tail(m) = -constraint_diff * constraint_scaling;
+	rhs.head(n) = -curved_grad;  
+	rhs.tail(m) = -constraint_diff; 
 
-	// 4. Solve the KKT system using an appropriate method
-	// For stability, use LDLT factorization with pivoting
+	// Solve the KKT system
+	// Use LDLT factorization for symmetric indefinite systems (KKT matrix is indefinite)
 	Eigen::LDLT<Eigen::MatrixXd> ldlt(kkt_matrix);
+	Eigen::VectorXd x;
 
-	// Check if factorization succeeded
-	if (ldlt.info() != Eigen::Success) {
-		message(1, "LDLT factorization failed, falling back to SVD");
+	if (ldlt.info() != Eigen::Success)
+	{
+		message(1, "WARNING: LDLT factorization failed for KKT system, falling back to SVD");
+		frec << "   WARNING: LDLT factorization failed for KKT system, using SVD" << endl;
 
-		// Use Eigen's built-in SVD instead of custom SVD_REDSVD
 		Eigen::BDCSVD<Eigen::MatrixXd> svd(kkt_matrix, Eigen::ComputeThinU | Eigen::ComputeThinV);
-
-		// Solve the system using SVD
-		Eigen::VectorXd x = svd.solve(rhs);
-
-		Eigen::VectorXd search_d = x.head(n);
-		Eigen::VectorXd lm = x.tail(m) / constraint_scaling; // Rescale back
-
-		return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, lm);
+		x = svd.solve(rhs);
+	}
+	else
+	{
+		x = ldlt.solve(rhs);
 	}
 
-	// Solve using LDLT
-	Eigen::VectorXd x = ldlt.solve(rhs);
-
-	// 5. Extract the solution components
+	// Extract solution components
 	Eigen::VectorXd search_d = x.head(n);
-	Eigen::VectorXd lm = x.tail(m) / constraint_scaling; // Rescale back
+	Eigen::VectorXd lm = x.tail(m);
 
-	// 6. Verify the solution
-	double kkt_error = (kkt_matrix * x - rhs).norm() / (1.0 + rhs.norm());
-	if (kkt_error > 1e-6) {
-		message(1, "Warning: KKT system solution has high residual: ", kkt_error);
+	// Compute residual and error (shared code path)
+	Eigen::VectorXd residual = kkt_matrix * x - rhs;
+	double kkt_error = residual.norm() / (1.0 + rhs.norm());
+
+	if (kkt_error > 1E-6)
+	{
+		ss.str("");
+		ss << "   WARNING: KKT system solution has high residual: " << kkt_error << endl;
+		frec << ss.str();
+		message(1, "WARNING: KKT system solution has high residual: ", kkt_error);
 	}
-
-	message(1, "KKT system solved with residual: ", kkt_error);
-	message(2, "search_d: ", search_d.transpose());
-	message(2, "lagrange multipliers: ", lm.transpose());
+	else if (verbose_level >= 2)
+	{
+		ss.str("");
+		ss << "   KKT direct solve completed. Residual: " << kkt_error << endl;
+		frec << ss.str();
+		message(2, "KKT direct solve completed. Residual: ", kkt_error);
+	}
 
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, lm);
 }
-//
-//pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(Eigen::MatrixXd& G, Eigen::MatrixXd& constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames)
-//{
-//	
-//	//check A full rank
-//
-//	// forming system to be solved - this is filth but it works..
-//	Eigen::MatrixXd coeff_u(dv_names.size(), dv_names.size() + cnames.size());  // todo only in WS
-//	coeff_u << G, constraint_jco.transpose();
-//	Eigen::MatrixXd coeff_l(cnames.size(), dv_names.size() + cnames.size());  // todo only in WS
-//	coeff_l << constraint_jco, Eigen::MatrixXd::Zero(cnames.size(), cnames.size());
-//	Eigen::MatrixXd coeff(dv_names.size() + cnames.size(), dv_names.size() + cnames.size());  // todo only in WS
-//	coeff << coeff_u, coeff_l;
-//	message(1, "coeff", coeff);  // tmp
-//
-//	Eigen::VectorXd rhs(curved_grad.size() + constraint_diff.size());
-//	rhs << curved_grad, constraint_diff;  // << vec1, vec2;
-//	message(1, "rhs", rhs);  // tmp
-//
-//	Eigen::VectorXd x;
-//	Eigen::MatrixXd V, U, S_, s;
-//	SVD_REDSVD rsvd;
-//	//SVD_EIGEN rsvd;
-//	rsvd.set_performance_log(performance_log);
-//
-//	rsvd.solve_ip(coeff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-//	S_ = s.asDiagonal();
-//	message(1, "singular values of KKT matrix", S_);  // tmp
-//
-//	// an old friend!
-//	x = V * S_.inverse() * U.transpose() * rhs;
-//	message(1, "solution vector of steps and lagrange mults", x);  // tmp
-//
-//	Eigen::VectorXd search_d, lm;
-//	search_d = x.head(dv_names.size());  // add rigor here or at least asserts to ensure operating on correct elements
-//	lm = x.tail(x.size() - dv_names.size());  // add rigor here or at least asserts to ensure operating on correct elements
-//
-//	
-//	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);
-//}
 
 pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, const Eigen::VectorXd* lm, vector<string> curr_ws)
 {
@@ -4248,15 +4220,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		}
 		const Eigen::MatrixXd& G = *hessian.e_ptr();
 
-		string eqp_solve_method; // probably too heavy to be a ++arg
-		eqp_solve_method = "null_space";
-		if (eqp_solve_method == "null_space")
+		string sqp_solve_method = pest_scenario.get_pestpp_options().get_sqp_solve_method(); 
+		if (sqp_solve_method == "NULL" || sqp_solve_method == "NULL_SPACE")
 		{
 			x = _kkt_null_space(G, constr_jco, constraint_diff, grad_vector, _cnames);
 			search_d = x.first;
 			lm = x.second;
 		}
-		else if (eqp_solve_method == "direct")
+		else if (sqp_solve_method == "DIRECT")
 		{
 			x = _kkt_direct(G, constr_jco, constraint_diff, grad_vector, _cnames);
 			search_d = x.first;
@@ -4264,7 +4235,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		}
 		else // if "schur", "cg", ...
 		{
-			throw_sqp_error("eqp_solve_method not implemented");
+			throw_sqp_error("sqp_solve_method not implemented");
 		}
 	}
 	else  // solve unconstrained QP subproblem
@@ -4627,12 +4598,12 @@ bool SeqQuadProgram::solve_new_ensemble()
 		{
 			hessian = hessian_en[selected_ls_parent];
 		}
-		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
+		BASE_SCALE_FACTOR = 1.0;
 	}
 	else
 	{
 		is_good_search = false;
-		BASE_SCALE_FACTOR = 1.0;
+		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
 	}
 	message(1, "new base scale factor: ", BASE_SCALE_FACTOR);
 
