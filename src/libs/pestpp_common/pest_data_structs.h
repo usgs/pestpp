@@ -380,17 +380,15 @@ public:
 	string get_sqp_solve_method()const { return sqp_solve_method; }
 	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
+	void set_sqp_num_refined_search_pts(int _num_pts) { sqp_num_refined_search_pts = _num_pts; }
+	int get_sqp_num_refined_search_pts()const { return sqp_num_refined_search_pts; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 	int get_sqp_subset_size()const { return sqp_subset_size; }
 	void set_sqp_subset_size(int _num_reals) { sqp_subset_size = _num_reals; }
-	string get_sqp_subset_how() const { return sqp_subset_how; }
-	void set_sqp_subset_how(string _how) { sqp_subset_how = _how; }
 	bool get_sqp_update_hessian()const { return sqp_update_hessian; }
 	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
 	string get_sqp_hessian_update_method()const { return sqp_hessian_update_method; }
 	void set_sqp_hessian_update_method(string _how) { sqp_hessian_update_method = _how; }
-	bool get_sqp_solve_partial_step()const { return sqp_solve_partial_step; }
-	void set_sqp_solve_partial_step(bool _flag) { sqp_solve_partial_step = _flag; }
 	vector<double> get_sqp_alpha_mults() const { return sqp_alpha_mults; } 
 	void set_sqp_alpha_mults(vector<double> _mults) { sqp_alpha_mults = _mults; }
 	double get_sqp_filter_tol() const { return sqp_filter_tol; }
@@ -839,13 +837,12 @@ private:
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
 	string sqp_search_method;
-	string sqp_subset_how;
 	string sqp_solve_method;
 	int sqp_num_reals;
 	int sqp_subset_size;
 	bool sqp_update_hessian;
+	int sqp_num_refined_search_pts;
 	string sqp_hessian_update_method;
-	bool sqp_solve_partial_step;
 	vector<double> sqp_alpha_mults;
 	double sqp_filter_tol;
 	double sqp_working_set_tol;

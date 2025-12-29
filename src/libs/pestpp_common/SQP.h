@@ -275,11 +275,10 @@ private:
 
 	bool seek_feasible();
 	FilterRec line_search(map<string, Eigen::VectorXd>& search_d_map, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
-	bool iterative_partial_step(const string& _blocking_constraint);
+	void generate_intermediate_candidates(const string& parent_name, double start_scale, double end_scale,	int num_points,	ParameterEnsemble* dvs_subset,	const map<string, Eigen::VectorXd>& search_d_map, ParameterEnsemble& dv_intermediate, vector<string>& intermediate_cand_names);
 	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool recalc = true);
 	FilterRec pick_from_filter_by_merit(SqpFilter _filtered);
-	bool pick_partial_step(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string, double>& sf_map);
 
 	double compute_actual_reduction(Parameters& trial_dv_values, Observations& trial_obs);
 	double compute_predicted_reduction(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
