@@ -1203,12 +1203,14 @@ void SeqQuadProgram::initialize()
 
 	message(2, "calculating initial objective function hessian");
 	hessian = calc_objective_hessian();
-	/*ss.str("");
-	ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;*/
 	Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
-	/*ss << hessian_dense << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << ss.str() << endl;*/
+	if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
+	{
+		ss.str("");
+		ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << ss.str() << endl;
+	}
 
 	/*message(2, "initializing hessian matrix with identity");
 	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
@@ -1415,12 +1417,16 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		else
 			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 
-		ss.str("");
-		ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
-		frec << ss.str();
+		if (pest_scenario.get_pestpp_options().get_sqp_debug_cmaes())
+		{
+			ss.str("");
+			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+			frec << ss.str();
 
-		message(0, "CMA-ES metrics summary");
-		message(2, cmaes.get_cma_update_summary());
+
+			message(0, "CMA-ES metrics summary");
+			message(2, cmaes.get_cma_update_summary());
+		}
 		
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
@@ -2408,14 +2414,14 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 	else
 		report_regul = false;
 
-	/*if (report_regul)
+	if (report_regul && pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
 	{
 		ss.str("");
 		ss << "   approx hessian after regularization " << "(" << context << "): " << endl;
 		ss << "   " << H_reg << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << ss.str() << endl;
-	}*/
+	}
 	used_hessian = Covariance(dv_names, H_reg.sparseView());
 	return H_reg;
 }
@@ -2468,8 +2474,13 @@ void SeqQuadProgram::iterate_2_solution()
         
 		if (use_cmaes && !seek_ies)
 		{
-			message(1, "updating CMA-ES with approximate gradient");
-			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
+			if (is_good_search)
+			{
+				message(1, "updating CMA-ES with approximate gradient");
+				cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
+			}
+			else
+				message(1, "keeping currrent CMA-ES covariance");
 
 			if (pest_scenario.get_pestpp_options().get_sqp_save_cov_every() > 0)
 			{
@@ -2544,12 +2555,15 @@ void SeqQuadProgram::iterate_2_solution()
 			else
 				message(1, "skipping hessian update");
 
-			/*ss.str("");
-			ss << endl << "approx hessian: " << endl << hessian << endl;*/
 			Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
-			/*ss << hessian_dense << endl;
-			ofstream& frec = file_manager.rec_ofstream();
-			frec << ss.str() << endl;*/
+			
+			if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
+			{
+				ss.str("");
+				ss << hessian_dense << endl;
+				ofstream& frec = file_manager.rec_ofstream();
+				frec << ss.str() << endl;
+			}
 		}
 	}
 }
@@ -2823,9 +2837,13 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	}
 	Parameters pgrad = _current_dv_values;
 	pgrad.update_without_clear(dv_names, grad);
-	ss.str("");
-	ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
-	frec << ss.str();
+	
+	if (pest_scenario.get_pestpp_options().get_sqp_debug_stosag_grad())
+	{
+		ss.str("");
+		ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
+		frec << ss.str();
+	}
 
 	return pgrad;
 }
@@ -5265,21 +5283,20 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 			int ratio = pest_scenario.get_pestpp_options().get_sqp_num_reals() / curr_parent_num + 1;
 			int new_parent_num = max(5, pest_scenario.get_pestpp_options().get_sqp_num_reals() / ratio);
 			cmaes.set_parent_num(new_parent_num);
-			
 		}
-		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 	}
 	else
 	{
-		
 		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
-		{
 			cmaes.set_parent_num(pest_scenario.get_pestpp_options().get_sqp_num_reals() / 4);
-		}
-		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 	}
+
+	message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
+	if (is_good_search)
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
+	else
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), false);
+	
 
 	bool is_violated = (selected.viol_val >= 1E-10);
 	bool is_recycled = (find(best_phis.begin(), best_phis.end(), selected.obj_val) != best_phis.end());

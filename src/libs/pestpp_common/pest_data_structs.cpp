@@ -1869,6 +1869,16 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_powell_damping_factor);
 		return true;
 	}
+	else if (key == "SQP_DEBUG_HESSIAN")
+	{
+		sqp_debug_hessian = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_DEBUG_CMAES")
+	{
+		sqp_debug_cmaes = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	return false;
 }
 
@@ -2061,6 +2071,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_seek_feas_max_iter: " << sqp_seek_feas_max_iter << endl;
 	os << "sqp_risk: " << sqp_risk << endl;
 	os << "sqp_powell_damping_factor: " << sqp_powell_damping_factor << endl;
+	os << "sqp_debug_hessian: " << sqp_debug_hessian << endl; 
+	os << "sqp_debug_cmaes: " << sqp_debug_cmaes << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2319,6 +2331,8 @@ void PestppOptions::set_defaults()
 	set_sqp_seek_feas_max_iter(3);
 	set_sqp_risk(0.50);
 	set_sqp_powell_damping_factor(0.2);
+	set_sqp_debug_hessian(false);
+	set_sqp_debug_cmaes(false);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);
