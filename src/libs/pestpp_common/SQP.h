@@ -192,14 +192,9 @@ private:
 
 	int iter;
 
-	double last_best;
-	double last_viol;
-	vector<double> best_phis, best_feas_phis;
-	vector<double> best_violations;
-	double best_phi_yet;
-	double best_violation_yet;
-	double working_set_tol;
-	double sqp_risk;
+	double last_best, last_viol;
+	vector<double> best_phis, best_violations;
+	double best_phi_yet, working_set_tol, sqp_risk;
 
 	map<string, double> obj_map, total_viol_map;
 	map<string, Eigen::VectorXd>  step_length_map;
@@ -214,8 +209,8 @@ private:
 	vector<string> adj_par_names;
 	bool use_subset, use_cmaes = true, adjust_step_control = false;
 
-	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
-	Observations current_obs, trial_obs, infeas_cand_obs;
+	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values;
+	Observations current_obs, trial_obs;
 	
 	Parameters current_grad_vector;
 	map<int, Parameters> grad_vector_map;
