@@ -294,6 +294,21 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 		}
 
 	}
+	vector<string> obs_problems;
+	for (string& oname : ctl_ordered_obs_names) {
+		if (observation_info.get_weight(oname) < 0) {
+			ss.str("");
+			ss << "observation " << oname << " weight less than zero";
+			obs_problems.push_back(ss.str());
+		}
+	}
+
+	for (auto &str : obs_problems)
+	{
+		cout << "observation error: " << str << endl;
+		f_rec << "observation error: " << str << endl;
+		err = true;
+	}
 
 
 
@@ -642,10 +657,20 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 
 				//try to use as a regul arg
-				if ((stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND) && (regul_scheme_ptr))
-				{
-					stat = regul_scheme_ptr->assign_value_by_key(kv.first,kv.second);
-					check_report_assignment(f_rec, stat, kv.first, kv.second);
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND) {
+					if (regul_scheme_ptr) {
+						stat = regul_scheme_ptr->assign_value_by_key(kv.first, kv.second);
+						check_report_assignment(f_rec, stat, kv.first, kv.second);
+
+					}
+					else
+					{
+						DynamicRegularization dr;
+						stat = dr.assign_value_by_key(kv.first, kv.second);
+						check_report_assignment(f_rec, stat, kv.first, kv.second);
+
+
+					}
 				}
 				
 				//ok, found no home for this line

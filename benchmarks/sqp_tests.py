@@ -572,11 +572,11 @@ if __name__ == "__main__":
     #if not os.path.exists(os.path.join("..","bin")):
     #    os.mkdir(os.path.join("..","bin"))
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sqp.exe"),os.path.join("..","bin","pestpp-sqp.exe"))
-    #basic_sqp_test()
+    basic_sqp_test()
     #rosenbrock_single_linear_constraint(nit=1)
     #dewater_basic_test()
     #dewater_slp_opt_test()
-    rosenc_test()
+    #rosenc_test()
     #m_d = rosenc_test()
     #m_d = os.path.join("mou_tests","master_rosenc_enopt")
     #plot_rosen(m_d)

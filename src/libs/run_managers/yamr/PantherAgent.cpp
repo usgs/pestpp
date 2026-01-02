@@ -659,6 +659,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			report("responding to REQ_RUNDIR", true);
 			net_pack.reset(NetPackage::PackType::RUNDIR, 0, 0,"");
 			string cwd =  OperSys::getcwd();
+            pest_utils::strip_nonascii_ip(cwd);
 			err = send_message(net_pack, cwd.c_str(), cwd.size());
 			if (err.first != 1)
 			{

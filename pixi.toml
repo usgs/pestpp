@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "pestpp"
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "linux-aarch64", "osx-arm64", "osx-64"]
@@ -17,19 +17,19 @@ pyemu = "*"
 install-modflow = "get-modflow --repo executables $CONDA_PREFIX/bin"
 
 # debug build
-configure-debug = { cmd = "cmake -G Ninja -S . -B .build -DCMAKE_BUILD_TYPE=Debug", depends-on = ["clean-build"], outputs = [".build/"] }
-build-debug = { cmd = "ninja -C .build", depends-on = ["configure-debug"] }
+configure-debug = { cmd = "cmake -G Ninja -S . -B _build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER_WORKS=1", depends-on = ["clean-build"], outputs = ["_build"] }
+build-debug = { cmd = "cmake --build _build", depends-on = ["configure-debug"] }
 
 # release build
-configure = { cmd = "cmake -G Ninja -S . -B .build -DCMAKE_BUILD_TYPE=Release", depends-on = ["clean-build"], outputs = [".build/"] }
-build-release = { cmd = "ninja -C .build", depends-on = ["configure"] }
+configure = { cmd = "cmake -G Ninja -S . -B _build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_WORKS=1", depends-on = ["clean-build"], outputs = ["_build"] }
+build-release = { cmd = "cmake --build _build", depends-on = ["configure"] }
 
 # generic build
-build = { cmd = "ninja -C .build" , inputs=[".build/"]}
+build = { cmd = "cmake --build _build", inputs=["_build"] }
 
 # clean build files
-clean = { cmd = "ninja -t clean", cwd = ".build" }
-clean-build = { cmd = "rm -rf .build" }
+clean = { cmd = "cmake --build _build -t clean"}
+clean-build = { cmd = "rm -rf _build" }
 
 # test build
 test = { cmd = "python basic_tests.py", cwd = "benchmarks" }

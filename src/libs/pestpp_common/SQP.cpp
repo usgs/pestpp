@@ -2700,10 +2700,10 @@ bool SeqQuadProgram::seek_feasible()
     ss.str("");
     string org_base = file_manager.get_base_filename();
     ss << "feas_ies_" << iter << "_" << org_base;
-
     file_manager.set_base_filename(ss.str());
     IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
     if (use_ensemble_grad) {
+
         ies.set_pe(dv);
         ies.set_oe(oe);
         ies.set_noise_oe(oe_base);

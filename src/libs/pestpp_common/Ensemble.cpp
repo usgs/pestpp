@@ -2229,7 +2229,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 			par_transform.active_ctl2model_ip(pars_real);
 		else if (tstat == ParameterEnsemble::transStatus::NUM)
 			par_transform.numeric2model_ip(pars_real);
-		replace_fixed(rname, pars_real);
+		replace_fixed(rname, pars_real, true);
 		nn = pars_real.get_notnormal_keys();
 		if (nn.size() > 0) {
             stringstream ss;
@@ -2433,19 +2433,7 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 			tied_names.push_back(name);
 		}
 	}
-//	vector<string> problems;
-//	for (auto& name : fixed_names)
-//    {
-//	    if ((pi.get_parameter_rec_ptr(name)->scale != 1.0) ||
-//                (pi.get_parameter_rec_ptr(name)->offset != 0.0))
-//        {
-//	        problems.push_back(name);
-//        }
-//    }
-//	if (problems.size())
-//    {
-//        throw_ensemble_error("the following fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
-//    }
+
 	pfinfo.set_fixed_names(fixed_names);
 	fill_fixed(header_info, fixed_names);
 	save_fixed(fixed_names);
@@ -3392,8 +3380,7 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 		{
 			par_transform.active_ctl2numeric_ip(pars);
 		}
-		else if (tstat == transStatus::MODEL)
-		{
+		else if (tstat == transStatus::MODEL) {
 			par_transform.active_ctl2model_ip(pars);
 		}
 
@@ -3418,13 +3405,22 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 	}
 }
 
-void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
+void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars, bool to_model)
 {
 	
 	map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
+	double val, offset, scale;
+
 	for (auto& r : rmap)
 	{
-		pars.update_rec(r.first, r.second);
+		val = r.second;
+		if (!to_model) {
+			scale = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(r.first)->scale;
+			offset = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(r.first)->offset;
+			val -= offset;
+			val /= scale;
+		}
+		pars.update_rec(r.first, val);
 	}
 
 	
@@ -4102,6 +4098,8 @@ map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
 		return map<string, double>();
 	}
 	map<string, double> rmap;
+	double val;
+
 	for (auto& fi : fixed_info)
 	{
 		if (fi.second.find(rname) == fi.second.end())

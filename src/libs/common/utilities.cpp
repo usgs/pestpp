@@ -16,6 +16,7 @@
 #include "network_package.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include "network_wrapper.h"
 
 
 //template <class T> const T& min ( const T& a, const T& b );
@@ -111,6 +112,17 @@ enough to be able to accept some of these foreign types naturally.
 // Instantiate tokenize for the explicitly specified vector<string> container
 template void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty);
 template void tokenize(const std::string& str, list<string>& tokens, const std::string& delimiters, const bool trimEmpty);
+
+bool invalidChar (char c)
+{
+	return !(c>=0 && (unsigned char)c<128);
+}
+
+void strip_nonascii_ip(string &s) {
+	s.erase(remove_if(s.begin(),s.end(), invalidChar), s.end());
+
+}
+
 
 std::string& strip_ip(string &s, const string &op, const string &delimiters)
 {
@@ -1880,16 +1892,20 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		
 		//check for double quotes
 		tokenize(next_line, quote_tokens, "\"", false);
+        bool stripped_last = false;
+
         if (quote_tokens[quote_tokens.size()-1].size() == 0)
         {
             quote_tokens.pop_back();
+            stripped_last = true;
         }
         if (quote_tokens.size() > 1)
 		{
 			int nqt = quote_tokens.size();
-			if (nqt % 2 != 0)
+			if ((!stripped_last) && (nqt % 2 == 0))
 				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
 			tokens.clear();
+        	bool last_empty_with_delim = false;
 			for (int i = 0; i < nqt; i++)
 			{
 				
@@ -1903,13 +1919,26 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 					tokenize(strip_cp(quote_tokens[i]), temp_tokens, ddelim,false);
 					
 					last_size = quote_tokens[i].size();
-					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
-						temp_tokens.pop_back();
-					for (auto t : temp_tokens)
-						tokens.push_back(t);
+					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim) {
+						if (quote_tokens[i].substr(last_size-2,1) == ddelim) {
+							temp_tokens.pop_back();
+							last_empty_with_delim = true;
+						}
+					}
+					for (auto& t : temp_tokens)
+                    {
+                        if (t.empty())
+                            continue;
+                        tokens.push_back(t);
+                    }
+
 				}
 				else if (quote_tokens[i].size() > 0)
 					tokens.push_back(quote_tokens[i]);
+				if (last_empty_with_delim) {
+					tokens.push_back("");
+					last_empty_with_delim = false;
+				}
 
 			}
 
@@ -1922,7 +1951,8 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 			ss.str("");
 			ss << "wrong number of tokens on line " << lcount;
 			ss << " of file '" << filename << "'.  Expecting ";
-			ss << hsize << ", found " << tokens.size();
+			ss << hsize << ", found " << tokens.size() << endl;
+            ss << "line:" << next_line;
 			throw_externalctrlfile_error(ss.str());
 		}
 		row_map.clear();
@@ -2147,9 +2177,19 @@ bool try_remove_quit_file()
 CmdLine::CmdLine(int argc, char* argv[]) :
 	ctl_file_name(""), panther_host_name(""), panther_port(""), 
 	runmanagertype(RunManagerType::SERIAL),org_cmdline_str(""),
-	restart(false),jac_restart(false)
+	restart(false),jac_restart(false),opersys("unknown"),
+	cwd(".")
 {
-	for (int i = 0; i < argc; ++i)
+#ifdef OS_LINUX
+	opersys = "linux";
+#endif
+#ifdef OS_WIN
+    opersys = "windows";
+#endif
+#ifdef OS_MAC
+    opersys = "apple";
+#endif
+for (int i = 0; i < argc; ++i)
 	{
 		org_cmdline_str.append(" ");
 		org_cmdline_str.append(argv[i]);
@@ -2195,10 +2235,17 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 	org_cmdline_vec = temp;
 	lower_cmdline_vec = temp_lower;
 
-
+    cwd = OperSys::getcwd();
+    string clean_path = cwd;
+    pest_utils::strip_nonascii_ip(clean_path);
+    if ((cwd != clean_path) && (opersys == "windows"))
+    {
+        throw_cmdline_error("non-ascii character(s) in current working directory path: \""+ cwd +"\", windows does not like this...");
+    }
 	if ((lower_cmdline_vec.size() == 3) || (lower_cmdline_vec.size() > 4))
 	{
-		throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
+		if (lower_cmdline_vec[2] != "/e")
+			throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
 	}
 	
 	//serial run mgr...done
@@ -2230,8 +2277,7 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 		throw_cmdline_error("unrecognized commandline arg '" + third_arg + "', expecting '/h','/e','/g'");
 	}
 
-	if (runmanagertype == RunManagerType::PANTHER_WORKER)
-	{
+	if (runmanagertype == RunManagerType::PANTHER_WORKER) {
 		string forth_arg = org_cmdline_vec[3];
 		if (forth_arg.find(":") == string::npos)
 		{
@@ -2272,13 +2318,12 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 			cout << "...using panther run manager in worker mode using hostname '" << panther_host_name << "' and port " << panther_port << endl;
 		}
 	}
-	return;
-
 }
  
 
 void CmdLine::throw_cmdline_error(string message)
 {
+	startup_report(cerr,"");
 	cerr << "--------------------------------------------------------" << endl;
 	cerr << "COMMAND LINE ERROR: " << message << endl;
 	cerr << "usage:" << endl << endl;
@@ -2292,6 +2337,24 @@ void CmdLine::throw_cmdline_error(string message)
 	cerr << " additional options can be found in the PEST++ users manual" << endl;
 	cerr << "--------------------------------------------------------" << endl;
 	exit(1);
+}
+
+void CmdLine::startup_report(std::ostream &s, string start_string) {
+
+	string version = PESTPP_VERSION;
+	s << endl << endl << "version: " << version << endl;
+	s << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl;
+	s << "using control file: \"" << ctl_file_name << "\"" << endl;
+	s << "in directory: \"" << cwd << "\"" << endl;
+	s << "on host: \"" << w_get_hostname() << "\"" << endl;
+	s << "on a(n) " << opersys << " operating system" << endl;
+#ifdef _DEBUG
+	s << "with debugging configuration" << endl;
+#else
+	s << "with release configuration" << endl;
+#endif
+	if (start_string.size() > 0)
+		s << "started at " << start_string << endl << endl;
 }
 
 // end of namespace pest_utils

@@ -921,6 +921,7 @@ void RunStorage::export_diff_to_text_file(const std::string &in1_filename, const
 	fout.close();
 }
 
+
 RunStorage::~RunStorage()
 {
   //free_memory();
