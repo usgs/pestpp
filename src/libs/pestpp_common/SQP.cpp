@@ -1200,20 +1200,16 @@ void SeqQuadProgram::initialize()
 		seek_feasible();
 	}
 	
-
 	message(2, "calculating initial objective function hessian");
 	hessian = calc_objective_hessian();
-	/*ss.str("");
-	ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;*/
 	Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
-	/*ss << hessian_dense << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << ss.str() << endl;*/
-
-	/*message(2, "initializing hessian matrix with identity");
-	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
-	h.setIdentity();
-	hessian = Covariance(dv_names, h);*/
+	if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
+	{
+		ss.str("");
+		ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << ss.str() << endl;
+	}
 	message(0, "initialization complete");
 }
 
@@ -1415,12 +1411,15 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		else
 			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 
-		ss.str("");
-		ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
-		frec << ss.str();
+		if (pest_scenario.get_pestpp_options().get_sqp_debug_cmaes())
+		{
+			ss.str("");
+			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+			frec << ss.str();
 
-		message(0, "CMA-ES metrics summary");
-		message(2, cmaes.get_cma_update_summary());
+			message(0, "CMA-ES metrics summary");
+			message(2, cmaes.get_cma_update_summary());
+		}
 		
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
@@ -2408,14 +2407,15 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 	else
 		report_regul = false;
 
-	/*if (report_regul)
+	if (report_regul && pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
 	{
 		ss.str("");
 		ss << "   approx hessian after regularization " << "(" << context << "): " << endl;
 		ss << "   " << H_reg << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << ss.str() << endl;
-	}*/
+	}
+
 	used_hessian = Covariance(dv_names, H_reg.sparseView());
 	return H_reg;
 }
@@ -2544,12 +2544,15 @@ void SeqQuadProgram::iterate_2_solution()
 			else
 				message(1, "skipping hessian update");
 
-			/*ss.str("");
-			ss << endl << "approx hessian: " << endl << hessian << endl;*/
 			Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
-			/*ss << hessian_dense << endl;
-			ofstream& frec = file_manager.rec_ofstream();
-			frec << ss.str() << endl;*/
+			
+			if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
+			{
+				ss.str("");
+				ss << hessian_dense << endl;
+				ofstream& frec = file_manager.rec_ofstream();
+				frec << ss.str() << endl;
+			}
 		}
 	}
 }
@@ -2823,9 +2826,13 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	}
 	Parameters pgrad = _current_dv_values;
 	pgrad.update_without_clear(dv_names, grad);
-	ss.str("");
-	ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
-	frec << ss.str();
+
+	if (pest_scenario.get_pestpp_options().get_sqp_debug_stosag_grad())
+	{
+		ss.str("");
+		ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
+		frec << ss.str();
+	}
 
 	return pgrad;
 }
@@ -3794,9 +3801,26 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 	vector<string> real_names;
 	vector<double> scale_vals;
 	
-	for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_alpha_mults())
+	/*for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_alpha_mults())
 	{
 		scale_vals.push_back(sf * BASE_SCALE_FACTOR);
+	}*/
+
+	vector<double> alpha_mults = pest_scenario.get_pestpp_options().get_sqp_alpha_mults();
+	sort(alpha_mults.begin(), alpha_mults.end());
+
+	for (auto it = alpha_mults.begin(); it != alpha_mults.end(); it++)
+	{
+		if (it == alpha_mults.begin())
+		{
+			scale_vals.push_back(*it * BASE_SCALE_FACTOR);
+		}
+		else
+		{
+			double prev = *(it - 1);
+			double curr = *it;
+			scale_vals.push_back(prev + (curr - prev) * BASE_SCALE_FACTOR);
+		}
 	}
 
 	sv_lineage_map.clear();
@@ -5919,7 +5943,7 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 		}
 		rank_mu_update = c_mu * rank_mu_update;
 
-		pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu_eff) * (curr_m.get_data_eigen_vec(par_names) - prev_m.get_data_eigen_vec(par_names)) / (c_m * sigma);
+		pc = (1 - c_c) * pc + sqrt(c_c * (2 - c_c) * mu_eff) * (m - prev_m.get_data_eigen_vec(par_names)) / sigma;
 		Eigen::MatrixXd rank_one_update = c_1 * (pc * pc.transpose());
 
 		C = (1.0 - c_1 - c_mu) * C + rank_mu_update + rank_one_update;

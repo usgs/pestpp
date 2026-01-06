@@ -107,7 +107,7 @@ private:
 	Eigen::VectorXd D;            // Eigenvalues of C
 	Eigen::MatrixXd pc;           // Evolution path
 	Eigen::MatrixXd ps;           // Evolution path for sigma
-	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, c_m = 1.0, mu_eff;
+	double c_sigma, c_c, c_1, c_mu, d_sigma, chi_n, mu_eff;
 	vector<double> weights;
 
 	double trace_ratio, det_ratio, frobenius_ratio, max_eigenval_ratio;
