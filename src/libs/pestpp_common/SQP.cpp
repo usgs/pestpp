@@ -1203,14 +1203,12 @@ void SeqQuadProgram::initialize()
 
 	message(2, "calculating initial objective function hessian");
 	hessian = calc_objective_hessian();
+	/*ss.str("");
+	ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;*/
 	Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
-	if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
-	{
-		ss.str("");
-		ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << ss.str() << endl;
-	}
+	/*ss << hessian_dense << endl;
+	ofstream& frec = file_manager.rec_ofstream();
+	frec << ss.str() << endl;*/
 
 	/*message(2, "initializing hessian matrix with identity");
 	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
@@ -1417,16 +1415,12 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		else
 			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
 
-		if (pest_scenario.get_pestpp_options().get_sqp_debug_cmaes())
-		{
-			ss.str("");
-			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
-			frec << ss.str();
+		ss.str("");
+		ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+		frec << ss.str();
 
-
-			message(0, "CMA-ES metrics summary");
-			message(2, cmaes.get_cma_update_summary());
-		}
+		message(0, "CMA-ES metrics summary");
+		message(2, cmaes.get_cma_update_summary());
 		
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
@@ -2414,14 +2408,14 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 	else
 		report_regul = false;
 
-	if (report_regul && pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
+	/*if (report_regul)
 	{
 		ss.str("");
 		ss << "   approx hessian after regularization " << "(" << context << "): " << endl;
 		ss << "   " << H_reg << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << ss.str() << endl;
-	}
+	}*/
 	used_hessian = Covariance(dv_names, H_reg.sparseView());
 	return H_reg;
 }
@@ -2474,13 +2468,8 @@ void SeqQuadProgram::iterate_2_solution()
         
 		if (use_cmaes && !seek_ies)
 		{
-			if (is_good_search)
-			{
-				message(1, "updating CMA-ES with approximate gradient");
-				cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
-			}
-			else
-				message(1, "keeping currrent CMA-ES covariance");
+			message(1, "updating CMA-ES with approximate gradient");
+			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
 
 			if (pest_scenario.get_pestpp_options().get_sqp_save_cov_every() > 0)
 			{
@@ -2555,15 +2544,12 @@ void SeqQuadProgram::iterate_2_solution()
 			else
 				message(1, "skipping hessian update");
 
+			/*ss.str("");
+			ss << endl << "approx hessian: " << endl << hessian << endl;*/
 			Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
-			
-			if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
-			{
-				ss.str("");
-				ss << hessian_dense << endl;
-				ofstream& frec = file_manager.rec_ofstream();
-				frec << ss.str() << endl;
-			}
+			/*ss << hessian_dense << endl;
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << ss.str() << endl;*/
 		}
 	}
 }
@@ -2584,7 +2570,11 @@ bool SeqQuadProgram::should_terminate()
     for (int i=0;i<best_phis.size();i++)
     {
 		if ((best_phis[i] < best_phi_yet) && (best_violations[i] == 0))
+		{
 			best_phi_yet = best_phis[i];
+			best_violation_yet = best_violations[i];
+		}
+		
     }
 
 	for (int i = 0; i < best_phis.size(); i++)
@@ -2606,6 +2596,7 @@ bool SeqQuadProgram::should_terminate()
 		<< right << setw(12) << "phi"
 		<< setw(15) << "violation" << endl;
 
+	//save phi and violation data to CSV file
 	ss.str("");
 	ss << file_manager.get_base_filename() << ".phi_viol.summary.csv";
 	string csv_filename = ss.str();
@@ -2713,7 +2704,7 @@ bool SeqQuadProgram::should_terminate()
 Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameters& _current_dv_values)
 {
 	Eigen::VectorXd grad(dv_names.size());
-
+	//first calc the current obj function value
 	double current_obj_val = 0.0;
 	for (auto& dv : dv_names)
 	{
@@ -2773,6 +2764,14 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
 		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
+		// Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod(dv_cov_matrix);
+		// Eigen::MatrixXd dv_cov_pseudoinv = cod.pseudoInverse();
+
+
+
+		//objective function anomalies
+		//Note: These objective values already reflect the effect of uncertain parameters
+		//because each real includes both dec vars and uncertain params
 		performance_log->log_event("filling obj fxn anomalies");
 
 		Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
@@ -2824,13 +2823,9 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	}
 	Parameters pgrad = _current_dv_values;
 	pgrad.update_without_clear(dv_names, grad);
-	
-	if (pest_scenario.get_pestpp_options().get_sqp_debug_stosag_grad())
-	{
-		ss.str("");
-		ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
-		frec << ss.str();
-	}
+	ss.str("");
+	ss << endl << "StoSAG-calculated gradient: " << endl << grad << endl;
+	frec << ss.str();
 
 	return pgrad;
 }
@@ -2915,6 +2910,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 			*_cnames = reduced_cnames;
 			m = rank;
 
+			// Recompute QR with reduced matrix
 			qr.compute(scaled_constraint_jco.transpose());
 			rank = qr.rank();
 		}
@@ -3085,6 +3081,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 		throw_sqp_error("search direction vector computation error (in null space KKT solve method)!");
 	}
 
+	// compute lagrangian multipliers
 	if (simplified_null_space_approach)
 	{
 		Eigen::BDCSVD<Eigen::MatrixXd> svd_AAT(scaled_constraint_jco * scaled_constraint_jco.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
@@ -3185,9 +3182,11 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(const Eigen::
 		x = ldlt.solve(rhs);
 	}
 
+	// Extract solution components
 	Eigen::VectorXd search_d = x.head(n);
 	Eigen::VectorXd lm = x.tail(m);
 
+	// Compute residual and error (shared code path)
 	Eigen::VectorXd residual = kkt_matrix * x - rhs;
 	double kkt_error = residual.norm() / (1.0 + rhs.norm());
 
@@ -4994,26 +4993,24 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-
-	vector<int> accept_idxs;
-	vector<string> onames = _oe.get_var_names();
-	vector<string> vnames = dv_candidates.get_var_names();
-	vector<string> real_names = dv_candidates.get_real_names();
-	const size_t n_cands = real_names.size();
-
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
-	obj_map = get_obj_map(dv_candidates, _oe);
+	double oext, oviol = 0.0, nviol = 0.0;
+
+	vector<string> real_names = dv_candidates.get_real_names();
 
 	map<string, Parameters> par_map;
 	map<string, Observations> obs_map;
-	vector<string> oe_var_names = _oe.get_var_names();
 	for (auto& d : real_names)
 	{
-		par_map.emplace(d, current_ctl_dv_values);
-		par_map[d].update_without_clear(dv_names, dv_candidates.get_real_vector(d));
+		Parameters p = current_ctl_dv_values;
+		Eigen::VectorXd t = dv_candidates.get_real_vector(d);
+		p.update_without_clear(dv_names, t);
+		par_map[d] = p;
 
-		obs_map.emplace(d, current_obs);
-		obs_map[d].update_without_clear(oe_var_names, _oe.get_real_vector(d));
+		Observations o = current_obs;
+		t = _oe.get_real_vector(d);
+		o.update_without_clear(_oe.get_var_names(), t);
+		obs_map[d] = o;
 	}
 	double viol_pad = pest_scenario.get_pestpp_options().get_sqp_viol_pad();
 	map<string, map<string, double>> violations, violations_nominal;
@@ -5027,7 +5024,14 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
 		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
 	}
+
+	vector<string> onames = _oe.get_var_names();
+	vector<string> vnames = dv_candidates.get_var_names();
+	obj_map = get_obj_map(dv_candidates, _oe);
 	
+	vector<double> infeas_vec, nviol_vec, feas_dist_map;
+	vector<int> accept_idxs, feas_idxs;
+
 	message(0, "current best phi:", last_best);
 	ss.str("");
 	ss << "evaluating " << obj_vec.size() << " candidate realizations and updating filter";
@@ -5046,27 +5050,25 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		candidate_filter = filter;
 
 
-	for (size_t i = 0; i < n_cands; i++)
+	for (int i = 0; i < obj_vec.size(); i++)
 	{
-		const string& rname = real_names[i];
-		const double obj_val = obj_vec[i];
+		ss << left << setw(25) << real_names[i]
+			<< setw(15) << obj_vec[i];
 
-		ss << left << setw(25) << rname	<< setw(15) << obj_val;
-
-		const auto& viol_map = violations[rname];
-		const auto& viol_nom_map = violations_nominal[rname];
-		double infeas_sum = 0.0, infeas_sum_nom = 0.0;
-
-		for (const auto& v : viol_map)
+		double infeas_sum = 0.0, infeas_sum_nom = 0.0, feas_dist = 0;
+		for (auto& v : violations[real_names[i]])
 			infeas_sum += v.second;
-		for (const auto& v : viol_nom_map)
+		infeas_vec.push_back(infeas_sum);
+		for (auto& v : violations_nominal[real_names[i]])
 			infeas_sum_nom += v.second;
-		total_viol_map[rname] = infeas_sum_nom;
-
+		nviol_vec.push_back(infeas_sum_nom);
+		total_viol_map[real_names[i]] = infeas_sum_nom;
 		bool filter_accept = candidate_filter.accept(obj_vec[i], infeas_sum_nom, infeas_sum, par_map[real_names[i]], obs_map[real_names[i]], real_names[i], iter, true);
 		string accept_reject = filter_accept ? "accept" : "reject";
 
-		ss << setw(20) << infeas_sum_nom << setw(15) << accept_reject << endl;
+		ss << setw(20) << infeas_sum_nom
+			<< setw(15) << accept_reject
+			<< endl;
 
 		if (filter_accept)
 			accept_idxs.push_back(i);
@@ -5083,39 +5085,39 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 	FilterRec selected;
 	vector<FilterRec> feasible = candidate_filter.get_feasible_solutions();
 
+	if (obj_sense == "minimize")
+		oext = 1E+30;
+	else
+		oext = -1E+30;
+
 	if (feasible.size() > 0)
 	{
-		if (obj_sense == "minimize")
+		for (const auto& f : feasible)
 		{
-			auto it = min_element(feasible.begin(), feasible.end(),
-				[](const FilterRec& a, const FilterRec& b) 
-				{ 
-					return a.obj_val < b.obj_val; 
-				});
-			if (it != feasible.end())
-				selected = *it;
-		}
-		else
-		{
-			auto it = max_element(feasible.begin(), feasible.end(),
-				[](const FilterRec& a, const FilterRec& b) 
-				{ 
-					return a.obj_val < b.obj_val; 
-				});
-			if (it != feasible.end())
-				selected = *it;
+			if ((obj_sense == "minimize") && (f.obj_val < oext))
+			{
+				oext = f.obj_val;
+				selected = f;
+			}
+			else if ((obj_sense == "maximize") && (f.obj_val > oext))
+			{
+				oext = f.obj_val;
+				selected = f;
+			}
 		}
 	}
 	else
 	{
 		vector<FilterRec> filterset = candidate_filter.get_filter_members();
-		auto it = min_element(filterset.begin(), filterset.end(),
-			[](const FilterRec& a, const FilterRec& b) 
-			{ 
-				return a.viol_val < b.viol_val; 
-			});
-		if (it != filterset.end())
-			selected = *it;
+		oext = 1E+30;
+		for (const auto f : filterset)
+		{
+			if (f.viol_val < oext)
+			{
+				oext = f.viol_val;
+				selected = f;
+			}
+		}
 	}
 
 	return { selected, candidate_filter };
@@ -5125,9 +5127,6 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-
-	const bool is_minimize = (obj_sense == "minimize");
-	set<double> best_phis_set(best_phis.begin(), best_phis.end());
 
 	vector<string> onames = _oe.get_var_names();
 	vector<string> vnames = dv_candidates.get_var_names();
@@ -5167,7 +5166,7 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 			message(1, "still no better solution...allowing some violation");
 			vector<FilterRec> filterset = candidate_filter.get_feasible_solutions(true);
 			bool found = false;
-			if (!filterset.empty())
+			if (filterset.size() > 0)
 			{
 				if (obj_sense == "minimize")
 				{
@@ -5187,10 +5186,20 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 				}
 
 				auto it = filterset.begin();
+
 				while (it != filterset.end())
 				{
-					bool better_obj = is_minimize ? (it->obj_val < last_best) : (it->obj_val > last_best);
-					if (better_obj && best_phis_set.find(it->obj_val) == best_phis_set.end())
+					bool better_obj = false;
+					if (obj_sense == "minimize")
+					{
+						better_obj = (it->obj_val < last_best);
+					}
+					else
+					{
+						better_obj = (it->obj_val > last_best);
+					}
+
+					if (better_obj && it->obj_val != last_best && find(best_phis.begin(), best_phis.end(), it->obj_val) == best_phis.end())
 					{
 						selected = *it;
 						found = true;
@@ -5211,10 +5220,20 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 					});
 
 				auto it = filterset.begin();
+
 				while (it != filterset.end())
 				{
-					bool better_obj = is_minimize ? (it->obj_val < last_best) : (it->obj_val > last_best);
-					if (better_obj && best_phis_set.find(it->obj_val) == best_phis_set.end())
+					bool better_obj = false;
+					if (obj_sense == "minimize")
+					{
+						better_obj = (it->obj_val < last_best);
+					}
+					else
+					{
+						better_obj = (it->obj_val > last_best);
+					}
+
+					if (better_obj && it->obj_val != last_best && find(best_phis.begin(), best_phis.end(), it->obj_val) == best_phis.end())
 					{
 						selected = *it;
 						found = true;
@@ -5229,8 +5248,7 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 				message(1, "WARNING: no unselected candidate found with better objective than last_best");
 			}
 
-			const vector<FilterRec>& filter_members = candidate_filter.get_filter_members();
-			if (selected.obj_val == last_best && selected.viol_val == last_viol && !filter_members.empty())
+			if (selected.obj_val == last_best && selected.viol_val == last_viol && candidate_filter.get_filter_members().size() > 0)
 			{
 				message(1, "resorting to global filter by merit");
 				selected = pick_from_filter_by_merit(candidate_filter);
@@ -5238,9 +5256,8 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 			}
 		}
 	}
-
-	const bool is_obj_val_new = (best_phis_set.find(selected.obj_val) == best_phis_set.end());
-	if (selected.viol_val > 0.0 || is_obj_val_new)
+	
+	if (selected.viol_val > 0.0 || find(best_phis.begin(), best_phis.end(), selected.obj_val) == best_phis.end())
 	{
 		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
 		{
@@ -5248,16 +5265,24 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 			int ratio = pest_scenario.get_pestpp_options().get_sqp_num_reals() / curr_parent_num + 1;
 			int new_parent_num = max(5, pest_scenario.get_pestpp_options().get_sqp_num_reals() / ratio);
 			cmaes.set_parent_num(new_parent_num);
+			
 		}
+		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 	}
 	else
 	{
+		
 		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
+		{
 			cmaes.set_parent_num(pest_scenario.get_pestpp_options().get_sqp_num_reals() / 4);
+		}
+		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
+		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 	}
 
-	message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
-	cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), is_good_search);
+	bool is_violated = (selected.viol_val >= 1E-10);
+	bool is_recycled = (find(best_phis.begin(), best_phis.end(), selected.obj_val) != best_phis.end());
 
 	filter.update(selected.obj_val, selected.viol_val, selected.viol_padded, selected.dp_val, selected.oe_val, selected.real_name, iter);
 	filter.report(frec, iter);
@@ -5289,8 +5314,7 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 
 	for (auto& d : vnames)
 		current_ctl_dv_values[d] = p.get_rec(d);
-	vector<string> oe_var_names = _oe.get_var_names();
-	current_obs.update_without_clear(oe_var_names, o.get_data_eigen_vec(oe_var_names));
+	current_obs.update_without_clear(_oe.get_var_names(), o.get_data_eigen_vec(_oe.get_var_names()));
 
 	return selected;
 }
