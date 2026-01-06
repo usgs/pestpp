@@ -1139,16 +1139,16 @@ void SeqQuadProgram::initialize()
 		echo = true;
 
 	initialize_parcov();
-	if (use_cmaes && ppo->get_sqp_num_reals() > 0)
+	if (use_cma && ppo->get_sqp_num_reals() > 0)
 	{
-		cmaes = CovMatAdapES(&pest_scenario, &rand_gen, &file_manager);
-		cmaes.initialize(dv_names.size(), ppo->get_sqp_num_reals());
-		cmaes.set_covariance(parcov.get_matrix());
+		cma = CovMatAdap(&pest_scenario, &rand_gen, &file_manager);
+		cma.initialize(dv_names.size(), ppo->get_sqp_num_reals());
+		cma.set_covariance(parcov.get_matrix());
 	}
-	else if (use_cmaes && (ppo->get_sqp_num_reals() <= 0) && (ppo->get_sqp_dv_en().size() > 0))
+	else if (use_cma && (ppo->get_sqp_num_reals() <= 0) && (ppo->get_sqp_dv_en().size() > 0))
 	{
-		message(1, "WARNING: CMA-ES requires sqp_num_reals > 0, disabling CMA-ES for finite-difference mode");
-		use_cmaes = false;
+		message(1, "WARNING: CMA requires sqp_num_reals > 0, disabling CMA for finite-difference mode");
+		use_cma = false;
 	}
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
@@ -1381,7 +1381,7 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		ParameterEnsemble _dv(&pest_scenario, &rand_gen);
 		ofstream& frec = file_manager.rec_ofstream();
 
-		message(1, "generating new dv and pars ensemble at current best phi via CMA-ES");
+		message(1, "generating new dv and pars ensemble at current best phi via CMA");
 		if (reset)
 		{
 			message(1, "resetting Hessian to identity");
@@ -1389,36 +1389,36 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 			h.setIdentity();
 			hessian = Covariance(dv_names, h);
 
-			cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-			cmaes.clear_archives();
+			cma.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+			cma.clear_archives();
 
-			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			_dv = cma.generate_population(current_ctl_dv_values, dv);
 			reset = false;
 		}
 		else if (reset_corr)
 		{
 			message(1, "dropping covariance elements in C");
-			cmaes.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			cma.reinflate_C(1.0, true, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+			_dv = cma.generate_population(current_ctl_dv_values, dv);
 			reset_corr = false;				
 		}
 		else if (seek_ies)
 		{
 			seek_ies = false;
-			cmaes.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
-			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			cma.reinflate_C(pest_scenario.get_pestpp_options().get_sqp_cma_reinflation_factor(), false, pest_scenario.get_pestpp_options().get_sqp_max_reinflation_cond_num());
+			_dv = cma.generate_population(current_ctl_dv_values, dv);
 		}
 		else
-			_dv = cmaes.generate_population(current_ctl_dv_values, dv);
+			_dv = cma.generate_population(current_ctl_dv_values, dv);
 
-		if (pest_scenario.get_pestpp_options().get_sqp_debug_cmaes())
+		if (pest_scenario.get_pestpp_options().get_sqp_debug_cma())
 		{
 			ss.str("");
-			ss << endl << "CMA-ES approximated covariance: " << endl << cmaes.get_covariance_matrix() << endl << endl;
+			ss << endl << "CMA approximated covariance: " << endl << cma.get_covariance_matrix() << endl << endl;
 			frec << ss.str();
 
-			message(0, "CMA-ES metrics summary");
-			message(2, cmaes.get_cma_update_summary());
+			message(0, "CMA metrics summary");
+			message(2, cma.get_cma_update_summary());
 		}
 		
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
@@ -2466,31 +2466,31 @@ void SeqQuadProgram::iterate_2_solution()
 			}
 		}
         
-		if (use_cmaes && !seek_ies)
+		if (use_cma && !seek_ies)
 		{
-			message(1, "updating CMA-ES with approximate gradient");
-			cmaes.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
+			message(1, "updating CMA with approximate gradient");
+			cma.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
 
 			if (pest_scenario.get_pestpp_options().get_sqp_save_cov_every() > 0)
 			{
 				if (iter % pest_scenario.get_pestpp_options().get_sqp_save_cov_every() == 0)
 				{
 					ss.str("");
-					ss << file_manager.get_base_filename() << "." << iter << ".cmaes";
-					Covariance cmaes_cov(dv_names, cmaes.get_covariance_matrix().sparseView());
+					ss << file_manager.get_base_filename() << "." << iter << ".CMA";
+					Covariance cma_cov(dv_names, cma.get_covariance_matrix().sparseView());
 					if (pest_scenario.get_pestpp_options().get_save_binary()) {
 						ss << ".jcb";
-						cmaes_cov.to_binary_new(ss.str());
+						cma_cov.to_binary_new(ss.str());
 					}
 					else {
 						ss << ".cov";
-						cmaes_cov.to_ascii(ss.str());
+						cma_cov.to_ascii(ss.str());
 					}
 
 				}
 				string fname = ss.str();
 				ss.str("");
-				ss << "CMA-ES covariance matrix for iteration " << iter << " saved to: " << fname;
+				ss << "CMA covariance matrix for iteration " << iter << " saved to: " << fname;
 				message(1, ss.str());
 			}
 		}
@@ -4887,7 +4887,7 @@ bool SeqQuadProgram::seek_feasible()
 	best_violations[best_violations.size() -1] = last_viol;
 	message(1, "finished seeking feasible, reset best phi,infeasible value to ", vector<double>{last_best,last_viol});
 
-	message(1, "updating cmaes archives with IES results for seeking feasibility");
+	message(1, "updating CMA archives with IES results for seeking feasibility");
 	map<string, double> obj_map = get_obj_map(*ies_pe_ptr, *ies_oe_ptr);
 	map<string, double> total_viol_map;
 	map<string, map<string, double>> violations_nominal = constraints.get_ensemble_violations_map(*ies_pe_ptr, *ies_oe_ptr, 0.0, true);
@@ -4915,12 +4915,12 @@ bool SeqQuadProgram::seek_feasible()
 		filter.update(obj_val, viol_val, vpad, p, o, real_name, -iter);  
 	}
 
-	if ((iter > 0) && (use_cmaes))
+	if ((iter > 0) && (use_cma))
 	{
 		if (last_viol < filter.get_viol_tol())
-			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
+			cma.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
 		else
-			cmaes.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
+			cma.update_archives(*ies_pe_ptr, obj_map, total_viol_map, to_string(-iter), true);
 	}
 
 	return false;
@@ -5285,24 +5285,24 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 	{
 		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
 		{
-			int curr_parent_num = cmaes.get_parent_num();
+			int curr_parent_num = cma.get_parent_num();
 			int ratio = pest_scenario.get_pestpp_options().get_sqp_num_reals() / curr_parent_num + 1;
 			int new_parent_num = max(5, pest_scenario.get_pestpp_options().get_sqp_num_reals() / ratio);
-			cmaes.set_parent_num(new_parent_num);
+			cma.set_parent_num(new_parent_num);
 			
 		}
-		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
+		message(1, "updating CMA archive of size: ", cma.get_parent_num());
+		cma.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 	}
 	else
 	{
 		
 		if (pest_scenario.get_pestpp_options().get_sqp_cma_parent_num() == 0)
 		{
-			cmaes.set_parent_num(pest_scenario.get_pestpp_options().get_sqp_num_reals() / 4);
+			cma.set_parent_num(pest_scenario.get_pestpp_options().get_sqp_num_reals() / 4);
 		}
-		message(1, "updating CMAES archive of size: ", cmaes.get_parent_num());
-		cmaes.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
+		message(1, "updating CMA archive of size: ", cma.get_parent_num());
+		cma.update_archives(dv_candidates, obj_map, total_viol_map, to_string(iter), true);
 	}
 
 	bool is_violated = (selected.viol_val >= 1E-10);
@@ -5809,7 +5809,7 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 
 }
 
-void CovMatAdapES::initialize(int n_params, int _num_reals)
+void CovMatAdap::initialize(int n_params, int _num_reals)
 {
 	lambda = _num_reals;
 	clear_archives();
@@ -5874,14 +5874,14 @@ void CovMatAdapES::initialize(int n_params, int _num_reals)
 
 }
 
-void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter) 
+void CovMatAdap::update(Parameters prev_m, Parameters curr_m, int iter) 
 {
 	ofstream& frec = file_manager->rec_ofstream();
 	CovMetrics metrics_prior = compute_cov_metrics();
 	if (iter == 1)
 		metrics_init = metrics_prior;
 
-	ParameterEnsemble U = feas_dp_archive;
+	ParameterEnsemble U = sorted_dp_archive;
 	vector<string> par_names = U.get_var_names();
 	m = curr_m.get_data_eigen_vec(par_names);
 	vector<string> mu_best_real_names;
@@ -5899,28 +5899,6 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 
 		}
 		U.keep_rows(mu_best_real_names);
-	}
-
-	if (U.shape().first < mu)
-	{
-		ParameterEnsemble U_ = infeas_dp_archive;
-		mu_best_real_names.clear();
-		i = U.shape().first;
-
-		for (auto r : U_.get_real_names())
-		{
-			i++;
-			if (i > mu)
-				break;
-			mu_best_real_names.push_back(r);
-		}
-
-		U_.keep_rows(mu_best_real_names);
-
-		if (U.shape().first != 0)
-			U.append_other_rows(U_);
-		else
-			U = U_;
 	}
 
 	if (U.shape().first != 0)
@@ -5954,17 +5932,19 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 
 		for (int i = 0; i < D.size(); i++)
 		{
-			D(i) = max(D(i), D.maxCoeff() * 1e-14);
+			D(i) = max(D(i), D.maxCoeff() * 1E-12);
 		}
 	}
 	else
 	{
-		frec << "...nothing to learn for covariance here...skipping CMA-ES update" << endl;
-		cout << "...nothing to learn for covariance here...skipping CMA-ES update" << endl;
+		frec << "...nothing to learn for covariance here...skipping CMA update" << endl;
+		cout << "...nothing to learn for covariance here...skipping CMA update" << endl;
 	}
 
 	CovMetrics metrics_post = compute_cov_metrics();
-	if ((metrics_post.condition_number > pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num()))
+	const double max_cond_num = pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num();
+
+	if (metrics_post.condition_number > max_cond_num)
 	{
 
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_C(C);
@@ -5972,29 +5952,29 @@ void CovMatAdapES::update(Parameters prev_m, Parameters curr_m, int iter)
 		double lambda_max = eigenvals.maxCoeff();
 		double lambda_min = eigenvals.minCoeff();
 
-		double target_cond = pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num();
-		double min_eig_floor = lambda_max / target_cond;
+		double min_eig_floor = lambda_max / max_cond_num;
 
 		double delta = 0.0;
 		if (lambda_min < min_eig_floor) 
 		{
 			delta = min_eig_floor - lambda_min + 1E-12;
 			C += delta * Eigen::MatrixXd::Identity(C.rows(), C.cols());
+
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(C);
+			B = eigensolver.eigenvectors();
+			D = eigensolver.eigenvalues();
 		}
 
 		ofstream& frec = file_manager->rec_ofstream();
 		frec << "...WARNING: ensemble is shrinking too much. Regularizing covariance by delta: " << delta << endl;
 		cout << "...WARNING: ensemble is shrinking too much. Regularizing covariance by delta: " << delta << endl;
-		/*double factor = metrics_post.determinant / pow(10.0, floor(log10(fabs(metrics_post.determinant))));
-		cout << "...WARNING: ensemble is shrinking too much. Reinflating cov matrix by: " << factor << endl;
-		reinflate_C(factor, false, pest_scenario_ptr->get_pestpp_options().get_sqp_max_reinflation_cond_num());*/
 
 		metrics_post = compute_cov_metrics();
 	}
-	cma_update_summary = report_cmaes_metrics(metrics_prior, metrics_post, iter); 
+	cma_update_summary = report_cma_metrics(metrics_prior, metrics_post, iter); 
 }
 
-void CovMatAdapES::reinflate_C(double reinflation_factor, bool reset_corr, double max_cond_num)
+void CovMatAdap::reinflate_C(double reinflation_factor, bool reset_corr, double max_cond_num)
 {
 	if (reinflation_factor < 0.0)
 	{
@@ -6086,15 +6066,13 @@ void CovMatAdapES::reinflate_C(double reinflation_factor, bool reset_corr, doubl
 		C = (C + C.transpose()) / 2.0;
 	}
 }
-void CovMatAdapES::clear_archives()
+void CovMatAdap::clear_archives()
 {
 	sorted_obj_map.clear();
-	sorted_viol_map.clear();
-	feas_dp_archive = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
-	infeas_dp_archive = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
+	sorted_dp_archive = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
 }
 
-void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear)
+void CovMatAdap::update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear)
 {
 	map<string, double> unique_obj_map;
 	set<double> seen_values;
@@ -6103,18 +6081,13 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 	if (clear) 
 	{
 		clear_archives();
-		feas_dp_archive = curr_pe.zeros_like(0);
-		infeas_dp_archive = curr_pe.zeros_like(0);
+		sorted_dp_archive = curr_pe.zeros_like(0);
 		unique_obj_map = obj_map;
 	}
 	else
 	{
-		if (feas_dp_archive.shape().second == 0) 
-			feas_dp_archive = curr_pe.zeros_like(0);
-		
-		if (infeas_dp_archive.shape().second == 0) 
-			infeas_dp_archive = curr_pe.zeros_like(0);
-		
+		if (sorted_dp_archive.shape().second == 0) 
+			sorted_dp_archive = curr_pe.zeros_like(0);
 
 		for (auto& o : obj_map)
 		{
@@ -6130,24 +6103,13 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 
 			if (!is_duplicate)
 				unique_obj_map[o.first] = o.second;
-			
 		}
 	}
 
 	for (auto o : unique_obj_map)
 	{
 		sorted_obj_map[tag + "|" + o.first] = o.second;
-		feas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
-		//if (viol_map[o.first] == 0)
-		//{
-		//	sorted_obj_map[tag + "|" + o.first] = o.second;
-		//	feas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
-		//}
-		//else
-		//{
-		//	sorted_viol_map[tag + "|" + o.first] = o.second;
-		//	infeas_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
-		//}
+		sorted_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));
 	}
 
 	if (sorted_obj_map.size() > 0)
@@ -6170,38 +6132,16 @@ void CovMatAdapES::update_archives(const ParameterEnsemble& pe, map<string, doub
 			sorted_obj_map[pair.first] = pair.second;
 
 		}
-		feas_dp_archive.keep_rows(sorted_names_from_obj, true);
-		feas_dp_archive.reorder(sorted_names_from_obj, curr_pe.get_var_names(), true);
+		sorted_dp_archive.keep_rows(sorted_names_from_obj, true);
+		sorted_dp_archive.reorder(sorted_names_from_obj, curr_pe.get_var_names(), true);
 	}
 
-	//if (sorted_viol_map.size() > 0)
-	//{
-	//	vector<pair<string, double>> sorted_viol_map_vec(sorted_viol_map.begin(), sorted_viol_map.end());
-	//	sort(sorted_viol_map_vec.begin(), sorted_viol_map_vec.end(),
-	//		[](const pair<string, double>& a, const pair<string, double>& b) {
-	//			return a.second < b.second;
-	//		});
-	//	vector<string> sorted_names_from_viol;
-	//	sorted_viol_map.clear();
-	//	int i = 0;
-	//	for (const auto& pair : sorted_viol_map_vec)
-	//	{
-	//		i++;
-	//		if (i > lambda)
-	//			break;
-	//		sorted_names_from_viol.push_back(pair.first);
-	//		sorted_viol_map[pair.first] = pair.second;
-	//	}
-	//	infeas_dp_archive.keep_rows(sorted_names_from_viol, true);
-	//	infeas_dp_archive.reorder(sorted_names_from_viol, curr_pe.get_var_names(), true);
-	//}
-
-	if (sorted_obj_map.size() + sorted_viol_map.size() == 0)
-		throw runtime_error("no members in sorted obj or viol maps after CovMatAdapES::update_archives()");
+	if (sorted_obj_map.size() == 0)
+		throw runtime_error("no members in sorted obj maps after CovMatAdap::update_archives()");
 
 }
 
-CovMatAdapES::CovMetrics CovMatAdapES::compute_cov_metrics() const
+CovMatAdap::CovMetrics CovMatAdap::compute_cov_metrics() const
 {
 	CovMetrics metrics;
 
@@ -6215,7 +6155,7 @@ CovMatAdapES::CovMetrics CovMatAdapES::compute_cov_metrics() const
 	return metrics;
 }
 
-string CovMatAdapES::report_cmaes_metrics(const CovMetrics& prior, const CovMetrics& post, int iter)
+string CovMatAdap::report_cma_metrics(const CovMetrics& prior, const CovMetrics& post, int iter)
 {
 
 	trace_ratio = post.trace / (prior.trace + 1E-30);
@@ -6276,7 +6216,7 @@ string CovMatAdapES::report_cmaes_metrics(const CovMetrics& prior, const CovMetr
 		<< "   " << setw(12) << " " << setw(10) << " " << endl;
 	ss << "   number of cov-based criteria satisfied: " << criteria_sat << endl << endl;
 
-	ss << left << setw(20) << "   CMA-ES parameter"
+	ss << left << setw(20) << "   CMA parameter"
 		<<setw(18) << "Value" << endl;
 	ss << scientific << setprecision(6);
 	ss << setw(20) << "      c_c" << fixed << setprecision(6) << c_c << endl;
@@ -6293,7 +6233,7 @@ string CovMatAdapES::report_cmaes_metrics(const CovMetrics& prior, const CovMetr
 
 }
 
-bool CovMatAdapES::should_terminate()
+bool CovMatAdap::should_terminate()
 {
 	if (trace_ratio_0 < 0.05 && det_ratio_0 < 0.05 && frobenius_ratio_0 < 0.05 && max_eigenval_ratio_0 < 0.05)
 		return true;
@@ -6302,7 +6242,7 @@ bool CovMatAdapES::should_terminate()
 
 }
 
-ParameterEnsemble CovMatAdapES::generate_population(Parameters& _curr_m, ParameterEnsemble _dv) 
+ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, ParameterEnsemble _dv) 
 {	
 	vector<string> rnames;
 	vector<string> parnames = _dv.get_var_names();

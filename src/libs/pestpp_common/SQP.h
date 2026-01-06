@@ -63,12 +63,12 @@ private:
 
 };
 
-class CovMatAdapES 
+class CovMatAdap
 {
 
 public:
-	CovMatAdapES(Pest* pest_ptr, std::mt19937* rand_gen, FileManager* file_mgr) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen), file_manager(file_mgr) {}
-	CovMatAdapES() : pest_scenario_ptr(nullptr), rand_gen_ptr(nullptr), file_manager(nullptr) {}
+	CovMatAdap(Pest* pest_ptr, std::mt19937* rand_gen, FileManager* file_mgr) : pest_scenario_ptr(pest_ptr), rand_gen_ptr(rand_gen), file_manager(file_mgr) {}
+	CovMatAdap() : pest_scenario_ptr(nullptr), rand_gen_ptr(nullptr), file_manager(nullptr) {}
 
 	void initialize(int n_params, int _num_reals);
 	void update(Parameters prev_m, Parameters curr_m, int iter);
@@ -114,12 +114,12 @@ private:
 	double trace_ratio_0, det_ratio_0, frobenius_ratio_0, max_eigenval_ratio_0;
 	bool possibly_converged = false;
 	
-	ParameterEnsemble feas_dp_archive, infeas_dp_archive;
-	map<string, double> sorted_obj_map, sorted_viol_map;
+	ParameterEnsemble sorted_dp_archive;
+	map<string, double> sorted_obj_map;
 	string cma_update_summary;
 	CovMetrics metrics_init;
 	CovMetrics compute_cov_metrics() const;
-	string report_cmaes_metrics(const CovMetrics& prior, const CovMetrics& post, int iter);
+	string report_cma_metrics(const CovMetrics& prior, const CovMetrics& post, int iter);
 	
 	
 
@@ -154,7 +154,7 @@ private:
 
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov, uncertain_parcov;
-	CovMatAdapES cmaes;
+	CovMatAdap cma;
 	chancePoints chancepoints;
 	string obj_func_str;
 	string obj_obs;
@@ -212,7 +212,7 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	vector<string> adj_par_names;
-	bool use_subset, use_cmaes = true, adjust_step_control = false;
+	bool use_subset, use_cma = true, adjust_step_control = false;
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;

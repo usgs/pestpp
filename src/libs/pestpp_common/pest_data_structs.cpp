@@ -1874,9 +1874,9 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_debug_hessian = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
-	else if (key == "SQP_DEBUG_CMAES")
+	else if (key == "SQP_DEBUG_CMA")
 	{
-		sqp_debug_cmaes = pest_utils::parse_string_arg_to_bool(value);
+		sqp_debug_cma = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
 	else if (key == "SQP_DEBUG_STOSAG_GRAD")
@@ -2077,7 +2077,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_risk: " << sqp_risk << endl;
 	os << "sqp_powell_damping_factor: " << sqp_powell_damping_factor << endl;
 	os << "sqp_debug_hessian: " << sqp_debug_hessian << endl;
-	os << "sqp_debug_cmaes: " << sqp_debug_cmaes << endl;
+	os << "sqp_debug_cmaes: " << sqp_debug_cma << endl;
 	os << "sqp_debug_stosag_grad: " << sqp_debug_stosag_grad << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
@@ -2338,7 +2338,7 @@ void PestppOptions::set_defaults()
 	set_sqp_risk(0.50);
 	set_sqp_powell_damping_factor(0.2);
 	set_sqp_debug_hessian(false);
-	set_sqp_debug_cmaes(false);
+	set_sqp_debug_cma(false);
 	set_sqp_debug_stosag_grad(false);
 
 	set_mou_generator("PSO");

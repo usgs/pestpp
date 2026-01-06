@@ -433,8 +433,8 @@ public:
 	void set_sqp_powell_damping_factor(double val) { sqp_powell_damping_factor = val; }
 	bool get_sqp_debug_hessian()const { return sqp_debug_hessian; }
 	void set_sqp_debug_hessian(bool _flag) { sqp_debug_hessian = _flag; }
-	bool get_sqp_debug_cmaes()const { return sqp_debug_cmaes; }
-	void set_sqp_debug_cmaes(bool _flag) { sqp_debug_cmaes = _flag; }
+	bool get_sqp_debug_cma()const { return sqp_debug_cma; }
+	void set_sqp_debug_cma(bool _flag) { sqp_debug_cma = _flag; }
 	bool get_sqp_debug_stosag_grad()const { return sqp_debug_stosag_grad; }
 	void set_sqp_debug_stosag_grad(bool _flag) { sqp_debug_stosag_grad = _flag; }
 	
@@ -873,7 +873,7 @@ private:
 	double sqp_risk;
 	double sqp_powell_damping_factor;
 	bool sqp_debug_hessian;
-	bool sqp_debug_cmaes;
+	bool sqp_debug_cma;
 	bool sqp_debug_stosag_grad;
 
 	int mou_population_size;
