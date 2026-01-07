@@ -594,7 +594,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}
 		}
-		else if (use_stosag)
+		else if (use_stosag && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
 		{
 			// StoSAG mode: no stack setup needed, will use existing ensemble for risk shifting
 			f_rec << "  using chance constraints/objectives with risk = " << risk << endl;
@@ -1455,7 +1455,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			shifted_obs.insert(name, new_constraint_val);
 		}
 	}
-	else if (use_stosag)
+	else if (use_stosag && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
 	{
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
@@ -3098,7 +3098,7 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
-	else if (use_stosag)
+	else if (use_stosag && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
 	{
 		//do nothing -- we don't need stacks here
 	}
