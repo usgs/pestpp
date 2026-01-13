@@ -1849,6 +1849,12 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_reset_hessian_every);
 		return true;
 	}
+	else if (key == "SQP_USE_ENSEMBLE_APPROX_HESSIAN")
+	{
+		sqp_use_ensemble_approx_hessian = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	
 	else if (key == "SQP_RESCALE_SEARCH_DIR")
 	{
 		sqp_rescale_search_dir = pest_utils::parse_string_arg_to_bool(value);
@@ -1867,6 +1873,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	else if (key == "SQP_POWELL_DAMPING_FACTOR")
 	{
 		convert_ip(value, sqp_powell_damping_factor);
+		return true;
+	}
+	else if (key == "SQP_DEBUG_ENABLE_CONSTRAINT_WEIGHTED_JCO")
+	{
+		sqp_debug_enable_constraint_weighted_jco = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
 	else if (key == "SQP_DEBUG_HESSIAN")
@@ -2333,10 +2344,12 @@ void PestppOptions::set_defaults()
 	set_sqp_enforce_bounds(false);
 	set_sqp_viol_pad(1E-4);
 	set_sqp_reset_hessian_every(-1);
+	set_sqp_use_ensemble_approx_hessian(true);
 	set_sqp_rescale_search_dir(true);
 	set_sqp_seek_feas_max_iter(3);
 	set_sqp_risk(0.50);
 	set_sqp_powell_damping_factor(0.2);
+	set_sqp_debug_enable_constraint_weighted_jco(true);
 	set_sqp_debug_hessian(false);
 	set_sqp_debug_cma(false);
 	set_sqp_debug_stosag_grad(false);

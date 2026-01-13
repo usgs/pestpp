@@ -1200,9 +1200,19 @@ void SeqQuadProgram::initialize()
 		seek_feasible();
 	}
 	
-	message(2, "calculating initial objective function hessian");
-	hessian = calc_objective_hessian();
-	Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
+	if (pest_scenario.get_pestpp_options().get_sqp_use_ensemble_approx_hessian())
+	{
+		message(2, "calculating initial objective function hessian");
+		hessian = calc_objective_hessian();
+		Eigen::MatrixXd hessian_dense = hessian.e_ptr()->toDense();
+	}
+	else
+	{
+		message(2, "initializing hessian matrix with identity");
+		Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+		h.setIdentity();
+		hessian = Covariance(dv_names, h);
+	}
 	if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
 	{
 		ss.str("");
@@ -1210,6 +1220,7 @@ void SeqQuadProgram::initialize()
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << ss.str() << endl;
 	}
+
 	message(0, "initialization complete");
 }
 
@@ -1820,22 +1831,22 @@ bool SeqQuadProgram::hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k
 
 Covariance SeqQuadProgram::calc_objective_hessian()
 {
-	message(1, "starting StoSAG hessian approximation for iteration ", iter);
+	message(1, "starting ensemble hessian approximation for iteration ", iter);
 
 	if (!use_ensemble_grad)
 	{
-		message(1, "StoSAG Hessian requires ensemble gradient mode - skipping");
+		message(1, "Ensemble Hessian requires ensemble gradient mode - skipping");
 		return Covariance();
 	}
 
 	
 	if (dv.shape().first < 2)
 	{
-		message(1, "insufficient ensemble size for StoSAG Hessian - need at least 2 realizations");
+		message(1, "insufficient ensemble size to approximate Hessian - need at least 2 realizations");
 		return Covariance();
 	}
 
-	performance_log->log_event("computing StoSAG Hessian from ensemble covariance");
+	performance_log->log_event("computing approximate Hessian from ensemble covariance");
 	Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
 	Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
@@ -1905,13 +1916,13 @@ Covariance SeqQuadProgram::calc_objective_hessian()
 	{
 		double tau = 2 * abs(min_eig) + min_allowed_eig;
 		H_stosag += tau * Eigen::MatrixXd::Identity(H_stosag.rows(), H_stosag.cols());
-		message(1, "Modified StoSAG Hessian to ensure positive definiteness. tau = ", tau);
+		message(1, "Modified approximate Hessian to ensure positive definiteness. tau = ", tau);
 	}
 
 	Covariance obj_hessian = Covariance(dv_names, H_stosag.sparseView());
 
 	double cond = eigenvalues.maxCoeff() / eigenvalues.minCoeff();
-	message(1, "StoSAG Hessian condition number: ", cond);
+	message(1, "Approximate Hessian condition number: ", cond);
 
 	return obj_hessian;
 }
@@ -1941,21 +1952,25 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 	if (seek_ies)
 	{
 		bool stosag_success = false;
-		if (use_ensemble_grad && dv.shape().first >= 2)
+
+		if (pest_scenario.get_pestpp_options().get_sqp_use_ensemble_approx_hessian())
 		{
-			Covariance obj_hessian = calc_objective_hessian();
-			if (obj_hessian.get_col_names().empty())
+			if (use_ensemble_grad && dv.shape().first >= 2)
 			{
-				stosag_success = true;
-				ss.str("");
-				ss << "successfully computed StoSAG-approximated Hessian" << endl;
-				message(1, ss.str());
-			}
-			else
-			{
-				ss.str("");
-				ss << "StoSAG Hessian computation failed, falling back to identity" << endl;
-				message(1, ss.str());
+				Covariance obj_hessian = calc_objective_hessian();
+				if (obj_hessian.get_col_names().empty())
+				{
+					stosag_success = true;
+					ss.str("");
+					ss << "successfully computed ensemble-approximated Hessian" << endl;
+					message(1, ss.str());
+				}
+				else
+				{
+					ss.str("");
+					ss << "Hessian approximation failed, falling back to identity" << endl;
+					message(1, ss.str());
+				}
 			}
 		}
 
@@ -2306,7 +2321,7 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 		bool use_stosag = false;
 		Eigen::MatrixXd H_stosag;
 
-		if (use_ensemble_grad && dv.shape().first >= 2)
+		if (use_ensemble_grad && dv.shape().first >= 2 && (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG"))
 		{
 			
 			Covariance obj_hessian = calc_objective_hessian();
@@ -2510,9 +2525,6 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			message(2, "calculating objective function hessian");
 			hessian = calc_objective_hessian();
-			/*ss.str("");
-			ss << "StoSAG-approx hessian: " << endl << hessian << endl;
-			frec << ss.str() << endl;*/
 		}
 
         constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
@@ -2681,11 +2693,6 @@ bool SeqQuadProgram::should_terminate()
 		return true;
 	}
 
-	if (converged)
-	{
-		message(1, "optimal solution detected at solve EQP step (lagrangian multiplier for all ineq constraints in working set is non-neg)");
-		return true;
-	}
     int q = pest_utils::quit_file_found();
     if ((q == 1) || (q == 2))
     {
@@ -2869,9 +2876,13 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 
 	ss.str("");
 	ss << "   applied constraint Jacobian scaling:";
-	ss << " min_scale=" << row_scales.minCoeff();
-	ss << " max_scale=" << row_scales.maxCoeff();
-	ss << " condition_improvement=" << (row_scales.maxCoeff() / row_scales.minCoeff()) << endl;
+	if (scaled_constraint_jco.rows() > 0)
+	{
+		ss << " min_scale=" << row_scales.minCoeff();
+		ss << " max_scale=" << row_scales.maxCoeff();
+		ss << " condition_improvement=" << (row_scales.maxCoeff() / row_scales.minCoeff());
+	}
+	ss << endl;
 	frec << ss.str();
 	performance_log->log_event(ss.str());
 
@@ -2880,6 +2891,18 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(const Eig
 
 	int m = scaled_constraint_jco.rows();
 	int n = scaled_constraint_jco.cols();
+
+	if (m == 0)
+	{
+		Eigen::MatrixXd G_reg = regularize_hessian(G, "null space unconstrained");
+		Eigen::LDLT<Eigen::MatrixXd> ldlt_H(G_reg);
+		if (ldlt_H.info() != Eigen::Success || !ldlt_H.isPositive())
+			search_d = -curved_grad;
+		else
+			search_d = ldlt_H.solve(-curved_grad);
+		return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, Eigen::VectorXd::Zero(0));
+	}
+
 	Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(scaled_constraint_jco.transpose());
 
 	int rank = qr.rank();

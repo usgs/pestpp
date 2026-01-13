@@ -3589,36 +3589,47 @@ pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_a
 		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dec_var_names, "BASE");
 		//Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
-		// Compute standard objective-optimized covariance matrix (original method)
-		Eigen::MatrixXd dv_cov_matrix_obj = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
-
-		// Compute constraint-aware covariance matrix 
-		pair<Eigen::MatrixXd, Eigen::VectorXd> cov_compute = compute_constraint_aware_covariance(dv, oe, working_set.first, dv_cov_matrix_obj);
-		Eigen::MatrixXd dv_cov_matrix = cov_compute.first;
-		Eigen::VectorXd constraint_weights = cov_compute.second;
-
-		// Get constraint observation anomalies for all working set constraints
-		Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), working_set.first, "BASE");
-
-		// Compute constraint-weighted cross-covariance (consistent with weighted covariance)
-		// This ensures both covariance and cross-covariance use the same weighting scheme
-		Eigen::MatrixXd cross_cov_matrix = Eigen::MatrixXd::Zero(dv_anoms.cols(), constraint_anoms.cols());
-		if ((constraint_weights.sum() - 1.0) > 1E-10)
+		Eigen::MatrixXd dv_cov_matrix{}, cross_cov_matrix{};
+		if (pest_scenario.get_pestpp_options().get_sqp_debug_enable_constraint_weighted_jco())
 		{
-			for (int i = 0; i < dv.shape().first; i++)
+			// Compute standard objective-optimized covariance matrix (original method)
+			Eigen::MatrixXd dv_cov_matrix_obj = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+
+			// Compute constraint-aware covariance matrix 
+			pair<Eigen::MatrixXd, Eigen::VectorXd> cov_compute = compute_constraint_aware_covariance(dv, oe, working_set.first, dv_cov_matrix_obj);
+			dv_cov_matrix = cov_compute.first;
+			Eigen::VectorXd constraint_weights = cov_compute.second;
+
+			// Get constraint observation anomalies for all working set constraints
+			Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), working_set.first, "BASE");
+
+			// Compute constraint-weighted cross-covariance (consistent with weighted covariance)
+			// This ensures both covariance and cross-covariance use the same weighting scheme
+			cross_cov_matrix = Eigen::MatrixXd::Zero(dv_anoms.cols(), constraint_anoms.cols());
+			if ((constraint_weights.sum() - 1.0) > 1E-10)
 			{
-				Eigen::VectorXd dv_anom = dv_anoms.row(i);
-				Eigen::RowVectorXd constraint_anom_row = constraint_anoms.row(i);
-				cross_cov_matrix += constraint_weights(i) * (dv_anom * constraint_anom_row);
+				for (int i = 0; i < dv.shape().first; i++)
+				{
+					Eigen::VectorXd dv_anom = dv_anoms.row(i);
+					Eigen::RowVectorXd constraint_anom_row = constraint_anoms.row(i);
+					cross_cov_matrix += constraint_weights(i) * (dv_anom * constraint_anom_row);
+				}
+				cross_cov_matrix /= (constraint_weights.sum() - 1.0); // Weighted normalization (consistent with covariance)
 			}
-			cross_cov_matrix /= (constraint_weights.sum() - 1.0); // Weighted normalization (consistent with covariance)
+			else
+			{
+				// fallback
+				// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+				cross_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * constraint_anoms);
+			}
 		}
 		else
 		{
-			// fallback
-			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+			dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+			Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), working_set.first, "BASE");
 			cross_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * constraint_anoms);
 		}
+
 
 		// Compute pseudoinverse using SVD (same method as objective gradient)
 		Eigen::MatrixXd s, V, U;

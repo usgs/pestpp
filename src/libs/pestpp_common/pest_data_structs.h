@@ -431,6 +431,10 @@ public:
 	void set_sqp_risk(double val) { sqp_risk = val; }
 	double get_sqp_powell_damping_factor() const { return sqp_powell_damping_factor; }
 	void set_sqp_powell_damping_factor(double val) { sqp_powell_damping_factor = val; }
+	bool get_sqp_use_ensemble_approx_hessian()const { return sqp_use_ensemble_approx_hessian; }
+	void set_sqp_use_ensemble_approx_hessian(bool _flag) { sqp_use_ensemble_approx_hessian = _flag; }
+	bool get_sqp_debug_enable_constraint_weighted_jco()const { return sqp_debug_enable_constraint_weighted_jco; }
+	void set_sqp_debug_enable_constraint_weighted_jco(bool _flag) { sqp_debug_enable_constraint_weighted_jco = _flag; }
 	bool get_sqp_debug_hessian()const { return sqp_debug_hessian; }
 	void set_sqp_debug_hessian(bool _flag) { sqp_debug_hessian = _flag; }
 	bool get_sqp_debug_cma()const { return sqp_debug_cma; }
@@ -868,13 +872,16 @@ private:
 	bool sqp_enforce_bounds;
 	double sqp_viol_pad;
 	int sqp_reset_hessian_every;
+	bool sqp_use_ensemble_approx_hessian;
 	bool sqp_rescale_search_dir;
 	int sqp_seek_feas_max_iter;
 	double sqp_risk;
 	double sqp_powell_damping_factor;
+	bool sqp_debug_enable_constraint_weighted_jco;
 	bool sqp_debug_hessian;
 	bool sqp_debug_cma;
 	bool sqp_debug_stosag_grad;
+	
 
 	int mou_population_size;
 	string mou_generator; 
