@@ -283,7 +283,10 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		}
 
 		ParameterEnsemble uncertain_ensemble(&pest_scenario, &rand_gen);
-		if (adj_par_names.size() > 0)
+		double opt_risk = pest_scenario.get_pestpp_options().get_opt_risk();
+		double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
+		bool use_chance = (opt_risk != 0.5) || (sqp_risk != 0.5);
+		if (adj_par_names.size() > 0 && use_chance)
 		{
 			Covariance unc_cov = uncertain_parcov.get(adj_par_names);
 			map<string, double> par_means = pest_scenario.get_ext_file_double_map("PARAMETER DATA EXTERNAL", MEAN_REAL_NAME);
@@ -321,7 +324,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 				file_manager.rec_ofstream());
 		}
 
-		if (dv_names.size() > 0 && adj_par_names.size() > 0)
+		if (dv_names.size() > 0 && adj_par_names.size() > 0 && use_chance)
 		{
 			vector<string> real_names = dv_ensemble.get_real_names();
 			uncertain_ensemble.reorder(real_names, vector<string>());
