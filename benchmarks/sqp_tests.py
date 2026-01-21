@@ -15,9 +15,10 @@ elif "darwin" in platform.platform().lower():
 else:
     bin_path = os.path.join(bin_path,"win")
 
+model_bin_path = os.path.join("..","..",bin_path)
+
 bin_path = os.path.abspath("test_bin")
 os.environ["PATH"] += os.pathsep + bin_path
-
 
 bin_path = os.path.join("..","..","..","bin")
 exe = ""
@@ -48,7 +49,7 @@ def basic_sqp_test():
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_opt.pst"))
     pst.pestpp_options.pop("ies_par_en")
     pst.control_data.noptmax = 0
-    pst.model_command = ["../../test_bin/win/mf6.exe"]
+    pst.model_command = [os.path.join(model_bin_path, "mf6")]
     pst.write(os.path.join(t_d,"freyberg6_run_sqp.pst"))
     pyemu.os_utils.run("{0} freyberg6_run_sqp.pst".format(exe_path),cwd=t_d)
 
