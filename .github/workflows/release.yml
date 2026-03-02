@@ -61,7 +61,7 @@ jobs:
           rm -r $path/*/ || true
 
       - name: Upload distribution
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
           path: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
