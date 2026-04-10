@@ -27,6 +27,7 @@
 #include <map>
 #include <algorithm>
 #include <sstream>
+#include <cmath>
 #include "SVDASolver.h"
 #include "ModelRunPP.h"
 #include "QSqrtMatrix.h"
@@ -42,6 +43,7 @@
 #include "covariance.h"
 #include "Ensemble.h"
 #include "linear_analysis.h"
+
 
 
 using namespace std;
@@ -535,12 +537,12 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
             
 			// Determine the number of scales to use
             int num_lrun_level = (lmrun - maxitn) / maxitn + 1;
-            if (num_lrun_level > lambda_scale_vec.size()) {
-                num_lrun_level = lambda_scale_vec.size();
+            if (num_lrun_level > static_cast<int>(lambda_scale_vec.size())) {
+                num_lrun_level = static_cast<int>(lambda_scale_vec.size());
             }
 
             // Slice the line search factor vector in place
-            if (num_lrun_level < lambda_scale_vec.size()) {
+            if (num_lrun_level < static_cast<int>(lambda_scale_vec.size())) {
                 lambda_scale_vec.resize(num_lrun_level);
             }
 			
@@ -549,7 +551,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			const double def_lowest_lambda_fac = 1.0e-14;
 			const double def_highest_lambda_fac = 1.0e14;
 			double phi_initial = base_run.get_phi(*regul_scheme_ptr);
-			double num_nonzero_obs = obs_names_vec.size();
+			int num_nonzero_obs = static_cast<int>(obs_names_vec.size());
 			// this is the critical difference between GLM lambdas and HP lambdas
 			// HP lambdas are a factor of the current phi
 			double lambda_mid = phi_initial / static_cast<double>(num_nonzero_obs);
