@@ -28,7 +28,6 @@
 #include <map>
 #include <algorithm>
 #include <sstream>
-#include <cmath>
 #include "SVDSolver.h"
 #include "RunManagerAbstract.h"
 #include "QSqrtMatrix.h"
