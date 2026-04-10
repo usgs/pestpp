@@ -1,3 +1,7 @@
+/**
+ * @file network_wrapper.cpp
+ * @brief Implementation of network_wrapper.
+ */
 #include "network_wrapper.h"
 #include "network_package.h"
 #include "utilities.h"
@@ -27,6 +31,11 @@
 
 using namespace std;
 
+/**
+ * @brief W get hostname.
+ *
+ * @return Description.
+ */
 string w_get_hostname()
 {
 	char* temp;
@@ -56,6 +65,11 @@ string w_get_hostname()
 
 }
 
+/**
+ * @brief W init.
+ *
+ * @return Description.
+ */
 string w_init()
 {
 	stringstream ss;
@@ -69,6 +83,13 @@ string w_init()
 	return ss.str();
 }
 
+/**
+ * @brief W close.
+ *
+ * @param sockfd Description.
+ *
+ * @return Description.
+ */
 int w_close(int sockfd)
 {
   int n;
@@ -87,6 +108,9 @@ int w_close(int sockfd)
 	return n;
 }
 
+/**
+ * @brief W cleanup.
+ */
 void w_cleanup()
 {
    #ifdef OS_WIN
@@ -107,6 +131,14 @@ std::pair<int,std::string> w_getaddrinfo(const char *node, const char *service,
 	return std::pair<int,string> (status,ss.str());
 }
 
+/**
+ * @brief W getnameinfo vec.
+ *
+ * @param sockfd Description.
+ * @param flags Description.
+ *
+ * @return Description.
+ */
 vector<string> w_getnameinfo_vec(int sockfd, int flags)
 {
 	int err;
@@ -122,6 +154,14 @@ vector<string> w_getnameinfo_vec(int sockfd, int flags)
 	return name_info;
 }
 
+/**
+ * @brief W getnameinfo string.
+ *
+ * @param sockfd Description.
+ * @param flags Description.
+ *
+ * @return Description.
+ */
 string w_getnameinfo_string(int sockfd, int flags)
 {
 	vector<string> name_info_vec = w_getnameinfo_vec(sockfd, flags);
@@ -130,6 +170,15 @@ string w_getnameinfo_string(int sockfd, int flags)
 	return ss.str();
 }
 
+/**
+ * @brief W socket.
+ *
+ * @param domain Description.
+ * @param type Description.
+ * @param protocol Description.
+ *
+ * @return Description.
+ */
 int w_socket(int domain, int type, int protocol)
 {
 	int sockfd = socket(domain, type, protocol);
@@ -149,6 +198,15 @@ int w_socket(int domain, int type, int protocol)
 	return sockfd;
 }
 
+/**
+ * @brief W connect.
+ *
+ * @param sockfd Description.
+ * @param serv_addr Description.
+ * @param addrlen Description.
+ *
+ * @return Description.
+ */
 int w_connect(int sockfd, struct sockaddr *serv_addr, socklen_t addrlen)
 {
 	int n=0;
@@ -159,6 +217,15 @@ int w_connect(int sockfd, struct sockaddr *serv_addr, socklen_t addrlen)
 	return n;
 }
 
+/**
+ * @brief W bind.
+ *
+ * @param sockfd Description.
+ * @param my_addr Description.
+ * @param addrlen Description.
+ *
+ * @return Description.
+ */
 int w_bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen)
 {
 	int n=0;
@@ -170,6 +237,15 @@ int w_bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen)
 	return n;
 }
 
+/**
+ * @brief W accept.
+ *
+ * @param sockfd Description.
+ * @param addr Description.
+ * @param addrlen Description.
+ *
+ * @return Description.
+ */
 int w_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int n=0;
@@ -181,6 +257,14 @@ int w_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 }
 
 
+/**
+ * @brief W listen.
+ *
+ * @param sockfd Description.
+ * @param backlog Description.
+ *
+ * @return Description.
+ */
 int w_listen(int sockfd, int backlog)
 {
 	int n;
@@ -191,6 +275,16 @@ int w_listen(int sockfd, int backlog)
 	return n;
 }
 
+/**
+ * @brief W recv.
+ *
+ * @param sockfd Description.
+ * @param buf Description.
+ * @param len Description.
+ * @param flags Description.
+ *
+ * @return Description.
+ */
 int w_recv(int sockfd, int8_t *buf, int64_t len, int flags)
 {
 	int n;
@@ -200,6 +294,16 @@ int w_recv(int sockfd, int8_t *buf, int64_t len, int flags)
 	}
 	return n;
 }
+/**
+ * @brief W send.
+ *
+ * @param sockfd Description.
+ * @param buf Description.
+ * @param len Description.
+ * @param flags Description.
+ *
+ * @return Description.
+ */
 int w_send(int sockfd, int8_t *buf, int64_t len, int flags)
 {
 	int n;
@@ -210,6 +314,15 @@ int w_send(int sockfd, int8_t *buf, int64_t len, int flags)
 	return n;
 }
 
+/**
+ * @brief W sendall.
+ *
+ * @param sockfd Description.
+ * @param buf Description.
+ * @param len Description.
+ *
+ * @return Description.
+ */
 int w_sendall(int sockfd, int8_t *buf, int64_t *len)
 {
 	unsigned long total = 0; // how many bytes we've sent
@@ -231,6 +344,15 @@ int w_sendall(int sockfd, int8_t *buf, int64_t *len)
 }
 
 
+/**
+ * @brief W recvall.
+ *
+ * @param sockfd Description.
+ * @param buf Description.
+ * @param len Description.
+ *
+ * @return Description.
+ */
 int w_recvall(int sockfd, int8_t *buf, int64_t *len)
 {
 	unsigned long total = 0; // how many bytes we've received
@@ -249,6 +371,14 @@ int w_recvall(int sockfd, int8_t *buf, int64_t *len)
 	return n; // return -1 on failure, 0 closed connection or 1 on success
 }
 
+/**
+ * @brief W bind first avl.
+ *
+ * @param servinfo Description.
+ * @param sockfd Description.
+ *
+ * @return Description.
+ */
 addrinfo* w_bind_first_avl(addrinfo *servinfo, int &sockfd)
 {
 	// loop through all the results and bind to the first we can
@@ -279,6 +409,14 @@ addrinfo* w_bind_first_avl(addrinfo *servinfo, int &sockfd)
 	return p;
 }
 
+/**
+ * @brief W connect first avl.
+ *
+ * @param servinfo Description.
+ * @param sockfd Description.
+ *
+ * @return Description.
+ */
 addrinfo* w_connect_first_avl(addrinfo *servinfo, int &sockfd)
 {
 	// loop through all the results and connect to the first we can
@@ -305,6 +443,12 @@ addrinfo* w_connect_first_avl(addrinfo *servinfo, int &sockfd)
 
 
 
+/**
+ * @brief W print servinfo.
+ *
+ * @param res Description.
+ * @param fout Description.
+ */
 void w_print_servinfo(addrinfo *res, ostream &fout)
 {
 	struct addrinfo *p;
@@ -316,6 +460,13 @@ void w_print_servinfo(addrinfo *res, ostream &fout)
 	}
 }
 
+/**
+ * @brief W get addrinfo string.
+ *
+ * @param p Description.
+ *
+ * @return Description.
+ */
 string w_get_addrinfo_string(struct addrinfo *p)
 {
 	stringstream sstr;
@@ -359,6 +510,16 @@ int w_select(int numfds, fd_set *readfds, fd_set *writefds,
 	return n;
 }
 
+/**
+ * @brief W memcpy s.
+ *
+ * @param dest Description.
+ * @param numberOfElements Description.
+ * @param src Description.
+ * @param count Description.
+ *
+ * @return Description.
+ */
 int w_memcpy_s(void *dest, size_t numberOfElements, const void *src, size_t count)
 {
 	int err = 0;
@@ -374,6 +535,11 @@ int w_memcpy_s(void *dest, size_t numberOfElements, const void *src, size_t coun
 	return err;
 }
 
+/**
+ * @brief W get error msg.
+ *
+ * @return Description.
+ */
 string w_get_error_msg()
 {
 	stringstream err_msg;
@@ -402,6 +568,11 @@ string w_get_error_msg()
 	return err_msg.str();
 }
 
+/**
+ * @brief W sleep.
+ *
+ * @param millisec Description.
+ */
 void w_sleep(int millisec)
 {
    #ifdef OS_WIN

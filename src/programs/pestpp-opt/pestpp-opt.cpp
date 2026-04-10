@@ -1,3 +1,7 @@
+/**
+ * @file pestpp-opt.cpp
+ * @brief Implementation of pestpp-opt.
+ */
 
 #include "RunManagerPanther.h" //needs to be first because it includes winsock2.h
 //#include <vld.h> // Memory Leak Detection using "Visual Leak Detector"
@@ -39,6 +43,14 @@ using namespace pest_utils;
 
 //using namespace pest_utils;
 
+/**
+ * @brief Main.
+ *
+ * @param argc Description.
+ * @param argv Description.
+ *
+ * @return Description.
+ */
 int main(int argc, char* argv[])
 {
 #ifndef _DEBUG
@@ -69,12 +81,6 @@ int main(int argc, char* argv[])
 		vector<string>::const_iterator it_find, it_find_next;
 		string next_item;
 		string socket_str = "";
-		
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "External run manager ('/e') not supported, please use panther instead" << endl;
-			exit(1);
-		}
 		
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER)
 		{
@@ -214,7 +220,8 @@ int main(int argc, char* argv[])
                 vector<string>{}, vector<string>{},
                 pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                 pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
-                pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+                pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
+				pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
 		}
 
 		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
@@ -289,7 +296,7 @@ int main(int argc, char* argv[])
 
 		if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS)
 		{
-			run_manager_ptr->initialize_restart(file_manager.build_filename("rnj"));
+			run_manager_ptr->initialize_restart(file_manager.build_filename("rns"));
 		}
 		else
 		{

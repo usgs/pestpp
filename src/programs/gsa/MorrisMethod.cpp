@@ -1,3 +1,7 @@
+/**
+ * @file MorrisMethod.cpp
+ * @brief Implementation of MorrisMethod.
+ */
 #include <vector>
 #include <Eigen/Dense>
 #include <cassert>
@@ -25,6 +29,14 @@ using namespace pest_utils;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
+/**
+ * @brief Initialize.
+ *
+ * @param _par_names_vec Description.
+ * @param _obs_names_vec Description.
+ * @param _no_data Description.
+ * @param _gsa_abstract_base Description.
+ */
 void MorrisObsSenFile::initialize(const vector<string> &_par_names_vec, const vector<string> &_obs_names_vec, double _no_data, const GsaAbstractBase *_gsa_abstract_base)
 {
 	par_names_vec =_par_names_vec;
@@ -33,6 +45,15 @@ void MorrisObsSenFile::initialize(const vector<string> &_par_names_vec, const ve
 	no_data = _no_data;
 }
 
+/**
+ * @brief Add sen run pair.
+ *
+ * @param par_name Description.
+ * @param p1 Description.
+ * @param obs1 Description.
+ * @param p2 Description.
+ * @param obs2 Description.
+ */
 void MorrisObsSenFile::add_sen_run_pair(const std::string &par_name, double p1, Observations &obs1, double p2, Observations &obs2)
 {
 	assert (obs1.size() == obs2.size());
@@ -90,6 +111,9 @@ void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, d
 	}
 }
 
+/**
+ * @brief Process pooled var file.
+ */
 void MorrisMethod::process_pooled_var_file()
 {
     group_2_pool_group_map.clear();
@@ -138,6 +162,13 @@ void MorrisMethod::process_pooled_var_file()
     }
 }
 
+/**
+ * @brief Create  p star mat.
+ *
+ * @param k Description.
+ *
+ * @return Description.
+ */
 MatrixXd MorrisMethod::create_P_star_mat(int k)
 {
 	MatrixXd b_mat = create_B_mat(k);
@@ -164,6 +195,13 @@ MorrisMethod::MorrisMethod(Pest &_pest_scenario,
 }
 
 
+/**
+ * @brief Initialize.
+ *
+ * @param _p Description.
+ * @param _r Description.
+ * @param _delta Description.
+ */
 void MorrisMethod::initialize(int _p, int _r, double _delta)
 {
 	p = _p;
@@ -172,6 +210,13 @@ void MorrisMethod::initialize(int _p, int _r, double _delta)
 	//delta = p / (2.0 * (p - 1));
 }
 
+/**
+ * @brief Create  b mat.
+ *
+ * @param k Description.
+ *
+ * @return Description.
+ */
 MatrixXd MorrisMethod::create_B_mat(int k)
 {
 	MatrixXd b_mat = MatrixXd::Constant(k+1, k, 0.0);
@@ -187,12 +232,26 @@ MatrixXd MorrisMethod::create_B_mat(int k)
 	return b_mat;
 }
 
+/**
+ * @brief Create  j mat.
+ *
+ * @param k Description.
+ *
+ * @return Description.
+ */
 MatrixXd MorrisMethod::create_J_mat(int k)
 {
 	MatrixXd j_mat = MatrixXd::Constant(k+1, k, 1.0);
 	return j_mat;
 }
 
+/**
+ * @brief Create  d mat.
+ *
+ * @param k Description.
+ *
+ * @return Description.
+ */
 MatrixXd MorrisMethod::create_D_mat(int k)
 {
 	MatrixXd d_mat=MatrixXd::Constant(k, k, 0.0);
@@ -202,6 +261,13 @@ MatrixXd MorrisMethod::create_D_mat(int k)
 	return d_mat;
 }
 
+/**
+ * @brief Create  p mat.
+ *
+ * @param k Description.
+ *
+ * @return Description.
+ */
 MatrixXd MorrisMethod::create_P_mat(int k)
 {
 	// generate and return a random permutation matrix
@@ -222,6 +288,13 @@ MatrixXd MorrisMethod::create_P_mat(int k)
 	return p_mat;
 }
 
+/**
+ * @brief Create x vec.
+ *
+ * @param k Description.
+ *
+ * @return Description.
+ */
 VectorXd MorrisMethod::create_x_vec(int k)
 {
 	// Warning Satelli's book is wrong.  Need to use Morris's original paper

@@ -1,3 +1,7 @@
+/**
+ * @file MOEA.cpp
+ * @brief Implementation of MOEA.
+ */
 #include <random>
 #include <iomanip>
 #include <iterator>
@@ -36,6 +40,14 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 }
 
+/**
+ * @brief Get member struct.
+ *
+ * @param op Description.
+ * @param dp Description.
+ *
+ * @return Description.
+ */
 map<string, map<string, double>> ParetoObjectives::get_member_struct(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	map<string, map<string, double>> _member_struct;
@@ -143,6 +155,15 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 }
 
+/**
+ * @brief Compare two.
+ *
+ * @param first Description.
+ * @param second Description.
+ * @param envtyp Description.
+ *
+ * @return Description.
+ */
 bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType envtyp)
 {
     if (infeas.find(first) != infeas.end())
@@ -167,6 +188,14 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 }
 
 
+/**
+ * @brief Compare two spea.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 bool ParetoObjectives::compare_two_spea(string& first, string& second)
 {
 	if (spea2_constrained_fitness_map.at(first) < spea2_constrained_fitness_map.at(second))
@@ -175,6 +204,14 @@ bool ParetoObjectives::compare_two_spea(string& first, string& second)
 		return false;
 }
 
+/**
+ * @brief Compare two nsga.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 {
 	if (member_front_map.at(first) < member_front_map.at(second))
@@ -189,6 +226,11 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 	return false;
 }
 
+/**
+ * @brief Drop duplicates.
+ *
+ * @param _member_struct Description.
+ */
 void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("checking for duplicate solutions");
@@ -245,12 +287,29 @@ void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member
 	}
 }
 
+/**
+ * @brief Get mopso fitness.
+ *
+ * @param members Description.
+ * @param op Description.
+ * @param dp Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	return get_mopso_fitness(members, _member_struct);
 }
 
+/**
+ * @brief Get mopso fitness.
+ *
+ * @param members Description.
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct)
 {
 	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
@@ -376,6 +435,14 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	return fitness;
 }
 
+/**
+ * @brief Get spea2 archive names to keep.
+ *
+ * @param num_members Description.
+ * @param keep Description.
+ * @param op Description.
+ * @param dp Description.
+ */
 void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
 {
 	ParameterEnsemble temp_dp = dp;
@@ -395,6 +462,13 @@ void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<s
 }
 
 
+/**
+ * @brief Update.
+ *
+ * @param op Description.
+ * @param dp Description.
+ * @param constraints_ptr Description.
+ */
 void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constraints_ptr)
 {
 	stringstream ss;
@@ -565,6 +639,18 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 
 
 
+/**
+ * @brief Get spea2 fitness.
+ *
+ * @param generation Description.
+ * @param op Description.
+ * @param dp Description.
+ * @param constraints_ptr Description.
+ * @param report Description.
+ * @param sum_tag Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
 {
 	stringstream ss;
@@ -707,6 +793,15 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
 }
 
+/**
+ * @brief Write pareto summary.
+ *
+ * @param sum_tag Description.
+ * @param generation Description.
+ * @param op Description.
+ * @param dp Description.
+ * @param constr_ptr Description.
+ */
 void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr)
 {
 	//update(op, dp, constr_ptr);
@@ -759,6 +854,11 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 
 }
 
+/**
+ * @brief Prep pareto summary file.
+ *
+ * @param summary_tag Description.
+ */
 void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 {
 	file_manager.open_ofile_ext(summary_tag);
@@ -780,6 +880,14 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 }
 
+/**
+ * @brief Get spea2 kth nn crowding distance.
+ *
+ * @param op Description.
+ * @param dp Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
@@ -789,6 +897,13 @@ map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(Observa
 }
 
 
+/**
+ * @brief Get spea2 kth nn crowding distance.
+ *
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
@@ -797,6 +912,14 @@ map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(map<str
 	return get_spea2_kth_nn_crowding_distance(members, _member_struct);
 }
 
+/**
+ * @brief Get spea2 kth nn crowding distance.
+ *
+ * @param members Description.
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 	map<string, double> crowd_distance_map;
@@ -848,6 +971,14 @@ map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(vector<
 }
 
 
+/**
+ * @brief Get cuboid crowding distance.
+ *
+ * @param op Description.
+ * @param dp Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
@@ -856,6 +987,13 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(ObservationEn
 	return get_cuboid_crowding_distance(_member_struct);
 }
 
+/**
+ * @brief Get cuboid crowding distance.
+ *
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
@@ -864,11 +1002,26 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(map<string, m
 	return get_cuboid_crowding_distance(members, _member_struct);
 }
 
+/**
+ * @brief Get cuboid crowding distance.
+ *
+ * @param members Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members)
 {
 	return get_cuboid_crowding_distance(members, member_struct);
 }
 
+/**
+ * @brief Get cuboid crowding distance.
+ *
+ * @param members Description.
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 
@@ -939,6 +1092,14 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	return crowd_distance_map;
 }
 
+/**
+ * @brief Get euclidean distance.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> first, map<string, double> second)
 {
 	vector<double> euclidean_dist{ 0, 0 };
@@ -963,6 +1124,14 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 	return euclidean_dist;
 }
 
+/**
+ * @brief Get euclidean fitness.
+ *
+ * @param E Description.
+ * @param V Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::get_euclidean_fitness(double E, double V)
 {
 	//double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
@@ -976,11 +1145,26 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	return val;
 }
 
+/**
+ * @brief Get cluster crowding fitness.
+ *
+ * @param members Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string>& members)
 {
 	return get_cluster_crowding_fitness(members, member_struct);
 }
 
+/**
+ * @brief Get cluster crowding fitness.
+ *
+ * @param members Description.
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 
@@ -1220,6 +1404,13 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	return crowd_ordered;
 }
 
+/**
+ * @brief Get spea2 fitness.
+ *
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitness(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("get_spea_fitness");
@@ -1289,6 +1480,13 @@ void ParetoObjectives::fill_domination_containers(map<string, map<string, double
 		}
 }
 
+/**
+ * @brief Sort members by dominance into fronts.
+ *
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct)
 {
 	//following fast non-dom alg in Deb
@@ -1393,6 +1591,14 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 }
 
 //compute probability of dominance
+/**
+ * @brief Dominance probability.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
 {
 	double prob_dom = 1;
@@ -1405,6 +1611,14 @@ double ParetoObjectives::dominance_probability(map<string, double>& first, map<s
 	return prob_dom;
 }
 
+/**
+ * @brief Dominance prob adhoc.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<string, double>& second)
 {
 	map<string, double> f = first, s = second;
@@ -1424,6 +1638,14 @@ double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<st
 	return pd;
 }
 
+/**
+ * @brief First equals second.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 bool ParetoObjectives::first_equals_second(map<string, double>& first, map<string, double>& second)
 {
 	for (auto f : first)
@@ -1434,6 +1656,14 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
 	return true;
 }
 
+/**
+ * @brief First dominates second.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second)
 {
 
@@ -1459,6 +1689,16 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 }
 
+/**
+ * @brief Std norm df.
+ *
+ * @param x Description.
+ * @param mu Description.
+ * @param sd Description.
+ * @param cumdf Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::std_norm_df(double x, double mu, double sd, bool cumdf)
 {
 	double Z, val;
@@ -1478,6 +1718,16 @@ double ParetoObjectives::std_norm_df(double x, double mu, double sd, bool cumdf)
 	return val;
 }
 
+/**
+ * @brief Psi function.
+ *
+ * @param aa Description.
+ * @param bb Description.
+ * @param mu Description.
+ * @param sd Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::psi_function(double aa, double bb, double mu, double sd)
 {
 	double a = std_norm_df(bb, mu, sd, false);
@@ -1487,6 +1737,11 @@ double ParetoObjectives::psi_function(double aa, double bb, double mu, double sd
 }
 
 //hypervolume works for two-objective problems for now
+/**
+ * @brief Set hypervolume partitions.
+ *
+ * @param _hv_pts Description.
+ */
 void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double>> _hv_pts)
 {
 	stringstream ss;
@@ -1555,6 +1810,12 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 }
 
 //this works only for two objectives following the method of Yang et al (2019)
+/**
+ * @brief Get ehvi.
+ *
+ * @param op Description.
+ * @param dp Description.
+ */
 void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
@@ -1570,6 +1831,15 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 	
 }
 
+/**
+ * @brief Get ei.
+ *
+ * @param phi Description.
+ * @param obj Description.
+ * @param curr_opt Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::get_ei(map<string, double> phi, string obj, double curr_opt)
 {
     double stdnorm = std_norm_df(curr_opt, phi.at(obj), phi.at(ppd_obj_to_sd_ptr->at(obj)),false);
@@ -1577,6 +1847,13 @@ double ParetoObjectives::get_ei(map<string, double> phi, string obj, double curr
 	return ei;
 }
 
+/**
+ * @brief Get ehvi.
+ *
+ * @param members Description.
+ *
+ * @return Description.
+ */
 map<string, double> ParetoObjectives::get_ehvi(vector<string>& members)
 {
 	map<string, double> ehvi_map;
@@ -1591,6 +1868,14 @@ map<string, double> ParetoObjectives::get_ehvi(vector<string>& members)
 	return ehvi_map;
 }
 
+/**
+ * @brief Get ehvi.
+ *
+ * @param member Description.
+ * @param _member_struct Description.
+ *
+ * @return Description.
+ */
 double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double>>& _member_struct)
 {
 	map<int, vector<double>> hv_i = hypervolume_partitions;
@@ -1670,6 +1955,14 @@ MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_
 
 
 template<typename T, typename A>
+/**
+ * @brief Message.
+ *
+ * @param level Description.
+ * @param _message Description.
+ * @param _extras Description.
+ * @param echo Description.
+ */
 void MOEA::message(int level, const string& _message, vector<T, A> _extras, bool echo)
 {
 	stringstream ss;
@@ -1694,12 +1987,25 @@ void MOEA::message(int level, const string& _message, vector<T, A> _extras, bool
 
 }
 
+/**
+ * @brief Message.
+ *
+ * @param level Description.
+ * @param _message Description.
+ */
 void MOEA::message(int level, const string& _message)
 {
 	message(level, _message, vector<string>());
 }
 
 template<typename T>
+/**
+ * @brief Message.
+ *
+ * @param level Description.
+ * @param _message Description.
+ * @param extra Description.
+ */
 void MOEA::message(int level, const string& _message, T extra)
 {
 	stringstream ss;
@@ -1708,6 +2014,11 @@ void MOEA::message(int level, const string& _message, T extra)
 	message(level, s);
 }
 
+/**
+ * @brief Throw moea error.
+ *
+ * @param message Description.
+ */
 void MOEA::throw_moea_error(const string& message)
 {
 	performance_log->log_event("MOEA error: " + message);
@@ -1718,6 +2029,11 @@ void MOEA::throw_moea_error(const string& message)
 	throw runtime_error("MOEA error: " + message);
 }
 
+/**
+ * @brief Get max len obj name.
+ *
+ * @return Description.
+ */
 int MOEA::get_max_len_obj_name()
 {
 	int max_len = 20;
@@ -1732,6 +2048,13 @@ int MOEA::get_max_len_obj_name()
 	return max_len;
 }
 
+/**
+ * @brief Decvar report.
+ *
+ * @param _dp Description.
+ *
+ * @return Description.
+ */
 map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
 {
 
@@ -1775,6 +2098,13 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
     return summary;
 }
 
+/**
+ * @brief Decvar change report.
+ *
+ * @param current_dv_summary Description.
+ *
+ * @return Description.
+ */
 map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<string, double>>& current_dv_summary)
 {
     map<string, map<string, double>> change_summary;
@@ -1823,6 +2153,14 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
     return change_summary;
 }
 
+/**
+ * @brief Obj func report.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ *
+ * @return Description.
+ */
 map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 	map<string, map<string, double>> summary = get_obj_func_summary_stats(_dp, _op);
@@ -1875,6 +2213,13 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 	return summary;
 }
 
+/**
+ * @brief Obj func change report.
+ *
+ * @param current_obj_summary Description.
+ *
+ * @return Description.
+ */
 map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<string, double>>& current_obj_summary)
 {
 	map<string, map<string, double>> change_summary;
@@ -1944,6 +2289,14 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 	return change_summary;
 }
 
+/**
+ * @brief Get obj func summary stats.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ *
+ * @return Description.
+ */
 map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 
@@ -2032,6 +2385,9 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 }
 
 
+/**
+ * @brief Sanity checks.
+ */
 void MOEA::sanity_checks()
 {
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -2086,6 +2442,12 @@ void MOEA::sanity_checks()
 }
 
 
+/**
+ * @brief Update archive nsga.
+ *
+ * @param _op Description.
+ * @param _dp Description.
+ */
 void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 {
 	message(2, "updating archive");
@@ -2163,6 +2525,12 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	save_populations(dp_archive, op_archive, "archive");
 }
 
+/**
+ * @brief Update archive spea.
+ *
+ * @param _op Description.
+ * @param _dp Description.
+ */
 void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 {
     int current_archive_size = population_schedule[iter] * 2;
@@ -2241,12 +2609,22 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	}
 }
 
+/**
+ * @brief Queue resample runs.
+ *
+ * @param _dp Description.
+ */
 void MOEA::queue_resample_runs(ParameterEnsemble& _dp)
 {
 	//insert outer iter scripts
 }
 
 
+/**
+ * @brief Queue chance runs.
+ *
+ * @param _dp Description.
+ */
 void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 {
 	/* queue up chance-related runs using the class attributes dp and op*/
@@ -2291,6 +2669,15 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 	}
 }
 
+/**
+ * @brief Run population.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ * @param allow_chance Description.
+ *
+ * @return Description.
+ */
 vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
 {
 	run_mgr_ptr->reinitialize();
@@ -2387,6 +2774,15 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	return failed_real_indices;
 }
 
+/**
+ * @brief Get chance shifted op.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ * @param opt_member Description.
+ *
+ * @return Description.
+ */
 ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member)
 {
 	if (risk_obj)
@@ -2395,11 +2791,17 @@ ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, Observat
 		return constraints.get_chance_shifted_constraints(_dp, _op, iter, string(), opt_member);
 }
 
+/**
+ * @brief Finalize.
+ */
 void MOEA::finalize()
 {
 
 }
 
+/**
+ * @brief Initialize.
+ */
 void MOEA::initialize()
 {
 	stringstream ss;
@@ -3427,6 +3829,12 @@ void MOEA::initialize()
 	message(0, "initialization complete");
 }
 
+/**
+ * @brief Update sim maps.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ */
 void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
     map<string,int> rmap = _dp.get_real_map();
@@ -3442,6 +3850,13 @@ void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 
 }
 
+/**
+ * @brief Get initial pso velocities.
+ *
+ * @param num_members Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::get_initial_pso_velocities(int num_members) {
 	ParameterEnsemble _pso_velocity = dp.zeros_like(num_members);
 	Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
@@ -3467,6 +3882,9 @@ ParameterEnsemble MOEA::get_initial_pso_velocities(int num_members) {
     return _pso_velocity;
 }
 
+/**
+ * @brief Initialize pso.
+ */
 void MOEA::initialize_pso()
 {
 	pso_velocity = get_initial_pso_velocities(dp.shape().first);
@@ -3477,6 +3895,11 @@ void MOEA::initialize_pso()
 
 }
 
+/**
+ * @brief Update pso velocity map.
+ *
+ * @param _pso_velocity Description.
+ */
 void MOEA::update_pso_velocity_map(ParameterEnsemble& _pso_velocity)
 {
     map<string,int> rmap = _pso_velocity.get_real_map();
@@ -3486,6 +3909,15 @@ void MOEA::update_pso_velocity_map(ParameterEnsemble& _pso_velocity)
     }
 }
 
+/**
+ * @brief Get optimal solution.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ * @param opt_member_name Description.
+ *
+ * @return Description.
+ */
 pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member_name)
 {
 	Parameters pars;
@@ -3578,6 +4010,11 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 }
 
 
+/**
+ * @brief Generate population.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::generate_population()
 {
 	//int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
@@ -3649,6 +4086,12 @@ ParameterEnsemble MOEA::generate_population()
 	return new_pop;
 }
 
+/**
+ * @brief Fill populations from maps.
+ *
+ * @param new_dp Description.
+ * @param new_op Description.
+ */
 void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnsemble& new_op )
 {
     vector<string> rnames;
@@ -3672,6 +4115,9 @@ void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnse
 
 }
 
+/**
+ * @brief Iterate to solution.
+ */
 void MOEA::iterate_to_solution()
 {
 	iter = 1;
@@ -3891,6 +4337,11 @@ void MOEA::iterate_to_solution()
 
 }
 
+/**
+ * @brief Should use multigen.
+ *
+ * @return Description.
+ */
 bool MOEA::should_use_multigen() {
 
     if (pest_scenario.get_pestpp_options().get_mou_use_multigen()) {
@@ -3903,6 +4354,9 @@ bool MOEA::should_use_multigen() {
     return false;
 }
 
+/**
+ * @brief Initialize population schedule.
+ */
 void MOEA::initialize_population_schedule()
 {
     stringstream ss;
@@ -3972,6 +4426,11 @@ void MOEA::initialize_population_schedule()
     }
 }
 
+/**
+ * @brief Initialize dv population.
+ *
+ * @return Description.
+ */
 bool MOEA::initialize_dv_population()
 {
 	stringstream ss;
@@ -4108,6 +4567,9 @@ bool MOEA::initialize_dv_population()
 }
 
 
+/**
+ * @brief Initialize obs restart population.
+ */
 void MOEA::initialize_obs_restart_population()
 {
 	string obs_filename = pest_scenario.get_pestpp_options().get_mou_obs_population_restart_file();
@@ -4172,6 +4634,12 @@ void MOEA::initialize_obs_restart_population()
 
 
 
+/**
+ * @brief Update pso pbest.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ */
 void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 	ParameterEnsemble tdp = _dp;
@@ -4219,6 +4687,14 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	pso_pbest_op = top;
 }
 
+/**
+ * @brief Get updated pso velocity.
+ *
+ * @param _dp Description.
+ * @param gbest_solutions Description.
+ *
+ * @return Description.
+ */
 pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
 	double cog_const, social_const;
@@ -4449,6 +4925,15 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 
 
 
+/**
+ * @brief Get pso gbest solutions.
+ *
+ * @param num_reals Description.
+ * @param _dp Description.
+ * @param _op Description.
+ *
+ * @return Description.
+ */
 vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 	stringstream ss;
@@ -4517,6 +5002,14 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	return gbest_solutions;
 }
 
+/**
+ * @brief Generate pso population.
+ *
+ * @param num_members Description.
+ * @param _dp Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemble& _dp)
 {
     //generate this first before pso resets the objectives member map...
@@ -4600,6 +5093,15 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 
 
 
+/**
+ * @brief Simplex cceua kn.
+ *
+ * @param s Description.
+ * @param k Description.
+ * @param optbounds Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds)
 {
 	//C++ implementation of the cceua algorithm, Duan et al. (1992) with the addition of k worst points
@@ -4724,6 +5226,15 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 	return s;//TODO fnew, icall
 } 
 
+/**
+ * @brief Generate simplex population.
+ *
+ * @param num_members Description.
+ * @param _dp Description.
+ * @param _op Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
     message(1, "generating simplex population of size", num_members);
@@ -4818,6 +5329,14 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
 }
 
 
+/**
+ * @brief Generate diffevol population.
+ *
+ * @param num_members Description.
+ * @param _dp Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
 {
 	/* adaptive idea:  Front. Built Environ., 09 July 2020 | https://doi.org/10.3389/fbuil.2020.00102
@@ -4955,6 +5474,14 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	return new_dp;
 }
 
+/**
+ * @brief Generate pm population.
+ *
+ * @param num_members Description.
+ * @param _dp Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating PM population of size", num_members);
@@ -5028,6 +5555,15 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	return tmp_dp;
 }
 
+/**
+ * @brief Selection.
+ *
+ * @param num_to_select Description.
+ * @param _dp Description.
+ * @param _mattype Description.
+ *
+ * @return Description.
+ */
 vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& _mattype)
 {
 	int i_member = 0, p1_idx,p2_idx;
@@ -5081,6 +5617,14 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 	return members;
 }
 
+/**
+ * @brief Generate sbx population.
+ *
+ * @param num_members Description.
+ * @param _dp Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating SBX population of size", num_members);
@@ -5186,6 +5730,14 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
+/**
+ * @brief Save pi constraints.
+ *
+ * @param _dp Description.
+ * @param pinames Description.
+ *
+ * @return Description.
+ */
 Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinames)
 {
 	//check if there are prior info equations
@@ -5243,6 +5795,14 @@ Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinam
 }
 
 
+/**
+ * @brief Save populations.
+ *
+ * @param _dp Description.
+ * @param _op Description.
+ * @param tag Description.
+ * @param force_save Description.
+ */
 void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag, bool force_save)
 {
 	
@@ -5438,6 +5998,13 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 
 }
 
+/**
+ * @brief Get new member name.
+ *
+ * @param tag Description.
+ *
+ * @return Description.
+ */
 string MOEA::get_new_member_name(string tag)
 {
 	stringstream ss;
@@ -5450,6 +6017,16 @@ string MOEA::get_new_member_name(string tag)
 	return pest_utils::upper_cp(ss.str());
 }
 
+/**
+ * @brief Sbx.
+ *
+ * @param probability Description.
+ * @param di Description.
+ * @param idx1 Description.
+ * @param idx2 Description.
+ *
+ * @return Description.
+ */
 pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx(double probability, double di, int idx1, int idx2)
 {
 	int i;
@@ -5776,6 +6353,18 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 
 }
 
+/**
+ * @brief Get sbx child values.
+ *
+ * @param p1 Description.
+ * @param p2 Description.
+ * @param lbnd Description.
+ * @param ubnd Description.
+ * @param eta Description.
+ * @param rnd Description.
+ * @param c1 Description.
+ * @param c2 Description.
+ */
 void MOEA::get_sbx_child_values(const double& p1, const double& p2, const double& lbnd, const double& ubnd, const double& eta, double& rnd, double& c1, double& c2)
 {
 	double y1 = min(p1, p2);
@@ -5812,6 +6401,15 @@ void MOEA::get_sbx_child_values(const double& p1, const double& p2, const double
 
 
 }
+/**
+ * @brief Get betas.
+ *
+ * @param v1 Description.
+ * @param v2 Description.
+ * @param distribution_index Description.
+ *
+ * @return Description.
+ */
 pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_index)
 {
 	stringstream ss;
@@ -5863,6 +6461,11 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 
 }
 
+/**
+ * @brief Gauss mutation ip.
+ *
+ * @param _dp Description.
+ */
 void MOEA::gauss_mutation_ip(ParameterEnsemble& _dp)
 {
 	/* 

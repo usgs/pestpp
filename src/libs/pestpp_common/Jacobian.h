@@ -58,8 +58,8 @@ public:
 	friend void TranFixed::jacobian_reverse(Jacobian &jac);
 	friend void TranLog10::jacobian_forward(Jacobian &jac);
 	friend void TranLog10::jacobian_reverse(Jacobian &jac);
-	friend void TranSVD::jacobian_forward(Jacobian &jac);
-	friend void TranSVD::jacobian_reverse(Jacobian &jac);
+	// friend void TranSVD::jacobian_forward(Jacobian &jac);
+	// friend void TranSVD::jacobian_reverse(Jacobian &jac);
 	
 	Jacobian(FileManager &_file_manager);
 	
@@ -138,7 +138,7 @@ protected:
 		vector<Parameters> &model_par_vec, set<string> &out_of_bound_par);
 	virtual bool out_of_bounds(const Parameters &model_parameters, const ParameterInfo &ctl_par_info, set<string> &out_of_bound_par) const;
 	virtual double derivative_inc(const string &name, const ParameterGroupInfo &group_info,   double cur_par_value,  bool central = false);
-	virtual bool get_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
+	virtual bool fill_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
 		vector<double> &delta_numeric_par_vec, bool phiredswh_flag, set<string> &out_of_bound_par);
 	virtual unordered_map<string, int> get_par2col_map() const;
 	virtual unordered_map<string, int> get_obs2row_map() const;

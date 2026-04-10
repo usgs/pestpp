@@ -1,3 +1,7 @@
+/**
+ * @file pestpp-da.cpp
+ * @brief Implementation of pestpp-da.
+ */
 // pestpp-da.cpp : Defines the entry point for the console application.
 //
 
@@ -37,35 +41,20 @@ using namespace std;
 using namespace pest_utils;
 
 
+/**
+ * @brief Main.
+ *
+ * @param argc Description.
+ * @param argv Description.
+ *
+ * @return Description.
+ */
 int main(int argc, char* argv[])
 {
 #ifndef _DEBUG
 	try
 	{
 #endif
-
-//		string version = PESTPP_VERSION;
-//		cout << endl << endl;
-//		cout << "             ==============================================" << endl;
-//		cout << "             pestpp-da: Model Independent Data Assimilation" << endl;
-//		cout << "             ==============================================" << endl << endl;
-//
-//		//cout << "                     for PEST(++) datasets " << endl << endl;
-//		cout << "               Developed by the PEST++ development team" << endl;
-//		cout << endl << endl << "version: " << version << endl;
-//		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-//        auto start = chrono::steady_clock::now();
-//        string start_string = get_time_string();
-//        cout << "started at " << start_string << endl;
-//		CmdLine cmdline(argc, argv);
-//
-//        if (quit_file_found())
-//        {
-//            cerr << "'pest.stp' found, please remove this file " << endl;
-//            return 1;
-//        }
-
-
 
         string version = PESTPP_VERSION;
         cout << endl << endl;
@@ -169,8 +158,8 @@ int main(int argc, char* argv[])
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 
-		cout << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
-		cout << "                            by the PEST++ development team" << endl;
+		fout_rec << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
+		fout_rec << "                            by the PEST++ development team" << endl;
 		fout_rec << endl;
 		cmdline.startup_report(fout_rec,start_string);
 		cmdline.startup_report(cout,start_string);
@@ -297,7 +286,6 @@ int main(int argc, char* argv[])
             DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
             da.initialize_dynamic_states();
             da.sanity_checks();
-            run_manager_ptr = 0;
             delete(run_manager_ptr);
 
             //now check the cycles
@@ -481,7 +469,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_ctl_ordered_obs_names(),
                 pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                 pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
-                pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+                pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
+				pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
         else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
@@ -625,8 +614,7 @@ int main(int argc, char* argv[])
 				}
 			}
 			//check for entries in the obs cycle table
-			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << pest_scenario.get_observation_info_ptr()->get_weight("GAGE_1") << endl;
-			if ((obs_cycle_info.find(*icycle) != obs_cycle_info.end()) || (false))
+			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 
 			{
 				performance_log.log_event("updating obs using da obs cycle table info");
@@ -790,7 +778,8 @@ int main(int argc, char* argv[])
                     }
                 }
 				da.set_noise_oe(cycle_curr_noise);
-				cycle_curr_noise.to_csv("cycle_curr_noise.csv");
+				if (verbose_level >= 3)
+					cycle_curr_noise.to_csv("cycle_curr_noise.csv");
 			}
 			else
             {

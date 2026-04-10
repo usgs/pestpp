@@ -442,6 +442,13 @@ def stack_test():
     pst = pyemu.Pst(pst_file)
     par = pst.parameter_data
     par.loc[par.partrans=="fixed","partrans"] = "log"
+    obs = pst.observation_data
+    obs.loc["q1","obsval"] = 100
+    obs.loc["q1","obgnme"] = "equal_to"
+    obs.loc["q1","weight"] = 1.0
+    
+    pst.pestpp_options.pop("opt_constraint_groups",None)
+    pst.pestpp_options.pop("base_jacobian",None)
     pst.pestpp_options["opt_risk"] = 0.1
     pst.pestpp_options["opt_stack_size"] = 10
     pst.control_data.noptmax = 1
@@ -489,7 +496,7 @@ def stack_test():
     if os.path.exists(d):
         shutil.rmtree(d)
     shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
-    pst.pestpp_options.pop("base_jacobian")
+    pst.pestpp_options.pop("base_jacobian",None)
     pst.write(os.path.join(d,"test.pst"))
     pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)   
     rec4 = os.path.join(d,"test.rec")
@@ -621,8 +628,6 @@ def fosm_invest():
         print(jcb.shape)
         sc = pyemu.Schur(jco=jcb,pst=pst,predictions=fnames)
         print(jcb_file,sc.get_forecast_summary().loc[:,"prior_var"].apply(lambda x: np.sqrt(x)))
-
-
 
 
 if __name__ == "__main__":

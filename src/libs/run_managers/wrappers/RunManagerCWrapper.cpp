@@ -1,3 +1,7 @@
+/**
+ * @file RunManagerCWrapper.cpp
+ * @brief Implementation of RunManagerCWrapper.
+ */
 #include <algorithm>
 #include "RunManagerCWrapper.h"
 #include "utilities.h"

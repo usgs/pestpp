@@ -1,3 +1,7 @@
+/**
+ * @file DataAssimilator.cpp
+ * @brief Implementation of DataAssimilator.
+ */
 #include <random>
 #include <map>
 #include <iomanip>
@@ -13,6 +17,13 @@
 #include "EnsembleMethodUtils.h"
 
 
+/**
+ * @brief Initialize noptmax schedule.
+ *
+ * @param cycles Description.
+ *
+ * @return Description.
+ */
 map<int,int> DataAssimilator::initialize_noptmax_schedule(vector<int>& cycles)
 {
     stringstream ss;
@@ -84,6 +95,9 @@ map<int,int> DataAssimilator::initialize_noptmax_schedule(vector<int>& cycles)
 }
 
 
+/**
+ * @brief Sanity checks.
+ */
 void DataAssimilator::sanity_checks()
 {
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -131,6 +145,11 @@ void DataAssimilator::sanity_checks()
 }
 
 
+/**
+ * @brief Da update.
+ *
+ * @param cycle Description.
+ */
 void DataAssimilator::da_update(int cycle)
 {
 	stringstream ss;
@@ -151,7 +170,7 @@ void DataAssimilator::da_update(int cycle)
 		else
 			accept = solve_glm(cycle);
 		report_and_save(cycle);
-		ph.update(oe, pe);
+		ph.update(oe, pe, weights);
 		last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		ph.report(true);
@@ -195,6 +214,12 @@ void DataAssimilator::da_update(int cycle)
 
 
 
+/**
+ * @brief Eig2csv.
+ *
+ * @param name Description.
+ * @param matrix Description.
+ */
 void DataAssimilator::eig2csv(string name, Eigen::MatrixXd matrix)
 {
 	ofstream file(name.c_str());
@@ -214,11 +239,24 @@ void DataAssimilator::eig2csv(string name, Eigen::MatrixXd matrix)
 }
 
 
+/**
+ * @brief Finalize.
+ */
 void DataAssimilator::finalize()
 {
 
 }
 
+/**
+ * @brief Process da obs cycle table.
+ *
+ * @param pest_scenario Description.
+ * @param ncycles_in_tables Description.
+ * @param fout_rec Description.
+ * @param obs_in_tbl Description.
+ *
+ * @return Description.
+ */
 map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec, set<string>& obs_in_tbl)
 {
 	//process da par cycle table
@@ -332,7 +370,6 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 				}
 				cycle_map[tbl_obs_names[ii]] = val;
 				ncycles_in_tables.push_back(cycle);
-				ncycles_in_tables.push_back(cycle);
 
 				// make sure cycle numbers are sorted and unique
 				sort(ncycles_in_tables.begin(), ncycles_in_tables.end());
@@ -355,6 +392,16 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 
 }
 
+/**
+ * @brief Process da weight cycle table.
+ *
+ * @param pest_scenario Description.
+ * @param ncycles_in_tables Description.
+ * @param fout_rec Description.
+ * @param obs_in_tbl Description.
+ *
+ * @return Description.
+ */
 map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec, set<string>& obs_in_tbl)
 {
 	//process da par cycle table
@@ -476,6 +523,15 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 
 }
 
+/**
+ * @brief Process da par cycle table.
+ *
+ * @param pest_scenario Description.
+ * @param ncycles_in_tables Description.
+ * @param fout_rec Description.
+ *
+ * @return Description.
+ */
 map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec)
 {
 	//process da par cycle table
@@ -606,6 +662,14 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 }
 
 
+/**
+ * @brief Write global phi info.
+ *
+ * @param icycle Description.
+ * @param f_phi Description.
+ * @param da Description.
+ * @param init_real_names Description.
+ */
 void write_global_phi_info(int icycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names)
 {
 	int iter = da.get_iter();
@@ -624,6 +688,15 @@ void write_global_phi_info(int icycle, ofstream& f_phi, DataAssimilator& da, vec
 	f_phi << endl;
 }
 
+/**
+ * @brief Generate global ensembles.
+ *
+ * @param da Description.
+ * @param fout_rec Description.
+ * @param curr_pe Description.
+ * @param curr_oe Description.
+ * @param curr_noise Description.
+ */
 void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe, ObservationEnsemble& curr_noise)
 {
 	//generate a parent ensemble which includes all parameters across all cycles

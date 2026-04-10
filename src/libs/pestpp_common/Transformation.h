@@ -288,51 +288,51 @@ protected:
  are transformed to super parameters and in the reverse direction super parameters are transformed to
  base parameters
 */
-class TranSVD: public Transformation {
-public:
-	TranSVD(int _max_sing, double _eign_thresh, const string &_name = "unnamed TranSVD");
-	TranSVD(const TranSVD &rhs);
-	void set_SVD_pack();
-	void update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
-		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names, 
-		Eigen::SparseMatrix<double>& parcov_inv, map<string,double> dss,const Parameters &_frozen_derivative_pars=Parameters());
-	void update_add_frozen_pars(const Parameters &_frozen_derivative_pars);
-	Parameters& get_frozen_derivative_pars() {return frozen_derivative_parameters;}
-	const vector<string>& get_super_parameter_names(){return super_parameter_names;}
-	virtual void forward(Transformable &data);
-	virtual void reverse(Transformable &data);
-	virtual void jacobian_forward(Jacobian &jac);
-	virtual void jacobian_reverse(Jacobian &jac);
-	virtual void d1_to_d2(Transformable &del_data, Transformable &data);
-	virtual void d2_to_d1(Transformable &del_data, Transformable &data);
-	void insert(const string &item_name, double item_value)
-	    {/*can't insert into SVD.  This is intentionally a no-op*/};
-	virtual ~TranSVD();
-	virtual void print(ostream &os) const;
-	virtual bool is_one_to_one() const {return false;}
-	virtual TranSVD* clone() const {return new TranSVD(*this);}
-	ParameterGroupInfo build_par_group_info(const ParameterGroupInfo &base_pg_info);
-	Parameters map_basepar_to_super(const Parameters &base_pars);
-	const Eigen::SparseMatrix<double>& get_vt() const;
-	void save(ostream &fout) const;
-	void read(istream &fin);
-	void set_performance_log(PerformanceLog *_performance_log);
-protected:
-	SVDPackage *tran_svd_pack;
-
-	vector<string> base_parameter_names;
-	vector<string> super_parameter_names;
-	vector<string> obs_names;
-	//Eigen::SparseMatrix<double> SqrtQ_J;
-	Eigen::SparseMatrix<double> jtqj;
-	Eigen::VectorXd Sigma;
-	Eigen::SparseMatrix<double> U;
-	Eigen::SparseMatrix<double> Vt;
-	Parameters init_base_numeric_parameters;
-	Parameters frozen_derivative_parameters;
-	void calc_svd();
-	map<string, double> dss;
-};
+// class TranSVD: public Transformation {
+// public:
+// 	TranSVD(int _max_sing, double _eign_thresh, const string &_name = "unnamed TranSVD");
+// 	TranSVD(const TranSVD &rhs);
+// 	void set_SVD_pack();
+// 	void update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
+// 		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names,
+// 		Eigen::SparseMatrix<double>& parcov_inv, map<string,double> dss,const Parameters &_frozen_derivative_pars=Parameters());
+// 	void update_add_frozen_pars(const Parameters &_frozen_derivative_pars);
+// 	Parameters& get_frozen_derivative_pars() {return frozen_derivative_parameters;}
+// 	const vector<string>& get_super_parameter_names(){return super_parameter_names;}
+// 	virtual void forward(Transformable &data);
+// 	virtual void reverse(Transformable &data);
+// 	virtual void jacobian_forward(Jacobian &jac);
+// 	virtual void jacobian_reverse(Jacobian &jac);
+// 	virtual void d1_to_d2(Transformable &del_data, Transformable &data);
+// 	virtual void d2_to_d1(Transformable &del_data, Transformable &data);
+// 	void insert(const string &item_name, double item_value)
+// 	    {/*can't insert into SVD.  This is intentionally a no-op*/};
+// 	virtual ~TranSVD();
+// 	virtual void print(ostream &os) const;
+// 	virtual bool is_one_to_one() const {return false;}
+// 	virtual TranSVD* clone() const {return new TranSVD(*this);}
+// 	ParameterGroupInfo build_par_group_info(const ParameterGroupInfo &base_pg_info);
+// 	Parameters map_basepar_to_super(const Parameters &base_pars);
+// 	const Eigen::SparseMatrix<double>& get_vt() const;
+// 	void save(ostream &fout) const;
+// 	void read(istream &fin);
+// 	void set_performance_log(PerformanceLog *_performance_log);
+// protected:
+// 	SVDPackage *tran_svd_pack;
+//
+// 	vector<string> base_parameter_names;
+// 	vector<string> super_parameter_names;
+// 	vector<string> obs_names;
+// 	//Eigen::SparseMatrix<double> SqrtQ_J;
+// 	Eigen::SparseMatrix<double> jtqj;
+// 	Eigen::VectorXd Sigma;
+// 	Eigen::SparseMatrix<double> U;
+// 	Eigen::SparseMatrix<double> Vt;
+// 	Parameters init_base_numeric_parameters;
+// 	Parameters frozen_derivative_parameters;
+// 	void calc_svd();
+// 	map<string, double> dss;
+// };
 
 //class TranNormalize: public Transformation {
 //public:

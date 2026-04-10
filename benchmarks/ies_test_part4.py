@@ -1152,7 +1152,7 @@ def multimodal_test():
     assert phidf.iteration.max() == pst.control_data.noptmax
     assert phidf.loc[phidf.index[-1],"min"] < 0.1
 
-    pst.pestpp_options["ies_multimodal_alpha"] = 1.0
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.0
     pst.write(os.path.join(test_d, "mm1.pst"))
     m_d = os.path.join(model_d, "master_base_{0}".format(func))
     #pyemu.os_utils.start_workers(test_d, exe_path, "mm1.pst", worker_root=model_d, num_workers=35, master_dir=m_d)
@@ -1160,10 +1160,39 @@ def multimodal_test():
         shutil.rmtree(m_d)
     shutil.copytree(test_d,m_d)
     pyemu.os_utils.run("{0} mm1.pst".format(exe_path),cwd=m_d)
-    
+
+
     phidf = pd.read_csv(os.path.join(m_d,"mm1.phi.actual.csv"))
     assert phidf.iteration.max() == pst.control_data.noptmax
     
+
+    pst.pestpp_options["ies_multimodal_alpha"] = 1.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_allreals_{0}".format(func))
+    #pyemu.os_utils.start_workers(test_d, exe_path, "mm1.pst", worker_root=model_d, num_workers=35, master_dir=m_d)
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d,m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path),cwd=m_d)
+
+    phidf1 = pd.read_csv(os.path.join(m_d,"mm1.phi.actual.csv"))
+    assert phidf1.iteration.max() == pst.control_data.noptmax
+    
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.99
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_almostallreals_{0}".format(func))
+    #pyemu.os_utils.start_workers(test_d, exe_path, "mm1.pst", worker_root=model_d, num_workers=35, master_dir=m_d)
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d,m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path),cwd=m_d)
+    phidf2 = pd.read_csv(os.path.join(m_d,"mm1.phi.actual.csv"))
+    assert phidf2.iteration.max() == pst.control_data.noptmax
+
+    diff = np.abs(phidf1["mean"].iloc[-1] - phidf2["mean"].iloc[-1])
+    print(diff)
+    assert diff < 1e-6
+
     pst.pestpp_options["ies_multimodal_alpha"] = 0.1
     pst.pestpp_options["ies_num_threads"] = 4
     pst.pestpp_options["ies_include_base"] = True
@@ -1996,6 +2025,7 @@ def tenpar_adjust_weights_test():
     obs.loc[:,"standard_deviation"] = 0.1
     obs.loc[pst.obs_names[12:],"standard_deviation"] = 1e-11
     obs.loc[pst.obs_names[12:],"obsval"] = 1e-9
+    #these values are hard coded later...
     with open(os.path.join(template_d,"phi.csv"),'w') as f:
         f.write("og1,0.333333\n")
         f.write("og3,0.333333\n")
@@ -2014,6 +2044,29 @@ def tenpar_adjust_weights_test():
     
     pst.pestpp_options['ies_verbose_level'] = 4
     pst.pestpp_options["ies_bad_phi_sigma"] = -1.5
+
+    pst.control_data.noptmax = 0
+    pst.pestpp_options["ies_drop_conflicts"] = False
+    pst.pestpp_options["ies_phi_factor_file"] = "phi.csv"
+    pst_name = "pest_adj.pst"
+    pst.write(os.path.join(template_d,pst_name),version=2)
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    shutil.copytree(template_d, test_d)
+    pyemu.os_utils.run("{0} {1}".format(exe_path, pst_name), cwd=test_d)
+    pst.set_res(os.path.join(test_d,pst_name.replace(".pst",".base.rei")))
+    print(pst.phi_components)
+    obs = pst.observation_data
+    aobs = pd.read_csv(os.path.join(test_d,pst_name.replace(".pst",".0.adjusted.obs_data.csv")),index_col=0)
+    obs.loc[aobs.index,"weight"] = aobs.weight.values
+    print(pst.phi_components)
+    print(pst.phi_components_normalized)
+    pcn = pst.phi_components_normalized
+    assert np.isclose(pcn["og3blahblah"],0.33333,1e-3)
+    assert np.isclose(pcn["og4yadayada"],0.33333,1e-3)
+    
+
+    pst.pestpp_options.pop("ies_phi_factor_file")
 
     
     pst.control_data.noptmax = 2
@@ -4948,14 +5001,85 @@ def tenpar_fixed_transform_test():
     assert diff.sum() < 1e-6
     
     
+def large_invest():
+    t_d = os.path.join("temp","template")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+    npar = 30000
+    nobs = 60000
+    pnames = ["ppppppppppppppppppppppppppppppppppp{0:07d}".format(i) for i in range(npar)]
+
+    onames = ["ooooooooooooooooooooooooooooooooooo{0:07d}".format(i) for i in range(nobs)]
+    pst = pyemu.Pst.from_par_obs_names(pnames,onames)
+    obs = pst.observation_data
+    obs["obsval"] = np.random.normal(0,1,nobs)
+    par = pst.parameter_data
+    par["parval1"] = 1.0
+    par["parubnd"] = 1.1
+    par["parlbnd"] = 0.9
+    
+    pst.pestpp_options["check_tplins"] = False
+    pst.pestpp_options["ies_num_reals"] = 600
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.75
+    pst.pestpp_options["save_dense"] = True
+    pst.pestpp_options["ies_num_threads"] = 10
+    pst.model_command = "ls"
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(t_d,"pest.pst"),version=2)
+
+    pyemu.os_utils.run("{0} pest.pst /e".format(exe_path),cwd=t_d)
+
+
+def tenpar_xsec_combined_autoadaloc_mm_stress_test():
+    """testing combined matrix + autoadaloc"""
+    model_d = "ies_10par_xsec"
+    test_d = os.path.join(model_d, "master_comb_aal_test1")
+    template_d = os.path.join(model_d, "test_template")
+
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    shutil.copytree(template_d, test_d)
+    pst.pestpp_options = {}
+    pst.pestpp_options["ies_num_reals"] = 30
+    
+    mat = pyemu.Matrix.from_names(pst.nnz_obs_names, pst.adj_par_names).to_dataframe()
+    mat.loc[:, :] = 1
+    mat.loc[:, pst.adj_par_names[::2]] = 0
+    pyemu.Matrix.from_dataframe(mat).to_ascii(os.path.join(template_d, "loc.mat"))
+
+    pst.pestpp_options["ies_localizer"] = "loc.mat"
+    pst.pestpp_options["ies_autoadaloc"] = True
+    pst.pestpp_options["ies_verbose_level"] = 3
+    pst.pestpp_options["ies_debug_fail_remainder"] = True
+    pst.pestpp_options["ies_debug_fail_subset"] = True
+    pst.pestpp_options["ies_debug_bad_phi"] = True
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.99
+    
+    pst.control_data.noptmax = 3
+
+    pst.write(os.path.join(template_d, "pest_aal_restart.pst"))
+    pyemu.os_utils.start_workers(template_d, exe_path, "pest_aal_restart.pst", num_workers=10,
+                                 master_dir=test_d, verbose=True, worker_root=model_d,
+                                 port=port)
+    
 
 if __name__ == "__main__":
-    tenpar_fixed_transform_test()
+    tenpar_xsec_combined_autoadaloc_mm_stress_test()
 
+    #tenpar_adjust_weights_test()
+    #large_invest()
+    #tenpar_fixed_transform_test()
+    #tenpar_reg_factor_test()
     #tenpar_ext_run_mgr_test()
     #freyberg_pdc_test()
     #tenpar_mean_iter_test()
-    #tenpar_reinflate_num_reals_2_test()
+    #tenpar_reinflate_num_reals_test()
     #freyberg_reinflate_num_reals_invest()
     #compared_freyberg_inflate_runs()
     #tenpar_mean_iter_test_sched()

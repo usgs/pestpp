@@ -1,3 +1,7 @@
+/**
+ * @file model_interface.cpp
+ * @brief Implementation of model_interface.
+ */
 #include "network_wrapper.h"
 #include "network_package.h"
 #include "utilities.h"
@@ -33,6 +37,17 @@ using namespace std;
 //}
 
 
+/**
+ * @brief Model interface.
+ *
+ * @param _tplfile_vec Description.
+ * @param _inpfile_vec Description.
+ * @param _insfile_vec Description.
+ * @param _outfile_vec Description.
+ * @param _comline_vec Description.
+ *
+ * @return Description.
+ */
 ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
                                _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec):
                                insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
@@ -64,6 +79,11 @@ ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpf
 
 }
 
+/**
+ * @brief Scrub filename ip.
+ *
+ * @param fname Description.
+ */
 void ModelInterface::scrub_filename_ip(string& fname)
 {
     vector<string> tokens;
@@ -84,6 +104,11 @@ void ModelInterface::scrub_filename_ip(string& fname)
 }
 
 
+/**
+ * @brief Throw mio error.
+ *
+ * @param base_message Description.
+ */
 void ModelInterface::throw_mio_error(string base_message)
 {
 	throw runtime_error("model input/output error:" + base_message);
@@ -91,6 +116,9 @@ void ModelInterface::throw_mio_error(string base_message)
 
 
 
+/**
+ * @brief Check io access.
+ */
 void ModelInterface::check_io_access()
 {
 	
@@ -130,6 +158,12 @@ void ModelInterface::check_io_access()
 	}
 }
 
+/**
+ * @brief Check tplins.
+ *
+ * @param par_names Description.
+ * @param obs_names Description.
+ */
 void ModelInterface::check_tplins(const vector<string> &par_names, const vector<string> &obs_names)
 {	
 	//rigorous checking of names in tpl and ins files vs control file
@@ -206,6 +240,12 @@ void ModelInterface::check_tplins(const vector<string> &par_names, const vector<
 
 
 
+/**
+ * @brief Run.
+ *
+ * @param pars Description.
+ * @param obs Description.
+ */
 void ModelInterface::run(Parameters* pars, Observations* obs)
 {
     exception_ptr run_exception = nullptr;
@@ -220,6 +260,14 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
+/**
+ * @brief Work.
+ *
+ * @param tid Description.
+ * @param ins_idx Description.
+ * @param obs Description.
+ * @param additional_ins_delims Description.
+ */
 void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims)
 {
 	int count = 0, i;
@@ -260,6 +308,14 @@ void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observation
 	}
 }
 
+/**
+ * @brief Work.
+ *
+ * @param tid Description.
+ * @param tpl_idx Description.
+ * @param pars Description.
+ * @param pro_pars Description.
+ */
 void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars)
 {
 	int count = 0, i;
@@ -301,6 +357,16 @@ void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters par
 	}
 }
 
+/**
+ * @brief Process template file thread.
+ *
+ * @param tid Description.
+ * @param tpl_idx Description.
+ * @param ttp Description.
+ * @param pars Description.
+ * @param pro_pars Description.
+ * @param eptr Description.
+ */
 void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplateProcess& ttp, Parameters pars, Parameters& pro_pars, exception_ptr& eptr)
 {
 	
@@ -320,6 +386,16 @@ void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplat
 	return;
 }
 
+/**
+ * @brief Process instruction file thread.
+ *
+ * @param tid Description.
+ * @param ins_idx Description.
+ * @param tip Description.
+ * @param obs Description.
+ * @param additional_ins_delims Description.
+ * @param eptr Description.
+ */
 void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInstructionProcess& tip, Observations& obs, string additional_ins_delims, exception_ptr& eptr)
 {
 
@@ -340,6 +416,11 @@ void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInst
 }
 
 
+/**
+ * @brief Write input files.
+ *
+ * @param pars_ptr Description.
+ */
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
 	int nnum_threads = num_threads;
@@ -459,6 +540,11 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
         cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 }
 
+/**
+ * @brief Read output files.
+ *
+ * @param obs Description.
+ */
 void ModelInterface::read_output_files(Observations *obs)
 {
 	int nnum_threads = num_threads;
@@ -609,6 +695,9 @@ void ModelInterface::read_output_files(Observations *obs)
 }
 
 
+/**
+ * @brief Remove existing.
+ */
 void ModelInterface::remove_existing()
 {
 	//first delete any existing input and output files
@@ -835,6 +924,11 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 }
 
+/**
+ * @brief Parse and check.
+ *
+ * @return Description.
+ */
 unordered_set<string> TemplateFile::parse_and_check()
 {
 	ifstream f(tpl_filename);
@@ -843,6 +937,14 @@ unordered_set<string> TemplateFile::parse_and_check()
 
 }
 
+/**
+ * @brief Write input file.
+ *
+ * @param input_filename Description.
+ * @param pars Description.
+ *
+ * @return Description.
+ */
 Parameters TemplateFile::write_input_file(const string& input_filename, Parameters& pars)
 {
 	ifstream f_tpl(tpl_filename);
@@ -943,6 +1045,11 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 	return pro_pars;
 }
 
+/**
+ * @brief Prep tpl file for reading.
+ *
+ * @param f_tpl Description.
+ */
 void TemplateFile::prep_tpl_file_for_reading(ifstream& f_tpl)
 {
 	if (f_tpl.bad())
@@ -965,6 +1072,13 @@ void TemplateFile::prep_tpl_file_for_reading(ifstream& f_tpl)
 		throw_tpl_error("marker on first line should be one character, not: " + marker);
 }
 
+/**
+ * @brief Get names.
+ *
+ * @param f Description.
+ *
+ * @return Description.
+ */
 unordered_set<string> TemplateFile::get_names(ifstream& f)
 {
 	unordered_set<string> names;
@@ -982,6 +1096,14 @@ unordered_set<string> TemplateFile::get_names(ifstream& f)
 	return names;
 }
 
+/**
+ * @brief Find all marker indices.
+ *
+ * @param line Description.
+ * @param marker Description.
+ *
+ * @return Description.
+ */
 vector<int> TemplateFile::find_all_marker_indices(const string& line, const string& marker)
 {
 	vector<int> indices;
@@ -994,6 +1116,13 @@ vector<int> TemplateFile::find_all_marker_indices(const string& line, const stri
 	return indices;
 }
 
+/**
+ * @brief Throw tpl error.
+ *
+ * @param message Description.
+ * @param lnum Description.
+ * @param warn Description.
+ */
 void TemplateFile::throw_tpl_error(const string& message, int lnum , bool warn)
 {
 	stringstream ss;
@@ -1010,6 +1139,13 @@ void TemplateFile::throw_tpl_error(const string& message, int lnum , bool warn)
 		throw runtime_error(ss.str());
 }
 
+/**
+ * @brief Parse tpl line.
+ *
+ * @param line Description.
+ *
+ * @return Description.
+ */
 vector<pair<string,pair<int, int>>> TemplateFile::parse_tpl_line(const string& line)
 {
 	vector<int> indices = find_all_marker_indices(line, marker);
@@ -1036,6 +1172,15 @@ vector<pair<string,pair<int, int>>> TemplateFile::parse_tpl_line(const string& l
 	return tpl_line_info;
 }
 
+/**
+ * @brief Cast to fixed len string.
+ *
+ * @param size Description.
+ * @param value Description.
+ * @param name Description.
+ *
+ * @return Description.
+ */
 string TemplateFile::cast_to_fixed_len_string(int size, double value, string& name)
 {
 	string val_str, fill_val=" ";
@@ -1161,6 +1306,13 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	return val_str;
 }
 
+/**
+ * @brief Read line.
+ *
+ * @param f_tpl Description.
+ *
+ * @return Description.
+ */
 string TemplateFile::read_line( ifstream& f_tpl)
 {
 	if (f_tpl.bad())
@@ -1175,6 +1327,13 @@ string TemplateFile::read_line( ifstream& f_tpl)
 	return line;
 }
 
+/**
+ * @brief Read ins line.
+ *
+ * @param f_ins Description.
+ *
+ * @return Description.
+ */
 string InstructionFile::read_ins_line(ifstream& f_ins)
 {
 	if (f_ins.bad())
@@ -1190,6 +1349,13 @@ string InstructionFile::read_ins_line(ifstream& f_ins)
 }
 
 
+/**
+ * @brief Read out line.
+ *
+ * @param f_out Description.
+ *
+ * @return Description.
+ */
 string InstructionFile::read_out_line(ifstream& f_out)
 {
 	if (f_out.bad())
@@ -1212,6 +1378,11 @@ out_line_num(0),last_ins_line(""),last_out_line(""), additional_delimiters(_addt
 }
 
 
+/**
+ * @brief Parse and check.
+ *
+ * @return Description.
+ */
 unordered_set<string> InstructionFile::parse_and_check()
 {
 	unordered_set<string> names;
@@ -1264,6 +1435,11 @@ unordered_set<string> InstructionFile::parse_and_check()
 	return names;
 }
 
+/**
+ * @brief Prep ins file for reading.
+ *
+ * @param f_ins Description.
+ */
 void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 {
 	if (f_ins.bad())
@@ -1292,6 +1468,13 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 }
 
 
+/**
+ * @brief Read output file.
+ *
+ * @param output_filename Description.
+ *
+ * @return Description.
+ */
 Observations InstructionFile::read_output_file(const string& output_filename)
 {
 	if (!pest_utils::check_exist_in(output_filename))
@@ -1398,6 +1581,14 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 }
 
 
+/**
+ * @brief Throw ins error.
+ *
+ * @param message Description.
+ * @param ins_lnum Description.
+ * @param out_lnum Description.
+ * @param warn Description.
+ */
 void InstructionFile::throw_ins_error(const string& message, int ins_lnum, int out_lnum, bool warn)
 {
 	stringstream ss;
@@ -1416,6 +1607,13 @@ void InstructionFile::throw_ins_error(const string& message, int ins_lnum, int o
 		throw runtime_error(ss.str());
 }
 
+/**
+ * @brief Parse obs name from token.
+ *
+ * @param token Description.
+ *
+ * @return Description.
+ */
 string InstructionFile::parse_obs_name_from_token(const string& token)
 {
 	int spos, epos;
@@ -1440,6 +1638,13 @@ string InstructionFile::parse_obs_name_from_token(const string& token)
 	return "";
 }
 
+/**
+ * @brief Tokenize ins line.
+ *
+ * @param ins_line Description.
+ *
+ * @return Description.
+ */
 vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
 {
 	int s, e;
@@ -1496,6 +1701,14 @@ vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
 	return tokens;
 }
 
+/**
+ * @brief Parse obs instruction.
+ *
+ * @param token Description.
+ * @param close_tag Description.
+ *
+ * @return Description.
+ */
 pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string& token, const string& close_tag)
 {
 	string name, temp;
@@ -1531,6 +1744,15 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	return pair<string, pair<int, int>>(name,se);
 }
 
+/**
+ * @brief Execute fixed.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ *
+ * @return Description.
+ */
 pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
 {
 	string temp;
@@ -1571,6 +1793,15 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	return pair<string, double>(info.first,value);
 }
 
+/**
+ * @brief Execute semi.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ *
+ * @return Description.
+ */
 pair<string, double> InstructionFile::execute_semi(const string& token, string& line, ifstream& f_out)
 {
 	string temp;
@@ -1620,6 +1851,15 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 
 
 
+/**
+ * @brief Execute free.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ *
+ * @return Description.
+ */
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
 	int tsize = line.size() / 20;
@@ -1661,6 +1901,15 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	return pair<string, double>(name,value);
 }
 
+/**
+ * @brief Tokenize.
+ *
+ * @param str Description.
+ * @param tokens Description.
+ * @param delimiters Description.
+ * @param trimEmpty Description.
+ * @param mx_tokens Description.
+ */
 void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty, int mx_tokens)
 {
 	std::string::size_type pos, lastPos = 0;
@@ -1688,6 +1937,13 @@ void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, c
 	}
 }
 
+/**
+ * @brief Execute primary.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ */
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)
 {
 	//check that a closing marker is found
@@ -1713,6 +1969,16 @@ void InstructionFile::execute_primary(const string& token, string& line, ifstrea
 }
 
 
+/**
+ * @brief Execute secondary.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ * @param all_markers_so_far Description.
+ *
+ * @return Description.
+ */
 bool InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out, bool all_markers_so_far)
 {
 	//check that a closing marker is found
@@ -1733,6 +1999,13 @@ bool InstructionFile::execute_secondary(const string& token, string& line, ifstr
 }
 
 
+/**
+ * @brief Execute whitespace.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ */
 void InstructionFile::execute_whitespace(const string& token, string& line, ifstream& f_out)
 {
 	string delims = " \t" + additional_delimiters;
@@ -1765,6 +2038,13 @@ void InstructionFile::execute_whitespace(const string& token, string& line, ifst
 }
 
 
+/**
+ * @brief Execute line advance.
+ *
+ * @param token Description.
+ * @param line Description.
+ * @param f_out Description.
+ */
 void InstructionFile::execute_line_advance(const string& token, string& line, ifstream& f_out)
 {
 	stringstream ss;

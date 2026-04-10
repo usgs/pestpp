@@ -1,3 +1,7 @@
+/**
+ * @file EnsembleSmoother.cpp
+ * @brief Implementation of EnsembleSmoother.
+ */
 #include <random>
 #include <map>
 #include <iomanip>
@@ -18,11 +22,19 @@
 
 
 
+/**
+ * @brief Throw ies error.
+ *
+ * @param message Description.
+ */
 void IterEnsembleSmoother::throw_ies_error(string message)
 {
 	EnsembleMethod::throw_em_error(message);
 }
 
+/**
+ * @brief Sanity checks.
+ */
 void IterEnsembleSmoother::sanity_checks()
 {
 	EnsembleMethod::sanity_checks();
@@ -30,6 +42,9 @@ void IterEnsembleSmoother::sanity_checks()
 
 
 
+/**
+ * @brief Iterate 2 solution.
+ */
 void IterEnsembleSmoother::iterate_2_solution()
 {
 	stringstream ss;

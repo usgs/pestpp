@@ -1,3 +1,7 @@
+/**
+ * @file constraints.cpp
+ * @brief Implementation of constraints.
+ */
 
 #include <string>
 #include <sstream>
@@ -21,12 +25,26 @@
 
 using namespace std;
 
+/**
+ * @brief Opt obj func.
+ *
+ * @param _pest_scenario Description.
+ * @param _file_mgr_ptr Description.
+ * @param _pfm Description.
+ *
+ * @return Description.
+ */
 OptObjFunc::OptObjFunc(Pest& _pest_scenario, FileManager* _file_mgr_ptr, PerformanceLog& _pfm):
 	pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), pfm(_pfm)
 {
 
 }
 
+/**
+ * @brief Update coef map from jacobian.
+ *
+ * @param jco Description.
+ */
 void OptObjFunc::update_coef_map_from_jacobian(Jacobian& jco)
 {
 	if (!use_obj_obs)
@@ -49,6 +67,14 @@ void OptObjFunc::update_coef_map_from_jacobian(Jacobian& jco)
 	}
 }
 
+/**
+ * @brief Get obj func value.
+ *
+ * @param pars Description.
+ * @param obs Description.
+ *
+ * @return Description.
+ */
 double OptObjFunc::get_obj_func_value(Parameters& pars, Observations& obs)
 {
 	double obj_val = 0.0;
@@ -77,6 +103,9 @@ double OptObjFunc::get_obj_func_value(Parameters& pars, Observations& obs)
 	return obj_val;
 }
 
+/**
+ * @brief Report.
+ */
 void OptObjFunc::report()
 {
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -116,6 +145,11 @@ void OptObjFunc::report()
 	}
 }
 
+/**
+ * @brief Throw optobjfunc error.
+ *
+ * @param message Description.
+ */
 void OptObjFunc::throw_optobjfunc_error(string message)
 {
 	string error_message = "error in sequentialLP process: " + message;
@@ -125,6 +159,12 @@ void OptObjFunc::throw_optobjfunc_error(string message)
 	throw runtime_error(error_message);
 }
 
+/**
+ * @brief Initialize.
+ *
+ * @param _constraint_names Description.
+ * @param _dv_names Description.
+ */
 void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv_names)
 {
     stringstream ss;
@@ -223,6 +263,16 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 }
 
 
+/**
+ * @brief Constraints.
+ *
+ * @param _pest_scenario Description.
+ * @param _file_mgr_ptr Description.
+ * @param _of_wr Description.
+ * @param _pfm Description.
+ *
+ * @return Description.
+ */
 Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm)
 	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), 
 	jco(*_file_mgr_ptr, _of_wr)
@@ -238,6 +288,12 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 }
 
 
+/**
+ * @brief Initialize.
+ *
+ * @param ctl_ord_dec_var_names Description.
+ * @param _dbl_max Description.
+ */
 void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_max)
 {
 	/* initialize the constraint class, most of this is to deal with chances*/
@@ -254,9 +310,17 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	string par_stack_name = pest_scenario.get_pestpp_options().get_opt_par_stack();
 	//maybe even an existing observations (e.g. constraints) stack!
 	string obs_stack_name = pest_scenario.get_pestpp_options().get_opt_obs_stack();
+	//check for sqp risk
+	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
 	//by default, we want to use fosm for chances, but it any
 	//of those stack options were passed, then use stacks instead
 	use_fosm = true;
+	use_stosag = false;
+	if (sqp_risk != 0.50)
+	{
+		use_stosag = true;
+		use_fosm = false;
+	}
 	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
 	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
@@ -424,8 +488,9 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 
 		//TODO: investigate a pi constraint only formulation
 		if (num_obs_constraints() == 0)
-			throw_constraints_error("no constraints/objectives found in groups: ", constraint_groups);
-	}
+			throw_constraints_error("no constraints/objectives found in groups: ", constraint_groups, false);
+
+		}
 
 
 	constraints_obs = pest_scenario.get_ctl_observations().get_subset(ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
@@ -503,7 +568,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//------------------------------------------
 	//  ---  chance constraints  ---
 	//------------------------------------------
-	risk = pest_scenario.get_pestpp_options().get_opt_risk();
+	if (use_stosag)
+		risk = pest_scenario.get_pestpp_options().get_sqp_risk();
+	else
+		risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)
 	{
 		pfm.log_event("initializing chance constraints/objectives");
@@ -582,6 +650,13 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
 				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}
+		}
+		else if (use_stosag)
+		{
+			// StoSAG mode: no stack setup needed, will use existing ensemble for risk shifting
+			f_rec << "  using chance constraints/objectives with risk = " << risk << endl;
+			f_rec << "  using existing ensemble for constraint shifting, no separate stack needed" << endl;
+			// No stack operations needed - the ensemble will be provided by SQP when needed
 		}
 		//otherwise, stack time baby!
 		else
@@ -907,6 +982,9 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	else use_chance = false;
 }
 
+/**
+ * @brief Initial report.
+ */
 void Constraints::initial_report()
 {
 	/*make a rec file report before any iterations have happened*/
@@ -1004,6 +1082,9 @@ void Constraints::initial_report()
 }
 
 
+/**
+ * @brief Update chance offsets.
+ */
 void Constraints::update_chance_offsets()
 {
 	/* recalculate the chance bits*/
@@ -1078,6 +1159,14 @@ void Constraints::update_chance_offsets()
 	}
 }
 
+/**
+ * @brief Get max constraint change.
+ *
+ * @param current_obs Description.
+ * @param upgrade_obs Description.
+ *
+ * @return Description.
+ */
 double Constraints::get_max_constraint_change(Observations& current_obs, Observations& upgrade_obs)
 {
 	/* work out which constraint has changed the most between the pointer to 
@@ -1103,6 +1192,14 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 //	return get_stack_shifted_chance_constraints(*current_constraints_sim_ptr);
 //}
 
+/**
+ * @brief Get sum of violations.
+ *
+ * @param pars Description.
+ * @param obs Description.
+ *
+ * @return Description.
+ */
 double Constraints::get_sum_of_violations(Parameters& pars, Observations& obs)
 {
 	double sum = 0.0;
@@ -1116,6 +1213,14 @@ double Constraints::get_sum_of_violations(Parameters& pars, Observations& obs)
 }
 
 
+/**
+ * @brief Get sum of violations.
+ *
+ * @param pe Description.
+ * @param oe Description.
+ *
+ * @return Description.
+ */
 vector<double> Constraints::get_sum_of_violations(ParameterEnsemble& pe, ObservationEnsemble& oe)
 {
 	if (pe.shape().first != oe.shape().first)
@@ -1129,6 +1234,17 @@ vector<double> Constraints::get_sum_of_violations(ParameterEnsemble& pe, Observa
 }
 
 
+/**
+ * @brief Get chance shifted constraints.
+ *
+ * @param pe Description.
+ * @param oe Description.
+ * @param gen Description.
+ * @param risk_obj Description.
+ * @param opt_member Description.
+ *
+ * @return Description.
+ */
 ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, int gen, string risk_obj, string opt_member)
 {
     stringstream ss;
@@ -1382,6 +1498,13 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 	return shifted_oe;
 }
 
+/**
+ * @brief Get chance shifted constraints.
+ *
+ * @param current_obs Description.
+ *
+ * @return Description.
+ */
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
 {
 	return get_chance_shifted_constraints(current_obs, risk);
@@ -1390,6 +1513,15 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 
 
 
+/**
+ * @brief Get chance shifted constraints.
+ *
+ * @param current_obs Description.
+ * @param _risk Description.
+ * @param use_stack_anomalies Description.
+ *
+ * @return Description.
+ */
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, double _risk, bool use_stack_anomalies)
 {
 	/* get the simulated constraint values with the chance shift applied*/
@@ -1437,6 +1569,15 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			shifted_obs.insert(name, new_constraint_val);
 		}
 	}
+	else if (use_stosag)
+	{
+		for (auto& name : ctl_ord_obs_constraint_names)
+		{
+			shifted_obs.insert(name, current_obs.get_rec(name));
+		}
+		f_rec << "  warning: get_chance_shifted_constraints called without ensemble in StoSAG mode - returning unshifted constraints" << endl;
+		f_rec << "  consider using ensemble-based overload for proper risk shifting" << endl;
+	}
 	else
 	{
 		if (!stack_runs_processed)
@@ -1459,6 +1600,15 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	return constraints_chance;
 }
 
+/**
+ * @brief Get obs resid constraint vectors.
+ *
+ * @param _current_ctl_dv_vals Description.
+ * @param _constraints_sim Description.
+ * @param cnames Description.
+ *
+ * @return Description.
+ */
 pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vectors(Parameters& _current_ctl_dv_vals, Observations& _constraints_sim, vector<string>& cnames)
 {
 	Eigen::VectorXd rhs(cnames.size()), resid(cnames.size());
@@ -1473,7 +1623,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vec
 		if (sim.find(cname) != sim.end())
 		{
 			rhs[i] = obs[cname];
-			resid[i] = obs[cname] - sim[cname];
+			resid[i] = sim[cname] - obs[cname];
 		}
 		else if (constraints_pi.find(cname) != constraints_pi.end())
 		{
@@ -1490,6 +1640,13 @@ pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vec
 }
 
 
+/**
+ * @brief Get working set ineq names.
+ *
+ * @param cnames Description.
+ *
+ * @return Description.
+ */
 vector<string> Constraints::get_working_set_ineq_names(vector<string>& cnames)
 {
 	vector<string> names;
@@ -1499,6 +1656,13 @@ vector<string> Constraints::get_working_set_ineq_names(vector<string>& cnames)
 	return names;
 }
 
+/**
+ * @brief Get stack mean.
+ *
+ * @param _stack_oe_map Description.
+ *
+ * @return Description.
+ */
 ObservationEnsemble Constraints::get_stack_mean(map<string, ObservationEnsemble>& _stack_oe_map)
 {
 	int max_nrow = 0;
@@ -1631,6 +1795,27 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
 	return shifted_obs;
 }
 
+/**
+ * @brief Get chance shifted constraints.
+ *
+ * @param current_obs Description.
+ * @param ensemble_oe Description.
+ * @param _risk Description.
+ *
+ * @return Description.
+ */
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& ensemble_oe, double _risk)
+{
+	return get_stack_shifted_chance_constraints(current_obs, ensemble_oe, _risk, false, false);
+}
+
+/**
+ * @brief Get constraint residual vec.
+ *
+ * @param sim Description.
+ *
+ * @return Description.
+ */
 vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 {
 	/* get the current distance to the the constraint bound - the edge of feasible*/
@@ -1653,6 +1838,15 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
+/**
+ * @brief Get constraint bound vectors.
+ *
+ * @param current_pars Description.
+ * @param current_obs Description.
+ * @param use_stack_anomalies Description.
+ *
+ * @return Description.
+ */
 pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs, bool use_stack_anomalies)
 {
 	/* get the upper and lower bound constraint vectors. For less than constraints, the lower bound is 
@@ -1715,6 +1909,13 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Pa
 }
 
 
+/**
+ * @brief Get sense from group name.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 pair<Constraints::ConstraintSense, string> Constraints::get_sense_from_group_name(const string& name)
 {
 	/* work out the constraint sense from the obs group name*/
@@ -1729,6 +1930,13 @@ pair<Constraints::ConstraintSense, string> Constraints::get_sense_from_group_nam
 }
 
 
+/**
+ * @brief Throw constraints error.
+ *
+ * @param message Description.
+ * @param messages Description.
+ * @param should_throw Description.
+ */
 void Constraints::throw_constraints_error(string message, const vector<string>& messages, bool should_throw)
 {
 	stringstream ss;
@@ -1737,6 +1945,13 @@ void Constraints::throw_constraints_error(string message, const vector<string>& 
 	throw_constraints_error(message + ss.str(), should_throw);
 }
 
+/**
+ * @brief Throw constraints error.
+ *
+ * @param message Description.
+ * @param messages Description.
+ * @param should_throw Description.
+ */
 void Constraints::throw_constraints_error(string message, const set<string>& messages, bool should_throw)
 {
 	stringstream ss;
@@ -1745,6 +1960,12 @@ void Constraints::throw_constraints_error(string message, const set<string>& mes
 	throw_constraints_error(message + ss.str(), should_throw);
 }
 
+/**
+ * @brief Throw constraints error.
+ *
+ * @param message Description.
+ * @param should_throw Description.
+ */
 void Constraints::throw_constraints_error(string message, bool should_throw)
 {
 	string error_message;
@@ -1767,6 +1988,13 @@ void Constraints::throw_constraints_error(string message, bool should_throw)
 	}
 }
 
+/**
+ * @brief Erf inv2.
+ *
+ * @param x Description.
+ *
+ * @return Description.
+ */
 double  Constraints::ErfInv2(double x)
 {
 	/* the inverse error function, needed for the FOSM-based chance constraints*/
@@ -1782,11 +2010,23 @@ double  Constraints::ErfInv2(double x)
 	return(sgn * sqrtf(-tt1 + sqrtf(tt1 * tt1 - tt2)));
 }
 
+/**
+ * @brief Get probit.
+ *
+ * @return Description.
+ */
 double Constraints::get_probit()
 {
 	return get_probit(risk);
 }
 
+/**
+ * @brief Get probit.
+ *
+ * @param _risk Description.
+ *
+ * @return Description.
+ */
 double Constraints::get_probit(double _risk)
 {
 	/* the probit function estimate
@@ -1795,6 +2035,15 @@ double Constraints::get_probit(double _risk)
 	return output;
 }
 
+/**
+ * @brief Sqp report.
+ *
+ * @param iter Description.
+ * @param current_pars Description.
+ * @param current_obs Description.
+ * @param echo Description.
+ * @param tag Description.
+ */
 void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo, string tag)
 {
 	
@@ -1809,14 +2058,50 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 	{
 		nsize = max(nsize, int(name.size()));
 	}
+
 	ss << endl << "  observation constraint information at iteration " << iter;
 	if (tag.size() > 0)
 		ss << " for " << tag;
 	ss << endl;
 	ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
-
+	f_rec << ss.str();
+	string header = ss.str();
 	infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+	if (echo) {
+		if (infeas_dist.size() > 0) {
+			cout << header << endl;
+			vector<pair<string,double>> pairs;
+			for (auto& it : infeas_dist)
+				pairs.push_back(it);
+			sort(pairs.begin(),pairs.end(),pest_utils::cmp_pair);
+			int c = 0;
+			ss.str("");
+			for (auto& pair : pairs) {
+				string name = pair.first;
+				ss << setw(nsize) << left << name;
+				ss << setw(14) << right << constraint_sense_name[name];
+				ss << setw(12) << constraints_obs.get_rec(name);
+				ss << setw(15) << current_obs.get_rec(name);
+				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				ss << endl;
+				c++;
+				if (c >= 10)
+					break;
+			}
+			cout << ss.str() << endl;
+			if (c >= 10) {
+				cout << "Note: only the first 10 most infeasible observation constraints are shown, see rec file for full listing" << endl;
+			}
+			else {
+				cout << "Note: only infeasible observation constraints are shown, see rec file for full listing" << endl;
+			}
+		}
+		else {
+			cout << "Note: all observation constraints satisfied, see rec file for full listing" << endl;
+		}
+	}
+	ss.str("");
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
@@ -1835,10 +2120,12 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		ss << endl;
 
 	}
+	ss << endl;
+	f_rec << ss.str();
+	ss.str("");
 	
 	if (ctl_ord_pi_constraint_names.size() > 0)
 	{
-
 
 		nsize = 20;
 		for (auto name : ctl_ord_pi_constraint_names)
@@ -1854,6 +2141,44 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		ss << " --- " <<  endl;
 		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+		header = ss.str();
+		f_rec << header;
+		ss.str("");
+		if (echo) {
+			if (infeas_dist.size() > 0) {
+				cout << header << endl;
+				vector<pair<string,double>> pairs;
+				for (auto& it : infeas_dist)
+					pairs.push_back(it);
+				sort(pairs.begin(),pairs.end(),pest_utils::cmp_pair);
+				int c = 0;
+				for (auto& pair : pairs) {
+					string name = pair.first;
+					PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
+					ss << setw(nsize) << left << name;
+					ss << setw(14) << right << constraint_sense_name[name];
+					ss << setw(12) << pi_rec.get_obs_value();
+					ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+					ss << setw(11) << "false" << setw(15) << pair.second;
+					ss << endl;
+					c++;
+					if (c >= 10) {
+						break;
+					}
+				}
+				cout << ss.str() << endl;
+				if (c >= 10) {
+					cout << "Note: only the first 10 most infeasible prior info constraints are shown, see rec file for full listing" << endl;
+				}
+				else {
+					cout << "Note: only infeasible prior info constraints are shown, see rec file for full listing" << endl;
+				}
+			}
+			else {
+				cout << "Note: all prior info constraints satisfied, see rec file for full listing" << endl;
+			}
+		}
+		ss.str("");
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
 			string name = ctl_ord_pi_constraint_names[i];
@@ -1873,13 +2198,12 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 			ss << endl;
 		}
 	}
-	ss << endl;
-	f_rec << ss.str();
-	if (echo)
-		cout << ss.str();
+
+
 
 	return;
 }
+
 
 void Constraints::mou_report(int iter, Parameters& current_pars, Observations& current_obs, const vector<string>& obs_obj_names,
 	const vector<string>& pi_obj_names, bool echo)
@@ -1909,7 +2233,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 		
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
-		obs_infeas = infeas_dist.size();
+		obs_infeas = 0;//infeas_dist.size();
 		for (int i = 0; i < num_obs_constraints(); ++i)
 		{
 			string name = ctl_ord_obs_constraint_names[i];
@@ -1922,6 +2246,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			if (infeas_dist.find(name) != infeas_dist.end())
 			{
 				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				obs_infeas++;
 			}
 			else
 			{
@@ -1946,7 +2271,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 
 		//report prior information constraints
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
-		pi_infeas = infeas_dist.size();
+		pi_infeas = 0;//infeas_dist.size();
 		ss << endl << " --- prior information constraint information at iteration " << iter << " --- " << endl;
 		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
@@ -1963,6 +2288,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			if (infeas_dist.find(name) != infeas_dist.end())
 			{
 				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				pi_infeas++;
 			}
 			else
 			{
@@ -1979,6 +2305,16 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	return;
 }
 
+/**
+ * @brief Mou population observation constraint summary.
+ *
+ * @param iter Description.
+ * @param oe Description.
+ * @param tag Description.
+ * @param obs_obj_names Description.
+ *
+ * @return Description.
+ */
 string Constraints::mou_population_observation_constraint_summary(int iter, ObservationEnsemble& oe, string tag, const vector<string>& obs_obj_names)
 {
     set<string> skip_names(obs_obj_names.begin(), obs_obj_names.end());
@@ -2122,6 +2458,13 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 }
 
 
+/**
+ * @brief Presolve report.
+ *
+ * @param iter Description.
+ * @param current_pars Description.
+ * @param current_obs Description.
+ */
 void Constraints::presolve_report(int iter, Parameters& current_pars, Observations& current_obs)
 {
 	/* this is a report to the rec file for the status of the constraints before solving the current iteration*/
@@ -2189,6 +2532,14 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 	return;
 }
 
+/**
+ * @brief Write res files.
+ *
+ * @param constraints Description.
+ * @param pars_and_dec_vars Description.
+ * @param tag Description.
+ * @param iter Description.
+ */
 void Constraints::write_res_files(Observations& constraints, Parameters& pars_and_dec_vars, string tag, int iter)
 {
 	/* one form of this method that doesn't require advanced knowledge of whether or not chances are being used.
@@ -2198,6 +2549,15 @@ void Constraints::write_res_files(Observations& constraints, Parameters& pars_an
 		write_res_file(constraints, pars_and_dec_vars, tag, iter, true);
 }
 
+/**
+ * @brief Write res file.
+ *
+ * @param constraints Description.
+ * @param pars_and_dec_vars Description.
+ * @param tag Description.
+ * @param iter Description.
+ * @param include_chance Description.
+ */
 void Constraints::write_res_file(Observations& constraints, Parameters& pars_and_dec_vars, string tag, int iter, bool include_chance)
 {
 	/* write a pest-style residuals file.  If chances are in use, then add "chance" to the file name
@@ -2221,6 +2581,14 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
+/**
+ * @brief Stack summary.
+ *
+ * @param iter Description.
+ * @param shifted_obs Description.
+ * @param echo Description.
+ * @param header Description.
+ */
 void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
@@ -2270,6 +2638,14 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 }
 
 
+/**
+ * @brief Presolve chance report.
+ *
+ * @param iter Description.
+ * @param current_obs Description.
+ * @param echo Description.
+ * @param header Description.
+ */
 void Constraints::presolve_chance_report(int iter, Observations& current_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
@@ -2329,7 +2705,81 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	
 }
 
+/**
+ * @brief Presolve chance report.
+ *
+ * @param iter Description.
+ * @param current_obs Description.
+ * @param ensemble_oe Description.
+ * @param risk_val Description.
+ * @param echo Description.
+ * @param header Description.
+ */
+void Constraints::presolve_chance_report(int iter, Observations& current_obs, ObservationEnsemble* ensemble_oe, double risk_val, bool echo, string header)
+{
+	/* write chance info to the rec file before undertaking the current iteration process
+	 * This overload uses ensemble-based risk shifting for SQP */
+	if (!use_chance)
+		return;
 
+	if (ensemble_oe != nullptr && ensemble_oe->shape().first > 0 && !use_fosm)
+	{
+		Observations base_obs = current_obs;
+		
+		vector<string> obs_names = ensemble_oe->get_var_names();
+		Eigen::VectorXd base_vec = ensemble_oe->get_real_vector("BASE");
+		base_obs.update_without_clear(obs_names, base_vec);
+		
+		Observations current_constraints_chance = get_chance_shifted_constraints(base_obs, *ensemble_oe, risk_val);
+
+		int nsize = 20;
+		for (auto o : ctl_ord_obs_constraint_names)
+			nsize = max(nsize, int(o.size()));
+
+		stringstream ss;
+		ss << endl << "   ";
+		if (header.size() == 0)
+			ss << "Chance constraint/objective information at start of iteration " << iter;
+		else
+			ss << header;
+		ss << endl;
+
+		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(12) << "sim value";
+		ss << setw(12) << "risk" << setw(14) << "new sim value" << endl;
+
+		for (int i = 0; i < num_obs_constraints(); ++i)
+		{
+			string name = ctl_ord_obs_constraint_names[i];
+			ss << setw(nsize) << left << name;
+			ss << setw(14) << right << constraint_sense_name[name];
+			ss << setw(12) << constraints_obs[name];
+			ss << setw(12) << current_obs.get_rec(name);
+			ss << setw(12) << risk_val;
+			ss << setw(14) << current_constraints_chance[name] << endl;
+		}
+		ss << "  note: constraint values shifted using ensemble distribution with risk = " << risk_val << endl;
+
+		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+		f_rec << ss.str();
+		if (echo)
+			cout << ss.str();
+		return;
+	}
+	else
+	{
+		// Fall back to original implementation
+		presolve_chance_report(iter, current_obs, echo, header);
+	}
+}
+
+
+/**
+ * @brief Should update chance.
+ *
+ * @param iter Description.
+ *
+ * @return Description.
+ */
 bool Constraints::should_update_chance(int iter)
 {
 	/* this is a total hack - it tries to determine if it is time to update the chance
@@ -2354,6 +2804,11 @@ bool Constraints::should_update_chance(int iter)
 	return false;
 }
 
+/**
+ * @brief Initialize chance schedule.
+ *
+ * @param frec Description.
+ */
 void Constraints::initialize_chance_schedule(ofstream& frec)
 {
     stringstream ss;
@@ -2502,6 +2957,15 @@ void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observ
 	}
 }
 
+/**
+ * @brief Postsolve pi constraints report.
+ *
+ * @param old_pars Description.
+ * @param new_pars Description.
+ * @param iter Description.
+ * @param status_map Description.
+ * @param price_map Description.
+ */
 void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Parameters& new_pars, int iter, map<string,string> status_map, map<string,double> price_map)
 {
 	
@@ -2584,6 +3048,13 @@ pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string rea
 	return pair<vector<int>,ObservationEnsemble>(failed_runs,_stack_oe);
 }
 
+/**
+ * @brief Save oe stack.
+ *
+ * @param iter Description.
+ * @param real_name Description.
+ * @param _stack_oe Description.
+ */
 void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble& _stack_oe)
 {
 	stringstream ss;
@@ -2618,6 +3089,13 @@ void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble&
 }
 
 
+/**
+ * @brief Save pe stack.
+ *
+ * @param iter Description.
+ * @param real_name Description.
+ * @param _stack_pe Description.
+ */
 void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _stack_pe)
 {
 	stringstream ss;
@@ -2653,6 +3131,12 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 }
 
 
+/**
+ * @brief Process stack runs.
+ *
+ * @param run_mgr_ptr Description.
+ * @param iter Description.
+ */
 void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 {
 	pair<vector<int>, ObservationEnsemble> stack_info;
@@ -2809,6 +3293,11 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 	}
 }
 
+/**
+ * @brief Nested stack stdev summary.
+ *
+ * @param _stack_oe_map Description.
+ */
 void Constraints::nested_stack_stdev_summary(map<string, ObservationEnsemble>& _stack_oe_map)
 {
 	Eigen::VectorXd cvals(ctl_ord_obs_constraint_names.size());
@@ -2867,6 +3356,12 @@ void Constraints::nested_stack_stdev_summary(map<string, ObservationEnsemble>& _
 }
 
 
+/**
+ * @brief Process runs.
+ *
+ * @param run_mgr_ptr Description.
+ * @param iter Description.
+ */
 void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 {
 	/* using the passed in run mgr pointer, process any runs that were queued up for chance-based 
@@ -2903,6 +3398,14 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 
 }
 
+/**
+ * @brief Add runs.
+ *
+ * @param iter Description.
+ * @param current_pars Description.
+ * @param current_obs Description.
+ * @param run_mgr_ptr Description.
+ */
 void Constraints::add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	/* using the passed run mgr pointer, queue up chance runs
@@ -2934,6 +3437,10 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
+	else if (use_stosag)
+	{
+		//do nothing -- we don't need stacks here
+	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
 	//with the current dec var values.
 	else
@@ -2945,6 +3452,14 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 	}
 }
 
+/**
+ * @brief Add runs.
+ *
+ * @param iter Description.
+ * @param current_pe Description.
+ * @param current_obs Description.
+ * @param run_mgr_ptr Description.
+ */
 void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	if (!use_chance)
@@ -3037,6 +3552,17 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	
 }
 
+/**
+ * @brief Add stack runs.
+ *
+ * @param iter Description.
+ * @param _stack_pe Description.
+ * @param current_pars Description.
+ * @param current_obs Description.
+ * @param run_mgr_ptr Description.
+ *
+ * @return Description.
+ */
 map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	//update _stack_pe parameter values for decision variables using current_pars
@@ -3053,6 +3579,11 @@ map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe
 	return _stack_pe_run_map;
 }
 
+/**
+ * @brief Get fosm par names.
+ *
+ * @return Description.
+ */
 vector<string> Constraints::get_fosm_par_names()
 {
 	/* get a vector of the fosm-based "parameter" names - adjustable, non-dec-var parameters in the control file*/
@@ -3062,6 +3593,14 @@ vector<string> Constraints::get_fosm_par_names()
 		return vector<string>();
 }
 
+/**
+ * @brief Get unsatified pi constraints.
+ *
+ * @param par_and_dec_vars Description.
+ * @param tol Description.
+ *
+ * @return Description.
+ */
 map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol)
 {
 	/* get a map of name, distance for each of the prior info constraints that are not satisfied in the par_and_dec_vars container.
@@ -3093,27 +3632,73 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	return unsatisfied;
 }
 
-map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol, bool include_weight)
+/**
+ * @brief Get ensemble violations map.
+ *
+ * @param pe Description.
+ * @param oe Description.
+ * @param tol Description.
+ * @param include_weight Description.
+ * @param shift_ensemble_oe Description.
+ * @param risk_val Description.
+ *
+ * @return Description.
+ */
+map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol, bool include_weight, ObservationEnsemble* shift_ensemble_oe, double risk_val)
 {
 	//make sure pe and oe share realizations
 	vector<string> pe_names = pe.get_real_names();
 	vector<string> oe_names = oe.get_real_names();
 	if (pe_names.size() != oe_names.size())
 		throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
-	for (int i=0;i<pe_names.size();i++)
+	for (int i = 0; i < pe_names.size(); i++)
 		if (pe_names[i] != oe_names[i])
 			throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
-	
+
+	// Check if we should use ensemble-based risk shifting
+	bool use_ensemble_risk_shift = (shift_ensemble_oe != nullptr) && (risk_val != 0.5) && (risk_val >= 0.0) && (risk_val <= 1.0) && use_chance;
+
+	Observations shifted_constraints;
+	if (use_ensemble_risk_shift && shift_ensemble_oe->shape().first > 0)
+	{
+		// Compute shifted constraint thresholds based on ensemble distribution
+		Observations base_obs = pest_scenario.get_ctl_observations();
+		vector<string> obs_names = shift_ensemble_oe->get_var_names();
+		const auto& obs_rnames = shift_ensemble_oe->get_real_names();
+		if (find(obs_rnames.begin(), obs_rnames.end(), "BASE") != obs_rnames.end())
+		{
+			Eigen::VectorXd base_vec = shift_ensemble_oe->get_real_vector("BASE");
+			base_obs.update_without_clear(obs_names, base_vec);
+		}
+		else
+		{
+			vector<double> mean_vec = shift_ensemble_oe->get_mean_stl_var_vector();
+			base_obs.update_without_clear(obs_names, mean_vec);
+		}
+		shifted_constraints = get_chance_shifted_constraints(base_obs, *shift_ensemble_oe, risk_val);
+	}
+
 	Observations obs = pest_scenario.get_ctl_observations();
 	Eigen::VectorXd v;
 	vector<string> vnames = oe.get_var_names();
 	map<string, double> vmap;
 	map<string, map<string, double>> violations;
+
 	for (auto& name : oe_names)
 	{
 		v = oe.get_real_vector(name);
 		obs.update_without_clear(vnames, v);
-		vmap = get_unsatified_obs_constraints(obs,tol,true,include_weight);
+
+		if (use_ensemble_risk_shift)
+		{
+			// Use pre-computed shifted thresholds
+			vmap = get_unsatified_obs_constraints_vs_shifted(obs, shifted_constraints, tol, include_weight);
+		}
+		else
+		{
+			// Use standard approach (with internal state-based shifting if use_chance)
+			vmap = get_unsatified_obs_constraints(obs, tol, true, include_weight);
+		}
 		violations[name] = vmap;
 	}
 
@@ -3132,7 +3717,66 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 	return violations;
 }
 
+/**
+ * @brief Get unsatified obs constraints vs shifted.
+ *
+ * @param constraints_sim Description.
+ * @param shifted_constraints Description.
+ * @param tol Description.
+ * @param include_weight Description.
+ *
+ * @return Description.
+ */
+map<string, double> Constraints::get_unsatified_obs_constraints_vs_shifted(Observations& constraints_sim, Observations& shifted_constraints, double tol, bool include_weight)
+{
+	map<string, double> unsatisfied;
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	double weight, sim_val, shifted_val, scaled_diff;
 
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		sim_val = constraints_sim[name];
+		shifted_val = shifted_constraints.get_rec(name); 
+
+		weight = 1.0;
+		if (include_weight)
+			weight = oi.get_weight(name);
+
+		if (tol >= 0)
+		{
+			scaled_diff = (shifted_val != 0) ? abs((shifted_val - sim_val) / shifted_val) : abs(shifted_val - sim_val);
+
+			if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > shifted_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * (sim_val - shifted_val);
+			else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < shifted_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * (shifted_val - sim_val);
+			else if ((constraint_sense_map[name] == ConstraintSense::equal_to) && (sim_val != shifted_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * abs(sim_val - shifted_val);
+		}
+		else
+		{
+			if (constraint_sense_map[name] == ConstraintSense::less_than)
+				unsatisfied[name] = weight * (sim_val - shifted_val);
+			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+				unsatisfied[name] = weight * (shifted_val - sim_val);
+			else if (constraint_sense_map[name] == ConstraintSense::equal_to)
+				unsatisfied[name] = weight * abs(sim_val - shifted_val);
+		}
+	}
+	return unsatisfied;
+}
+
+/**
+ * @brief Get unsatified obs constraints.
+ *
+ * @param constraints_sim Description.
+ * @param tol Description.
+ * @param do_shift Description.
+ * @param include_weight Description.
+ *
+ * @return Description.
+ */
 map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift, bool include_weight)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.
@@ -3163,18 +3807,39 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
         weight = 1.0;
         if (include_weight)
             weight = oi.get_weight(name);
-		//check for invalid obs constraints (e.g. satisfied)
-		if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > obs_val) && (scaled_diff > tol))
-			unsatisfied[name] = weight * (sim_val - obs_val);
-		else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < obs_val) && (scaled_diff > tol))
-			unsatisfied[name] = weight * (obs_val - sim_val);
-		else if ((constraint_sense_map[name] == ConstraintSense::equal_to) && (sim_val != obs_val) && (scaled_diff > tol))
-			unsatisfied[name] = weight * abs(sim_val - obs_val);
+		//check for invalid obs constraints (e.g. satified)
+		if (tol >= 0)
+		{
+			if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > obs_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * (sim_val - obs_val);
+			else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < obs_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * (obs_val - sim_val);
+			else if ((constraint_sense_map[name] == ConstraintSense::equal_to) && (sim_val != obs_val) && (scaled_diff > tol))
+				unsatisfied[name] = weight * abs(sim_val - obs_val);
+		}
+		else
+		{
+			if (constraint_sense_map[name] == ConstraintSense::less_than)
+				unsatisfied[name] = weight * (sim_val - obs_val);
+			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+				unsatisfied[name] = weight * (obs_val - sim_val);
+			else if (constraint_sense_map[name] == ConstraintSense::equal_to)
+				unsatisfied[name] = weight * abs(sim_val - obs_val);
+		}
 	}
 	return unsatisfied;
 
 }
 
+/**
+ * @brief Get constraint map.
+ *
+ * @param par_and_dec_vars Description.
+ * @param constraints_sim Description.
+ * @param do_shift Description.
+ *
+ * @return Description.
+ */
 map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift)
 {
 	double sim_val, obs_val;
@@ -3210,100 +3875,300 @@ map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars
 	return constraint_map;
 }
 
-Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, double working_set_tol)
+/**
+ * @brief Reduce working set.
+ *
+ * @param working_set Description.
+ * @param lagrange_mults Description.
+ *
+ * @return Description.
+ */
+pair<vector<string>, bool> Constraints::reduce_working_set(vector<string>& working_set, const Eigen::VectorXd& lagrange_mults)
 {
-    pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
-    Mat mat;
-    if (working_set.first.size() > 0) {
-        Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
+//	// If unsuccessful iteration, drop the constraint with largest violation
+//	if (unsuccessful)
+//	{
+//		// TODO: Implement logic for unsuccessful iterations
+//		// Could look at constraint violations and remove most violated constraint
+//		return working_set;
+//	}
 
-        cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
-        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
-        //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
-        Eigen::MatrixXd s, V, U;
-        Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
-                                                         Eigen::DecompositionOptions::ComputeFullV);
-        s = svd_fac.singularValues();
-        U = svd_fac.matrixU();
-        V = svd_fac.matrixV();
-        s.col(0).asDiagonal().inverse();
-        Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
-        full_s_inv.setZero();
-        for (int i = 0; i < s.size(); i++)
-            full_s_inv(i, i) = s(i);
-        delta_dv = V.transpose() * full_s_inv * U;
-        //delta_oe.transposeInPlace();
-        //delta_dv.transposeInPlace();
-        Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
-        delta_dv.resize(0, 0);
-        delta_oe.resize(0, 0);
-        V.resize(0, 0);
-        U.resize(0, 0);
-        full_s_inv.resize(0, 0);
-        Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
-        oe.update_var_map();
-        map<string, int> vmap = oe.get_var_map();
-        int i = 0;
-        for (auto &n : working_set.first) {
-            working_mat.row(i) = approx_jco.row(vmap[n]);
-            i++;
-        }
-        mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
-        //return Mat(working_set, dv.get_var_names(), working_mat.sparseView());
+	// Following Algorithm 16.3 in Nocedal & Wright
+	vector<string> working_set_ineq_names = get_working_set_ineq_names(working_set);
+
+	// Find most negative Lagrange multiplier for inequality constraints
+	double lm_min = 0.0;
+	int idx = -1;
+	vector<int> idxs;
+	set<string> working_set_ineq_set(working_set_ineq_names.begin(), working_set_ineq_names.end());
+
+	for (int i = 0; i < working_set.size(); i++)
+	{
+		if (working_set_ineq_set.find(working_set[i]) == working_set_ineq_set.end())
+			continue;
+		if ((lagrange_mults[i] < 0.0) && (lagrange_mults[i] < lm_min))
+		{
+			idx = i;
+			lm_min = lagrange_mults[i];
+		}
+		/*if (lagrange_mults[i] > 0.0)
+			idxs.push_back(i);*/
+	}
+
+	if (lm_min <= 1E-10 && lm_min >= -1E-10)
+	{
+		return pair<vector<string>, bool>(working_set, true);
+		//throw_constraints_error("optimal solution detected at solve EQP step (lagrangian multiplier for all ineq constraints in working set is non-neg)");
+	}
+
+	if (idx >= 0)
+	{
+		string to_drop = working_set[idx];
+		working_set.erase(working_set.begin() + idx);
+	}
+
+	//if (idxs.size() > 0)
+	//{
+	//	//drop all constraints with positive lagrange multipliers
+	//	//starting from back to avoid index shifting
+	//	sort(idxs.begin(), idxs.end(), greater<int>());
+	//	for (auto i : idxs)
+	//	{
+	//		string to_drop = working_set[i];
+	//		working_set.erase(working_set.begin() + i);
+	//	}
+	//}
+
+	return pair<vector<string>, bool>(working_set, false);
+}
+
+/**
+ * @brief Get working set constraint matrix.
+ *
+ * @param par_and_dec_vars Description.
+ * @param constraints_sim Description.
+ * @param dv Description.
+ * @param oe Description.
+ * @param do_shift Description.
+ * @param lagrange_mults Description.
+ * @param curr_ws Description.
+ * @param working_set_tol Description.
+ * @param wset_lvl Description.
+ *
+ * @return Description.
+ */
+pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults, vector<string> curr_ws, double working_set_tol, int wset_lvl)
+{
+    pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol, wset_lvl);
+	if (curr_ws.size() > 0)
+		working_set.first = curr_ws;
+
+	bool converged = false;
+	if (lagrange_mults != nullptr)
+	{
+		auto result = reduce_working_set(working_set.first, *lagrange_mults);
+		working_set.first = result.first;
+		converged = result.second;
+	}
+
+    Mat mat;
+    if (working_set.first.size() > 0) 
+	{
+		// StoSAG method: compute sample dec var cov matrix and its pseudo inverse
+		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dec_var_names, "BASE");
+		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+
+		// Compute pseudoinverse using SVD (same method as objective gradient)
+		Eigen::MatrixXd s, V, U;
+		SVD_REDSVD rsvd;
+		rsvd.set_performance_log(&pfm);
+		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
+
+		// Get constraint observation anomalies for all working set constraints
+		Eigen::MatrixXd constraint_anoms = oe.get_eigen_anomalies(vector<string>(), working_set.first, "BASE");
+
+		// Compute StoSAG Jacobian: for each constraint i, compute grad_i = dv_cov_pseudoinv * cross_cov_vector_i
+		// where cross_cov_vector_i = 1.0 / (N-1) * (dv_anoms.transpose() * constraint_anoms_i)
+		// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+		Eigen::MatrixXd cross_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * constraint_anoms);
+
+		// Now compute Jacobian matrix: each row is the gradient of a constraint
+		Eigen::MatrixXd approx_jco = dv_cov_pseudoinv * cross_cov_matrix;
+		Eigen::MatrixXd working_mat = approx_jco.transpose();
+
+		mat = Mat(working_set.first, dec_var_names, working_mat.sparseView());
+
+		  // this is the EnOpt method
+  //      Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
+  //      Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
+
+  //      cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
+  //      Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
+  //      //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
+  //      Eigen::MatrixXd s, s_, V, U;
+  //      Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
+  //                                                       Eigen::DecompositionOptions::ComputeFullV);
+  //      s = svd_fac.singularValues();
+  //      U = svd_fac.matrixU();
+  //      V = svd_fac.matrixV();
+  //      s_ = s.asDiagonal().inverse();
+  //      Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
+  //      full_s_inv.setZero();
+		//for (int i = 0; i < s.size(); i++)
+		//	full_s_inv(i, i) = s_(i,i);
+  //      delta_dv = V * full_s_inv * U.transpose();
+  //      //delta_oe.transposeInPlace();
+  //      //delta_dv.transposeInPlace();
+  //      Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
+  //      delta_dv.resize(0, 0);
+  //      delta_oe.resize(0, 0);
+  //      V.resize(0, 0);
+  //      U.resize(0, 0);
+  //      full_s_inv.resize(0, 0);
+
+        //Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
+        //oe.update_var_map();
+        //map<string, int> vmap = oe.get_var_map();
+        //int i = 0;
+        //for (auto &n : working_set.first) {
+        //    working_mat.row(i) = approx_jco.row(vmap[n]);
+        //    i++;
+        //}
+        //mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
     }
     if (working_set.second.size() > 0)
     {
         //deal with pi constraints in the working set
         augment_constraint_mat_with_pi(mat,working_set.second);
     }
-    return Mat();
+	return pair<Mat, bool>(mat, converged);
 }
 
-Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& _jco, bool do_shift, double working_set_tol)
+
+
+/**
+ * @brief Get working set constraint matrix.
+ *
+ * @param par_and_dec_vars Description.
+ * @param constraints_sim Description.
+ * @param _jco Description.
+ * @param do_shift Description.
+ * @param lagrange_mults Description.
+ * @param working_set_tol Description.
+ * @param wset_lvl Description.
+ *
+ * @return Description.
+ */
+pair<Mat, bool> Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& _jco, bool do_shift, const Eigen::VectorXd* lagrange_mults, double working_set_tol, int wset_lvl)
 {
-	pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+	pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift, working_set_tol, wset_lvl);
 	Mat mat;
-    if (working_set.first.size() > 0) {
+	bool converged = false;
+    if (working_set.first.size() > 0) 
+	{
+		if (lagrange_mults != nullptr) 
+		{
+			auto result = reduce_working_set(working_set.first, *lagrange_mults);
+			working_set.first = result.first;
+			converged = result.second;
+		}
+
         Eigen::SparseMatrix<double> t = _jco.get_matrix(working_set.first, dec_var_names);
-        Mat(working_set.first, dec_var_names, t);
+        mat = Mat(working_set.first, dec_var_names, t);
     }
 	if (working_set.second.size() > 0) {
         augment_constraint_mat_with_pi(mat,working_set.second);
-
-
     }
-	return mat;
+	
+	return pair<Mat, bool>(mat, converged);
 }
 
+/**
+ * @brief Augment constraint mat with pi.
+ *
+ * @param mat Description.
+ * @param pi_names Description.
+ */
 void Constraints::augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names)
 {
     
 
 }
 
-pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol) {
+/**
+ * @brief Get working set.
+ *
+ * @param par_and_dec_vars Description.
+ * @param constraints_sim Description.
+ * @param do_shift Description.
+ * @param working_set_tol Description.
+ * @param wset_lvl Description.
+ *
+ * @return Description.
+ */
+pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol, int wset_lvl) {
     map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
     vector<string> working_set,working_set_pi;
     for (auto &name : ctl_ord_obs_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set.push_back(name);
-
-        else if (abs(constraint_map[name]) < working_set_tol) {
-            working_set.push_back(name);
-        }
+		else
+		{
+			if (wset_lvl == 1)
+			{
+				if (abs(constraint_map[name]) < working_set_tol)
+					working_set.push_back(name);
+			}
+			else
+			{
+				if (constraint_sense_map[name] == ConstraintSense::less_than) 
+				{
+					if (constraint_map[name] < working_set_tol)
+						working_set.push_back(name);
+				}
+				else if (constraint_sense_map[name] == ConstraintSense::greater_than) 
+				{
+					if (constraint_map[name] > -working_set_tol)
+						working_set.push_back(name);
+				}
+			}
+		}
     }
     for (auto &name : ctl_ord_pi_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set_pi.push_back(name);
-
-        else if (abs(constraint_map[name]) < working_set_tol) {
-            working_set_pi.push_back(name);
-        }
+		else
+		{
+			if (wset_lvl == 1)
+			{
+				if (abs(constraint_map[name]) < working_set_tol)
+					working_set_pi.push_back(name);
+			}
+			else
+			{
+				if (constraint_sense_map[name] == ConstraintSense::less_than)
+				{
+					if (constraint_map[name] < working_set_tol)
+						working_set_pi.push_back(name);
+				}
+				else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+				{
+					if (constraint_map[name] > -working_set_tol)
+						working_set_pi.push_back(name);
+				}
+			}
+		}
     }
     return pair<vector<string>,vector<string>>(working_set,working_set_pi);
 }
 
+/**
+ * @brief Get num nz pi constraint elements.
+ *
+ * @return Description.
+ */
 int Constraints::get_num_nz_pi_constraint_elements()
 {
 	/* work out how many elements are in the PI constraints.  This is needed for dimensioning the 

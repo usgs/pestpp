@@ -29,7 +29,7 @@ public:
 	//directly from Mat objects
 	//linear_analysis(Mat& _jacobian,Pest& _pest_scenario, FileManager& _file_manager, Mat& _parcov, Mat& _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
 
-    ObservationInfo glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
+    void glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter,
 		RunManagerAbstract* run_mgr_ptr);
 	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter,ModelRun& optimum_run);
 	pair<ObservationEnsemble,map<string,double>> process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble, map<int, int>>& fosm_real_info, int iter,
@@ -143,19 +143,9 @@ private:
 
 	pair<double, double> get_range(double value, double variance, const ParameterRec::TRAN_TYPE &tt);
 
-
-
-
-
-
-
-
-
 };
 
 map<string, double> get_obj_comps(string &filename);
 map<string, int> get_nnz_group(Pest &pest_scenario);
-ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, string &resid_filename);
-ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, PhiData obj);
-ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations &sim);
+pair<ObservationInfo,map<string,double>> normalize_weights_by_residual(Pest &pest_scenario, Observations &sim);
 #endif

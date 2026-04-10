@@ -16,5 +16,10 @@
     You should have received a copy of the GNU General Public License
     along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file pest_error.cpp
+ * @brief Implementation of pest_error.
+ */
+
 
 #include "pest_error.h"

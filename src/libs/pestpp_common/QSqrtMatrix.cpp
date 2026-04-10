@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file QSqrtMatrix.cpp
+ * @brief Implementation of QSqrtMatrix.
+ */
+
 #include <utility>
 #include <cmath>
 #include <Eigen/Dense>
@@ -30,11 +35,28 @@
 using namespace std;
 using namespace Eigen;
 
+/**
+ * @brief Q sqrt matrix.
+ *
+ * @param _obs_info_ptr Description.
+ * @param _prior_info_ptr Description.
+ *
+ * @return Description.
+ */
 QSqrtMatrix::QSqrtMatrix(const ObservationInfo *_obs_info_ptr, const PriorInformation *_prior_info_ptr)
 : obs_info_ptr(_obs_info_ptr), prior_info_ptr(_prior_info_ptr)
 {
 }
 
+/**
+ * @brief Get sparse matrix.
+ *
+ * @param obs_names Description.
+ * @param regul Description.
+ * @param get_sqaure Description.
+ *
+ * @return Description.
+ */
 Eigen::SparseMatrix<double> QSqrtMatrix::get_sparse_matrix(const vector<string> &obs_names, const DynamicRegularization &regul, bool get_sqaure) const
 {
 
@@ -104,6 +126,9 @@ Eigen::SparseMatrix<double> QSqrtMatrix::get_sparse_matrix(const vector<string> 
 	return weights;
 }
 
+/**
+ * @brief Destructor for .
+ */
 QSqrtMatrix::~QSqrtMatrix(void)
 {
 }

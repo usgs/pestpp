@@ -147,10 +147,10 @@ def helper(func):
 
     with open("obj.dat",'w') as f:
         for i,obj in enumerate(objs):
-            f.write("obj_{0} {1}\n".format(i+1,float(obj)))
+            f.write("obj_{0} {1}\n".format(i+1,float(obj[0])))
         #f.write("obj_2 {0}\n".format(float(obj2)))
         for i,constr in enumerate(constrs):
-            f.write("constr_{0} {1}\n".format(i+1,float(constr)))
+            f.write("constr_{0} {1}\n".format(i+1,float(constr[0])))
     return objs,constrs
 
 def setup_problem(name,additive_chance=False, risk_obj=False, self_adaptive=False):
@@ -412,9 +412,9 @@ def setup_problem(name,additive_chance=False, risk_obj=False, self_adaptive=Fals
     par.loc[adf.parnme,"parlbnd"] = -0.5
     par.loc[adf.parnme,"parchglim"] = "relative"
     par.loc[adf.parnme,"pargp"] = "obj_add"
-    #much less uncertainty in the second obj
-    par.loc[adf.parnme[1],"parubnd"] = 0.5
-    par.loc[adf.parnme[1],"parlbnd"] = -0.5
+    # #much less uncertainty in the second obj
+    # par.loc[adf.parnme[1],"parubnd"] = 0.5
+    # par.loc[adf.parnme[1],"parlbnd"] = -0.5
 
     if additive_chance:
         par.loc[adf.parnme, "partrans"] = "none"

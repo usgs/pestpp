@@ -1,3 +1,7 @@
+/**
+ * @file sobol.cpp
+ * @brief Implementation of sobol.
+ */
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -29,6 +33,15 @@ Sobol::Sobol(Pest &_pest_scenario,
 	{
 	}
 
+/**
+ * @brief Gen rand vec.
+ *
+ * @param nsample Description.
+ * @param min Description.
+ * @param max Description.
+ *
+ * @return Description.
+ */
 VectorXd Sobol::gen_rand_vec(long nsample, double min, double max)
 {
 	VectorXd v(nsample);
@@ -55,6 +68,9 @@ VectorXd Sobol::gen_rand_vec(long nsample, double min, double max)
 	return v;
 }
 
+/**
+ * @brief Gen m1 m2.
+ */
 void Sobol::gen_m1_m2()
 {
 	long npar = adj_par_name_vec.size();
@@ -77,6 +93,15 @@ void Sobol::gen_m1_m2()
 	}
 }
 
+/**
+ * @brief Gen  n matrix.
+ *
+ * @param m1 Description.
+ * @param m2 Description.
+ * @param idx_vec Description.
+ *
+ * @return Description.
+ */
 MatrixXd Sobol::gen_N_matrix(const MatrixXd &m1, const MatrixXd &m2, const vector<int> &idx_vec)
 {
   MatrixXd n = m1;
@@ -87,6 +112,14 @@ MatrixXd Sobol::gen_N_matrix(const MatrixXd &m1, const MatrixXd &m2, const vecto
   return n;
 }
 
+/**
+ * @brief Add model runs.
+ *
+ * @param run_manager Description.
+ * @param n Description.
+ * @param f_out Description.
+ * @param tag Description.
+ */
 void Sobol::add_model_runs(RunManagerAbstract &run_manager, const MatrixXd &n, ofstream &f_out, string tag)
 {
 	int run_id;
@@ -107,6 +140,11 @@ void Sobol::add_model_runs(RunManagerAbstract &run_manager, const MatrixXd &n, o
 	}
 }
 
+/**
+ * @brief Assemble runs.
+ *
+ * @param run_manager Description.
+ */
 void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 {
 	MatrixXd c;
@@ -146,6 +184,16 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 }
 
 
+/**
+ * @brief Get obs vec.
+ *
+ * @param run_manager Description.
+ * @param run_set Description.
+ * @param model_run Description.
+ * @param obs_name Description.
+ *
+ * @return Description.
+ */
 vector<double> Sobol::get_obs_vec(RunManagerAbstract &run_manager, int run_set, ModelRun &model_run, const string &obs_name)
 {
 	ModelRun run0 = model_run;
@@ -179,6 +227,15 @@ vector<double> Sobol::get_obs_vec(RunManagerAbstract &run_manager, int run_set, 
 }
 
 
+/**
+ * @brief Get phi vec.
+ *
+ * @param run_manager Description.
+ * @param run_set Description.
+ * @param model_run Description.
+ *
+ * @return Description.
+ */
 vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, ModelRun &model_run)
 {
 	ModelRun run0 = model_run;
@@ -206,6 +263,12 @@ vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, 
 	return phi_vec;
 }
 
+/**
+ * @brief Process runs.
+ *
+ * @param run_manager Description.
+ * @param model_run Description.
+ */
 void Sobol::process_runs(RunManagerAbstract& run_manager, ModelRun &model_run)
 {
 	run_map.clear();
@@ -223,6 +286,12 @@ void Sobol::process_runs(RunManagerAbstract& run_manager, ModelRun &model_run)
 	}
 }
 
+/**
+ * @brief Calc sen.
+ *
+ * @param run_manager Description.
+ * @param model_run Description.
+ */
 void Sobol::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 {
 	process_runs(run_manager, model_run);
@@ -307,6 +376,14 @@ void Sobol::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 }
 
 
+/**
+ * @brief Calc sen single old.
+ *
+ * @param run_manager Description.
+ * @param model_run Description.
+ * @param fout_sbl Description.
+ * @param obs_name Description.
+ */
 void Sobol::calc_sen_single_old(RunManagerAbstract& run_manager, ModelRun model_run, ofstream& fout_sbl, const string& obs_name)
 {
 	vector<double> ya;
@@ -371,6 +448,16 @@ void Sobol::calc_sen_single_old(RunManagerAbstract& run_manager, ModelRun model_
 }
 
 
+/**
+ * @brief Calc sen single.
+ *
+ * @param run_manager Description.
+ * @param model_run Description.
+ * @param fout_sbl Description.
+ * @param obs_name Description.
+ *
+ * @return Description.
+ */
 pair<vector<double>, vector<double>> Sobol::calc_sen_single(RunManagerAbstract &run_manager, ModelRun model_run, ofstream &fout_sbl, const string &obs_name)
 {
 	vector<double> ya;

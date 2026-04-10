@@ -1,3 +1,7 @@
+/**
+ * @file FileManager.cpp
+ * @brief Implementation of FileManager.
+ */
 
 /*
 
@@ -24,22 +28,46 @@
 
 using namespace pest_utils;
 
+/**
+ * @brief File manager.
+ *
+ * @return Description.
+ */
 FileManager::FileManager()
 	: directory(""), pest_base_filename("")
 {
 }
+/**
+ * @brief File manager.
+ *
+ * @param _base_filename Description.
+ * @param _directory Description.
+ *
+ * @return Description.
+ */
 FileManager::FileManager(const string &_base_filename, const string &_directory)
   : directory(strip_cp(_directory)), pest_base_filename(strip_cp(_base_filename))
 {
 	initialize_path(_base_filename, _directory);
 }
 
+/**
+ * @brief Initialize path.
+ *
+ * @param _base_filename Description.
+ * @param _directory Description.
+ */
 void FileManager::initialize_path(const string &_base_filename, const string &_directory)
 {
 	directory = strip_cp(_directory);
 	pest_base_filename = strip_cp(_base_filename);
 }
 
+/**
+ * @brief Open default files.
+ *
+ * @param restart Description.
+ */
 void  FileManager::open_default_files(bool restart)
 {
 	close_file("rec");
@@ -59,6 +87,9 @@ void  FileManager::open_default_files(bool restart)
 
 
 
+/**
+ * @brief Destructor for .
+ */
 FileManager::~FileManager(void)
 {
 	for (auto &i : ofile_map)
@@ -78,6 +109,14 @@ FileManager::~FileManager(void)
 	}
 }
 
+/**
+ * @brief Build filename.
+ *
+ * @param ext Description.
+ * @param include_dir Description.
+ *
+ * @return Description.
+ */
 string FileManager::build_filename(const string &ext, bool include_dir)
 {
 	if (!include_dir)
@@ -101,6 +140,15 @@ string FileManager::build_filename(const string &ext, bool include_dir)
 //	return directory + OperSys::DIR_SEP + name;
 //}
 
+/**
+ * @brief Open ofile absolute.
+ *
+ * @param tag Description.
+ * @param filename Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 ofstream &FileManager::open_ofile_absolute(const string &tag, const string &filename, ofstream::openmode mode)
 {
 	pair<map<string ,ofstream*>::iterator, bool> ret;
@@ -118,6 +166,14 @@ ofstream &FileManager::open_ofile_absolute(const string &tag, const string &file
 	return f_new;
 }
 
+/**
+ * @brief Open ofile ext.
+ *
+ * @param extension Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 ofstream &FileManager::open_ofile_ext(const string &extension, ofstream::openmode mode)
 {
 		string filename = build_filename(extension);
@@ -125,6 +181,15 @@ ofstream &FileManager::open_ofile_ext(const string &extension, ofstream::openmod
 		return f_new;
 }
 
+/**
+ * @brief Open ofile local.
+ *
+ * @param tag Description.
+ * @param filename Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 ofstream &FileManager::open_ofile_local(const string &tag, const string &filename, ofstream::openmode mode)
 {
 	string comp_filename = directory + OperSys::DIR_SEP + filename;
@@ -132,6 +197,15 @@ ofstream &FileManager::open_ofile_local(const string &tag, const string &filenam
 	return f_new;
 }
 
+/**
+ * @brief Open ifile absolute.
+ *
+ * @param tag Description.
+ * @param filename Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 ifstream &FileManager::open_ifile_absolute(const string &tag, const string &filename, ifstream::openmode mode)
 {
 	pair<map<string ,ifstream*>::iterator, bool> ret;
@@ -151,6 +225,14 @@ ifstream &FileManager::open_ifile_absolute(const string &tag, const string &file
 	return f_new;
 }
 
+/**
+ * @brief Open ifile ext.
+ *
+ * @param extension Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 ifstream &FileManager::open_ifile_ext(const string &extension, ifstream::openmode mode)
 {
 		string filename = build_filename(extension);
@@ -158,6 +240,15 @@ ifstream &FileManager::open_ifile_ext(const string &extension, ifstream::openmod
 		return f_new;
 }
 
+/**
+ * @brief Open ifile local.
+ *
+ * @param tag Description.
+ * @param filename Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 ifstream &FileManager::open_ifile_local(const string &tag, const string &filename, ifstream::openmode mode)
 {
 	string comp_filename = directory + OperSys::DIR_SEP + filename;
@@ -165,6 +256,15 @@ ifstream &FileManager::open_ifile_local(const string &tag, const string &filenam
 	return f_new;
 }
 
+/**
+ * @brief Open iofile absolute.
+ *
+ * @param tag Description.
+ * @param filename Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 fstream &FileManager::open_iofile_absolute(const string &tag, const string &filename, fstream::openmode mode)
 {
 	pair<map<string ,fstream*>::iterator, bool> ret;
@@ -187,6 +287,14 @@ fstream &FileManager::open_iofile_absolute(const string &tag, const string &file
 	return f_new;
 }
 
+/**
+ * @brief Open iofile ext.
+ *
+ * @param extension Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 fstream &FileManager::open_iofile_ext(const string &extension, fstream::openmode mode)
 {
 		string filename = build_filename(extension);
@@ -194,6 +302,15 @@ fstream &FileManager::open_iofile_ext(const string &extension, fstream::openmode
 		return f_new;
 }
 
+/**
+ * @brief Open iofile local.
+ *
+ * @param tag Description.
+ * @param filename Description.
+ * @param mode Description.
+ *
+ * @return Description.
+ */
 fstream &FileManager::open_iofile_local(const string &tag, const string &filename, fstream::openmode mode)
 {
 	string comp_filename = directory + OperSys::DIR_SEP + filename;
@@ -202,6 +319,11 @@ fstream &FileManager::open_iofile_local(const string &tag, const string &filenam
 }
 
 
+/**
+ * @brief Close all files containing.
+ *
+ * @param partial_name Description.
+ */
 void FileManager::close_all_files_containing(const std::string& partial_name)
 {
     string lower = lower_cp(partial_name);
@@ -218,6 +340,11 @@ void FileManager::close_all_files_containing(const std::string& partial_name)
         close_file(tc);
 }
 
+/**
+ * @brief Close all files ending with.
+ *
+ * @param partial_name Description.
+ */
 void FileManager::close_all_files_ending_with(const std::string& partial_name)
 {
 	string lower = lower_cp(partial_name);
@@ -236,6 +363,11 @@ void FileManager::close_all_files_ending_with(const std::string& partial_name)
 		close_file(tc);
 }
 
+/**
+ * @brief Close file.
+ *
+ * @param tag Description.
+ */
 void FileManager::close_file(const string &tag)
 {
 	{
@@ -272,6 +404,13 @@ void FileManager::close_file(const string &tag)
 	filename_map.erase(tag);
 }
 
+/**
+ * @brief Get ofstream.
+ *
+ * @param tag Description.
+ *
+ * @return Description.
+ */
 ofstream &FileManager::get_ofstream(const string &tag)
 {
 	map<string, ofstream*>::iterator it;
@@ -284,6 +423,13 @@ ofstream &FileManager::get_ofstream(const string &tag)
 	return *(it->second);
 }
 
+/**
+ * @brief Get fstream.
+ *
+ * @param tag Description.
+ *
+ * @return Description.
+ */
 fstream &FileManager::get_fstream(const string &tag)
 {
 	map<string, fstream*>::iterator it;
@@ -296,6 +442,13 @@ fstream &FileManager::get_fstream(const string &tag)
 	return *(it->second);
 }
 
+/**
+ * @brief Get ifstream.
+ *
+ * @param tag Description.
+ *
+ * @return Description.
+ */
 ifstream &FileManager::get_ifstream(const string &tag)
 {
 	map<string, ifstream*>::iterator it;
@@ -309,11 +462,21 @@ ifstream &FileManager::get_ifstream(const string &tag)
 }
 
 
+/**
+ * @brief Rec ofstream.
+ *
+ * @return Description.
+ */
 ofstream &FileManager::rec_ofstream()
 {
 	return get_ofstream("rec");
 }
 
+/**
+ * @brief Sen ofstream.
+ *
+ * @return Description.
+ */
 ofstream &FileManager::sen_ofstream()
 {
 	return get_ofstream("sen");

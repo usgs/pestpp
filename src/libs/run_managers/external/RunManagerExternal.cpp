@@ -1,3 +1,7 @@
+/**
+ * @file RunManagerExternal.cpp
+ * @brief Implementation of RunManagerExternal.
+ */
 #include "network_wrapper.h"
 #include <iostream>
 #include "RunManagerExternal.h"
@@ -17,6 +21,9 @@ RunManagerExternal::RunManagerExternal(vector<string> _comline_vec,
 	cout << "              starting external run manager ..." << endl << endl;
 }
 
+/**
+ * @brief Run.
+ */
 void RunManagerExternal::run()
 {
 
@@ -126,6 +133,9 @@ void RunManagerExternal::run()
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 RunManagerExternal::~RunManagerExternal()
 {
 }

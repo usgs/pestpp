@@ -16,6 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file system_variables.cpp
+ * @brief Implementation of system_variables.
+ */
+
 
 #include <cstdlib>
 #include <cstdio>
@@ -50,6 +55,11 @@ const std::string OperSys::COMMAND_LINE_APPEND = " & ";
 
 using namespace std;
 
+/**
+ * @brief String2pathname.
+ *
+ * @param s Description.
+ */
 void OperSys::string2pathname(string &s)
 {
 	size_t i;
@@ -67,6 +77,11 @@ void OperSys::string2pathname(string &s)
 	s = new_s.str();
 }
 
+/**
+ * @brief Getcwd.
+ *
+ * @return Description.
+ */
 string OperSys::getcwd()
 {
     #ifdef OS_WIN
@@ -85,6 +100,11 @@ string OperSys::getcwd()
     #endif
 }
 
+/**
+ * @brief Chdir.
+ *
+ * @param str Description.
+ */
 void OperSys::chdir(const char *str)
 {
    #ifdef OS_WIN
@@ -95,6 +115,14 @@ void OperSys::chdir(const char *str)
    #endif
 }
 
+/**
+ * @brief Gets s.
+ *
+ * @param str Description.
+ * @param len Description.
+ *
+ * @return Description.
+ */
 char* OperSys::gets_s(char *str, size_t len)
 {
  #ifdef OS_WIN
@@ -106,6 +134,13 @@ char* OperSys::gets_s(char *str, size_t len)
 
 }
 
+/**
+ * @brief Double is invalid.
+ *
+ * @param x Description.
+ *
+ * @return Description.
+ */
 bool OperSys::double_is_invalid(double x)
 {
 	bool test = false;
@@ -142,6 +177,13 @@ PROCESS_INFORMATION start(string &cmd_string)
 
 
 #ifdef OS_LINUX
+/**
+ * @brief Start.
+ *
+ * @param cmd_string Description.
+ *
+ * @return Description.
+ */
 int start(string &cmd_string)
 {
 	//split cmd_string on whitespaces

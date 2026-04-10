@@ -1,3 +1,7 @@
+/**
+ * @file GsaAbstractBase.cpp
+ * @brief Implementation of GsaAbstractBase.
+ */
 #include <iostream>
 #include <list>
 #include <iomanip>
@@ -74,10 +78,21 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 GsaAbstractBase::~GsaAbstractBase(void)
 {
 }
 
+/**
+ * @brief Process gsa file.
+ *
+ * @param fin Description.
+ * @param file_manager Description.
+ *
+ * @return Description.
+ */
 map<string, string>  GsaAbstractBase::process_gsa_file(ifstream &fin, FileManager &file_manager)
 {
 	map<string, string> arg_map;
@@ -109,6 +124,11 @@ map<string, string>  GsaAbstractBase::process_gsa_file(ifstream &fin, FileManage
 }
 
 
+/**
+ * @brief Calc parameter norm std dev.
+ *
+ * @return Description.
+ */
 map<string, double> GsaAbstractBase::calc_parameter_norm_std_dev()
 {
 	map<string, double> std_dev_map;
@@ -121,6 +141,11 @@ map<string, double> GsaAbstractBase::calc_parameter_norm_std_dev()
 	return std_dev_map;
 }
 
+/**
+ * @brief Calc parameter unif std dev.
+ *
+ * @return Description.
+ */
 map<string, double> GsaAbstractBase::calc_parameter_unif_std_dev()
 {
 	map<string, double> std_dev_map;
@@ -133,6 +158,12 @@ map<string, double> GsaAbstractBase::calc_parameter_unif_std_dev()
 	return std_dev_map;
 }
 
+/**
+ * @brief Parce line.
+ *
+ * @param line Description.
+ * @param arg_map Description.
+ */
 void GsaAbstractBase::parce_line(const string &line, map<string, string> &arg_map)
 {
 	string key;
@@ -180,6 +211,15 @@ void GsaAbstractBase::parce_line(const string &line, map<string, string> &arg_ma
 }
 
 
+/**
+ * @brief Calc interval midpoints.
+ *
+ * @param n_interval Description.
+ * @param min Description.
+ * @param max Description.
+ *
+ * @return Description.
+ */
 vector<double>  GsaAbstractBase::calc_interval_midpoints(int n_interval, double min, double max)
 {
 	assert(max > min);
@@ -194,6 +234,13 @@ vector<double>  GsaAbstractBase::calc_interval_midpoints(int n_interval, double 
 }
 
 
+/**
+ * @brief Ltqnorm.
+ *
+ * @param p Description.
+ *
+ * @return Description.
+ */
 double GsaAbstractBase::ltqnorm(double p)
 {
 	/*
@@ -298,6 +345,14 @@ double GsaAbstractBase::ltqnorm(double p)
 	}
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param out Description.
+ * @param rhs Description.
+ *
+ * @return Description.
+ */
 ostream& operator<<(ostream& out, const vector<double> &rhs)
 {
 	int n=0;
@@ -308,6 +363,14 @@ ostream& operator<<(ostream& out, const vector<double> &rhs)
 	return out;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param out Description.
+ * @param pr Description.
+ *
+ * @return Description.
+ */
 ostream& operator<<(ostream& out, const pair<double, double> &pr)
 {
 	out << "(" << pr.first << ", " << pr.second << ")";

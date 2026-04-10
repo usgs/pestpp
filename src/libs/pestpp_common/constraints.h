@@ -64,6 +64,7 @@ public:
 	void presolve_report(int iter, Parameters& current_pars, Observations& current_obs);
 	void stack_summary(int iter, Observations& shifted_obs, bool echo = false, string header = string());
 	void presolve_chance_report(int iter, Observations& current_obs, bool echo=false, string header = string());
+	void presolve_chance_report(int iter, Observations& current_obs, ObservationEnsemble* ensemble_oe, double risk_val, bool echo = false, string header = string());
 	void postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter,
 		map<string, string> status_map=map<string,string>(), map<string, double> price_map=map<string,double>());
 	void postsolve_pi_constraints_report(Parameters& old_pars, Parameters& new_pars, int iter,
@@ -107,13 +108,15 @@ public:
 
 	//get maps of obs and pi constraints that are not satisfied - the value is the distance to constraint RHS
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
+	map<string, double> get_unsatified_obs_constraints_vs_shifted(Observations& constraints_sim, Observations& shifted_constraints, double tol, bool include_weight);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true, bool include_weight = false);
 	map<string, double> get_constraint_map(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift);
 
-	Mat get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, double working_set_tol = 0.1);
-	Mat get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, double working_set_tol = 0.1);
+	pair<Mat, bool> get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, const Eigen::VectorXd* lagrange_mults = nullptr, double working_set_tol = 0.15, int wset_lvl = 1);
+	pair<Mat, bool> get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>(), double working_set_tol = 0.15, int wset_lvl = 1);
+	pair<vector<string>, bool> reduce_working_set(vector<string>& working_set, const Eigen::VectorXd& lagrange_mults);
 
-	map<string, map<string, double>> get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol=0.0,bool include_weight=true);
+	map<string, map<string, double>> get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol = 0.0, bool include_weight = true, ObservationEnsemble* shift_ensemble_oe = nullptr, double risk_val = 0.5);
 
 	//get the number of non-zero Prior info constraint elements
 	int get_num_nz_pi_constraint_elements();
@@ -148,12 +151,13 @@ public:
 
 	//workout a constraints sense
 	static pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
-
+	map<string, string> get_constraint_sense() { return constraint_sense_name; }
 	//get risk-shifted simulated constraint values using current_constraints_sim_ptr
 	//Observations get_stack_shifted_chance_constraints();
 	//get risk-shifted simulated constraint values using _constraints_sim arg
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim, double _risk, bool use_stack_anomalies=true);
+	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& ensemble_oe, double _risk);
 
 	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, int gen, string risk_obj = string(), string opt_member=string());
 
@@ -175,6 +179,7 @@ private:
 	int stack_size;
 	bool use_chance;
 	bool use_fosm;
+	bool use_stosag;
 	bool std_weights;
 	bool stack_runs_processed;
 	double risk;
@@ -253,7 +258,7 @@ private:
 
 	ObservationEnsemble get_stack_mean(map<string, ObservationEnsemble>& _stack_oe_map);
 
-	pair<vector<string>,vector<string>> get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol=0.1);
+	pair<vector<string>,vector<string>> get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol=0.1, int wset_lvl = 1);
     void augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names);
 
     void initialize_chance_schedule(ofstream& frec);

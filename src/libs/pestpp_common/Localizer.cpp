@@ -1,3 +1,7 @@
+/**
+ * @file Localizer.cpp
+ * @brief Implementation of Localizer.
+ */
 #include <random>
 #include <iomanip>
 #include <unordered_set>
@@ -13,6 +17,15 @@
 #include "system_variables.h"
 #include "Localizer.h"
 
+/**
+ * @brief Initialize.
+ *
+ * @param performance_log Description.
+ * @param frec Description.
+ * @param forgive_missing Description.
+ *
+ * @return Description.
+ */
 bool Localizer::initialize(PerformanceLog *performance_log, ofstream& frec, bool forgive_missing)
 {
 	stringstream ss;
@@ -286,6 +299,15 @@ void Localizer::update_par_info_from_mat(Mat& mat, vector<vector<string>>& par_m
 	}
 }
 
+/**
+ * @brief Process mat.
+ *
+ * @param performance_log Description.
+ * @param mat Description.
+ * @param forgive_missing Description.
+ *
+ * @return Description.
+ */
 unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_mat(PerformanceLog* performance_log, Mat& mat,  bool forgive_missing)
 {
 	stringstream ss;
@@ -485,6 +507,11 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 }
 
 
+/**
+ * @brief Report.
+ *
+ * @param f_rec Description.
+ */
 void Localizer::report(ofstream &f_rec)
 {
 	vector<string> zeros;
@@ -835,6 +862,13 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 }
 
 
+/**
+ * @brief Aal upgrade thread function.
+ *
+ * @param id Description.
+ * @param worker Description.
+ * @param eptr Description.
+ */
 void aal_upgrade_thread_function(int id, AutoAdaLocThread &worker, exception_ptr &eptr)
 {
 	try
@@ -869,6 +903,11 @@ AutoAdaLocThread::AutoAdaLocThread(PerformanceLog *_performance_log, ofstream *_
 
 }
 
+/**
+ * @brief Work.
+ *
+ * @param thread_id Description.
+ */
 void AutoAdaLocThread::work(int thread_id)
 {
 
@@ -1075,6 +1114,14 @@ void AutoAdaLocThread::work(int thread_id)
 }
 
 
+/**
+ * @brief Get obs hadamard vector.
+ *
+ * @param par_name Description.
+ * @param obs_names Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<string>& obs_names)
 {
 	int idx;
@@ -1105,6 +1152,15 @@ Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<strin
 	return loc;
 }
 
+/**
+ * @brief Get obsdiff hadamard matrix.
+ *
+ * @param num_reals Description.
+ * @param col_name Description.
+ * @param obs_names Description.
+ *
+ * @return Description.
+ */
 Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col_name, vector<string> &obs_names)
 {
 	if (colname2col_map.find(col_name) == colname2col_map.end()) {
@@ -1124,6 +1180,15 @@ Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col
 }
 
 
+/**
+ * @brief Get pardiff hadamard matrix.
+ *
+ * @param num_reals Description.
+ * @param row_name Description.
+ * @param par_names Description.
+ *
+ * @return Description.
+ */
 Eigen::MatrixXd Localizer::get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names)
 {
 	if (rowname2row_map.find(row_name) == rowname2row_map.end()) {

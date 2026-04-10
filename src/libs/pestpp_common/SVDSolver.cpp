@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 	*/
+
+/**
+ * @file SVDSolver.cpp
+ * @brief Implementation of SVDSolver.
+ */
 #include "RunManagerPanther.h"
 #include <fstream>
 #include <iostream>
@@ -50,6 +55,12 @@ using namespace Eigen;
 const string SVDSolver::svd_solver_type_name = "svd_base_par";
 
 
+/**
+ * @brief Set.
+ *
+ * @param _mu Description.
+ * @param _phi_comp Description.
+ */
 void MuPoint::set(double _mu, const PhiComponets &_phi_comp)
 {
 	mu = max(numeric_limits<double>::min(), _mu);
@@ -58,21 +69,41 @@ void MuPoint::set(double _mu, const PhiComponets &_phi_comp)
 
 }
 
+/**
+ * @brief F.
+ *
+ * @return Description.
+ */
 double MuPoint::f() const
 {
 	return phi_comp.meas - target_phi_meas;
 }
 
+/**
+ * @brief Error frac.
+ *
+ * @return Description.
+ */
 double MuPoint::error_frac()
 {
 	return abs((phi_comp.meas - target_phi_meas) / target_phi_meas);
 }
 
+/**
+ * @brief Error percent.
+ *
+ * @return Description.
+ */
 double MuPoint::error_percent()
 {
 	return (phi_comp.meas - target_phi_meas) / target_phi_meas;
 }
 
+/**
+ * @brief Print.
+ *
+ * @param os Description.
+ */
 void MuPoint::print(ostream &os)
 {
 		//streamsize n = os.precision(numeric_limits<double>::digits10 + 1);
@@ -85,6 +116,13 @@ void MuPoint::print(ostream &os)
 		os.precision(n);
 
 }
+/**
+ * @brief Overloaded operator < operator.
+ *
+ * @param rhs Description.
+ *
+ * @return Description.
+ */
 bool MuPoint::operator< (const MuPoint &rhs) const
 {
 	return abs(f()) < abs(rhs.f());
@@ -109,6 +147,11 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 
 }
 
+/**
+ * @brief Set svd package.
+ *
+ * @param _svd_pack Description.
+ */
 void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
 {
 	
@@ -128,6 +171,9 @@ void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
 	svd_package->set_performance_log(performance_log);
 }
 
+/**
+ * @brief Destructor for .
+ */
 SVDSolver::~SVDSolver(void)
 {
 	delete svd_package;
@@ -694,6 +740,16 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 }
 
 
+/**
+ * @brief Compute jacobian.
+ *
+ * @param run_manager Description.
+ * @param termination_ctl Description.
+ * @param cur_run Description.
+ * @param restart_runs Description.
+ *
+ * @return Description.
+ */
 	ModelRun SVDSolver::compute_jacobian(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &cur_run, bool restart_runs)
 	{
 		ostream &os = file_manager.rec_ofstream();
@@ -705,16 +761,14 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 		RestartController::write_start_iteration(fout_restart, this->get_solver_type(), -9999, -9999);
 
 		//write current parameters so we have a backup for restarting
-		RestartController::write_start_parameters_updated(fout_restart, file_manager.build_filename("parb", false));
-		output_file_writer.write_par(file_manager.open_ofile_ext("parb"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
+		RestartController::write_start_parameters_updated(fout_restart, file_manager.build_filename("par", false));
+		output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
 			*(par_transform.get_scale_ptr()));
-		file_manager.close_file("parb");
-		RestartController::write_finish_parameters_updated(fout_restart, file_manager.build_filename("parb", false));
+		file_manager.close_file("par");
+		RestartController::write_finish_parameters_updated(fout_restart, file_manager.build_filename("par", false));
 
 		cout << "COMPUTING JACOBIAN:" << endl << endl;
 		os << "COMPUTING JACOBIAN:" << endl << endl;
-		cout << "  Iteration type: " << get_description() << endl;
-		os << "    Iteration type: " << get_description() << endl;
 		os << "    Model calls so far : " << run_manager.get_total_runs() << endl << endl << endl;
 		iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
 
@@ -927,6 +981,17 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	return new_base_run;
 }
 
+/**
+ * @brief Iteration jac.
+ *
+ * @param run_manager Description.
+ * @param termination_ctl Description.
+ * @param base_run Description.
+ * @param calc_init_obs Description.
+ * @param restart_runs Description.
+ *
+ * @return Description.
+ */
 bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	ostream &os = file_manager.rec_ofstream();
@@ -1003,6 +1068,16 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	return true;
 }
 
+/**
+ * @brief Iteration upgrd.
+ *
+ * @param run_manager Description.
+ * @param termination_ctl Description.
+ * @param base_run Description.
+ * @param restart_runs Description.
+ *
+ * @return Description.
+ */
 ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)
 {
 	ostream &os = file_manager.rec_ofstream();
@@ -1789,6 +1864,16 @@ Parameters SVDSolver::limit_parameters_freeze_all_ip(const Parameters &init_acti
 	return new_frozen_active_ctl_parameters;
 }
 
+/**
+ * @brief Param change stats.
+ *
+ * @param p_old Description.
+ * @param p_new Description.
+ * @param have_fac Description.
+ * @param fac_change Description.
+ * @param have_rel Description.
+ * @param rel_change Description.
+ */
 void SVDSolver::param_change_stats(double p_old, double p_new, bool &have_fac, double &fac_change, bool &have_rel, double &rel_change)
 {
 	have_rel = have_fac = true;
@@ -1813,6 +1898,15 @@ void SVDSolver::param_change_stats(double p_old, double p_new, bool &have_fac, d
 	}
 }
 
+/**
+ * @brief Iteration update and report.
+ *
+ * @param os Description.
+ * @param base_run Description.
+ * @param upgrade Description.
+ * @param termination_ctl Description.
+ * @param run_manager Description.
+ */
 void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_run, ModelRun &upgrade, TerminationController &termination_ctl, RunManagerAbstract &run_manager)
 {
 	const string *p_name;
@@ -1852,6 +1946,16 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 	termination_ctl.process_iteration(upgrade.get_phi_comp(DynamicRegularization::get_unit_reg_instance()), max_rel_change);
 }
 
+/**
+ * @brief Par heading out bnd.
+ *
+ * @param p_org Description.
+ * @param p_new Description.
+ * @param lower_bnd Description.
+ * @param upper_bnd Description.
+ *
+ * @return Description.
+ */
 bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd, double upper_bnd)
 {
 	/*bool out_of_bnd = false;
@@ -2292,6 +2396,13 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 	os << endl;
 }
 
+/**
+ * @brief Save frozen pars.
+ *
+ * @param fout Description.
+ * @param frozen_pars Description.
+ * @param id Description.
+ */
  void SVDSolver::save_frozen_pars(std::ostream &fout, const Parameters &frozen_pars, int id)
  {
 		 fout << "frozen_parameter_set_begin  " << id << endl;
@@ -2300,6 +2411,14 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 		 fout.flush();
  }
 
+/**
+ * @brief Read frozen pars.
+ *
+ * @param fin Description.
+ * @param id Description.
+ *
+ * @return Description.
+ */
  Parameters SVDSolver::read_frozen_pars(std::istream &fin, int id)
  {
 	 Parameters fz_pars;

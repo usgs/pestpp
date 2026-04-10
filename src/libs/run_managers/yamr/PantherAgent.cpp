@@ -1,3 +1,7 @@
+/**
+ * @file PantherAgent.cpp
+ * @brief Implementation of PantherAgent.
+ */
 #include "PantherAgent.h"
 #include "utilities.h"
 #include "Serialization.h"
@@ -19,6 +23,13 @@ using namespace pest_utils;
 
 int  linpack_wrap(void);
 
+/**
+ * @brief P a n t h e r agent.
+ *
+ * @param _frec Description.
+ *
+ * @return Description.
+ */
 PANTHERAgent::PANTHERAgent(ofstream &_frec)
 	: frec(_frec),
 	  max_time_without_master_ping_seconds(300),
@@ -28,6 +39,12 @@ PANTHERAgent::PANTHERAgent(ofstream &_frec)
 }
 
 
+/**
+ * @brief Init network.
+ *
+ * @param host Description.
+ * @param port Description.
+ */
 void PANTHERAgent::init_network(const string &host, const string &port)
 {
 	report("initializing network connection", true);
@@ -85,6 +102,9 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 PANTHERAgent::~PANTHERAgent()
 {
 	w_close(sockfd);
@@ -92,6 +112,11 @@ PANTHERAgent::~PANTHERAgent()
 }
 
 
+/**
+ * @brief Process ctl file.
+ *
+ * @param ctl_filename Description.
+ */
 void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 {
 	string version = PESTPP_VERSION;
@@ -160,6 +185,14 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	//pest_scenario.clear_ext_files();
 }
 
+/**
+ * @brief Recv message.
+ *
+ * @param net_pack Description.
+ * @param tv Description.
+ *
+ * @return Description.
+ */
 pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 {
 	fd_set read_fds;
@@ -248,6 +281,15 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval
 	//          2  no message received
 }
 
+/**
+ * @brief Recv message.
+ *
+ * @param net_pack Description.
+ * @param timeout_seconds Description.
+ * @param timeout_microsecs Description.
+ *
+ * @return Description.
+ */
 pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs)
 {
 	pair<int, string> err;
@@ -260,6 +302,15 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_
 	return err;
 }
 
+/**
+ * @brief Transfer files.
+ *
+ * @param tfiles Description.
+ * @param group Description.
+ * @param run_id Description.
+ * @param desc Description.
+ * @param tag Description.
+ */
 void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc, string tag)
 {
     int bytes_read;
@@ -324,6 +375,15 @@ void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int r
 }
 
 
+/**
+ * @brief Send message.
+ *
+ * @param net_pack Description.
+ * @param data Description.
+ * @param data_len Description.
+ *
+ * @return Description.
+ */
 pair<int,string> PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
 {
 	pair<int,string> err;
@@ -349,6 +409,15 @@ pair<int,string> PANTHERAgent::send_message(NetPackage &net_pack, const void *da
 }
 
 
+/**
+ * @brief Run model.
+ *
+ * @param pars Description.
+ * @param obs Description.
+ * @param net_pack Description.
+ *
+ * @return Description.
+ */
 std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &pars, Observations &obs, NetPackage &net_pack)
 {
 	NetPackage::PackType final_run_status = NetPackage::PackType::RUN_FAILED;
@@ -543,6 +612,12 @@ void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thr
 }
 
 
+/**
+ * @brief Start.
+ *
+ * @param host Description.
+ * @param port Description.
+ */
 void PANTHERAgent::start(const string &host, const string &port)
 {
 	stringstream ss;
@@ -577,6 +652,12 @@ void PANTHERAgent::start(const string &host, const string &port)
 }
 
 
+/**
+ * @brief Start impl.
+ *
+ * @param host Description.
+ * @param port Description.
+ */
 void PANTHERAgent::start_impl(const string &host, const string &port)
 {
 	NetPackage net_pack;
@@ -1248,6 +1329,11 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 }
 
 
+/**
+ * @brief Terminate or restart.
+ *
+ * @param error_code Description.
+ */
 void PANTHERAgent::terminate_or_restart(int error_code) const
 {
 	
@@ -1263,6 +1349,12 @@ void PANTHERAgent::terminate_or_restart(int error_code) const
 	throw PANTHERAgentRestartError("");
 }
 
+/**
+ * @brief Report.
+ *
+ * @param message Description.
+ * @param to_cout Description.
+ */
 void PANTHERAgent::report(const string& message, bool to_cout)
 {
 	string t_str = pest_utils::get_time_string();

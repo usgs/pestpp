@@ -1403,6 +1403,7 @@ def fr_timeout_test():
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_include_base"] = False
     pst.pestpp_options["max_run_fail"] = 1
+    pst.pestpp_options["panther_ping_interval_secs"] = 2
 
     #pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = False
@@ -2125,10 +2126,13 @@ def parse_pst_test():
 
 
 
+
+
 if __name__ == "__main__":
     #parse_pst_test()
     #basic_test()
-    nonascii_path_test()
+    #mf6_v5_glm_test()
+    #nonascii_path_test()
 
     #mf6_v5_ies_nonpersistent_test()
     #large_fake_test()
@@ -2143,7 +2147,7 @@ if __name__ == "__main__":
     #plot_collapse_invest()
 
     #run()
-    #mf6_v5_ies_test()
+    
     #prep_ends()
     #sweep_bin_test()
     # mf6_v5_sen_test()
@@ -2185,7 +2189,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     
-    #fr_timeout_test()
+    fr_timeout_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 

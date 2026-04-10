@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file TerminationController.cpp
+ * @brief Implementation of TerminationController.
+ */
+
 #include "TerminationController.h"
 #include <vector>
 #include <algorithm>
@@ -38,6 +43,9 @@ TerminationController::TerminationController(int _noptmax, double _phiredstp,
 	termimate_reason = "unknown";
 }
 
+/**
+ * @brief Reset.
+ */
 void TerminationController::reset() {
 	nopt_count = 0;
 	nphinored_count = 0;
@@ -45,6 +53,14 @@ void TerminationController::reset() {
 	terminate_code = false;
 }
 
+/**
+ * @brief Process iteration.
+ *
+ * @param phi_comp Description.
+ * @param relpar Description.
+ *
+ * @return Description.
+ */
 bool TerminationController::process_iteration(const PhiComponets &phi_comp, double relpar)
 {
 	++nopt_count;
@@ -111,6 +127,11 @@ bool TerminationController::process_iteration(const PhiComponets &phi_comp, doub
 	}
 	return check_last_iteration();
 }
+/**
+ * @brief Check last iteration.
+ *
+ * @return Description.
+ */
 bool TerminationController::check_last_iteration()
 {
 
@@ -152,6 +173,11 @@ bool TerminationController::check_last_iteration()
 	return terminate_code;
 }
 
+/**
+ * @brief Termination summary.
+ *
+ * @param fout Description.
+ */
 void TerminationController::termination_summary(std::ostream &fout)
 {
 	fout << "-----------------------------------------" << endl;
@@ -193,6 +219,11 @@ const TerminationController& TerminationController::operator=(const TerminationC
 }
 
 
+/**
+ * @brief Save state.
+ *
+ * @param fout Description.
+ */
 void TerminationController::save_state(std::ostream &fout)
 {
 
@@ -209,6 +240,11 @@ void TerminationController::save_state(std::ostream &fout)
 
 
 
+/**
+ * @brief Read state.
+ *
+ * @param line Description.
+ */
 void  TerminationController::read_state(const std::string &line)
 {
 	vector<string> tokens;
@@ -251,6 +287,9 @@ void  TerminationController::read_state(const std::string &line)
 	}
 }
 
+/**
+ * @brief Destructor for .
+ */
 TerminationController::~TerminationController(void)
 {
 }

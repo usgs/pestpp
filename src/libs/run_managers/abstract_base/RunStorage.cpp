@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file RunStorage.cpp
+ * @brief Implementation of RunStorage.
+ */
+
 
 
 #include <sstream>
@@ -36,10 +41,24 @@ using namespace std;
 
 const double RunStorage::no_data = -9999.0;
 
+/**
+ * @brief Run storage.
+ *
+ * @param _filename Description.
+ *
+ * @return Description.
+ */
 RunStorage::RunStorage(const string &_filename) :filename(_filename), run_byte_size(0)
 {
 }
 
+/**
+ * @brief Reset.
+ *
+ * @param _par_names Description.
+ * @param _obs_names Description.
+ * @param _filename Description.
+ */
 void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_obs_names, const string &_filename)
 {
 	par_names = _par_names;
@@ -115,6 +134,11 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 }
 
 
+/**
+ * @brief Init restart.
+ *
+ * @param _filename Description.
+ */
 void RunStorage::init_restart(const std::string &_filename)
 {
 	filename = _filename;
@@ -202,6 +226,11 @@ void RunStorage::init_restart(const std::string &_filename)
     }
 }
 
+/**
+ * @brief Get nruns.
+ *
+ * @return Description.
+ */
 int RunStorage::get_nruns()
 {
 
@@ -223,6 +252,11 @@ int RunStorage::get_nruns()
 	return n_runs;
 }
 
+/**
+ * @brief Get num good runs.
+ *
+ * @return Description.
+ */
 int RunStorage::get_num_good_runs()
 {
 	int n_ok = 0;
@@ -237,6 +271,11 @@ int RunStorage::get_num_good_runs()
 	}
 	return n_ok;
 }
+/**
+ * @brief Increment nruns.
+ *
+ * @return Description.
+ */
 int RunStorage::increment_nruns()
 {
 	buf_stream.seekg(0, ios_base::beg);
@@ -263,12 +302,28 @@ const std::vector<string>& RunStorage::get_obs_name_vec()const
 	return obs_names;
 }
 
+/**
+ * @brief Get stream pos.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
 streamoff RunStorage::get_stream_pos(int run_id)
 {
 	streamoff pos = beg_run0 + run_byte_size*run_id;
 	return pos;
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
  int RunStorage::add_run(const vector<double> &model_pars, const string &info_txt, double info_value)
  {
 	std::int8_t r_status = 0;
@@ -294,6 +349,15 @@ streamoff RunStorage::get_stream_pos(int run_id)
 	return run_id;
  }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
  int RunStorage::add_run(const Eigen::VectorXd &model_pars, const string &info_txt, double info_value)
  {
 	std::int8_t r_status = 0;
@@ -320,6 +384,15 @@ streamoff RunStorage::get_stream_pos(int run_id)
  }
 
 
+/**
+ * @brief Add run.
+ *
+ * @param pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunStorage::add_run(const Parameters &pars, const string &info_txt, double info_value)
 {
 	vector<double> data(pars.get_data_vec(par_names));
@@ -327,6 +400,11 @@ int RunStorage::add_run(const Parameters &pars, const string &info_txt, double i
 	return run_id;
 }
 
+/**
+ * @brief Copy.
+ *
+ * @param rhs_rs Description.
+ */
 void RunStorage::copy(const RunStorage &rhs_rs)
 {
 	if (buf_stream.is_open())
@@ -366,6 +444,13 @@ void RunStorage::copy(const RunStorage &rhs_rs)
     }
 }
 
+/**
+ * @brief Update run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ */
 void RunStorage::update_run(int run_id, const Parameters &pars, const Observations &obs)
 {
 
@@ -408,6 +493,12 @@ void RunStorage::update_run(int run_id, const Parameters &pars, const Observatio
 }
 
 
+/**
+ * @brief Update run.
+ *
+ * @param run_id Description.
+ * @param obs Description.
+ */
 void RunStorage::update_run(int run_id, const Observations &obs)
 {
 
@@ -453,6 +544,12 @@ void RunStorage::update_run(int run_id, const Observations &obs)
     }
 }
 
+/**
+ * @brief Update run.
+ *
+ * @param run_id Description.
+ * @param serial_data Description.
+ */
 void RunStorage::update_run(int run_id, const vector<char> serial_data)
 {
 
@@ -492,6 +589,11 @@ void RunStorage::update_run(int run_id, const vector<char> serial_data)
 }
 
 
+/**
+ * @brief Update run failed.
+ *
+ * @param run_id Description.
+ */
 void RunStorage::update_run_failed(int run_id)
 {
 
@@ -511,6 +613,12 @@ void RunStorage::update_run_failed(int run_id)
     }
 }
 
+/**
+ * @brief Set run nfailed.
+ *
+ * @param run_id Description.
+ * @param nfail Description.
+ */
 void RunStorage::set_run_nfailed(int run_id, int nfail)
 {
 
@@ -526,6 +634,13 @@ void RunStorage::set_run_nfailed(int run_id, int nfail)
     }
 }
 
+/**
+ * @brief Get run status native.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
 std::int8_t RunStorage::get_run_status_native(int run_id)
 {
 
@@ -540,12 +655,27 @@ std::int8_t RunStorage::get_run_status_native(int run_id)
 	return r_status;
 }
 
+/**
+ * @brief Get run status.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run_status(int run_id)
 {
 	int status = get_run_status_native(run_id);
 	return status;
 }
 
+/**
+ * @brief Get info.
+ *
+ * @param run_id Description.
+ * @param run_status Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ */
 void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double &info_value)
 {
 
@@ -567,6 +697,18 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
     }
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ * @param clear_old Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run(int run_id, Parameters &pars, Observations &obs, string &info_txt, double &info_value, bool clear_old)
 {
 
@@ -591,6 +733,16 @@ int RunStorage::get_run(int run_id, Parameters &pars, Observations &obs, string 
 	return status;
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ * @param clear_old Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run(int run_id, Parameters &pars, Observations &obs, bool clear_old)
 {
 	string info_txt;
@@ -598,6 +750,19 @@ int RunStorage::get_run(int run_id, Parameters &pars, Observations &obs, bool cl
 	return get_run(run_id, pars, obs, info_txt, info_value, clear_old);
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param npars Description.
+ * @param obs Description.
+ * @param nobs Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, size_t nobs, string &info_txt, double &info_value)
 {
     if (!buf_stream.good())
@@ -640,6 +805,17 @@ int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, siz
 	return status;
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars_vec Description.
+ * @param obs_vec Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &obs_vec, string &info_txt, double &info_value)
 {
 	std::int8_t  r_status;
@@ -669,6 +845,15 @@ int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &ob
 	return status;
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars_vec Description.
+ * @param obs_vec Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &obs_vec)
 {
 	string info_txt;
@@ -676,6 +861,17 @@ int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &ob
 	return get_run(run_id, pars_vec, obs_vec, info_txt, info_value);
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param npars Description.
+ * @param obs Description.
+ * @param nobs Description.
+ *
+ * @return Description.
+ */
 int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, size_t nobs)
 {
 	string info_txt;
@@ -683,6 +879,13 @@ int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, siz
 	return get_run(run_id, pars, npars, obs, nobs, info_txt, info_value);
 }
 
+/**
+ * @brief Get serial pars.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
 vector<char> RunStorage::get_serial_pars(int run_id)
 {
 
@@ -701,6 +904,14 @@ vector<char> RunStorage::get_serial_pars(int run_id)
 	return serial_data;
 }
 
+/**
+ * @brief Get parameters.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ *
+ * @return Description.
+ */
 int  RunStorage::get_parameters(int run_id, Parameters &pars)
 {
 	std::int8_t r_status;
@@ -729,6 +940,14 @@ int  RunStorage::get_parameters(int run_id, Parameters &pars)
 }
 
 
+/**
+ * @brief Get observations.
+ *
+ * @param run_id Description.
+ * @param obs Description.
+ *
+ * @return Description.
+ */
 int  RunStorage::get_observations(int run_id, Observations &obs)
 {
 
@@ -759,6 +978,14 @@ int  RunStorage::get_observations(int run_id, Observations &obs)
 }
 
 
+/**
+ * @brief Get observations vec.
+ *
+ * @param run_id Description.
+ * @param obs_data Description.
+ *
+ * @return Description.
+ */
 int  RunStorage::get_observations_vec(int run_id, vector<double> &obs_data)
 {
 
@@ -786,6 +1013,9 @@ int  RunStorage::get_observations_vec(int run_id, vector<double> &obs_data)
 	return status;
 }
 
+/**
+ * @brief Free memory.
+ */
 void RunStorage::free_memory()
 {
 
@@ -799,6 +1029,11 @@ void RunStorage::free_memory()
     }
 }
 
+/**
+ * @brief Check rec size.
+ *
+ * @param serial_data Description.
+ */
 void RunStorage::check_rec_size(const vector<char> &serial_data) const
 {
 	if (serial_data.size() != run_data_byte_size)
@@ -807,6 +1042,11 @@ void RunStorage::check_rec_size(const vector<char> &serial_data) const
 	}
 }
 
+/**
+ * @brief Check rec id.
+ *
+ * @param run_id Description.
+ */
 void RunStorage::check_rec_id(int run_id)
 {
 	int n_runs = get_nruns();
@@ -819,6 +1059,11 @@ void RunStorage::check_rec_id(int run_id)
 }
 
 
+/**
+ * @brief Print run summary.
+ *
+ * @param fout Description.
+ */
 void RunStorage::print_run_summary(std::ostream &fout)
 {
 	int nruns = get_nruns();
@@ -834,6 +1079,13 @@ void RunStorage::print_run_summary(std::ostream &fout)
 
 }
 
+/**
+ * @brief Export diff to text file.
+ *
+ * @param in1_filename Description.
+ * @param in2_filename Description.
+ * @param out_filename Description.
+ */
 void RunStorage::export_diff_to_text_file(const std::string &in1_filename, const std::string &in2_filename, const std::string &out_filename)
 {
 	RunStorage rs1("");
@@ -922,6 +1174,9 @@ void RunStorage::export_diff_to_text_file(const std::string &in1_filename, const
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 RunStorage::~RunStorage()
 {
   //free_memory();
