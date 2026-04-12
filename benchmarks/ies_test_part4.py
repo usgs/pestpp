@@ -1644,7 +1644,7 @@ def zdt1_weight_test():
     pst.pestpp_options["ies_multimodal_alpha"] = .2
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
-    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     #pst.pestpp_options["ies_subset_size"] = -20
     weights.to_csv(os.path.join(t_d, "weights.csv"))
     pst.write(os.path.join(t_d, "zdt1_ies.pst"))
