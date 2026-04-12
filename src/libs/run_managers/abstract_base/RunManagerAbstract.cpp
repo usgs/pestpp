@@ -32,6 +32,15 @@
 #include "Transformable.h"
 #include "utilities.h"
 
+/**
+ * @brief Derive the failed-run storage filename from the primary storage filename.
+ *
+ * Replaces the *.rns* extension with *.rnf*, or appends *.rnf* if no
+ * *.rns* extension is found.
+ *
+ * @param stor_filename  The primary run storage filename (*case.rns*).
+ * @return The corresponding failed-run storage filename (*case.rnf*).
+ */
 static string make_failed_filename(const string& stor_filename) {
 	string fn = stor_filename;
 	size_t pos = fn.rfind(".rns");
@@ -521,9 +530,17 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
  }
 
 /**
- * @brief Update run failed.
+ * @brief Mark a run as failed in the primary storage and, if the failure
+ *        count has reached max_run_fail, copy its parameter values into
+ *        the failed-run storage file (*case.rnf*).
  *
- * @param run_id Description.
+ * The failure count is stored in the run-status byte of the *.rnf* record
+ * as the negative of the attempt count (e.g. -3 means the run was attempted
+ * three times).  The parameter values and metadata (info_txt, info_value) are
+ * copied from the primary storage so that users can later inspect which
+ * parameter combinations caused persistent model failure.
+ *
+ * @param run_id  The run manager ID of the failed run.
  */
  void  RunManagerAbstract::update_run_failed(int run_id)
  {
@@ -547,6 +564,14 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 	 return file_stor;
  }
 
+/**
+ * @brief Return a const reference to the failed-run storage (*case.rnf*).
+ *
+ * The returned RunStorage contains one entry for each run that exceeded
+ * the max_run_fail threshold.  Each entry holds the parameter values that
+ * were supplied to the model, associated metadata, and the number of
+ * failed attempts encoded in the run-status byte.
+ */
  const RunStorage& RunManagerAbstract::get_failed_runstorage_ref() const
  {
 	 return failed_file_stor;

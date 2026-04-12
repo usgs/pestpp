@@ -174,6 +174,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [5.3.4 Run Management Record File](#s9-3-4)
         - [5.3.5 Run Management Control Variables ](#s9-3-5)
     - [5.4 Run Book-Keeping Files](#s9-4)
+        - [5.4.1 Failed Run Storage File](#s9-4-1)
 - [6. PESTPP-GLM](#s10)
     - [6.1 Introduction](#s10-1)
         - [6.2.1 Basic Equations](#s10-1-1)
@@ -2535,6 +2536,18 @@ In situations where the forward model runtime is very short, allowing the master
 
 After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run – if PESTPP-XXX exits gracefully, these files are removed. These run storage files can be read and processed using pyEMU.
 
+### <a id='s9-4-1' />5.4.1 Failed Run Storage File
+
+In addition to the run storage files described above, the PEST++ run manager also writes a *case.rnf* file. This file records the parameter values associated with model runs that have been declared as permanently failed – that is, runs which have been attempted *max_run_fail()* times without success. The *case.rnf* file uses the same binary format as the *case.rns* run storage file, and can therefore be read and processed using pyEMU.
+
+Unlike the *case.rns*, *case.rnu* and *case.rnj* files, the *case.rnf* file is not removed when PESTPP-XXX exits gracefully. It is intended to persist after a run so that users can inspect which parameter combinations caused model failure.
+
+Each entry in the *case.rnf* file contains the parameter values that were supplied to the model for the failed run, together with any associated metadata (such as the realization name in the case of PESTPP-IES or PESTPP-DA). The number of times each run was attempted before being declared as failed is also stored with each entry.
+
+This file can be useful in several contexts. When undertaking highly parameterized inversion or ensemble-based analyses, some parameter combinations may drive the model into a state from which it cannot recover, producing either numerical instability or execution failure. By examining the parameter values stored in *case.rnf*, a user can identify regions of parameter space that are problematic for a given model. This information can then be used to refine parameter bounds, adjust prior parameter distributions, or modify model input files to improve model stability. It can also serve as a diagnostic tool when deploying PEST++ for the first time on a new model, helping to identify parameter ranges or combinations that require attention.
+
+The *case.rnf* file is produced by all members of the PEST++ suite whenever one or more model runs exceed the *max_run_fail()* threshold. If no runs are declared as permanently failed, the file will exist but will be empty. The file is written incrementally as runs fail, so its contents are available even if PESTPP-XXX is interrupted or terminated prematurely.
+
 # <a id='s10' />6. PESTPP-GLM
 
 ## <a id='s10-1' />6.1 Introduction
@@ -2831,6 +2844,7 @@ The following table summarizes the contents of files that are recorded by PESTPP
 | *caseN.fosm_reweight.rei*      | Scaled final weights used in FOSM calculations.                                                                                                                                                                                                                                                                         |
 | *case.rst*                     | A binary file containing restart information.                                                                                                                                                                                                                                                                           |
 | *case.rns, case.rnj, case.rnu* | Binary files used by the run manager.                                                                                                                                                                                                                                                                                   |
+| *case.rnf*                     | Binary file containing parameter values of permanently failed model runs. See section 5.4.1.                                                                                                                                                                                                                           |
 
 Table 6.1. Files recorded by PESTPP-GLM.
 
@@ -3063,6 +3077,7 @@ PESTPP-SEN writes the following output files. It is assumed that the filename ba
 | *case.rmr*           | Parallel run management record. This file is written if model runs are conducted in parallel.                                                                                                                                                                                    |
 | *Case.sen.par.csv*   | Morris only. Lists the parameter sets used to run the model.                                                                                                                                                                                                                     |
 | *case.rns*           | Binary file used for model run management.                                                                                                                                                                                                                                       |
+| *case.rnf*           | Binary file containing parameter values of permanently failed model runs. See section 5.4.1.                                                                                                                                                                                     |
 
 Table 7.3 Files written by PESTPP-SEN. It is assumed that the name of the PEST control file is *case.pst*. Data elements in all of the above files are comma delimited.
 
@@ -3341,6 +3356,7 @@ Files recorded by PESTPP-OPT are listed in the following table. The contents of 
 | *case.rnj*             | A binary file used for run management.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | *case.N.par_stack.csv* | Optional parameter stack saved each iteration                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | *case.N.obs_stack.csv* | Optional observation stack saved each iteration                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| *case.rnf*             | Binary file containing parameter values of permanently failed model runs. See section 5.4.1.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Table 8.1 PESTPP-OPT output files. It is assumed that the name of the PEST control file is *case.pst*.
 
@@ -3874,6 +3890,7 @@ Non-CSV output files written by PESTPP-IES are listed in the following table.
 | *case.rmr*              | Parallel run management record. This file is written if model runs are conducted in parallel.                                                                                             |
 | *case.log*              | Performance log. This file records the times at which various processing steps begin and end.                                                                                             |
 | *case.rns*              | Binary file used for model run management. This file is typically removed after a successful PESTPP-IES run.                                                                              |
+| *case.rnf*              | Binary file containing parameter values of permanently failed model runs. See section 5.4.1. This file persists after a successful PESTPP-IES run.                                        |
 | *case.N.res.cov/.jcb*   | (optional) residual covariance matrix saved each iteration.                                                                                                                               |
 | *case.N.autoadaloc.mat* | The (optional) localization matrix yielded by the automatic adaptive localization process                                                                                                 |
 | *case.N.base.par*       | The “base” realization parameter values for the Nth iteration in a PEST-style par file. Only written if the “base” realization is available.                                              |
@@ -4852,6 +4869,10 @@ Since the parameters and observations being used can change across cycles, the P
 <td><em>Case.global.&lt;cycle&gt;.&lt; iter&gt;.pcs.csv</em></td>
 <td>The global parameter change summary for cycle &lt;cycle&gt; after iteration &lt;iter&gt;</td>
 </tr>
+<tr class="odd">
+<td><em>case.rnf</em></td>
+<td>Binary file containing parameter values of permanently failed model runs. See section 5.4.1.</td>
+</tr>
 </tbody>
 </table>
 
@@ -5051,8 +5072,8 @@ The following table summarizes the contents of files that are recorded by PESTPP
 <td>The listing of parents used to generate each offspring for each generation</td>
 </tr>
 <tr class="even">
-<td></td>
-<td></td>
+<td><em>case.rnf</em></td>
+<td>Binary file containing parameter values of permanently failed model runs. See section 5.4.1.</td>
 </tr>
 </tbody>
 </table>
@@ -5349,8 +5370,8 @@ The following table summarizes the contents of files that are recorded by PESTPP
 <td>Chance-related outputs if chance constraints are active (e.g., chance-shifted summaries analogous to MOU).</td>
 </tr>
 <tr class="odd">
-<td></td>
-<td></td>
+<td><em>case.rnf</em></td>
+<td>Binary file containing parameter values of permanently failed model runs. See section 5.4.1.</td>
 </tr>
 </tbody>
 </table>

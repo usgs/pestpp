@@ -34,6 +34,16 @@ class Parameters;
 class Observations;
 
 
+/**
+ * @brief Abstract base class for all PEST++ run managers.
+ *
+ * Manages the lifecycle of model runs including parameter distribution,
+ * run execution, result collection, and failure tracking.  Two RunStorage
+ * instances are maintained: \c file_stor for the primary run storage file
+ * (*case.rns*) and \c failed_file_stor for the failed-run storage file
+ * (*case.rnf*).  The failed-run file persists after a successful run so
+ * that users can inspect which parameter combinations caused model failure.
+ */
 class RunManagerAbstract
 {
 public:
@@ -64,6 +74,7 @@ public:
 	virtual bool get_run(int run_id, double *pars, size_t npars, double *obs, size_t nobs);
 	virtual bool get_run(int run_id, std::vector<double> &pars_vec, std::vector<double> &obs_vec, std::string &info_txt, double &info_value);
 	virtual bool get_run(int run_id, std::vector<double> &pars_vec, std::vector<double> &obs_vec);
+	/** @brief Return the set of run IDs whose failure count has exceeded max_run_fail. */
 	virtual const std::set<int> get_failed_run_ids();
     virtual const std::map<std::string,std::vector<int>> get_run_info_map();
 	virtual bool get_model_parameters(int run_num, Parameters &pars);
@@ -71,16 +82,22 @@ public:
 	virtual Observations get_obs_template(double value = -9999.0) const;
 	virtual int get_total_runs(void) const {return total_runs;}
 	virtual int get_num_good_runs(void);
+	/** @brief Return the number of runs whose failure count has exceeded max_run_fail. */
 	virtual int get_num_failed_runs(void);
+	/** @brief Return true if the run identified by @p id has failed more than max_n_failure times. */
 	virtual bool n_run_failures_exceeded(int id);
 	virtual int get_nruns(void) {return file_stor.get_nruns();}
 	virtual int get_cur_groupid(void);
 	virtual std::vector<int> get_outstanding_run_ids();
 	virtual ~RunManagerAbstract(void) {}
 	virtual std::string get_run_filename() { return file_stor.get_filename(); }
+	/** @brief Return a const reference to the primary run storage (*case.rns*). */
 	virtual const RunStorage& get_runstorage_ref() const;
+	/** @brief Return a const reference to the failed-run storage (*case.rnf*). */
 	virtual const RunStorage& get_failed_runstorage_ref() const;
+	/** @brief Return the number of runs recorded in the failed-run storage file. */
 	virtual int get_num_failed_stored() { return failed_file_stor.get_nruns(); }
+	/** @brief Return the filename of the failed-run storage file (*case.rnf*). */
 	virtual std::string get_failed_run_filename() { return failed_file_stor.get_filename(); }
 	virtual void print_run_summary(std::ostream &fout) { file_stor.print_run_summary(fout); }
 	//virtual Observations get_init_run_obs() { return init_run_obs; }
@@ -92,8 +109,8 @@ protected:
 	int total_runs;
 	int max_n_failure; // maximum number of times to retry a failed model run
 	int cur_group_id;  // used in some of the derived classes (ie PANTHER)
-	RunStorage file_stor;
-	RunStorage failed_file_stor;
+	RunStorage file_stor;          ///< Primary run storage (*case.rns*).
+	RunStorage failed_file_stor;   ///< Failed-run storage (*case.rnf*). Persists after graceful exit.
 	RUN_MGR_TYPE mgr_type;
 	std::vector<std::string> comline_vec;
 	std::vector<std::string> tplfile_vec;
@@ -103,6 +120,12 @@ protected:
 	bool run_requried(int run_id);
 	//Observations init_run_obs;
 	std::vector<double> init_sim;
+	/**
+	 * @brief Mark a run as failed and, if the failure threshold is exceeded,
+	 *        record its parameters in the failed-run storage file (*case.rnf*).
+	 *
+	 * @param run_id  The run manager ID of the failed run.
+	 */
 	virtual void update_run_failed(int run_id);
 };
 
