@@ -79,6 +79,9 @@ public:
 	virtual ~RunManagerAbstract(void) {}
 	virtual std::string get_run_filename() { return file_stor.get_filename(); }
 	virtual const RunStorage& get_runstorage_ref() const;
+	virtual const RunStorage& get_failed_runstorage_ref() const;
+	virtual int get_num_failed_stored() { return failed_file_stor.get_nruns(); }
+	virtual std::string get_failed_run_filename() { return failed_file_stor.get_filename(); }
 	virtual void print_run_summary(std::ostream &fout) { file_stor.print_run_summary(fout); }
 	//virtual Observations get_init_run_obs() { return init_run_obs; }
 	virtual std::vector<double> get_init_sim() { return init_sim;  }
@@ -90,6 +93,7 @@ protected:
 	int max_n_failure; // maximum number of times to retry a failed model run
 	int cur_group_id;  // used in some of the derived classes (ie PANTHER)
 	RunStorage file_stor;
+	RunStorage failed_file_stor;
 	RUN_MGR_TYPE mgr_type;
 	std::vector<std::string> comline_vec;
 	std::vector<std::string> tplfile_vec;
