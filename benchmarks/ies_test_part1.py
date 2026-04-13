@@ -2347,6 +2347,7 @@ def tenpar_localizer_incomplete_group_test():
         pst.pestpp_options["ies_localizer_forgive_missing"] = True
         pst.pestpp_options["ies_save_lambda_en"] = True
         pst.pestpp_options["ies_autoadaloc"] = True
+        pst.pestpp_options["overdue_giveup_fac"] = 100000
         pst.control_data.noptmax = 2
 
         # pst.pestpp_options["ies_verbose_level"] = 3
