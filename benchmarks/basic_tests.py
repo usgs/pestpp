@@ -1448,6 +1448,17 @@ def fr_timeout_test():
                 print(line.strip())
                 assert num == 7 # hard coded above
 
+    rnf_par,rnf_obs,rnf_info = pyemu.helpers.read_pestpp_runstorage(os.path.join(m_d,"pest.rnf"),irun="all",with_metadata=True)
+    print(rnf_par)
+    print(rnf_obs)
+    print(rnf_info)
+    assert rnf_par.shape[0] == rnf_obs.shape[0]
+    assert rnf_par.shape[0] == rnf_info.shape[0]
+    assert rnf_par.shape[0] == 3
+    assert rnf_par.shape[1] == pst.npar
+    assert rnf_obs.shape[1] == pst.nobs
+    
+
 
 
 def ins_missing_e_test():
