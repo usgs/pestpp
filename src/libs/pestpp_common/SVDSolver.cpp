@@ -1160,7 +1160,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		// that deals with lambda
 		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
 		{
-			int lmrun = 15; // a default for cases where we're working in serial
+			int lmrun = 3; // a default for cases where we're working in serial
 
 			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
 			stringstream panther_message;
@@ -1179,10 +1179,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			else 
 			{ // otherwise stick with our default
 				panther_message.str("");
-				panther_message << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs";
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
 				performance_log->log_event(panther_message.str());
-				std::cout << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << std::endl;
-				fout_rec << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << endl;
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
 			}
 			// determine how many lambdas to use based on how many agents are available
 			int maxitn;
