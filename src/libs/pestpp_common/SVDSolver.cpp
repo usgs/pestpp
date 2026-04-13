@@ -578,31 +578,28 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	else if (glm_normal_form == PestppOptions::GLMNormalForm::HP)
     {
         performance_log->log_event("commencing HP-style scaling (PEST_HP logic)");
-
+		// scale diagonal elements similar to how HP handles it.
+		// Around lines 6275 - 6331 in runpest.F
         // Form the raw normal matrix and innovation (RHS)
         JtQJ = jac.transpose() * q_mat * jac;
         Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 
         // Calculate scaling factors SC = 1 / sqrt(diag(JtQJ))
-        // Per runpest.txt lines 824-827
         Eigen::VectorXd d = JtQJ.diagonal();
         Eigen::VectorXd SC = d.array().inverse().sqrt();
 
-        // Per runpest.R line 836. This results in a diagonal of 1.0.
+		// diagonal of 1.0.
         Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
         JtQJ = SC_mat * JtQJ * SC_mat;
 
   		// Scale the innovation vector: innovation_i = innovation_i * SC_i
-        // Per runpest.Fline 830
         innovation = SC.cwiseProduct(innovation);
 
-        // Per runpest.f lines 894-897: 
         // RTEMP = max(SC), RRTEMP = lambda / RTEMP^2
         double max_sc = SC.maxCoeff();
         double rrtemp = (max_sc > 0) ? (lambda / (max_sc * max_sc)) : 0.0;
 
         // Apply damping to the diagonal: LHS_ii = 1.0 + (SC_i^2 * RRTEMP)
-        // Per runpest.txt line 898
         Eigen::VectorXd damping = SC.array().square() * rrtemp;
         for (int i = 0; i < JtQJ.rows(); ++i)
         {
@@ -616,7 +613,6 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
         VectorXd Sigma_inv = Sigma.array().inverse();
 
         // Compute upgrade vector and unscale by SC
-        // Per runpest.txt line 979: W1 = W1 * SC
         upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
     }
 	else
