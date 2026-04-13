@@ -1159,12 +1159,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		// all this code comes from interpreting a portion of the PEST_HP Fortran code
 		// that deals with lambda
 		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
-		// if glm_hp_lambda is activated, we sidestep the entire old GLM lambda process
-		// all this code comes from interpreting a portion of the PEST_HP Fortran code
-		// that deals with lambda
-		if (pest_scenario.get_pestpp_options().get_glm_hp_lambda())
 		{
-			int lmrun = 15; // a default for cases where we're working in serial
+			int lmrun = 3; // a default for cases where we're working in serial
 
 			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
 			stringstream panther_message;
