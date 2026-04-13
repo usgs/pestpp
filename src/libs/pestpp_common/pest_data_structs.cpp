@@ -718,6 +718,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 			glm_normal_form = GLMNormalForm::IDENT;
 		else if (value == "PRIOR")
 			glm_normal_form = GLMNormalForm::PRIOR;
+		else if (value == "HP")
+			glm_normal_form = GLMNormalForm::HP;
 	}
 
 	else if (key == "GLM_DEBUG_DER_FAIL")

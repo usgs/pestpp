@@ -575,7 +575,50 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation));
 
 	}
+	else if (glm_normal_form == PestppOptions::GLMNormalForm::HP)
+    {
+        performance_log->log_event("commencing HP-style scaling (PEST_HP logic)");
 
+        // Form the raw normal matrix and innovation (RHS)
+        JtQJ = jac.transpose() * q_mat * jac;
+        Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
+
+        // Calculate scaling factors SC = 1 / sqrt(diag(JtQJ))
+        // Per runpest.txt lines 824-827
+        Eigen::VectorXd d = JtQJ.diagonal();
+        Eigen::VectorXd SC = d.array().inverse().sqrt();
+
+        // Per runpest.R line 836. This results in a diagonal of 1.0.
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
+        JtQJ = SC_mat * JtQJ * SC_mat;
+
+  		// Scale the innovation vector: innovation_i = innovation_i * SC_i
+        // Per runpest.Fline 830
+        innovation = SC.cwiseProduct(innovation);
+
+        // Per runpest.f lines 894-897: 
+        // RTEMP = max(SC), RRTEMP = lambda / RTEMP^2
+        double max_sc = SC.maxCoeff();
+        double rrtemp = (max_sc > 0) ? (lambda / (max_sc * max_sc)) : 0.0;
+
+        // Apply damping to the diagonal: LHS_ii = 1.0 + (SC_i^2 * RRTEMP)
+        // Per runpest.txt line 898
+        Eigen::VectorXd damping = SC.array().square() * rrtemp;
+        for (int i = 0; i < JtQJ.rows(); ++i)
+        {
+            JtQJ.coeffRef(i, i) += damping(i);
+        }
+
+        performance_log->log_event("commencing SVD factorization of HP-scaled JtQJ");
+        svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
+        
+        output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
+        VectorXd Sigma_inv = Sigma.array().inverse();
+
+        // Compute upgrade vector and unscale by SC
+        // Per runpest.txt line 979: W1 = W1 * SC
+        upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
+    }
 	else
 		throw runtime_error("unrecognized marquardt scaling type");
 
@@ -1179,10 +1222,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			else 
 			{ // otherwise stick with our default
 				panther_message.str("");
-				panther_message << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs";
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
 				performance_log->log_event(panther_message.str());
-				std::cout << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << std::endl;
-				fout_rec << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << endl;
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
 			}
 			// determine how many lambdas to use based on how many agents are available
 			int maxitn;
