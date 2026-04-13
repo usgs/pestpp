@@ -1,3 +1,7 @@
+/**
+ * @file network_package.cpp
+ * @brief Implementation of network_package.
+ */
 #include <memory>
 #include <sstream>
 #include <cstring>
@@ -12,11 +16,23 @@ int64_t NetPackage::last_group_id = 0;
 int8_t NetPackage::security_code[5] = { 1, 3, 5, 7, 9 };
 
 //Static Methods
+/**
+ * @brief Get new group id.
+ *
+ * @return Description.
+ */
 int NetPackage::get_new_group_id()
 {
 	return ++last_group_id;
 }
 
+/**
+ * @brief Allowable ascii char.
+ *
+ * @param value Description.
+ *
+ * @return Description.
+ */
 bool NetPackage::allowable_ascii_char(int8_t value)
 {
 	// This is for security resasons.  Only \0
@@ -27,6 +43,14 @@ bool NetPackage::allowable_ascii_char(int8_t value)
 	return ret_val;
 }
 
+/**
+ * @brief Check string.
+ *
+ * @param data_src Description.
+ * @param _size Description.
+ *
+ * @return Description.
+ */
 bool NetPackage::check_string(const int8_t *data_src, size_t _size)
 {
 	bool safe_data = true;
@@ -41,6 +65,11 @@ bool NetPackage::check_string(const int8_t *data_src, size_t _size)
 	return safe_data;
 }
 
+/**
+ * @brief Get info txt.
+ *
+ * @return Description.
+ */
 string NetPackage::get_info_txt()
 {
 	string info_txt = extract_string(desc, DESC_LEN);
@@ -49,6 +78,15 @@ string NetPackage::get_info_txt()
 	return info_txt;
 }
 
+/**
+ * @brief Check string.
+ *
+ * @param data_src Description.
+ * @param index1 Description.
+ * @param _size Description.
+ *
+ * @return Description.
+ */
 bool NetPackage::check_string(const vector<int8_t> &data_src, size_t index1, size_t _size)
 {
 	size_t index2 = min(index1 + _size, data_src.size());
@@ -56,6 +94,14 @@ bool NetPackage::check_string(const vector<int8_t> &data_src, size_t index1, siz
 	return safe_data;
 }
 
+/**
+ * @brief Extract string.
+ *
+ * @param data_src Description.
+ * @param _size Description.
+ *
+ * @return Description.
+ */
 string NetPackage::extract_string(const int8_t *data_src, size_t _size)
 {
 	vector<char> buf;
@@ -69,6 +115,15 @@ string NetPackage::extract_string(const int8_t *data_src, size_t _size)
 	return ret_val;
 }
 
+/**
+ * @brief Extract string.
+ *
+ * @param data_src Description.
+ * @param index1 Description.
+ * @param _size Description.
+ *
+ * @return Description.
+ */
 string NetPackage::extract_string(const vector<int8_t> &data_src, size_t index1, size_t _size)
 {
 	size_t index2 = min(index1 + _size, data_src.size());
@@ -89,6 +144,14 @@ string NetPackage::extract_string(const vector<int8_t> &data_src, size_t index1,
 //}
 
 template<class InputIterator>
+/**
+ * @brief Pack string.
+ *
+ * @param first Description.
+ * @param last Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> NetPackage::pack_string(InputIterator first, InputIterator last)
 {
 	vector<int8_t> buf;
@@ -100,6 +163,16 @@ vector<int8_t> NetPackage::pack_string(InputIterator first, InputIterator last)
 }
 
 //Non static methods
+/**
+ * @brief Net package.
+ *
+ * @param _type Description.
+ * @param _group Description.
+ * @param _run_id Description.
+ * @param desc_str Description.
+ *
+ * @return Description.
+ */
 NetPackage::NetPackage(PackType _type, int _group, int _run_id, const string &desc_str)
 	: type(_type), group(_group), run_id(_run_id)
 {
@@ -128,6 +201,14 @@ NetPackage::NetPackage(PackType _type, int _group, int _run_id, const string &de
 	"obs_names","start_run","run_finished","run_failed","run_killed","terminate","ping","req_kill","io_error","corrupt_mesg",
 		"debug_loop","debug_freeze_on_fail","file_wrkr2mstr","file_mstr2wrkr"});
 }
+/**
+ * @brief Reset.
+ *
+ * @param _type Description.
+ * @param _group Description.
+ * @param _run_id Description.
+ * @param _desc Description.
+ */
 void NetPackage::reset(PackType _type, int _group, int _run_id, const string &_desc)
 {
 	type = _type;
@@ -152,6 +233,15 @@ void NetPackage::reset(PackType _type, int _group, int _run_id, const string &_d
 	data.clear();
 }
 
+/**
+ * @brief Send.
+ *
+ * @param sockfd Description.
+ * @param data Description.
+ * @param data_len_l Description.
+ *
+ * @return Description.
+ */
 std::pair<int,std::string> NetPackage::send(int sockfd, const void *data, int64_t data_len_l)
 {
 	int n;
@@ -210,6 +300,13 @@ std::pair<int,std::string> NetPackage::send(int sockfd, const void *data, int64_
 	return pair<int,string>(n,ss.str());  // return -2 on corrupt send, -1 on failure, 0 closed connection or 1 on success
 }
 
+/**
+ * @brief Recv.
+ *
+ * @param sockfd Description.
+ *
+ * @return Description.
+ */
 pair<int,string>  NetPackage::recv(int sockfd)
 {
 	long n;
@@ -342,6 +439,11 @@ pair<int,string>  NetPackage::recv(int sockfd)
 	return pair<int,string> (n,ss.str());  // -2 on corrupt read, -1 on failure, 0 on a close connection or 1 on success
 }
 
+/**
+ * @brief Print header.
+ *
+ * @param fout Description.
+ */
 void NetPackage::print_header(std::ostream &fout)
 {
 	fout << "NetPackage: type = " << int(type) <<", group = " << group << ", run_id = " << run_id << ", description = " << desc <<

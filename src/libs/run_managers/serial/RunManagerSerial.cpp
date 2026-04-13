@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file RunManagerSerial.cpp
+ * @brief Implementation of RunManagerSerial.
+ */
+
 #include "RunManagerSerial.h"
 #include <iostream>
 #include <sstream>
@@ -61,6 +66,12 @@ void RunManagerSerial::run_async(pest_utils::thread_flag* terminate, pest_utils:
     mi.run(terminate,finished,run_exception, pars, obs);
 }
 
+/**
+ * @brief Run.
+ *
+ * @param pars Description.
+ * @param obs Description.
+ */
 void RunManagerSerial::run(Parameters* pars, Observations* obs)
 {
     thread_flag f_terminate(false);
@@ -108,6 +119,9 @@ void RunManagerSerial::run(Parameters* pars, Observations* obs)
         rethrow_exception(run_exception);
 }
 
+/**
+ * @brief Run.
+ */
 void RunManagerSerial::run()
 {
 	int success_runs = 0;
@@ -242,6 +256,9 @@ void RunManagerSerial::run()
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 RunManagerSerial::~RunManagerSerial(void)
 {
 }

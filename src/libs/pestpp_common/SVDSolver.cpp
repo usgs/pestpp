@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 	*/
+
+/**
+ * @file SVDSolver.cpp
+ * @brief Implementation of SVDSolver.
+ */
 #include "RunManagerPanther.h"
 #include <fstream>
 #include <iostream>
@@ -50,6 +55,12 @@ using namespace Eigen;
 const string SVDSolver::svd_solver_type_name = "svd_base_par";
 
 
+/**
+ * @brief Set.
+ *
+ * @param _mu Description.
+ * @param _phi_comp Description.
+ */
 void MuPoint::set(double _mu, const PhiComponets &_phi_comp)
 {
 	mu = max(numeric_limits<double>::min(), _mu);
@@ -58,21 +69,41 @@ void MuPoint::set(double _mu, const PhiComponets &_phi_comp)
 
 }
 
+/**
+ * @brief F.
+ *
+ * @return Description.
+ */
 double MuPoint::f() const
 {
 	return phi_comp.meas - target_phi_meas;
 }
 
+/**
+ * @brief Error frac.
+ *
+ * @return Description.
+ */
 double MuPoint::error_frac()
 {
 	return abs((phi_comp.meas - target_phi_meas) / target_phi_meas);
 }
 
+/**
+ * @brief Error percent.
+ *
+ * @return Description.
+ */
 double MuPoint::error_percent()
 {
 	return (phi_comp.meas - target_phi_meas) / target_phi_meas;
 }
 
+/**
+ * @brief Print.
+ *
+ * @param os Description.
+ */
 void MuPoint::print(ostream &os)
 {
 		//streamsize n = os.precision(numeric_limits<double>::digits10 + 1);
@@ -85,6 +116,13 @@ void MuPoint::print(ostream &os)
 		os.precision(n);
 
 }
+/**
+ * @brief Overloaded operator < operator.
+ *
+ * @param rhs Description.
+ *
+ * @return Description.
+ */
 bool MuPoint::operator< (const MuPoint &rhs) const
 {
 	return abs(f()) < abs(rhs.f());
@@ -109,6 +147,11 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 
 }
 
+/**
+ * @brief Set svd package.
+ *
+ * @param _svd_pack Description.
+ */
 void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
 {
 	
@@ -128,6 +171,9 @@ void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
 	svd_package->set_performance_log(performance_log);
 }
 
+/**
+ * @brief Destructor for .
+ */
 SVDSolver::~SVDSolver(void)
 {
 	delete svd_package;
@@ -694,6 +740,16 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 }
 
 
+/**
+ * @brief Compute jacobian.
+ *
+ * @param run_manager Description.
+ * @param termination_ctl Description.
+ * @param cur_run Description.
+ * @param restart_runs Description.
+ *
+ * @return Description.
+ */
 	ModelRun SVDSolver::compute_jacobian(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &cur_run, bool restart_runs)
 	{
 		ostream &os = file_manager.rec_ofstream();
@@ -705,16 +761,14 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 		RestartController::write_start_iteration(fout_restart, this->get_solver_type(), -9999, -9999);
 
 		//write current parameters so we have a backup for restarting
-		RestartController::write_start_parameters_updated(fout_restart, file_manager.build_filename("parb", false));
-		output_file_writer.write_par(file_manager.open_ofile_ext("parb"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
+		RestartController::write_start_parameters_updated(fout_restart, file_manager.build_filename("par", false));
+		output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
 			*(par_transform.get_scale_ptr()));
-		file_manager.close_file("parb");
-		RestartController::write_finish_parameters_updated(fout_restart, file_manager.build_filename("parb", false));
+		file_manager.close_file("par");
+		RestartController::write_finish_parameters_updated(fout_restart, file_manager.build_filename("par", false));
 
 		cout << "COMPUTING JACOBIAN:" << endl << endl;
 		os << "COMPUTING JACOBIAN:" << endl << endl;
-		cout << "  Iteration type: " << get_description() << endl;
-		os << "    Iteration type: " << get_description() << endl;
 		os << "    Model calls so far : " << run_manager.get_total_runs() << endl << endl << endl;
 		iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
 
@@ -927,6 +981,17 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	return new_base_run;
 }
 
+/**
+ * @brief Iteration jac.
+ *
+ * @param run_manager Description.
+ * @param termination_ctl Description.
+ * @param base_run Description.
+ * @param calc_init_obs Description.
+ * @param restart_runs Description.
+ *
+ * @return Description.
+ */
 bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	ostream &os = file_manager.rec_ofstream();
@@ -1003,6 +1068,16 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	return true;
 }
 
+/**
+ * @brief Iteration upgrd.
+ *
+ * @param run_manager Description.
+ * @param termination_ctl Description.
+ * @param base_run Description.
+ * @param restart_runs Description.
+ *
+ * @return Description.
+ */
 ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)
 {
 	ostream &os = file_manager.rec_ofstream();
@@ -1089,13 +1164,14 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		// that deals with lambda
 		if (pest_scenario.get_pestpp_options().get_glm_hp_lambda())
 		{
-			int lmrun = 3; // a default for cases where we're working in serial
+			int lmrun = 15; // a default for cases where we're working in serial
 
 			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
 			stringstream panther_message;
 			
 			// if we're using panther, then we can ask it for the curret number of agents.
-			if (panther_manager) {
+			if (panther_manager) 
+			{
 				std::map<std::string, int> stats = panther_manager->get_agent_stats();
 				lmrun = stats["total"];
 				panther_message.str("");
@@ -1103,12 +1179,14 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				performance_log->log_event(panther_message.str());
 				std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
 				fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
-			} else { // otherwise stick with our default
+			} 
+			else 
+			{ // otherwise stick with our default
 				panther_message.str("");
-				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs";
 				performance_log->log_event(panther_message.str());
-				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
-				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 15 upgrade runs" << endl;
 			}
 			// determine how many lambdas to use based on how many agents are available
 			int maxitn;
@@ -1137,12 +1215,12 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
             
 			// Determine the number of scales to use
             int num_lrun_level = (lmrun - maxitn) / maxitn + 1;
-            if (num_lrun_level > lambda_scale_vec.size()) {
-                num_lrun_level = lambda_scale_vec.size();
+            if (num_lrun_level > static_cast<int>(lambda_scale_vec.size())) {
+                num_lrun_level = static_cast<int>(lambda_scale_vec.size());
             }
 
             // Slice the line search factor vector in place
-            if (num_lrun_level < lambda_scale_vec.size()) {
+            if (num_lrun_level < static_cast<int>(lambda_scale_vec.size())) {
                 lambda_scale_vec.resize(num_lrun_level);
             }
 			
@@ -1151,7 +1229,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			const double def_lowest_lambda_fac = 1.0e-14;
 			const double def_highest_lambda_fac = 1.0e14;
 			double phi_initial = base_run.get_phi(*regul_scheme_ptr);
-			double num_nonzero_obs = obs_names_vec.size();
+			int num_nonzero_obs = static_cast<int>(obs_names_vec.size());
 			// this is the critical difference between GLM lambdas and HP lambdas
 			// HP lambdas are a factor of the current phi
 			double lambda_mid = phi_initial / static_cast<double>(num_nonzero_obs);
@@ -1220,19 +1298,87 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			}
 			
 			std::sort(lambda_vec.begin(), lambda_vec.end());
-
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
 		}
 		
-		else // non-HP option, do lambda as normal
+		else // non-HP option, do lambdas as normal
 		{
 			lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+			std::sort(lambda_vec.begin(), lambda_vec.end());
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+			// if glm_panther_lambdas is turned on, we'll slightly modify the use lambda 
+			// protocol to make sure we're utilizing just the right amount of lambda.
+			if (pest_scenario.get_pestpp_options().get_glm_panther_lambdas())
+			{
+				int lmrun;
+				RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
+				stringstream panther_message;
+				
+				// if we're using panther, then we can ask it for the curret number of agents.
+				if (panther_manager) 
+				{
+					std::map<std::string, int> stats = panther_manager->get_agent_stats();
+					lmrun = stats["total"];
+					panther_message.str("");
+					panther_message << "Number of connected agents to be used for lambda upgrades: " << lmrun;
+					performance_log->log_event(panther_message.str());
+					std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
+					fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
+
+					int current_product = lambda_vec.size() * lambda_scale_vec.size();
+
+					// Loop until the product is less than or equal to lmrun
+					while (current_product > lmrun) {
+						// Decide whether to remove from lambda_vec or lambda_scale_vec
+						// A simple heuristic is to remove from the larger vector to balance them
+						if (lambda_vec.size() > lambda_scale_vec.size()) 
+						{
+							lambda_vec.pop_back(); // Remove the largest lambda
+						} 
+						else 
+						{
+							lambda_scale_vec.pop_back(); // Remove the largest scale
+						}
+						current_product = lambda_vec.size() * lambda_scale_vec.size();
+					}
+
+					// Now, add lambdas if the product is still too small
+					while (current_product < lmrun) {
+						// Add a new lambda value.
+						double lowest_lambda = lambda_vec.front();
+						double highest_lambda = lambda_vec.back();
+
+						// Add a new value, alternating between low and high
+						if (lambda_vec.size() % 2 == 0) 
+						{ // Add a low value
+							lambda_vec.insert(lambda_vec.begin(), lowest_lambda / 10.0);
+						} else 
+						{ // Add a high value
+							lambda_vec.push_back(highest_lambda * 10.0);
+						}
+
+						// Keep lambda_vec sorted after adding
+						std::sort(lambda_vec.begin(), lambda_vec.end());
+
+						current_product = lambda_vec.size() * lambda_scale_vec.size();
+						}
+					} 
+					else 
+					{ // otherwise stick with our default
+						panther_message.str("");
+						panther_message << "The current run manager is not a Panther manager. Not altering GLM lambda runs.";
+						performance_log->log_event(panther_message.str());
+						std::cout << "The current run manager is not a Panther manager. Not altering GLM lambda runs." << std::endl;
+						fout_rec << "The current run manager is not a Panther manager. Not altering GLM lambda runs." << endl;
+					}
+
+			
+			}
 		}
 		
-	    
-		std::sort(lambda_vec.begin(), lambda_vec.end());
-		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
-		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
-
 		int i_update_vec = 0;
 		stringstream message;
 		stringstream prf_message;
@@ -1294,6 +1440,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
 				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+				// pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_par,false,true);
+				// scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+                //now flip back to all ctl pars not just active...
+                // scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
@@ -1718,6 +1868,16 @@ Parameters SVDSolver::limit_parameters_freeze_all_ip(const Parameters &init_acti
 	return new_frozen_active_ctl_parameters;
 }
 
+/**
+ * @brief Param change stats.
+ *
+ * @param p_old Description.
+ * @param p_new Description.
+ * @param have_fac Description.
+ * @param fac_change Description.
+ * @param have_rel Description.
+ * @param rel_change Description.
+ */
 void SVDSolver::param_change_stats(double p_old, double p_new, bool &have_fac, double &fac_change, bool &have_rel, double &rel_change)
 {
 	have_rel = have_fac = true;
@@ -1742,6 +1902,15 @@ void SVDSolver::param_change_stats(double p_old, double p_new, bool &have_fac, d
 	}
 }
 
+/**
+ * @brief Iteration update and report.
+ *
+ * @param os Description.
+ * @param base_run Description.
+ * @param upgrade Description.
+ * @param termination_ctl Description.
+ * @param run_manager Description.
+ */
 void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_run, ModelRun &upgrade, TerminationController &termination_ctl, RunManagerAbstract &run_manager)
 {
 	const string *p_name;
@@ -1781,6 +1950,16 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 	termination_ctl.process_iteration(upgrade.get_phi_comp(DynamicRegularization::get_unit_reg_instance()), max_rel_change);
 }
 
+/**
+ * @brief Par heading out bnd.
+ *
+ * @param p_org Description.
+ * @param p_new Description.
+ * @param lower_bnd Description.
+ * @param upper_bnd Description.
+ *
+ * @return Description.
+ */
 bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd, double upper_bnd)
 {
 	/*bool out_of_bnd = false;
@@ -2221,6 +2400,13 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 	os << endl;
 }
 
+/**
+ * @brief Save frozen pars.
+ *
+ * @param fout Description.
+ * @param frozen_pars Description.
+ * @param id Description.
+ */
  void SVDSolver::save_frozen_pars(std::ostream &fout, const Parameters &frozen_pars, int id)
  {
 		 fout << "frozen_parameter_set_begin  " << id << endl;
@@ -2229,6 +2415,14 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 		 fout.flush();
  }
 
+/**
+ * @brief Read frozen pars.
+ *
+ * @param fin Description.
+ * @param id Description.
+ *
+ * @return Description.
+ */
  Parameters SVDSolver::read_frozen_pars(std::istream &fin, int id)
  {
 	 Parameters fz_pars;

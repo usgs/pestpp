@@ -1,3 +1,7 @@
+/**
+ * @file Stats.cpp
+ * @brief Implementation of Stats.
+ */
 #include <string>
 #include <vector>
 #include <cmath>
@@ -11,6 +15,13 @@
 
 using namespace std;
 
+/**
+ * @brief Vec mean.
+ *
+ * @param data_vec Description.
+ *
+ * @return Description.
+ */
 double vec_mean(const vector<double> &data_vec)
 {
 	RunningStats stats;
@@ -18,6 +29,14 @@ double vec_mean(const vector<double> &data_vec)
 	return stats.comp_mean();
 }
 
+/**
+ * @brief Vec mean missing data.
+ *
+ * @param data_vec Description.
+ * @param missing_val Description.
+ *
+ * @return Description.
+ */
 double vec_mean_missing_data(const vector<double> &data_vec, double missing_val)
 {
 	RunningStatsMissingData stats(missing_val);
@@ -25,6 +44,15 @@ double vec_mean_missing_data(const vector<double> &data_vec, double missing_val)
 	return stats.comp_mean();
 }
 
+/**
+ * @brief Vec array prod.
+ *
+ * @param data_vec1 Description.
+ * @param data_vec2 Description.
+ * @param missing_val Description.
+ *
+ * @return Description.
+ */
 vector<double> vec_array_prod(const vector<double> &data_vec1, const vector<double> &data_vec2, double missing_val)
 {
 	vector<double> prod_vec = data_vec1;
@@ -46,6 +74,15 @@ vector<double> vec_array_prod(const vector<double> &data_vec1, const vector<doub
 	return prod_vec;
 }
 
+/**
+ * @brief Sum of prod missing data.
+ *
+ * @param x_vec Description.
+ * @param y_vec Description.
+ * @param missing_val Description.
+ *
+ * @return Description.
+ */
 pair<double, size_t> sum_of_prod_missing_data(const std::vector<double> &x_vec, const std::vector<double> &y_vec, double missing_val)
 {
 	double m_xy_k = 0;
@@ -85,6 +122,15 @@ pair<double, size_t> sum_of_prod_missing_data(const std::vector<double> &x_vec, 
 	return make_pair(m_xy_k * n_actual, n_actual);
 }
 
+/**
+ * @brief Sobol u missing data.
+ *
+ * @param x_vec Description.
+ * @param y_vec Description.
+ * @param missing_val Description.
+ *
+ * @return Description.
+ */
 double sobol_u_missing_data(const std::vector<double> &x_vec, const std::vector<double> &y_vec, double missing_val)
 {
 	pair<double, size_t> data = sum_of_prod_missing_data(x_vec, y_vec, missing_val);
@@ -92,6 +138,16 @@ double sobol_u_missing_data(const std::vector<double> &x_vec, const std::vector<
 	return u;
 }
 
+/**
+ * @brief Si saltelli numer.
+ *
+ * @param y_a Description.
+ * @param y_b Description.
+ * @param y_c Description.
+ * @param missing_val Description.
+ *
+ * @return Description.
+ */
 double si_saltelli_numer(const std::vector<double>& y_a, const std::vector<double>& y_b, const std::vector<double>& y_c, double missing_val)
 {
 	assert (y_a.size() == y_b.size());
@@ -117,6 +173,15 @@ double si_saltelli_numer(const std::vector<double>& y_a, const std::vector<doubl
 }
 
 
+/**
+ * @brief Sti saltelli numer.
+ *
+ * @param y_a Description.
+ * @param y_c Description.
+ * @param missing_val Description.
+ *
+ * @return Description.
+ */
 double sti_saltelli_numer(const std::vector<double>& y_a, const std::vector<double>& y_c, double missing_val)
 {
 	assert(y_a.size() == y_c.size());
@@ -137,6 +202,9 @@ double sti_saltelli_numer(const std::vector<double>& y_a, const std::vector<doub
 	return t;
 }
 
+/**
+ * @brief Reset.
+ */
 void RunningStats::reset()
 {
 	n = 0;
@@ -145,6 +213,11 @@ void RunningStats::reset()
 	qk = 0.0;
 }
 
+/**
+ * @brief Add.
+ *
+ * @param sample Description.
+ */
 void RunningStats::add(double sample)
 {
 	++n;
@@ -162,6 +235,11 @@ void RunningStats::add(double sample)
 	}
 }
 
+/**
+ * @brief Add.
+ *
+ * @param sample Description.
+ */
 void RunningStats::add(const std::vector<double> &sample)
 {
 	for (auto &s : sample)
@@ -170,31 +248,61 @@ void RunningStats::add(const std::vector<double> &sample)
 	}
 }
 
+/**
+ * @brief Comp var.
+ *
+ * @return Description.
+ */
 double RunningStats::comp_var() const
 {
 	return qk / (n-1);
 }
 
+/**
+ * @brief Comp sigma.
+ *
+ * @return Description.
+ */
 double RunningStats::comp_sigma() const
 {
 	return sqrt(comp_var());
 }
 
+/**
+ * @brief Comp mean.
+ *
+ * @return Description.
+ */
 double RunningStats::comp_mean() const
 {
 return mk;
 }
 
+/**
+ * @brief Comp abs mean.
+ *
+ * @return Description.
+ */
 double RunningStats::comp_abs_mean() const
 {
 	return mk_abs;
 }
 
+/**
+ * @brief Comp nsamples.
+ *
+ * @return Description.
+ */
 long RunningStats::comp_nsamples() const
 {
 	return n;
 }
 
+/**
+ * @brief Add.
+ *
+ * @param sample Description.
+ */
 void RunningStatsMissingData::add(double sample)
 {
 	if (sample != missing_value)
@@ -203,6 +311,11 @@ void RunningStatsMissingData::add(double sample)
 	}
 }
 
+/**
+ * @brief Add.
+ *
+ * @param sample Description.
+ */
 void RunningStatsMissingData::add(const std::vector<double> &sample)
 {
 	for (auto &s : sample)

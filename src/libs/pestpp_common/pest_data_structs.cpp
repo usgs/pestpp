@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file pest_data_structs.cpp
+ * @brief Implementation of pest_data_structs.
+ */
+
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -39,6 +44,14 @@ using namespace::std;
 using namespace::pest_utils;
 
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ControlInfo& val)
 {
 	os << "PEST Control Information" << endl;
@@ -71,6 +84,9 @@ ParameterGroupRec& ParameterGroupRec::operator=(const ParameterGroupRec &rhs)
 	return *this;
 }
 
+/**
+ * @brief Set defaults.
+ */
 void ParameterGroupRec::set_defaults()
 {
 	name = "PARGP";
@@ -84,6 +100,14 @@ void ParameterGroupRec::set_defaults()
 	splitreldiff = 0.5;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ParameterGroupRec& val)
 {
 	os << "PEST Parameter Group Information" << endl;
@@ -109,6 +133,13 @@ const ParameterGroupRec ParameterGroupInfo::get_group_rec(const string &name) co
 	return ret_val;
 }
 
+/**
+ * @brief Get group rec ptr 4 mod.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr_4_mod(const string &name)
 {
 	ParameterGroupRec* ret_val = 0;
@@ -121,16 +152,35 @@ ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr_4_mod(const string &nam
 	return ret_val;
 }
 
+/**
+ * @brief Get group name.
+ *
+ * @param par_name Description.
+ *
+ * @return Description.
+ */
 string ParameterGroupInfo::get_group_name(const string &par_name) const
 {
 	return get_group_rec(par_name).name;
 }
 
+/**
+ * @brief Insert group.
+ *
+ * @param group_name Description.
+ * @param rec Description.
+ */
 void ParameterGroupInfo::insert_group(const string &group_name, ParameterGroupRec &rec)
 {
 	groups[group_name] = rec;
 }
 
+/**
+ * @brief Insert parameter link.
+ *
+ * @param parameter_name Description.
+ * @param group_name Description.
+ */
 void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, const string & group_name)
 {
 	unordered_map<string, ParameterGroupRec>::const_iterator g_iter;
@@ -180,6 +230,11 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 //    return *this;
 //}
 
+/**
+ * @brief Get group names.
+ *
+ * @return Description.
+ */
 vector<string> ParameterGroupInfo::get_group_names() const
 {
 	vector<string> group_names;
@@ -188,6 +243,11 @@ vector<string> ParameterGroupInfo::get_group_names() const
 	return group_names;
 }
 
+/**
+ * @brief Have switch derivative.
+ *
+ * @return Description.
+ */
 bool ParameterGroupInfo::have_switch_derivative() const
 {
 	bool switch_der = false;
@@ -202,6 +262,9 @@ bool ParameterGroupInfo::have_switch_derivative() const
 	return switch_der;
 }
 
+/**
+ * @brief Destructor for .
+ */
 ParameterGroupInfo::~ParameterGroupInfo()
 {
 //	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
@@ -218,6 +281,9 @@ ParameterGroupInfo::~ParameterGroupInfo()
 //    }
 }
 
+/**
+ * @brief Free mem.
+ */
 void ParameterGroupInfo::free_mem()
 {
 
@@ -227,6 +293,14 @@ void ParameterGroupInfo::free_mem()
 
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
 {
 	unordered_map<string, ParameterGroupRec>::const_iterator it(val.parameter2group.begin());
@@ -267,6 +341,13 @@ const ParameterRec* ParameterInfo::get_parameter_rec_ptr(const string &name) con
 	return ret_val;
 }
 
+/**
+ * @brief Get parameter rec ptr 4 mod.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 ParameterRec* ParameterInfo::get_parameter_rec_ptr_4_mod(const string &name)
 {
 	ParameterRec *ret_val = 0;
@@ -279,6 +360,13 @@ ParameterRec* ParameterInfo::get_parameter_rec_ptr_4_mod(const string &name)
 	return ret_val;
 }
 
+/**
+ * @brief Get low bnd.
+ *
+ * @param keys Description.
+ *
+ * @return Description.
+ */
 Parameters ParameterInfo::get_low_bnd(const vector<string> &keys) const
 {
 	Parameters l_bnd;
@@ -297,6 +385,13 @@ Parameters ParameterInfo::get_low_bnd(const vector<string> &keys) const
 	return l_bnd;
 }
 
+/**
+ * @brief Get up bnd.
+ *
+ * @param keys Description.
+ *
+ * @return Description.
+ */
 Parameters ParameterInfo::get_up_bnd(const vector<string> &keys) const
 {
 	Parameters u_bnd;
@@ -315,6 +410,13 @@ Parameters ParameterInfo::get_up_bnd(const vector<string> &keys) const
 	return u_bnd;
 }
 
+/**
+ * @brief Get init value.
+ *
+ * @param keys Description.
+ *
+ * @return Description.
+ */
 Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 {
 	Parameters init_value;
@@ -333,12 +435,22 @@ Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 	return init_value;
 }
 
+/**
+ * @brief Rectify ies da args.
+ */
 void PestppOptions::rectify_ies_da_args()
 {
 	for (auto& a : passed_da_ies_args)
 		passed_args.emplace(a);
 }
 
+/**
+ * @brief Parse plusplus line.
+ *
+ * @param line Description.
+ *
+ * @return Description.
+ */
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
 	map<string, ARG_STATUS> arg_map;
@@ -367,6 +479,14 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 	return arg_map;
 }
 
+/**
+ * @brief Assign value by key.
+ *
+ * @param key Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
 {
 	upper_ip(key);
@@ -620,6 +740,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
     {
         glm_hp_lambdas = pest_utils::parse_string_arg_to_bool(value);
     }
+	else if (key == "GLM_PANTHER_LAMBDAS")
+    {
+        glm_panther_lambdas = pest_utils::parse_string_arg_to_bool(value);
+    }
 	else if (key == "UPGRADE_AUGMENT")
 	{
 		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
@@ -852,6 +976,15 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 }
 
 
+/**
+ * @brief Assign ies value by key.
+ *
+ * @param key Description.
+ * @param value Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 bool PestppOptions::assign_ies_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	if ((use_da_args) && (key.find("IES") != string::npos))
@@ -1232,12 +1365,32 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
 
     }
+	else if (key == "IES_REINFLATE_NUM_REALS")
+	{
+		ies_reinflate_num_reals.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",");
+		for (const auto& fac : tok)
+		{
+			ies_reinflate_num_reals.push_back(convert_cp<int>(fac));
+		}
+		return true;
+	}
 
 
 
     return false;
 }
 
+/**
+ * @brief Assign da value by key.
+ *
+ * @param key Description.
+ * @param value Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 bool PestppOptions::assign_da_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	//DA parameters
@@ -1320,6 +1473,15 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 }
 
 
+/**
+ * @brief Assign value by key continued.
+ *
+ * @param key Description.
+ * @param value Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value, const string& org_value)
 {
 	// This method was added as a workaround for a compiler limit of at most 128 nesting levels (MSVC); no more else if blocks could be added to assign_value_by_key()
@@ -1431,17 +1593,32 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
         return true;
 
     }
+
     else if (key == "PANTHER_PERSISTENT_WORKERS")
     {
-        panther_persistent_workers = pest_utils::parse_string_arg_to_bool(value);
-        return true;
+    	panther_persistent_workers = pest_utils::parse_string_arg_to_bool(value);
+    	return true;
     }
 
-	
+    else if (key == "PANTHER_PING_INTERVAL_SECS")
+    {
+    	convert_ip(value, panther_ping_interval_secs);
+    	return true;
+    }
+
 	return false;
 }
 
 
+/**
+ * @brief Assign mou value by key.
+ *
+ * @param key Description.
+ * @param value Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	if (key == "MOU_GENERATOR")
@@ -1701,6 +1878,15 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 }
 
 
+/**
+ * @brief Assign value by key sqp.
+ *
+ * @param key Description.
+ * @param value Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& value, const string& org_value)
 {
 	if (key == "SQP_DV_EN")
@@ -1714,9 +1900,19 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_obs_restart_en = org_value;
 		return true;
 	}
+	else if (key == "SQP_SEARCH_METHOD")
+	{
+		sqp_search_method = org_value;
+		return true;
+	}
 	else if (key == "SQP_NUM_REALS")
 	{
 		convert_ip(value, sqp_num_reals);
+		return true;
+	}
+	else if (key == "SQP_SUBSET_SIZE")
+	{
+		convert_ip(value, sqp_subset_size);
 		return true;
 	}
 	else if (key == "SQP_UPDATE_HESSIAN")
@@ -1724,23 +1920,138 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_update_hessian = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
-	else if (key == "SQP_SCALE_FACS")
+	else if (key == "SQP_SOLVE_PARTIAL_STEP")
 	{
-		sqp_scale_facs.clear();
+		sqp_solve_partial_step = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_FILTER_TOL")
+	{
+		convert_ip(value, sqp_filter_tol);
+		return true;
+	}
+	else if (key == "SQP_WORKING_SET_TOL")
+	{
+		convert_ip(value, sqp_working_set_tol);
+		return true;
+	}
+	else if (key == "SQP_CMA_REINFLATION_FACTOR")
+	{
+		convert_ip(value, sqp_cma_reinflation_factor);
+		return true;
+	}
+	else if (key == "SQP_ALPHA_MULTS")
+	{
+		sqp_alpha_mults.clear();
 		vector<string> tok;
 		tokenize(value, tok, ",		");
 		double v;
 		for (const auto& t : tok)
 		{
 			convert_ip(t, v);
-			sqp_scale_facs.push_back(v);
+			sqp_alpha_mults.push_back(v);
 		}
 		return true;
 	}
-	
+	else if (key == "SQP_CMA_C1")
+	{
+		convert_ip(value, sqp_cma_c1);
+		return true;
+	}
+	else if (key == "SQP_CMA_CMU")
+	{
+		convert_ip(value, sqp_cma_cmu);
+		return true;
+	}
+	else if (key == "SQP_CMA_CC")
+	{
+		convert_ip(value, sqp_cma_cc);
+		return true;
+	}
+	else if (key == "SQP_CMA_PARENT_NUM")
+	{
+		convert_ip(value, sqp_cma_parent_num);
+		return true;
+	}
+	else if (key == "SQP_CMA_STEPSIZE_CONTROL")
+	{
+		sqp_cma_stepsize_control = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_MAX_CONSEC_INFEAS_IES")
+	{
+		convert_ip(value, sqp_max_consec_infeas_ies);
+		return true;
+	}
+	else if (key == "SQP_MAX_REINFLATION_COND_NUM")
+	{
+		convert_ip(value, sqp_max_reinflation_cond_num);
+		return true;
+	}
+	else if (key == "SQP_SCALE_UP_FACTOR")
+	{
+		convert_ip(value, sqp_scale_up_factor);
+		return true;
+	}
+	else if (key == "SQP_SCALE_DOWN_FACTOR")
+	{
+		convert_ip(value, sqp_scale_down_factor);
+		return true;
+	}
+	else if (key == "SQP_HESS_MAX_COND_NUM")
+	{
+		convert_ip(value, sqp_hess_max_cond_num);
+		return true;
+	}
+	else if (key == "SQP_SAVE_COV_EVERY")
+	{
+		convert_ip(value, sqp_save_cov_every);
+		return true;
+	}
+	else if (key == "SQP_ENFORCE_BOUNDS")
+	{
+		sqp_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_VIOL_PAD")
+	{
+		convert_ip(value, sqp_viol_pad);
+		return true;
+	}
+	else if (key == "SQP_RESET_HESSIAN_EVERY")
+	{
+		convert_ip(value, sqp_reset_hessian_every);
+		return true;
+	}
+	else if (key == "SQP_WSET_LEVEL")
+	{
+		convert_ip(value, sqp_wset_level);
+		return true;
+	}
+	else if (key == "SQP_RESCALE_SEARCH_DIR")
+	{
+		sqp_rescale_search_dir = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_SEEK_FEAS_MAX_ITER")
+	{
+		convert_ip(value, sqp_seek_feas_max_iter);
+		return true;
+	}
+	else if (key == "SQP_RISK")
+	{
+		convert_ip(value, sqp_risk);
+		return true;
+	}
 	return false;
 }
 
+
+/**
+ * @brief Summary.
+ *
+ * @param os Description.
+ */
 void PestppOptions::summary(ostream& os) const
 {
 
@@ -1796,6 +2107,8 @@ void PestppOptions::summary(ostream& os) const
     os << "panther_timeout_milliseconds: " << panther_timeout_milliseconds << endl;
     os << "panther_echo_interval_milliseconds: " << panther_echo_interval_milliseconds << endl;
     os << "panther_persistent_workers: " << panther_persistent_workers << endl;
+	os << "panther_ping_interval_secs: " << panther_ping_interval_secs << endl;
+
 
     os << endl;
 
@@ -1899,11 +2212,36 @@ void PestppOptions::summary(ostream& os) const
 	os << endl << "...pestpp-sqp options:" << endl;
 	os << "sqp_dv_en: " << sqp_dv_en << endl;
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
+	os << "sqp_search_method: " << sqp_search_method << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
+	os << "sqp_subset_size: " << sqp_subset_size << endl;
 	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
-	os << "sqp_scale_facs:" << endl;
-	for (auto m : sqp_scale_facs)
+	os << "sqp_hessian_update_method: " << sqp_hessian_update_method << endl;
+	os << "sqp_solve_partial_step: " << sqp_solve_partial_step << endl;
+	os << "sqp_alpha_mults:" << endl;
+	for (auto m : sqp_alpha_mults)
 		os << "  " << m << endl;
+	os << "sqp_filter_tol: " << sqp_filter_tol << endl;
+	os << "sqp_working_set_tol: " << sqp_working_set_tol << endl;
+	os << "sqp_cma_c1: " << sqp_cma_c1 << endl;
+	os << "sqp_cma_cmu: " << sqp_cma_cmu << endl;
+	os << "sqp_cma_cc: " << sqp_cma_cc << endl;
+	os << "sqp_cma_parent_num: " << sqp_cma_parent_num << endl;
+	os << "sqp_cma_stepsize_control: " << sqp_cma_stepsize_control << endl;
+	os << "sqp_cma_reinflation_factor: " << sqp_cma_reinflation_factor << endl;
+	os << "sqp_max_consec_infeas_ies: " << sqp_max_consec_infeas_ies << endl;
+	os << "sqp_max_reinflation_cond_num: " << sqp_max_reinflation_cond_num << endl;
+	os << "sqp_scale_up_factor: " << sqp_scale_up_factor << endl;
+	os << "sqp_scale_down_factor: " << sqp_scale_down_factor << endl;
+	os << "sqp_hess_max_cond_num: " << sqp_hess_max_cond_num << endl;
+	os << "sqp_save_cov_every: " << sqp_save_cov_every << endl;
+	os << "sqp_enforce_bounds: " << sqp_enforce_bounds << endl;
+	os << "sqp_viol_pad: " << sqp_viol_pad << endl;
+	os << "sqp_reset_hessian_every: " << sqp_reset_hessian_every << endl;
+	os << "sqp_wset_level: " << sqp_wset_level << endl;
+	os << "sqp_rescale_search_dir: " << sqp_rescale_search_dir << endl;
+	os << "sqp_seek_feas_max_iter: " << sqp_seek_feas_max_iter << endl;
+	os << "sqp_risk: " << sqp_risk << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2032,6 +2370,10 @@ void PestppOptions::summary(ostream& os) const
         os << v << ",";
     os << endl;
     os << "ies_run_realname: " << ies_run_realname;
+	os << "ies_reinflate_num_reals: " << endl;
+	for (auto v : ies_reinflate_num_reals)
+		os << v << ",";
+	os << endl;
 
     os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -2056,6 +2398,9 @@ void PestppOptions::summary(ostream& os) const
 }
 
 
+/**
+ * @brief Set defaults.
+ */
 void PestppOptions::set_defaults()
 {
 
@@ -2092,6 +2437,7 @@ void PestppOptions::set_defaults()
 	set_glm_iter_mc(false);
     set_glm_debug_high_2nd_iter_phi(false);
 	set_glm_hp_lambdas(false);
+	set_glm_panther_lambdas(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
@@ -2131,9 +2477,34 @@ void PestppOptions::set_defaults()
 
 	set_sqp_dv_en("");
 	set_sqp_obs_restart_en("");
+	set_sqp_search_method("LINE");
 	set_sqp_num_reals(-1);
-	set_sqp_update_hessian(false);
-	set_sqp_scale_facs(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 1.0,2.,5.,10.,});
+	set_sqp_subset_size(-10);
+	set_sqp_update_hessian(true);
+	set_sqp_hessian_update_method("BFGS");
+	set_sqp_solve_partial_step(true);
+	set_sqp_alpha_mults(vector<double>{0.001, 0.005, 0.01, 0.1, 0.5, 1.0});
+	set_sqp_filter_tol(0.001);
+	set_sqp_working_set_tol(0.10);
+	set_sqp_cma_c1(-1);
+	set_sqp_cma_cmu(-1);
+	set_sqp_cma_cc(-1);
+	set_sqp_cma_parent_num(-1);
+	set_sqp_cma_stepsize_control(false);
+	set_sqp_cma_reinflation_factor(-1.0);
+	set_sqp_max_consec_infeas_ies(3);
+	set_sqp_max_reinflation_cond_num(500.0);
+	set_sqp_scale_up_factor(1.0);
+	set_sqp_scale_down_factor(1.0);
+	set_sqp_hess_max_cond_num(1E+5);
+	set_sqp_save_cov_every(-1);
+	set_sqp_enforce_bounds(false);
+	set_sqp_viol_pad(1E-4);
+	set_sqp_reset_hessian_every(-1);
+	set_sqp_wset_level(1);
+	set_sqp_rescale_search_dir(true);
+	set_sqp_seek_feas_max_iter(3);
+	set_sqp_risk(0.50);
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);
@@ -2226,7 +2597,7 @@ void PestppOptions::set_defaults()
 	set_ies_loc_type("LOCAL");
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
-    set_ies_multimodal_alpha(1.0);
+    set_ies_multimodal_alpha(0.0);
     set_ensemble_output_precision(20);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
@@ -2234,6 +2605,7 @@ void PestppOptions::set_defaults()
     set_ies_n_iter_reinflate(vector < int > {0});
     set_ies_reinflate_factor(vector < double > {1.0});
     set_ies_run_realname("");
+	set_ies_reinflate_num_reals(vector<int>{0});
 
     set_ies_updatebyreals(false);
     set_save_dense(false);
@@ -2286,9 +2658,18 @@ void PestppOptions::set_defaults()
     set_panther_timeout_milliseconds(-999);
     set_panther_echo_interval_milliseconds(1000);
     set_panther_persistent_workers(true);
+	set_panther_ping_interval_secs(60);
 
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ParameterInfo& val)
 {
 	for(unordered_map<string, ParameterRec>::const_iterator s=val.parameter_info.begin(),
@@ -2298,6 +2679,14 @@ ostream& operator<< (ostream &os, const ParameterInfo& val)
 	return os;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ObservationGroupRec& val)
 {
 	os << "    gtarg = " << val.gtarg << endl;
@@ -2305,6 +2694,14 @@ ostream& operator<< (ostream &os, const ObservationGroupRec& val)
 	return os;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ObservationRec& val)
 {
 	os << "    weight = " << val.weight << endl;
@@ -2312,6 +2709,13 @@ ostream& operator<< (ostream &os, const ObservationRec& val)
 	return os;
 }
 
+/**
+ * @brief Is regularization.
+ *
+ * @param grp_name Description.
+ *
+ * @return Description.
+ */
 bool ObservationGroupRec::is_regularization(const string &grp_name)
 {
 	bool is_reg = false;
@@ -2321,6 +2725,12 @@ bool ObservationGroupRec::is_regularization(const string &grp_name)
 
 }
 
+/**
+ * @brief Reset group weights.
+ *
+ * @param group Description.
+ * @param val Description.
+ */
 void ObservationInfo::reset_group_weights(string &group, double val)
 {
 	for (auto &o : observations)
@@ -2334,6 +2744,12 @@ void ObservationInfo::reset_group_weights(string &group, double val)
 }
 
 
+/**
+ * @brief Scale group weights.
+ *
+ * @param group Description.
+ * @param scale_val Description.
+ */
 void ObservationInfo::scale_group_weights(string &group, double scale_val)
 {
 	for (auto &o : observations)
@@ -2358,6 +2774,13 @@ const ObservationRec* ObservationInfo::get_observation_rec_ptr(const string &nam
 	return ret_val;
 }
 
+/**
+ * @brief Get observation rec ptr 4 mod.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 ObservationRec* ObservationInfo::get_observation_rec_ptr_4_mod(const string& name)
 {
 	ObservationRec* ret_val = 0;
@@ -2383,6 +2806,11 @@ const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name
 	return ret_val;
 }
 
+/**
+ * @brief Get groups.
+ *
+ * @return Description.
+ */
 vector<string> ObservationInfo::get_groups() const
 {
 	vector<string> ogroups;
@@ -2393,6 +2821,11 @@ vector<string> ObservationInfo::get_groups() const
 	return ogroups;
 }
 
+/**
+ * @brief Is regularization.
+ *
+ * @return Description.
+ */
 bool ObservationRec::is_regularization() const
 {
 	bool is_reg = false;
@@ -2401,6 +2834,11 @@ bool ObservationRec::is_regularization() const
 	return is_reg;
 }
 
+/**
+ * @brief Get nnz obs.
+ *
+ * @return Description.
+ */
 int ObservationInfo::get_nnz_obs() const
 {
 	int nnz = 0;
@@ -2412,6 +2850,11 @@ int ObservationInfo::get_nnz_obs() const
 	return nnz;
 }
 
+/**
+ * @brief Get nnz obs and reg.
+ *
+ * @return Description.
+ */
 int ObservationInfo::get_nnz_obs_and_reg() const
 {
 	int nnz = 0;
@@ -2423,11 +2866,24 @@ int ObservationInfo::get_nnz_obs_and_reg() const
 	return nnz;
 }
 
+/**
+ * @brief Get weight.
+ *
+ * @param obs_name Description.
+ *
+ * @return Description.
+ */
 double ObservationInfo::get_weight(const string &obs_name) const
 {
 	return observations.find(obs_name)->second.weight;
 }
 
+/**
+ * @brief Set weight.
+ *
+ * @param obs_name Description.
+ * @param value Description.
+ */
 void ObservationInfo::set_weight(const string &obs_name, double value)
 {
 	if (observations.find(obs_name) == observations.end())
@@ -2436,16 +2892,37 @@ void ObservationInfo::set_weight(const string &obs_name, double value)
 	observations[obs_name].weight = value;
 }
 
+/**
+ * @brief Get group.
+ *
+ * @param obs_name Description.
+ *
+ * @return Description.
+ */
 string ObservationInfo::get_group(const string &obs_name) const
 {
 	return observations.find(obs_name)->second.group;
 }
 
+/**
+ * @brief Is regularization.
+ *
+ * @param obs_name Description.
+ *
+ * @return Description.
+ */
 bool ObservationInfo::is_regularization(const string &obs_name) const
 {
 	return observations.find(obs_name)->second.is_regularization();
 }
 
+/**
+ * @brief Get regulatization obs.
+ *
+ * @param obs_in Description.
+ *
+ * @return Description.
+ */
 Observations ObservationInfo::get_regulatization_obs(const Observations &obs_in)
 {
 	Observations reg_obs;
@@ -2461,6 +2938,14 @@ Observations ObservationInfo::get_regulatization_obs(const Observations &obs_in)
 }
 
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const ObservationInfo& val)
 {
 	os << "PEST Observation Information" << endl;
@@ -2478,6 +2963,14 @@ ostream& operator<< (ostream &os, const ObservationInfo& val)
 	return os;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const SVDInfo& val)
 {
 	os << "PEST SVD Information" << endl;
@@ -2486,6 +2979,15 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 	return os;
 }
 
+/**
+ * @brief Assign value by key.
+ *
+ * @param key Description.
+ * @param org_value Description.
+ * @param f_rec Description.
+ *
+ * @return Description.
+ */
 PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value, ofstream& f_rec)
 {
 	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
@@ -2565,6 +3067,9 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }
 
+/**
+ * @brief Set defaults.
+ */
 void ControlInfo::set_defaults()
 {
 	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
@@ -2589,11 +3094,19 @@ void ControlInfo::set_defaults()
 
 }
 
+/**
+ * @brief S v d info.
+ *
+ * @return Description.
+ */
 SVDInfo::SVDInfo()
 {
 	set_defaults();
 }
 
+/**
+ * @brief Set defaults.
+ */
 void SVDInfo::set_defaults()
 {
 	maxsing = 1000000;
@@ -2601,6 +3114,14 @@ void SVDInfo::set_defaults()
 	eigwrite = 0;
 }
 
+/**
+ * @brief Assign value by key.
+ *
+ * @param key Description.
+ * @param org_value Description.
+ *
+ * @return Description.
+ */
 PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const string org_value)
 {
 	string value = upper_cp(org_value);
@@ -2621,6 +3142,13 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }
 
+/**
+ * @brief Draw standard normal.
+ *
+ * @param rand_gen Description.
+ *
+ * @return Description.
+ */
 double draw_standard_normal(std::mt19937& rand_gen)
 {	
 	using std::sqrt;
@@ -2637,6 +3165,16 @@ double draw_standard_normal(std::mt19937& rand_gen)
 	return r * sin(2.0 * pi * v2);
 }
 
+/**
+ * @brief Uniform draws.
+ *
+ * @param num_reals Description.
+ * @param lower_bound Description.
+ * @param upper_bound Description.
+ * @param rand_gen Description.
+ *
+ * @return Description.
+ */
 vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen)
 {
 	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
@@ -2652,6 +3190,32 @@ vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bou
 	return vals;
 	
 }
+/**
+ * @brief Uniform int draws.
+ *
+ * @param num_reals Description.
+ * @param lower_bound Description.
+ * @param upper_bound Description.
+ * @param rand_gen Description.
+ *
+ * @return Description.
+ */
+vector<int> uniform_int_draws(int num_reals, int lower_bound, int upper_bound, std::mt19937& rand_gen)
+{
+	vector<int> vals;
+	int v1;
+    //vector<double> uvals = uniform_draws(num_reals,(double)lower_bound,(double)upper_bound,rand_gen);
+	for (int i = 0; i < num_reals; i++)
+    //for (auto& v : uvals)
+	{
+		v1 = (rand_gen() % (upper_bound - lower_bound + 1)) + lower_bound;
+
+		vals.push_back(floor(v1));
+	}
+	return vals;
+
+}
+
 
 
 

@@ -1,0 +1,27 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                -2
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+n_iter_base                    -1
+lambda_scale_fac               1
+n_iter_super                   3
+lambdas                        0.1,1,10,100,1000
+ies_num_reals                  50
+da_use_simulated_states        True
+debug_parse_only True
+* parameter groups external
+control.pargp_data.csv
+* parameter data external
+control.par_data.csv
+* observation data external
+control.obs_data.csv
+* model command line
+run_model.bat
+* model input external
+control.tplfile_data.csv
+* model output external
+control.insfile_data.csv

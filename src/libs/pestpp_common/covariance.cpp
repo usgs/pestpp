@@ -1,3 +1,7 @@
+/**
+ * @file covariance.cpp
+ * @brief Implementation of covariance.
+ */
 
 #include <string>
 #include <sstream>
@@ -22,6 +26,13 @@ using namespace std;
 //Mat constructors
 //---------------------------------------
 
+/**
+ * @brief Mat.
+ *
+ * @param filename Description.
+ *
+ * @return Description.
+ */
 Mat::Mat(string filename)
 {
 	string ext = filename.substr(filename.find_last_of(".") + 1);
@@ -71,6 +82,9 @@ Mat::Mat(vector<string> _row_names, vector<string> _col_names,
 	mattype = _mattype;
 }
 
+/**
+ * @brief Update sets.
+ */
 void Mat::update_sets()
 {
 	row_set.clear();
@@ -100,6 +114,11 @@ const vector<string>* Mat::cn_ptr()
 	return ptr;
 }
 
+/**
+ * @brief Identity.
+ *
+ * @return Description.
+ */
 Mat Mat::identity()
 {
 	Eigen::SparseMatrix<double> i(nrow(), ncol());
@@ -108,6 +127,11 @@ Mat Mat::identity()
 	return Mat(*rn_ptr(),*cn_ptr(),i);
 }
 
+/**
+ * @brief Zero.
+ *
+ * @return Description.
+ */
 Mat Mat::zero()
 {
 	Eigen::SparseMatrix<double> i(nrow(), ncol());
@@ -146,6 +170,11 @@ const Eigen::VectorXd* Mat::s_ptr()
 	return ptr;
 }
 
+/**
+ * @brief Get  u.
+ *
+ * @return Description.
+ */
 Mat Mat::get_U()
 {
 	if (U.rows() == 0) SVD();
@@ -162,6 +191,11 @@ Mat Mat::get_U()
 	return Mat(row_names, u_col_names, U);
 }
 
+/**
+ * @brief Get  v.
+ *
+ * @return Description.
+ */
 Mat Mat::get_V()
 {
 	if (V.rows() == 0) SVD();
@@ -179,6 +213,11 @@ Mat Mat::get_V()
 }
 
 
+/**
+ * @brief Get s.
+ *
+ * @return Description.
+ */
 Mat Mat::get_s()
 {
 	if (V.rows() == 0) SVD();
@@ -200,16 +239,29 @@ Mat Mat::get_s()
 	return Mat(s_names, s_names, s_mat);
 }
 
+/**
+ * @brief Transpose.
+ *
+ * @return Description.
+ */
 Mat Mat::transpose()
 {
 	return Mat(col_names, row_names, matrix.transpose());
 }
 
+/**
+ * @brief T.
+ *
+ * @return Description.
+ */
 Mat Mat::T()
 {
 	return Mat(col_names, row_names, matrix.transpose());
 }
 
+/**
+ * @brief Transpose ip.
+ */
 void Mat::transpose_ip()
 {
 	if (mattype != MatType::DIAGONAL)
@@ -221,6 +273,13 @@ void Mat::transpose_ip()
 	}
 }
 
+/**
+ * @brief Inv.
+ *
+ * @param echo Description.
+ *
+ * @return Description.
+ */
 Mat Mat::inv(bool echo)
 {
 	Logger* log = new Logger();
@@ -232,6 +291,13 @@ Mat Mat::inv(bool echo)
 }
 
 
+/**
+ * @brief Inv.
+ *
+ * @param log Description.
+ *
+ * @return Description.
+ */
 Mat Mat::inv(Logger* log)
 {
 	if (nrow() != ncol()) throw runtime_error("Mat::inv() error: only symmetric positive definite matrices can be inverted with Mat::inv()");
@@ -263,6 +329,11 @@ Mat Mat::inv(Logger* log)
 	return Mat(row_names, col_names, inv_mat);
 }
 
+/**
+ * @brief Inv ip.
+ *
+ * @param echo Description.
+ */
 void Mat::inv_ip(bool echo)
 {
 	ofstream flog("Mat.log");
@@ -271,6 +342,11 @@ void Mat::inv_ip(bool echo)
 	return;
 }
 
+/**
+ * @brief Inv ip.
+ *
+ * @param pfm Description.
+ */
 void Mat::inv_ip(PerformanceLog& pfm)
 {
 	if (nrow() != ncol()) throw runtime_error("Mat::inv() error: only symmetric positive definite matrices can be inverted with Mat::inv()");
@@ -314,6 +390,9 @@ void Mat::inv_ip(PerformanceLog& pfm)
 }
 
 
+/**
+ * @brief S v d.
+ */
 void Mat::SVD()
 {
 	Eigen::JacobiSVD<Eigen::MatrixXd> svd_fac(matrix, Eigen::DecompositionOptions::ComputeFullU |
@@ -329,6 +408,14 @@ void Mat::SVD()
 //Mat operator
 //--------------------------------------
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param mat Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, Mat mat)
 {
 	cout << "row names : ";
@@ -352,6 +439,11 @@ ostream& operator<< (ostream &os, Mat mat)
 
 
 
+/**
+ * @brief To ascii.
+ *
+ * @param filename Description.
+ */
 void Mat::to_ascii(const string &filename)
 {
 	ofstream out(filename);
@@ -381,6 +473,11 @@ void Mat::to_ascii(const string &filename)
 	out.close();
 }
 
+/**
+ * @brief From file.
+ *
+ * @param filename Description.
+ */
 void Mat::from_file(const string &filename)
 {
 	stringstream ss;
@@ -407,6 +504,11 @@ void Mat::from_file(const string &filename)
 
 }
 
+/**
+ * @brief From csv.
+ *
+ * @param filename Description.
+ */
 void Mat::from_csv(const string &filename)
 {
 	ifstream csv(filename);
@@ -487,6 +589,13 @@ void Mat::from_csv(const string &filename)
 }
 
 
+/**
+ * @brief From triplets.
+ *
+ * @param _row_names Description.
+ * @param _col_names Description.
+ * @param triplets Description.
+ */
 void Mat::from_triplets(const vector<string> &_row_names, const vector<string> &_col_names, const vector<Eigen::Triplet<double>> &triplets)
 {
 	matrix.resize(_row_names.size(), _col_names.size());
@@ -498,6 +607,11 @@ void Mat::from_triplets(const vector<string> &_row_names, const vector<string> &
 
 }
 
+/**
+ * @brief From ascii.
+ *
+ * @param filename Description.
+ */
 void Mat::from_ascii(const string &filename)
 {
 	ifstream in(filename);
@@ -603,6 +717,14 @@ void Mat::from_ascii(const string &filename)
 	matrix = new_matrix;
 }
 
+/**
+ * @brief Read namelist.
+ *
+ * @param in Description.
+ * @param nitems Description.
+ *
+ * @return Description.
+ */
 vector<string> Mat::read_namelist(ifstream &in, int &nitems)
 {
 	vector<string> names;
@@ -628,6 +750,11 @@ vector<string> Mat::read_namelist(ifstream &in, int &nitems)
 	return names;
 }
 
+/**
+ * @brief To binary.
+ *
+ * @param filename Description.
+ */
 void Mat::to_binary(const string &filename)
 {
 	pest_utils::save_binary_orgfmt(filename, row_names, col_names, matrix);
@@ -686,6 +813,11 @@ void Mat::to_binary(const string &filename)
 //	jout.close();
 }
 
+/**
+ * @brief To binary new.
+ *
+ * @param filename Description.
+ */
 void Mat::to_binary_new(const string &filename)
 {
 	pest_utils::save_binary_extfmt(filename, row_names, col_names, matrix);
@@ -747,6 +879,11 @@ void Mat::to_binary_new(const string &filename)
 //	jout.close();
 }
 
+/**
+ * @brief From binary.
+ *
+ * @param filename Description.
+ */
 void Mat::from_binary(const string &filename)
 {
 	pest_utils::read_binary(filename, row_names, col_names, matrix);
@@ -758,6 +895,13 @@ void Mat::from_binary(const string &filename)
 //Maninpulate the shape and ordering of Mats
 //-----------------------------------------
 
+/**
+ * @brief Left cols.
+ *
+ * @param idx Description.
+ *
+ * @return Description.
+ */
 Mat Mat::leftCols(const int idx)
 {
 	vector<string> cnames;
@@ -767,6 +911,13 @@ Mat Mat::leftCols(const int idx)
 	return Mat(row_names,cnames,matrix.leftCols(idx));
 }
 
+/**
+ * @brief Right cols.
+ *
+ * @param idx Description.
+ *
+ * @return Description.
+ */
 Mat Mat::rightCols(const int idx)
 {
 	vector<string> cnames;
@@ -776,6 +927,15 @@ Mat Mat::rightCols(const int idx)
 	return Mat(row_names,cnames,matrix.rightCols(idx));
 }
 
+/**
+ * @brief Get.
+ *
+ * @param new_row_names Description.
+ * @param new_col_names Description.
+ * @param update Description.
+ *
+ * @return Description.
+ */
 Mat Mat::get(const vector<string> &new_row_names, const vector<string> &new_col_names, bool update)
 {
 	//check that every row and col name is listed
@@ -872,6 +1032,14 @@ Mat Mat::get(const vector<string> &new_row_names, const vector<string> &new_col_
 	return Mat(new_row_names,new_col_names,new_matrix,this->mattype);
 }
 
+/**
+ * @brief Extract.
+ *
+ * @param extract_row_names Description.
+ * @param extract_col_names Description.
+ *
+ * @return Description.
+ */
 Mat Mat::extract(const vector<string> &extract_row_names, const vector<string> &extract_col_names)
 {
 	Mat new_mat;
@@ -896,12 +1064,28 @@ Mat Mat::extract(const vector<string> &extract_row_names, const vector<string> &
 	return new_mat;
 }
 
+/**
+ * @brief Extract.
+ *
+ * @param extract_row_name Description.
+ * @param extract_col_names Description.
+ *
+ * @return Description.
+ */
 Mat Mat::extract(const string &extract_row_name, const vector<string> &extract_col_names)
 {
 	vector<string> extract_row_names;
 	extract_row_names.push_back(extract_row_name);
 	return extract(extract_row_names, extract_col_names);
 }
+/**
+ * @brief Extract.
+ *
+ * @param extract_row_names Description.
+ * @param extract_col_name Description.
+ *
+ * @return Description.
+ */
 Mat Mat::extract(const vector<string> &extract_row_names, const string &extract_col_name)
 {
 	vector<string> extract_col_names;
@@ -909,6 +1093,11 @@ Mat Mat::extract(const vector<string> &extract_row_names, const string &extract_
 	return extract(extract_row_names, extract_col_names);
 }
 
+/**
+ * @brief Isdiagonal.
+ *
+ * @return Description.
+ */
 bool Mat::isdiagonal()
 {
 	if (mattype == MatType::DIAGONAL)
@@ -916,6 +1105,11 @@ bool Mat::isdiagonal()
 	return false;
 }
 
+/**
+ * @brief Drop cols.
+ *
+ * @param drop_col_names Description.
+ */
 void Mat::drop_cols(const vector<string> &drop_col_names)
 {
 	vector<string> missing_col_names;
@@ -957,6 +1151,11 @@ void Mat::drop_cols(const vector<string> &drop_col_names)
 	mattype = new_mat.get_mattype();
 }
 
+/**
+ * @brief Drop rows.
+ *
+ * @param drop_row_names Description.
+ */
 void Mat::drop_rows(const vector<string> &drop_row_names)
 {
 
@@ -1011,6 +1210,13 @@ void Mat::drop_rows(const vector<string> &drop_row_names)
 //-----------------------------------------
 //covariance matrices
 //-----------------------------------------
+/**
+ * @brief Covariance.
+ *
+ * @param filename Description.
+ *
+ * @return Description.
+ */
 Covariance::Covariance(string filename)
 {
 	mattype = MatType::SPARSE;
@@ -1028,6 +1234,13 @@ Covariance::Covariance(string filename)
 														 files can be used to instantiate a Cov");
 }
 
+/**
+ * @brief Covariance.
+ *
+ * @param names Description.
+ *
+ * @return Description.
+ */
 Covariance::Covariance(vector<string> &names)
 {
 	row_names = names;
@@ -1036,12 +1249,26 @@ Covariance::Covariance(vector<string> &names)
 	mattype = MatType::SPARSE;
 }
 
+/**
+ * @brief Covariance.
+ *
+ * @return Description.
+ */
 Covariance::Covariance()
 {
 	icode = 1;
 	mattype = MatType::SPARSE;
 }
 
+/**
+ * @brief Covariance.
+ *
+ * @param _names Description.
+ * @param _matrix Description.
+ * @param _mattype Description.
+ *
+ * @return Description.
+ */
 Covariance::Covariance(vector<string> _names, Eigen::SparseMatrix<double> _matrix, Mat::MatType _mattype)
 {
 	if ((_names.size() != _matrix.rows()) || (_names.size() != _matrix.cols()))
@@ -1054,6 +1281,13 @@ Covariance::Covariance(vector<string> _names, Eigen::SparseMatrix<double> _matri
 	mattype =_mattype;
 }
 
+/**
+ * @brief Covariance.
+ *
+ * @param _mat Description.
+ *
+ * @return Description.
+ */
 Covariance::Covariance(Mat _mat)
 {
 	if (_mat.get_row_names() != _mat.get_col_names())
@@ -1066,6 +1300,11 @@ Covariance::Covariance(Mat _mat)
 }
 
 
+/**
+ * @brief From diagonal.
+ *
+ * @param other Description.
+ */
 void Covariance::from_diagonal(Covariance &other)
 {
 	row_names = other.get_row_names();
@@ -1082,6 +1321,13 @@ void Covariance::from_diagonal(Covariance &other)
 	}
 
 }
+/**
+ * @brief Diagonal.
+ *
+ * @param val Description.
+ *
+ * @return Description.
+ */
 Covariance Covariance::diagonal(double val)
 {
 	vector<Eigen::Triplet<double>> triplet_list;
@@ -1093,6 +1339,16 @@ Covariance Covariance::diagonal(double val)
 	return Covariance(*rn_ptr(), i);
 }
 
+/**
+ * @brief Try from.
+ *
+ * @param pest_scenario Description.
+ * @param file_manager Description.
+ * @param is_parcov Description.
+ * @param forgive_missing Description.
+ *
+ * @return Description.
+ */
 string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool is_parcov, bool forgive_missing)
 {
 	stringstream how;
@@ -1268,24 +1524,76 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 }
 
 
+/**
+ * @brief Get.
+ *
+ * @param other_names Description.
+ * @param update Description.
+ *
+ * @return Description.
+ */
 Covariance Covariance::get(const vector<string> &other_names, bool update)
 {
 	Covariance new_cov(Mat::get(other_names, other_names, update));
 	return new_cov;
 }
 
+/**
+ * @brief Get.
+ *
+ * @param row_name Description.
+ * @param col_name Description.
+ *
+ * @return Description.
+ */
+double Covariance::get(const string& row_name, const string& col_name)
+{
+	// Find indices for the row and column names
+	auto row_iter = find(row_names.begin(), row_names.end(), row_name);
+	auto col_iter = find(col_names.begin(), col_names.end(), col_name);
+
+	if (row_iter == row_names.end() || col_iter == col_names.end())
+	{
+		throw runtime_error("Covariance::get() error: name not found in matrix: " +
+			(row_iter == row_names.end() ? row_name : col_name));
+	}
+
+	int row_idx = distance(row_names.begin(), row_iter);
+	int col_idx = distance(col_names.begin(), col_iter);
+
+	return matrix.coeff(row_idx, col_idx);
+}
+
+/**
+ * @brief Extract.
+ *
+ * @param extract_names Description.
+ *
+ * @return Description.
+ */
 Covariance Covariance::extract(vector<string> &extract_names)
 {
 	Covariance new_cov(Mat::extract(extract_names, extract_names));
 	return new_cov;
 }
 
+/**
+ * @brief Drop.
+ *
+ * @param drop_names Description.
+ */
 void Covariance::drop(vector<string> &drop_names)
 {
 	drop_rows(drop_names);
 	drop_cols(drop_names);
 }
 
+/**
+ * @brief From uncertainty file.
+ *
+ * @param filename Description.
+ * @param ordered_names Description.
+ */
 void Covariance::from_uncertainty_file(const string &filename, vector<string> &ordered_names)
 {
 	ifstream in(filename);
@@ -1537,6 +1845,12 @@ void Covariance::from_parameter_bounds(ofstream& frec, const vector<string> &par
 
 
 
+/**
+ * @brief From parameter bounds.
+ *
+ * @param pest_scenario Description.
+ * @param frec Description.
+ */
 void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> par_std = pest_scenario.get_ext_file_double_map("parameter data external", "standard_deviation");
@@ -1572,6 +1886,12 @@ void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 		par_std,pest_scenario.get_pestpp_options().get_par_sigma_range());
 }
 
+/**
+ * @brief From parameter bounds.
+ *
+ * @param pst_filename Description.
+ * @param frec Description.
+ */
 void Covariance::from_parameter_bounds(const string &pst_filename, ofstream& frec)
 {
 	ifstream ipst(pst_filename);
@@ -1581,6 +1901,12 @@ void Covariance::from_parameter_bounds(const string &pst_filename, ofstream& fre
 	from_parameter_bounds(pest_scenario, frec);
 }
 
+/**
+ * @brief From observation weights.
+ *
+ * @param pst_filename Description.
+ * @param frec Description.
+ */
 void Covariance::from_observation_weights(const string &pst_filename, ofstream& frec)
 {
 	ifstream ipst(pst_filename);
@@ -1659,6 +1985,12 @@ void Covariance::from_observation_weights(ofstream& frec, const vector<string>& 
 }
 
 
+/**
+ * @brief From observation weights.
+ *
+ * @param pest_scenario Description.
+ * @param frec Description.
+ */
 void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
@@ -1689,6 +2021,11 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 
 }
 
+/**
+ * @brief To uncertainty file.
+ *
+ * @param filename Description.
+ */
 void Covariance::to_uncertainty_file(const string &filename)
 {
 	ofstream out(filename);
@@ -1721,17 +2058,34 @@ void Covariance::to_uncertainty_file(const string &filename)
 	}
 }
 
+/**
+ * @brief Cholesky.
+ */
 void Covariance::cholesky()
 {
 	Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> llt;
 	lower_cholesky = llt.matrixL();
 }
 
+/**
+ * @brief Draw.
+ *
+ * @param ndraws Description.
+ *
+ * @return Description.
+ */
 vector<Eigen::VectorXd> Covariance::draw(int ndraws)
 {
 	throw runtime_error("Covariance::draw() not implemented");
 }
 
+/**
+ * @brief Standard normal.
+ *
+ * @param gen Description.
+ *
+ * @return Description.
+ */
 vector<double> Covariance::standard_normal(default_random_engine gen)
 {
 	normal_distribution<double> stanard_normal(0.0, 1.0);

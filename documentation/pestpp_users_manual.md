@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.22
+# <a id='s1' />Version 5.2.24
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-August 2025
+October 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -1655,8 +1655,6 @@ If a PEST control file includes a “singular value decomposition” section, th
 
 Unless you wish to over-ride internal PESTPP-GLM settings for implementation of singular value decomposition, it is best to omit the “singular value decomposition” section from the PEST control file. If you do decide to include it, PESTCHEK-friendly values for control variables are those shown in figure 4.2. However, set MAXSING to a number equal to, or greater than, the number of parameters featured in the PEST control file unless you specifically wish to reduce the dimensionality of the inverse problem solution space.
 
-An issue that sometimes causes confusion is the different roles played by the PEST MAXSING and EIGTHRESH variables on the one hand, and the PEST++ *max_n_super()* and *super_eigthresh()* control variables on the other hand. As is described later in this manual, the latter two variables are used to determine how many super parameters are used in SVD-assisted inversion. MAXSING and EIGTHRESH, on the other hand, control the operation of the singular value decomposition solution process, regardless of whether this is being used to estimate base parameters or super parameters.
-
 Note that PESTPP-GLM, PESTPP-IES, and PESTPP-DA support only SVD-based inversion and contain internal default values for the SVD truncation arguments. If this section exists, then MAXSING and EIGTHRESH override internal defaults, even if SVDMODE is set to 0.
 
 ## <a id='s8-8' />4.8 Parameter Groups Section
@@ -2230,8 +2228,6 @@ pi2 1.0 * log(ro2) + 1.0 * log(h2) = 2.6026 2.0 prgp1<br>
 ~ This is a comment line<br>
 ++ forecasts(ar18,ar19) parcov(param.unc)<br>
 ++ lambdas(0.1, 1.0, 10,100)<br>
-++ n_iter_base(-1)<br>
-++ n_iter_super(4)<br>
 ++ base_jacobian(pest.jco)<br>
 ++ par_sigma_range(6)<br></th>
 </tr>
@@ -2357,8 +2353,6 @@ maxsing 100<br>
 forecasts ar18,ar19<br>
 Parcov param.unc ~ the prior cov matrix in unc file format<br>
 lambdas 0.1, 1.0, 10,100 ~some lambda values<br>
-n_iter_base -1<br>
-n_iter_super 4<br>
 base_jacobian pest.jcb<br>
 par_sigma_range 6<br>
 ies_par_en par.jcb<br>
@@ -2467,6 +2461,11 @@ If you are running the manager together with multiple agent instances on the sam
 in a command line window to ascertain the hostname of a machine.
 
 If, for some reason, a agent ceases execution, or the computer on which it resides loses its connection with the manager, it should be re-started using the above command. A agent does not have to be restarted using the “/r” switch as its tasks are repetitive and simple, namely to receive parameters, run the model, and then send model outputs to the PESTPP-XXX manager.
+
+All fo the PEST++ tools also support an "external" run manager, which as the name suggests, relies on some external scheme to process model runs.  The external run manager expects this external scheme to interact with the run-storage file (namely, *case*.rns).  When the external run manager is being used, the "model command(s)" in the pest control file are called only one time per batch of runs to be completed.  In this way, users can call their external run management scheme(s) programmatically.  pyEMU has support for reading and updating the (binary) run storage file.  The external run mananger is invoked with the "/e" command line switch:
+
+| pestpp-xxx case /e|
+|-------------------|
 
 ### <a id='s9-3-4' />5.3.4 Run Management Record File
 
@@ -2649,6 +2648,8 @@ If only a single value is supplied for *lambdas()*, then this value of lambda is
 
 If *++glm_hp_lambdas(true)* is added to the control file, then the lambda calculation process completely changes to mimic how PEST_HP handles lambda calculations. A midpoint lambda is determined by *phi/n_obs*, then lambdas above and below that value are added depending on the number of available agents. If working in serial, then 3 lambdas will be used. *lambda_scale_vec* is likewise altered to mimic how PEST_HP handles lambda scaling.
 
+If *++glm_panther_lambdas(true)* is added to the control file, then GLM lambdas and lambda scales are used. However, PESTPP-GLM will automatically increase or decrease the number of upgrade tests depending on the number of panther agents currently connected. When combined with the default values of *lambdas* and *lambda_scale_fac*, this can be an easy way to easily use the appropriate number of agents during the upgrade step.
+
 ### <a id='s10-1-5' />6.2.5 Singular Value Decomposition
 
 In order to simplify the following equations, it is assumed that regularization observations and/or prior information equations are assimilated into the rows of Z using a weight factor that has already been evaluated.
@@ -2719,27 +2720,7 @@ Unfortunately, the large computational savings accrued through SVD-assisted inve
 
 A second problem that is associated with SVD-assisted inversion using PEST is that of inconvenience. The SVDAPREP utility must be employed to construct a special PEST input dataset based on super parameters. If re-definition of super parameters is required after a few iterations of an inversion process because of model nonlinearity, then SVDAPREP must be run again.
 
-PESTPP-GLM eradicates the second of these problems completely. There is no need to construct a PEST input dataset based on super parameters, as this is all done behind the scenes. Furthermore, PESTPP-GLM can be instructed to undertake intermittent re-construction of a full-scale Jacobian matrix, and subsequent redefinition of super parameters automatically and unattended.
-
-Four PEST++ control variables govern the operation of SVD-assisted inversion as undertaken by PESTPP-GLM. If any of these are present, SVD-assisted inversion is implemented; default values are supplied for any of these control variables that a user fails to supply.
-
-The number of super parameters to estimate can be set using either or both of the *max_n_super()* and ­*super_eigthresh()* control variables. The value supplied for *max_n_super* must be an integer greater than zero. This sets an upper limit on the number of super parameters to employ. *super_eigthresh()* performs a similar role to the PEST EIGTHRESH variable. The number of estimated super parameters is set by the singular value index at which the ratio of the corresponding singular value of J<sup>t</sup>QJ to the maximum singular value of this matrix is equal to the user-supplied value of *super_eigthresh()*. The default value for *super_eigthresh()* is 1.0E‑8. The default value for *max_n_super()* is the number of adjustable parameters so that the number of super parameters is determined by the value of *super_eigthresh()*.
-
-If *glm_normal_form(prior)* is supplied, activating the regularized GLM solution process, the super parameters are formed from the normal matrix J<sup>t</sup>QJ + C<sub>p </sub>where Cp is the prior parameter covariance matrix (which is optionally supplied via the *parcov* argument). This effectively builds some prior parameter covariance matrix eigen components into the super parameter vectors.
-
-As was mentioned above, PESTPP-GLM allows mixing of inversion iterations based on base parameters and super parameters. Where an iteration is used to estimate base parameters the Jacobian matrix that is computed during that iteration is used to define super parameters for ensuing iterations in which the latter are estimated; however, base parameters are adjusted in any iteration in which a base Jacobian matrix is calculated before the ensuing super parameter iterations are commenced. The *n_iter_base()* control variable sets the number of base parameter iterations that are done in succession. These are followed by *n_iter_super()* super parameter iterations. The cycle is then repeated.
-
-A special setting for *n_iter_base()* instructs PESTPP-GLM to vary from this behavior. If *n_iter_base()* is set to -1, then PESTPP-GLM carries out only one base parameter iteration. This comprises the first iteration of the inversion process. Furthermore, it does not upgrade base parameters using this Jacobian matrix before proceeding to the next iteration (which is a super parameter iteration). Instead the Jacobian matrix is used only for definition of super parameters; parameter upgrades are restricted to super parameter iterations. (This is the same behavior as that undertaken by PEST when it implements SVD-assisted inversion using a super parameter PEST control file constructed by SVDAPREP).
-
-The number of super parameters to form is controlled by *max_n_super* variable. When used judiciously and combined with the RedSVD package, the formation of the super parameter problem can be very efficient since the RedSVD solver only factorize the normal matrix to the number of specified components.
-
-Two other aspects of PESTPP’s behavior in undertaking SVD-assisted inversion are worth mentioning.
-
-Like PEST, PESTPP-GLM writes a parameter value file (i.e., a PAR) file at the end of every iteration of the inversion process, this containing best parameters achieved to date. (The filename base of this file is the same as that of the PEST control file.) Unlike PEST however, PESTPP-GLM does not need to write a separate BPA file containing best parameters. This is because the PAR file that it records when undertaking super parameter iterations does not contain best-fit values of super parameters. Instead it contains the best values of base parameters. Nevertheless, for the sake of conformity with PEST, it also records best parameters in a BPA file (as well as in a file named *case.parb* whose contents are identical to those of *case.bpa* and *case.par*).
-
-The handling of Jacobian matrix files (i.e., JCO files) is also somewhat different from that of PEST. PESTPP-GLM records a Jacobian matrix file at the completion of every iteration of the inversion process. For those iterations in which it adjusts super parameters, this file is named *case.jco*, where *case* is the filename base of the PEST control file. The elements of this Jacobian matrix are comprised of partial derivatives of model outputs with respect to super parameters. For those iterations in which it computes sensitivities with respect to base parameters this file is named *case.jcb*. The elements of this Jacobian matrix are comprised of partial derivatives of model outputs with respect to native (i.e., base) model parameters.
-
-Note, however, that if PESTPP-GLM is not undertaking SVD-assisted inversion, then the JCO file that is recorded at the end of each iteration of the inversion process is named *case.jco*. Under these circumstances, this file contains sensitivities with respect to base model parameters.
+Note as of PEST++ version 5.2.25, the automated internal SVD-assist functionality in PESTPP-GLM has been removed.  Users who use SVD-Assist are encouraged to use the PEST utilities.
 
 ### <a id='s10-1-7' />6.2.7 Expediting the First Iteration
 
@@ -2765,7 +2746,7 @@ The integrity of FOSM analysis is based on the following assumptions:
 
 When implemented by PESTPP-GLM, an additional assumption is made. It is that the standard deviation of measurement noise associated with each observation is proportional current observation residual. This attempts to account for how well (or otherwise) the model reproduces the observations. If the model is not fitting a given observation, then that implies a large uncertainty for that observation, which in turn prevents the observation from conditioning the parameter(s) it is sensitive to. Note, the residual weight adjustment process will never increase weights (measurement noise standard deviations will never be decreased).
 
-FOSM analysis is implemented by PESTPP-GLM if the *uncertainty()* control variable is set to *true* (it is *true* by default). In implementing FOSM analysis, PESTPP-GLM ignores regularization observations and prior information equations. However, this does not prevent a user from denoting prior correlation between parameters; this can be supplied through a covariance matrix prescribed through the *parcov()* control variable. As presently coded, PESTPP-GLM will undertake FOSM-based uncertainty analyses during each iteration (base or super) and also at the end of iterations.
+FOSM analysis is implemented by PESTPP-GLM if the *uncertainty()* control variable is set to *true* (it is *true* by default). In implementing FOSM analysis, PESTPP-GLM ignores regularization observations and prior information equations. However, this does not prevent a user from denoting prior correlation between parameters; this can be supplied through a covariance matrix prescribed through the *parcov()* control variable. As presently coded, PESTPP-GLM will undertake FOSM-based uncertainty analyses during each iteration and also at the end of iterations.
 
 If parameters are log-transformed in a PEST control file, then FOSM-based analyses pertains to the log (to base 10) of these parameters. Calculations that involve log-transformation are invisible to the user. However, if a user elects to provide prior parameter uncertainties (through a prior parameter covariance matrix or uncertainty file), these must pertain to the logs of log-transformed parameters. Similarly variances that appear in the parameter covariance matrix that is produced by PESTPP-GLM pertain to the logs of log-transformed parameters.
 
@@ -2789,7 +2770,7 @@ PESTPP-GLM-calculated prior and posterior parameter uncertainties are recorded i
 
 If the glm\_*num_reals(N)* argument is supplied, then PESTPP-GLM will also generate *N* stochastic realizations from the FOSM-approximated posterior parameter covariance matrix (these realizations comprising a posterior parameter ensemble). It will then calculate model outputs using these realizations by running the model once for each of them (in parallel if PESTPP-GLM is being run in parallel mode). The parameter ensemble is saved to a CSV file named *case.N.paren.csv*, while the resulting model output ensemble is saved to a CSV file named *case.N.obsen.csv*. Alternatively, if the *save_binary()* variable is set to “true”, then the ensembles are saved in binary “enhanced Jacobian” (i.e., JCB) files named *case.N.paren.jcb* and *case.N.obsen.jcb*. This posterior Monte Carlo is undertaken at the completion of PESTPP-GLM iterations, and, also, if the *glm_iter_mc(true)* argument is set, then also, during each iteration­–if the posterior Monte Carlo is being undertaken during an iteration, the realizations are queued up and run with the lambda upgrade vectors.
 
-Through the *glm_accept_mc_phi* argument, PESTPP-GLM will accept the lowest-phi FOSM-based parameter realization if the realization yields a lower phi than the lambda-testing lowest phi. In this way, PESTPP-GLM can be used as a hybrid global-local algorithm which combines efficient local search via subspace (and optionally super parameter) GLM solution process with the randomized search from the FOSM-based Monte Carlo realizations. Note the *glm_accept_mc_phi* option is only applicable to base parameter iterations, although FOSM analytical and Monte Carlo operations are still undertaken during super parameter iterations.
+Through the *glm_accept_mc_phi* argument, PESTPP-GLM will accept the lowest-phi FOSM-based parameter realization if the realization yields a lower phi than the lambda-testing lowest phi. In this way, PESTPP-GLM can be used as a hybrid global-local algorithm which combines efficient local search via subspace GLM solution process with the randomized search from the FOSM-based Monte Carlo realizations.
 
 As well as calculating parameter uncertainties, PESTPP-GLM can also be asked to calculate the prior and posterior uncertainties of some predictions. This functionality is activated through use of the *forecasts()* control variable. The values which must be supplied for this variable are the names of predictions whose uncertainties are sought, or, optionally, the name of a file that stores multiple entries. For example, *forecasts(ar10,ar11)* requests that prior and predictive uncertainties be evaluated for model outputs named “ar10” and “ar11” in the PEST control file on which PESTPP-GLM’s operations are based. Despite the fact that these model outputs are predictions, they must be listed in the “observation data” section of the PEST control file; hence sensitivities of these model outputs to parameters are available as rows of the Jacobian matrix which is calculated by PESTPP-GLM. Model predictions should be endowed with weights of zero in a PEST control file; this is because predictions are not used to constrain parameters, and hence do not form part of a calibration dataset. (PESTPP-GLM issues a warning message if this is not the case.). If the *forecasts* argument is not supplied and the *uncertainty* flag is true, then PESTPP-GLM will treat all zero-weighted observations as forecasts. The uncertainties and lower/upper bounds of forecasts that are specified in this way are listed in the PESTPP-GLM run record file, and in a comma-delimited file named *case.N.pred.usum.csv*. Posterior predictive lower and upper bounds are calculated by subtracting and adding two standard deviations from/to the value of the prediction as calculated by the model using initial or estimated parameter values.
 
@@ -2829,7 +2810,6 @@ The following table summarizes the contents of files that are recorded by PESTPP
 | *case.rmr*                     | Parallel run management record file.                                                                                                                                                                                                                                                                                    |
 | *case.par*                     | Parameter value file. This is compatible with a file of the same name written by PEST. It records the best parameter values obtained up until any point of the inversion process, and at its end.                                                                                                                       |
 | *case.parN*                    | Parameter value file for iteration *N*. This file contains best parameters calculated during iteration *N* of the inversion process.                                                                                                                                                                                    |
-| *case.bpa*                     | Same as *case.par*. This file records base parameter values (which are actual parameter values) when PESTPP-GLM conducts SVD-assisted inversion. It is included in the set of PESTPP-GLM output files for compatibility with PEST.                                                                                      |
 | *case.parb*                    | Same as *case.bpa*.                                                                                                                                                                                                                                                                                                     |
 | *case.res*                     | Residuals file. This file lists model outputs, observations, residuals and related data calculated using best parameters achieved through the inversion process. The latter are listed in file *case.par*.                                                                                                              |
 | *case.reiN*                    | An intermediate residuals file. This file lists model outputs, observations, residuals and related data calculated using best parameters achieved during iteration *N* of the inversion process. The latter are listed in file *case.parN*.                                                                             |
@@ -2843,7 +2823,7 @@ The following table summarizes the contents of files that are recorded by PESTPP
 | *case.svd*                     | Information is appended to this file every time a parameter upgrade direction is calculated using a new Marquardt lambda. It lists the singular values of the (J<sup>t</sup>QJ + λI) matrix.                                                                                                                |
 | *case.log*                     | PESTPP-GLM performance record. This file records the times at which PESTPP-GLM commenced and completed various processing tasks.                                                                                                                                                                                        |
 | *case.fpr*                     | Records a history of when parameters were frozen at their bounds, and when they were subsequently released.                                                                                                                                                                                                             |
-| *case.jco*                     | A PEST-compatible Jacobian matrix file that is refreshed during every iteration of the inversion process. This is a binary file. On iterations that are dedicated to estimation of super parameter parameters, it contains super parameter sensitivities. On other iterations it contains base parameter sensitivities. |
+| *case.jco*                     | A PEST-compatible Jacobian matrix file that is refreshed during every iteration of the inversion process|
 | *case.jcb*                     | A PEST-compatible Jacobian matrix file that contains base parameter sensitivities. It is refreshed on every occasion that base parameter sensitivities are re-calculated.                                                                                                                                               |
 | *case.post.cov*                | Contains the posterior parameter covariance matrix if linear uncertainty (i.e., FOSM) analysis is requested.                                                                                                                                                                                                            |
 | *case.N.par.usum.csv*          | Summarizes linear uncertainty analysis as it pertains to parameters.                                                                                                                                                                                                                                                    |
@@ -2898,10 +2878,6 @@ Note also that the number of control variables may change with time. Refer to th
 
 | Variable                    | Type               | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |---------------------------------|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| *max_n_super(100000)*           | integer                | The maximum number of super parameters to use when conducting SVD-assisted inversion. The default is the number of adjustable parameters, in which case the number of super parameters is effectively set by *super_eigthresh()*.                                                                                                                                                                                                                                                                                                                                        |
-| *super_eigthresh(1.0E-6)*       | real                   | The ratio to maximum singular value of J<sup>t</sup>QJ at which truncation takes place to form super parameters. Note, however, that if the number of super parameters calculated in this way exceeds *max_n_super()* then the value of the latter variable takes precedence.                                                                                                                                                                                                                                                                                    |
-| *n_iter_base(100000)*           | integer                | Where super parameters are estimated in some iterations and base parameters are estimated in other iterations, this variable sets the number of sequential base parameter iterations to undertake before commencing an iteration in which super parameters are adjusted. If *n_iter_base()* is set to -1, this instructs PESTPP-GLM to emulate PEST behaviour; a base parameter Jacobian matrix is calculated; then super parameters are estimated as soon as they are defined on the basis of this matrix. Super parameters are estimated in all succeeding iterations. |
-| *n_iter_super(0)*               | integer                | Where super parameters are estimated in some iterations and base parameters are estimated in other iterations, this variable sets the number of sequential super parameter iterations to undertake before commencing an iteration in which a base parameter Jacobian matrix is recalculated and base parameters are adjusted.                                                                                                                                                                                                                                            |
 | *jac_scale(true)*               | Boolean                | Scale parameters by their sensitivities when calculating parameter upgrades. This can increase numerical precision; however, it may incur a numerical cost.                                                                                                                                                                                                                                                                                                                                                                                                              |
 | *svd_pack(redsvd)*              | text                   | This informs PESTPP-GLM of the package that it must employ to undertake singular value decomposition of the J<sup>t</sup>QJ matrix (appropriately modified to include the Marquardt lambda and regularization). Options are “eigen” and “redsvd”.                                                                                                                                                                                                                                                                                                                |
 | *lambdas(0.1,1,10,100,1000)*    | set of real numbers    | Values for the Marquardt lambda used in calculation of parameter upgrades. Note that this base list is augmented with values bracketing the previous iteration’s best lambda. However, if a single value is specified, only that lambda (and no other lambda) is used in all iterations.                                                                                                                                                                                                                                                                                 |
@@ -2920,11 +2896,11 @@ Note also that the number of control variables may change with time. Refer to th
 | *Enforce_tied_bounds(false)*    | Boolean                | Flag to enforce parameter bounds on any tied parameters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | *glm_accept_mc_phi(false)*      | Boolean                | Flag to accept FOSM-based realization phi each base iteration if the phi is lower than the lambda-testing phi. Default is false.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | *rand_seed(358183147)*          | unsigned integer       | Seed for the random number generator. Used for FOSM-basd Monte Carlo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| *glm_rebase_super(true)*        | boolean                | A flag to run the super-parameter truncated values once at the start of the first super parameter iteration to provide a more accurate “base” run for calculating sensitivity numerators. Only applies if *n_iter_base* = -1 and *base_jacobian* is supplied. Default is False, which indicates use either the *hotstart_resfile* residuals or use the base run previously completed                                                                                                                                                                                     |
 | *glm_iter_mc(false)*            | Boolean                | Flag to undertake FOSM-based posterior Monte Carlo during each iteration of PESTPP-GLM. Default is False, which will result in Monte Carlo only after iterations are done (depending on the *glm_num_reals* and *uncertainty* flags)                                                                                                                                                                                                                                                                                                                                     |
 | *ensemble_output_precision*     | int                    | Number of significant digits to use in ASCII format ensemble files. Default is 6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | *glm_norm_form(diag)*           | string                 | The form of the normal matrix to use. Can be “ident” (identity matrix lambda scaling), “diag” (use the diagonal of X<sup>t</sup>QX for lambda scaling) or “prior” (scale with the inverse of the prior parameter covariance matrix. Default is diag.s                                                                                                                                |
-| *glm_hp_lambdas(false)*           | string                 | Flag that controls whether to override normal GLM lambda determination with PEST_HP-style lambdas and lambda scale vectors. Default is false.                                                                                                                                                                                                                     |
+| *glm_hp_lambdas(false)*           | string                 | Flag that controls whether to override normal GLM lambda determination with PEST_HP-style lambdas and lambda scale vectors. Default is false.                 
+| *glm_panther_lambdas(false)*           | string                 | Flag that controls whether to add or remove from lambdas and lambda_scale_fac as needed depending on the number of agents currently connected to panther. Mutually exclusive with *glm_hp_lambdas*. Does nothing if running in serial.                                                                                                                                                                                            |
 
 Table 6.3 PESTPP-GLM control variables. Variables which control parallel run management can be supplied in addition to these. See section 5.3.6.
 
@@ -3637,6 +3613,8 @@ In highly nonlinear problems, the gradient between parameters and simulated equi
 
 To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “covariance reinflation”. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations or “anomalies”) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
 
+Figure 9.3 shows how the reinflation cycles can mitigate variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
+
 This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Note this argument can be a single integer or a sequence of integers like 2,5,9, in which case PESTPP-IES will reinflate the ensemble after the 2<sup>nd</sup> , 7<sup>th</sup>, and 16<sup>th</sup> iterations. Some other behavioural characteristics of using parameter covariance reinflation:
 
 - The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit when using the *ies_n_iter_reinflate* option.
@@ -3649,7 +3627,11 @@ This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. 
 
 - During a reinflation cycle, all realizations that have either failed or have been removed for poor performance will be brought back into the current parameter ensemble. If restarting, supplying the previous prior parameter ensemble along with the restart parameter ensemble will enable PESTPP-IES to bring all the prior realizations lost during the previous analysis back into the current ensemble.
 
-Figure 9.3 shows how the reinflation cycles can mitigate variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
+- Through the use of *ies_reinflate_num_reals*, which is supplied as a sequence of positive integers, users can adjust the number of realizations used during each reinflation cycle.  For example, a user can supply "10,1000", which results in 10 realizations being used before the first reinflation (including the prior), and them 1000 realizations being used after the first reinflation.  The *ies_reinflate_num_reals* maximum value is limited by the *ies_num_reals* and/or by the number of realizations supplied in an existing parameter ensemble. 
+
+- In an effort to minimize the number of model evaluations required to apply PESTPP-IES, users may want to use a small(er) ensemble for a few iterations to hone in an acceptable mean parameter vector, then expand the ensemble to use more realizations, centered on the location of that mean vector.  Standard reinflation resets to the prior parameter variances and correlations (as described in the prior parameter ensemble), this prior reinflation can and should result in a large increase in phi for the reinflated realizations.  In some cases, where users want to better maintain the phi of the ensemble (that is keep the realizations more calibrated), new realiztions can be generated from the current ensemble, such that the variances and correlations in the current ensemble are preserved, which, depending on the linearity of the inverse problem, can result in the newly generated ensemble maintaining a lower phi value, that is, the new realizations are somewhat "calibrated".  This optional behavior is actived by supplying the *ies_reinflation_num_reals* value as negative.  Note that any new realization generated from this operation is essentially a linear combination of the current parameter realizations, which means at most the new realizations will occupy a limited dimensional subspace (at most, the dimensions occupied will be equal to the number of realziations in the current ensemble).  To help expand the subset dimensions of the new ensemble, users can supply *ies_reinflation_factor* as a negative value ranging from less than zero to -1.0 (inclusive).  With a negative *ies_reinflation_factor*, a randomly selected scaled, centered prior ensemble realization is added to each new realization, where the scaling amount is the absolute value of *ies_reinflation_factor*.  
+
+
 
 <img src="./media/image6.emf" style="width:6.28022in;height:3.83791in" />
 
@@ -3727,7 +3709,7 @@ In some contexts, a more heuristic approach may be taken to balancing goodness o
 
 In addition to its role in generating initial parameter realizations, the prior parameter probability distribution supports the following aspects of PESTPP-IES calculations.
 
-1.  It features in equation 18 of Chen and Oliver (2013). This term of the equation is omitted if equation 19 is used for parameter field adjustment in its stead; as stated above, this occurs if *ies_use_approx()* is set to *true*.
+1.  It features in equation 18 of Chen and Oliver (2013). This term of the equation is omitted if equation 19 is used for parameter field adjustment in its stead; as stated above, this occurs if *ies_use_approx()* is set to *true*.  Note users can supply *ies_regularization_factor* as a negative value when *ies_use_approx* is *true*.  In this case, the prior component of the full solution upgrade equation 19 of Chen and Oliver is scaled by the absolute value of the regularization factor.  This allows users to apply a portion of the prior component rather than the full prior component
 
 2.  It provides weights to individual “regularization observations” that measure departures of adjusted parameter fields from initial parameter fields. This occurs if *ies_reg_factor()* is set to a value greater than zero.
 
@@ -4217,6 +4199,12 @@ Note also that the number of control variables may change with time. Refer to th
 <td>Text</td>
 <td>The name of a parameter realization in an external parameter ensemble file to run. Only used if noptmax = -2.</td>
 </tr>
+<tr class="even">
+<td><em>ies_reinflate_num_reals</em></td>
+<td>list of ints</td>
+<td>The number of realizations to use between reinflation cycles.  If negative, new realizations are drawn from the current ensemble.</td>
+</tr>
+
 </tbody>
 </table>
 
@@ -5136,7 +5124,281 @@ Variables discussed in section 5.3.6 that control parallel run management are no
 
 Table 13.2. PESTPP-MOU specific control arguments. PESTPP-MOU shares many other control arguments with PESTPP-OPT
 
-# <a id='s17' />14. References
+
+# <a id='s17' />14. PESTPP-SQP
+
+## <a id='s17-1' />14.1 Introduction
+PESTPP-SQP is a sophisticated tool for constrained nonlinear optimization that implements Sequential Quadratic Programming (SQP) methods with advanced ensemble-based gradient estimation capabilities. Designed for decision-support workflows in computationally expensive modeling applications, PESTPP-SQP addresses the challenge of optimizing model decision variables subject to complex model-based constraints, including chance constraints that account for uncertainty in constraint satisfaction.
+
+The tool represents a significant advancement in optimization methodology by combining classical SQP theory with modern ensemble-based approaches. At its core, PESTPP-SQP formulates local quadratic models of the Lagrangian function around the current decision variable vector, approximating the original nonlinear optimization problem with tractable quadratic programming subproblems. The mathematical foundation rests on the Karush-Kuhn-Tucker (KKT) optimality conditions, which serve as a "traffic control system" ensuring that any solution found is truly optimal and feasible.
+
+One of PESTPP-SQP's most innovative features is its implementation of the Stochastic Simplex Approximate Gradient (StoSAG) method developed by Fonseca et al. (2015). This ensemble-based gradient estimation approach fundamentally transforms how gradients are computed by leveraging statistical correlation analysis between parameter perturbations and objective function responses, eliminating the need for multiple expensive model runs typically required by finite difference methods. The StoSAG implementation includes sophisticated numerical techniques such as singular value decomposition with truncation thresholds to ensure robust gradient estimation even when parameter ensembles exhibit high correlation or near-singularity.
+
+The optimization process employs a sophisticated filter-based globalization strategy that provides more flexible alternatives to traditional penalty function approaches. This filter method maintains a partial ordering in the two-dimensional space of objective function values and constraint violations, allowing the algorithm to balance competing goals of optimality and feasibility more naturally than rigid penalty weights. When ensemble gradients are active, PESTPP-SQP can leverage CMA-ES (Covariance Matrix Adaptation Evolution Strategy) style population proposals with adaptive covariance mechanisms to avoid convergence to local minima and maintain population diversity.
+
+Advanced functionality includes automatic scaling mechanisms for steps and gradients, with intelligent fallback to diagonal rescaling or steepest descent when Hessian approximations become problematic. The tool supports both finite-difference and ensemble-based gradient computation, with optional restarts from prior Jacobian matrices and residuals to accelerate optimization. Working set tolerance mechanisms provide fine-grained control over constraint activation and deactivation, while adaptive localization weights help focus gradient information on the most relevant parameters in high-dimensional settings.
+
+
+## <a id='s17-2' />14.2 Theory
+### <a id='s17-2-1' />14.2.1 Background and Basic Equations
+
+PESTPP-SQP formulates a local quadratic model of the Lagrangian function around the current decision-variable vector x. This approach approximates the original nonlinear optimization problem with a simpler quadratic subproblem that can be solved efficiently. 
+
+For a constrained optimization problem:
+```
+minimize f(x)
+subject to: g_i(x) ≤ 0, i = 1, ..., m
+            h_j(x) = 0, j = 1, ..., p
+```
+
+The Lagrangian function is defined as:
+```
+L(x, λ, μ) = f(x) + Σᵢ λᵢ g_i(x) + Σⱼ μⱼ h_j(x)
+```
+
+where λᵢ ≥ 0 are the Lagrange multipliers for inequality constraints and μⱼ are the multipliers for equality constraints.
+
+At iteration k, PESTPP-SQP constructs a quadratic approximation to the Lagrangian around the current point (xₖ, λₖ, μₖ):
+```
+L(xₖ + d, λₖ, μₖ) ≈ L(xₖ, λₖ, μₖ) + ∇ₓL(xₖ, λₖ, μₖ)ᵀd + ½dᵀBₖd
+```
+
+where d is the search direction and Bₖ is an approximation to the Hessian matrix of the Lagrangian ∇²ₓₓL(xₖ, λₖ, μₖ). The quadratic subproblem becomes:
+```
+minimize: ∇f(xₖ)ᵀd + ½dᵀBₖd
+subject to: g_i(xₖ) + ∇g_i(xₖ)ᵀd ≤ 0, i = 1, ..., m
+            h_j(xₖ) + ∇h_j(xₖ)ᵀd = 0, j = 1, ..., p
+```
+
+This quadratic programming subproblem can be solved efficiently using specialized QP solvers, yielding a search direction dₖ that moves toward optimality while maintaining feasibility.
+
+The quadratic objective model employs an approximation to the Hessian matrix of the Lagrangian, which captures the curvature information of both the objective function and the constraints. By default, PESTPP-SQP uses the BFGS (Broyden-Fletcher-Goldfarb-Shanno) method with Powell damping to update this Hessian approximation, ensuring that the approximation maintains positive definiteness and provides good curvature information. For cases where the problem structure benefits from potentially indefinite approximations, the SR1 (Symmetric Rank-1) update method is also available.
+
+The equality-constrained quadratic programming subproblem is formed by identifying the working set of active inequality constraints at the current point. This working set represents the constraints that are currently "tight" or binding at the solution. PESTPP-SQP computes the search direction using two complementary approaches: the null-space method and direct KKT solving. The null-space method uses singular value decomposition (SVD) to project the problem into the null space of active constraints, computing a reduced-space Newton step that respects the constraint manifold. A range-space correction is then applied to ensure feasibility. When the null-space approach encounters numerical difficulties or becomes unsuitable, PESTPP-SQP falls back to a direct solution of the Karush-Kuhn-Tucker (KKT) system, providing a robust alternative that maintains convergence guarantees.
+
+The Karush-Kuhn-Tucker (KKT) conditions form the mathematical foundation that drives both step computation and active-set updates in PESTPP-SQP. In simple terms, KKT conditions are like a "traffic control system" for optimization that ensures any solution found is truly optimal and feasible. These conditions state that at an optimal solution, the gradient of the objective function must be expressible as a weighted combination of the gradients of the active constraints, where the weights (called Lagrange multipliers) are non-negative for inequality constraints. Think of it this way: if you're trying to minimize cost while staying within budget, the KKT conditions ensure that you can't improve the cost further without violating the budget constraint. 
+
+For a constrained optimization problem of the form:
+```
+minimize f(x)
+subject to: g_i(x) ≤ 0, i = 1, ..., m
+            h_j(x) = 0, j = 1, ..., p
+```
+
+where f(x) is the objective function, g_i(x) are inequality constraints, and h_j(x) are equality constraints, the KKT conditions are:
+
+**1. Stationarity:**
+```
+∇f(x*) + Σᵢ λᵢ∇g_i(x*) + Σⱼ μⱼ∇h_j(x*) = 0
+```
+
+**2. Primal Feasibility:**
+```
+g_i(x*) ≤ 0, i = 1, ..., m
+h_j(x*) = 0, j = 1, ..., p
+```
+
+**3. Dual Feasibility:**
+```
+λᵢ ≥ 0, i = 1, ..., m
+```
+
+**4. Complementary Slackness:**
+```
+λᵢ g_i(x*) = 0, i = 1, ..., m
+```
+
+Here, x* is the optimal solution, λᵢ are the Lagrange multipliers for inequality constraints, and μⱼ are the Lagrange multipliers for equality constraints. The stationarity condition ensures that the objective function gradient can be expressed as a weighted combination of constraint gradients. Primal feasibility guarantees that all constraints are satisfied. Dual feasibility requires non-negative multipliers for inequality constraints. Complementary slackness ensures that inactive constraints (g_i(x*) < 0) have zero multipliers, while active constraints (g_i(x*) = 0) can have positive multipliers.
+
+PESTPP-SQP uses these conditions to determine when constraints should enter or leave the active set and to compute search directions that move toward optimality while maintaining feasibility. All variable bounds are enforced at all times, ensuring that the optimization process never violates the fundamental parameter limits.
+
+To ensure that the algorithm converges to a good solution from any starting point, PESTPP-SQP employs a sophisticated filter method combined with line-search techniques. The filter method provides a more flexible alternative to traditional penalty function approaches by maintaining a "filter" of acceptable points in the two-dimensional space of objective function values and constraint violations. A trial point is accepted if it improves either the objective function or the total constraint violation without causing unacceptable degradation in the other metric. This creates a partial ordering that allows the algorithm to balance the competing goals of optimality and feasibility (similar to Pareto analysis) more naturally than rigid penalty weights. The line search component scales the computed search direction using user-provided multipliers, with internal Wolfe-like conditions guiding the acceptance of trial points. These conditions ensure that each step provides sufficient improvement in the objective function and maintains sufficient curvature information for future iterations.
+
+Hessian approximation management is crucial for the success of SQP methods, and PESTPP-SQP implements a robust system for maintaining reliable curvature information. The BFGS method with Powell damping serves as the default approach, carefully designed to maintain positive curvature even when the true Hessian might be indefinite. This is particularly important because positive definite Hessian approximations lead to well-conditioned subproblems and reliable search directions. When the problem structure suggests that indefinite curvature information might be more informative, such as in problems with saddle points or regions of negative curvature, users can choose to use the SR1 method as an alternative that can capture these information. However, PESTPP-SQP includes sophisticated automatic fallback mechanisms for situations where the Hessian approximation becomes problematic. When the computed search direction fails to be a descent direction (i.e., it would increase rather than decrease the objective), the algorithm automatically resorts to diagonal rescaling or steepest descent methods. This ensures that optimization progress continues even when curvature information becomes unreliable, maintaining the robustness of the overall approach.
+
+### <a id='s17-2-2' />14.2.2 Gradient approximation
+PESTPP-SQP employs similar ensemble-based gradient approximation technique that is used in PESTPP-IES. However, to enhance its robustness, scalability, and efficiency in solving constrained optimization problems, it implements Stochastic Simplex Approximate Gradient (StoSAG) method developed by Fonseca et al. (2015). T
+
+The StoSAG method fundamentally transforms how gradients are computed in optimization by leveraging ensemble-based statistical approaches similar to the approach by Chen and Oliver (2013) in IES. StoSAG uses an ensemble of parameter/decision-variable realizations and their corresponding objective function evaluations to estimate gradients instead of requiring multiple model runs to compute finite difference approximations.
+
+The mathematical foundation of StoSAG relies on the relationship between parameter perturbations and objective function responses, which is largely similar to the ensemble-based approach by Chen and Oliver (2013). However, the key distinction of StoSAG lies in how parameter anomalies are computed for gradient estimation. In the traditional IES approach, parameter anomalies are calculated as deviations from the ensemble mean, treating all ensemble members as equally weighted samples from the parameter distribution. StoSAG, however, computes parameter anomalies relative to a designated "base" realization, which represents the current best parameter estimate around which the gradient is being approximated. This base-centered anomaly computation ensures that the gradient estimation is properly localized around the point of interest in the optimization process, providing more accurate and relevant gradient information for computing search directions at the current iteration.
+
+PESTPP-SQP adds some features with the implementation of StoSAG to enhance its practical applicability. Similar to PESTPP-IES, the method uses selective subsets of ensemble members for gradient computation, which improves computational efficiency while maintaining robustness. The subset selection process ensures that the base realization is always included and uses intelligent sampling strategies to maintain gradient quality. This selective approach is particularly valuable for large-scale problems where full ensemble gradient computation would be computationally prohibitive.
+
+The StoSAG implementation also incorporates advanced numerical techniques to handle potential numerical instabilities. The method uses singular value decomposition (SVD) with truncation thresholds to compute the pseudo-inverse of the parameter covariance matrix, ensuring robust gradient estimation even when the parameter ensemble exhibits high correlation or near-singularity. This approach is based on the work of Dehdari and Oliver (2012) and provides a numerically stable alternative to direct matrix inversion.
+
+One of the key advantages of StoSAG over traditional finite difference methods is its ability to provide gradient information from ensemble members that may not be perfectly centered around the current parameter values. This flexibility allows PESTPP-SQP to leverage existing ensemble information from previous iterations or from other sources (such as ensemble Kalman filter applications), making the method particularly efficient for iterative optimization processes.
+
+The method also naturally incorporates uncertainty quantification, as the ensemble-based approach inherently provides information about the reliability of gradient estimates. This uncertainty information can be used to adaptively adjust optimization strategies, such as modifying step sizes or switching between different gradient approximation methods based on the estimated gradient quality.
+
+### <a id='s17-2-3' />14.2.3 Improving iterative realization sampling using Covariance Matrix Adaptation (CMA)
+
+PESTPP-SQP incorporates CMA to generate and adapt parameter and decision variable ensembles used for gradient estimation via StoSAG. The CMA-ES strategy continually updates the covariance matrix during the optimization workflow to ensure that the parameter/decision variable realizations generated in each iteration are well-positioned for accurate gradient approximation around the base realization. The adaptive covariance mechanism automatically adjusts the parameter sampling distribution based on successful search directions and maintains archives of feasible/infeasible solutions, leading to more efficient exploration and reliable gradient computation.
+
+Under the hood, PESTPP-SQP manages adaptive covariance updates, reinflation procedures to prevent degeneracy, and maintains archives of feasible and infeasible solutions. This approach helps avoid convergence to local minima and maintains population diversity throughout the optimization process. The adaptive covariance mechanism automatically adjusts the search distribution based on successful and unsuccessful search directions, leading to more efficient exploration of the parameter space.
+
+PESTPP-SQP features automatic scaling mechanisms for both steps and gradients. The update_scaling function monitors the relative step sizes compared to gradients and adjusts diagonal scaling factors accordingly. When the Hessian matrix becomes unreliable or produces non-descent directions, the algorithm automatically falls back to a scaled identity matrix with diagonal elements based on the computed scaling factors. This ensures continued progress even when curvature information becomes problematic.
+
+The restart functionality allows PESTPP-SQP to utilize previously computed Jacobian matrices and residuals to accelerate the first optimization step. This is particularly valuable for problems where initial model runs are expensive, as it can skip redundant computations and begin optimization from a more informed starting point. The working set tolerance mechanism provides fine-grained control over constraint activation and deactivation. The working_set_tol parameter determines when constraints enter or leave the active set, with automatic adjustment based on optimization progress. Successful iterations lead to tighter tolerance values, while failures result in relaxation of the tolerance to maintain feasibility.
+
+### <a id='s17-2-4' />14.2.4 PESTPP-SQP workflow
+
+PESTPP-SQP follows an iterative workflow that combines sequential quadratic programming theory with advanced ensemble-based gradient estimation and robust globalization strategies
+
+**1. Initialization and Setup**
+The optimization process begins with comprehensive initialization procedures that establish the foundation for subsequent iterations. PESTPP-SQP loads and parses the PEST control file, identifying decision variable groups specified through the `opt_dec_var_groups` option, and constructs the objective function definition from observation and prior information equation groups. The tool supports restart capabilities, allowing users to provide previously computed Jacobian matrices and residual files to accelerate the first optimization step, particularly valuable for expensive forward models. When using ensemble-based gradients, the initialization phase can optionally seed the parameter ensemble with user-provided realizations or generate an initial ensemble based on parameter covariance information.
+
+**2. Gradient Estimation and Hessian Approximation**
+Gradient estimation forms the core of each SQP iteration, with PESTPP-SQP offering two complementary approaches. For ensemble-based gradients using StoSAG, the tool leverages the current parameter ensemble to compute gradient estimates through statistical correlation analysis. This process involves calculating parameter covariances and cross-covariances with the objective function (and constraints, for constraint Jacobian approximation). When using finite-difference gradients, PESTPP-SQP performs a systematic Jacobian sequence, perturbing each parameter individually while optionally reusing base Jacobian information from previous runs to reduce computational overhead.
+
+Following gradient estimation, PESTPP-SQP updates the Hessian approximation using either BFGS with Powell damping (default) or SR1 methods. The BFGS approach maintains positive definiteness to ensure well-conditioned quadratic subproblems, while SR1 can capture indefinite curvature information useful for certain problem structures. Automatic scaling mechanisms monitor the relative step sizes compared to gradients and adjust diagonal scaling factors accordingly, with intelligent fallback to scaled identity matrices when curvature information becomes unreliable.
+
+**3. Quadratic Programming Subproblem Solution**
+The heart of each SQP iteration involves solving a quadratic programming subproblem that approximates the original constrained optimization problem. PESTPP-SQP identifies the working set of active inequality constraints based on the current working set tolerance, then constructs the constraint Jacobian matrix for these active constraints. The search direction is computed using either the null-space method (default) with SVD-based projection or direct KKT solving, depending on numerical conditions and problem structure. The null-space approach projects the problem into the constraint manifold's null space for reduced-space Newton steps, while direct KKT solving provides a robust alternative when numerical difficulties arise.
+
+**4. Globalization and Step Acceptance**
+Globalization ensures that each iteration makes meaningful progress toward optimality while maintaining feasibility. PESTPP-SQP employs a filter-based line search that maintains a partial ordering in the two-dimensional space of objective function values and constraint violations. The line search evaluates candidate steps using user-specified scale multipliers, testing each candidate against parameter bounds and constraint satisfaction. The filter method accepts trial points that improve either the objective function or constraint violations without causing unacceptable degradation in the other metric, providing more flexible alternatives to traditional penalty function approaches. The working set tolerance mechanism automatically adjusts based on optimization progress, tightening when iterations are successful and relaxing when failures occur to maintain feasibility.
+
+**5. CMA-ES Ensemble Adaptation (Ensemble Mode)**
+When using ensemble-based gradients, PESTPP-SQP incorporates CMA-ES strategies to adapt the parameter sampling distribution for improved gradient estimation quality. PESTPP-SQP updates the covariance matrix based on successful parameter combinations from previous iterations, maintains archives of feasible and infeasible solutions, and generates new parameter ensembles positioned for accurate gradient approximation around the current base realization. When the base solution becomes infeasible, automatic reinflation procedures prevent degeneracy by expanding the sampling distribution to restore exploration capability.
+
+**Step 6: Feasibility Recovery (When Needed)**
+If the optimization process encounters persistent infeasibility or stagnation, PESTPP-SQP activates an IES-based feasibility recovery routine. This specialized procedure focuses exclusively on achieving feasibility before returning to the main SQP optimization process, ensuring that the algorithm can recover from challenging initial conditions or constraint violations that might otherwise cause premature termination.
+
+**Termination Criteria**
+PESTPP-SQP employs multiple termination criteria to ensure comprehensive convergence assessment. The algorithm monitors stagnation in both objective function reduction and constraint improvement, evaluates KKT consistency for active constraints to verify optimality conditions, and supports standard PEST stop-file handling for user-controlled termination. This multi-faceted approach ensures that optimization continues only when meaningful progress is possible while providing reliable convergence guarantees for well-posed problems.
+
+
+### <a id='s17-2-5' />14.2.5 Running PESTPP-SQP
+
+PESTPP-SQP runs like other PEST++ tools:
+- Serial runs: call pestpp-sqp case
+- Parallel runs: use the manager/agent workflow described in this manual (section 5), including run management options.
+
+Inputs:
+- Standard PEST control file (parameters, bounds, observations/prior information, command lines, template/instruction files).
+- Optional Jacobian/residuals for hot starts.
+- Optional parameter/observation ensembles (CSV/JCO/JCB) for ensemble gradient mode.
+
+### <a id='s17-2-6' />14.2.6 PESTPP-SQP Output Files
+
+The following table summarizes the contents of files that are recorded by PESTPP-SQP. Most of these have been discussed above. It is assumed that the PEST control file on which the inversion process is based is named *case.pst*.
+
+<div style="text-align: left"><table>
+</div><colgroup>
+<col style="width: 33%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>File</strong></th>
+<th><strong>Contents</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><em>case.rec</em></td>
+<td>Run record file. This file records a complete history of the optimization process with per-iteration summaries including objective function values, constraint violations, working set and filter decisions, and Hessian updates.</td>
+</tr>
+<tr class="even">
+<td><em>case.rmr</em></td>
+<td>Parallel run management record file.</td>
+</tr>
+<tr class="odd">
+<td><em>case.log</em></td>
+<td>Performance record. This file records the times commenced and completed various processing tasks.</td>
+</tr>
+<tr class="even">
+<td><em>case.par</em></td>
+<td>Decision variable values at the best-so-far solution.</td>
+</tr>
+<tr class="odd">
+<td><em>case.&lt;N&gt;.par</em></td>
+<td>Decision variable values at iteration N.</td>
+</tr>
+<tr class="even">
+<td><em>case.rei</em></td>
+<td>Residuals file for accepted/base points.</td>
+</tr>
+<tr class="odd">
+<td><em>case.&lt;N&gt;.rei</em></td>
+<td>Residuals file for iteration N diagnostics.</td>
+</tr>
+<tr class="even">
+<td><em>case.&lt;N&gt;.jcb</em></td>
+<td>Iteration Jacobians (finite difference mode only).</td>
+</tr>
+<tr class="odd">
+<td><em>case.dv_candidates.csv</em></td>
+<td>Candidate decision variable batches from line search.</td>
+</tr>
+<tr class="even">
+<td><em>case.oe_candidates.csv</em></td>
+<td>Candidate observation batches from line search.</td>
+</tr>
+<tr class="odd">
+<td><em>case.&lt;N&gt;.par.csv</em><br>
+<em>case.&lt;N&gt;.par.jcb</em></td>
+<td>Decision variable ensembles per iteration (ensemble mode). Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format.</td>
+</tr>
+<tr class="even">
+<td><em>case.&lt;N&gt;.obs.csv</em><br>
+<em>case.&lt;N&gt;.obs.jcb</em></td>
+<td>Observation ensembles per iteration (ensemble mode). Depending on the value of <em>SAVE_BINARY</em>, the file may be stored in csv format or binary format.</td>
+</tr>
+<tr class="odd">
+<td><em>case.&lt;N&gt;.pcs.csv</em></td>
+<td>Parameter change summaries (ensemble mode).</td>
+</tr>
+<tr class="even">
+<td><em>case.chance.*</em></td>
+<td>Chance-related outputs if chance constraints are active (e.g., chance-shifted summaries analogous to MOU).</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+Table 14.1. Files recorded by PESTPP-SQP.
+
+File names use the standard PEST++ conventions shown elsewhere in this manual.
+
+
+## <a id='s17-3' />17.3 Summary of PESTPP-SQP control variables
+### <a id='s17-3-1' />17.4.1 General
+
+Like all the tools in the PEST++ suite, PESTPP-MOU uses a control file, template files, and instruction files.
+
+### <a id='s17-3-2' />17.4.2 Control Variables in the PEST Control File 
+
+### <a id='s17-3-3' />17.4.3 PEST++ Control Variables
+
+Table 17.XXX lists PEST++ control variables that are specific to only PESTPP-SQP. The objective function is identified using the same control variable used for PESTPP-OPT. Likewise, constraints are identified the same way as in PESTPP-OPT/MOU (via group names and inequality sense). If a variable is not supplied, a default value is employed. The value of the default is presented along with the name of each variable in the table below.
+
+Variables discussed in section 5.3.6 that control parallel run management are not listed in table 13.2.
+
+| Variable                        | Type | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|-------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| *sqp_num_reals(0)*                    | integer                | >0 enables ensemble-gradient SQP; 0 uses finite-difference gradients. |
+| *sqp_dv_en()*                         | text                   | Initial DV ensemble file (CSV/JCO/JCB). If omitted, draws from prior covariance. |
+| *sqp_obs_restart_en()*                | text                   | Observation ensemble restart (CSV/JCO/JCB) matched to DV ensemble if available. |
+| *base_jacobian()*                     | text                   | JCO/JCB file for hot-start Jacobian in FD mode. |
+| *sqp_alpha_mults(0.25,0.5,1.0,2.0)*   | list of reals          | Line-search scale multipliers. |
+| *sqp_filter_tol(1.0e-6)*              | real                   | Filter tolerance for objective/violation dominance. |
+| *sqp_working_set_tol(1.0e-4)*         | real                   | Tolerance to classify an inequality as active. |
+| *sqp_update_hessian(true)*            | boolean                | Enable/disable BFGS/SR1 Hessian updates (BFGS default internally). |
+| *sqp_subset_size(-10)*                | integer                | Ensemble subset size for gradient estimation; negative means percent of current ensemble size. |
+| *sqp_cma_stepsize_control(false)*     | boolean | Enable CMA-ES step-size control via evolution path. |
+| *sqp_cma_c1()*                         | real    | Rank-one learning rate. |
+| *sqp_cma_cmu()*                        | real    | Rank-μ learning rate. |
+| *sqp_cma_cc()*                         | real    | Cumulation (time scale) for the evolution path. |
+| *sqp_cma_reinflation_factor(1.1)*      | real    | Reinflation factor to maintain exploration when base realization is infeasible. |
+
+
+
+# <a id='s18' />15. References
 
 Ahlfeld, D.P. and Mulligan, A.E., 2000. Optimal Management of Flow in Groundwater Systems. Vol 1. Academic Press.
 
@@ -5154,7 +5416,9 @@ Chen, Y. and Oliver, D.S., 2016. Localization and regularization for iterative e
 
 Coello, C.A.C., Pulido, G.T., Lechuga, M.S., (2004). Handling multiple objectives with particle swarm optimization. *IEEE Transactions on Evolutionary Computing* 8. doi: <https://doi.org/10.1109/tevc.2004.826067>.
 
-Doherty, J., 2015. Calibration and uncertainty analysis for complex environmental models. Published by Watermark Numerical Computing, Brisbane, Australia. 227pp. ISBN: 978-0-9943786-0-6. Downloadable from [www.pesthomepage.org](http://www.pesthomepage.org).
+Dehdari, V., and Oliver, D.S., (2012). "Sequential Quadratic Programming for Solving Constrained Production Optimization–Case Study From Brugge Field." *SPE Journal* (17) 874–884. doi: <https://doi.org/10.2118/141589-PA>
+
+Doherty, J., 2015. Calibration and uncertainty analysis for complex environmental models. Published by Watermark Numerical Computing, Brisbane, Australia. 227pp. ISBN: 978-0-9943786-0-6. doi: <http://www.pesthomepage.org>.
 
 Doherty, J., 2018a. Manual for PEST: Model-Independent Parameter Estimation. Part 1: PEST, SENSAN and Global Optimisers. Watermark Numerical Computing, Brisbane, Australia. Downloadable from [www.pesthomepage.org](http://www.pesthomepage.org).
 
@@ -5178,6 +5442,8 @@ Evensen, G. 2003. The ensemble Kalman filter: Theoretical formulation and practi
 
 Fienen, M.N., Doherty, J.E., Hunt, R.J., and Reeves, H.W., 2010. Using Prediction Uncertainty Analysis to Design Hydrologic Monitoring Networks: Example Applications from the Great Lakes Water Availability Pilot Project. U.S. Geological Survey Scientific Investigations Report 2010–5159, 44 p. \[http://pubs.usgs.gov/sir/2010/5159 \]
 
+Fonseca, R. M., Leeuwenburgh, O., Van den Hof, P. M., and J. D. Jansen. "Improving the Ensemble Optimization Method Through Covariance Matrix Adaptation (CMA-EnOpt)." Paper presented at the SPE Reservoir Simulation Symposium, The Woodlands, Texas, USA, February 2013. doi: <https://doi.org/10.2118/163657-MS>.
+
 Forrest, J., Nuez, D., Lougee-Heimer, R., 2016. CLP: COIN-OR Linear Programming Solver. https://projects.coin-or.org/Clp. (Accessed 9 November 2016).
 
 Hantush, M.M., Marino, M.A., 1989. Chance-constrained model for management of stream-aquifer system. *J. Water Resour. Plan. Manag.* 115 (3), 259-277.
@@ -5192,7 +5458,7 @@ Lougee-Heimer, R., 2003. The common optimization interface for operations resear
 
 Luo, X., Bhakta, T. and Naevdal, G., 2018. Correlation-based adaptive localization with applications to ensemble-based 4d seismic history-matching. *SPE Journal, April 2018, 396-427.*
 
-Macasieb, R.Q., White, J.T., Damiano, P., Siade, A.J., 2025. A Probabilistic Approach to Surrogate-Assisted Multi-Objective Optimization of Complex Groundwater Problems. *Water Resources Research* 61 (5), e2024WR038554. https://doi.org/10.1029/2024WR038554.
+Macasieb, R. Q., White, J. T., Pasetto, D., & Siade, A. J. (2025). A probabilistic approach to surrogate‐assisted multi‐objective optimization of complexgroundwater problems. *Water Resources Research*, 61, e2024WR038554. doi: <https://doi.org/10.1029/2024WR038554>.
 
 Miller, B.L., Wagner, H.M., 1965. Chance constrained programming with joint constraints. *Operations Res.* 13 (6), 930-945.
 

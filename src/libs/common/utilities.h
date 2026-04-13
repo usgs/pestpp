@@ -50,6 +50,8 @@ namespace pest_utils
 	}
 
 
+	vector<string> tokenize_w_quotes(const std::string& input);
+
 	/* @brief Splits a string and returns the sub-strings.
 
 	String str is split into sub-strings using the characters specified
@@ -97,6 +99,7 @@ namespace pest_utils
 		return x;
 	}
 
+	void strip_nonascii_ip(string &s);
 	/* @brief Strip leading and/or trailing characters from a string
 
 		The characters contained in argument delimiters are stripped from
@@ -332,6 +335,7 @@ public:
 	vector<string> get_row_vector(string key, string col_name, vector<string> include_cols = vector<string>());
 	vector<string> get_col_string_vector(string col_name);
 	void set_index_col_name(string& _col_name);
+	void set_data_value(const string& row_name, const string& col_name, const string& value, bool forgive=false);
 	string get_index_col_name() { return index_col_name; }
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
@@ -383,11 +387,17 @@ inline void ExternalCtlFile::fill_col_vector(string col_name, vector<t>& col_vec
 	}
 }
 
+
+
 string get_time_string();
 string get_time_string_short();
+bool cmp_pair(pair<string,double>& first, pair<string,double>& second);
 
 int quit_file_found();
 bool try_remove_quit_file();
+
+
+
 
 class CmdLine {
 
@@ -398,13 +408,18 @@ public:
 	string panther_host_name;
 	string org_cmdline_str;
 	string panther_port;
+	string opersys;
+	string cwd;
 	bool jac_restart;
 	bool restart;
 	RunManagerType runmanagertype;
+
+	void startup_report(ostream& s,string start_string);
 private:
 	void throw_cmdline_error(string message);
 
 };
+
 
 
 

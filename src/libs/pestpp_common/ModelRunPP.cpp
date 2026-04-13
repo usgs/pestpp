@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file ModelRunPP.cpp
+ * @brief Implementation of ModelRunPP.
+ */
+
 #include <vector>
 #include <map>
 #include "utilities.h"
@@ -35,6 +40,14 @@
 using namespace std;
 using namespace pest_utils;
 
+/**
+ * @brief Model run.
+ *
+ * @param _obj_func_ptr Description.
+ * @param _sim_obs Description.
+ *
+ * @return Description.
+ */
 ModelRun::ModelRun(const ObjectiveFunc *_obj_func_ptr, const Observations &_sim_obs)
 	: obj_func_ptr(_obj_func_ptr), sim_obs(_sim_obs), obs_is_valid(false)
 {
@@ -51,18 +64,33 @@ ModelRun& ModelRun::operator=(const ModelRun &rhs)
 }
 
 
+/**
+ * @brief Get frozen ctl pars.
+ *
+ * @return Description.
+ */
 Parameters ModelRun::get_frozen_ctl_pars() const
 {
 	Parameters frz_pars(ctl_pars, frozen_ctl_par_names);
 	return frz_pars;
 }
 
+/**
+ * @brief Set frozen ctl parameters.
+ *
+ * @param frz_pars Description.
+ */
 void ModelRun::set_frozen_ctl_parameters(const Parameters &frz_pars)
 {
 	frozen_ctl_par_names.clear();
 	add_frozen_ctl_parameters(frz_pars);
 }
 
+/**
+ * @brief Add frozen ctl parameters.
+ *
+ * @param frz_pars Description.
+ */
 void ModelRun::add_frozen_ctl_parameters(const Parameters &frz_pars)
 {
 	for (auto &ipar : frz_pars)
@@ -72,16 +100,30 @@ void ModelRun::add_frozen_ctl_parameters(const Parameters &frz_pars)
 	}
 }
 
+/**
+ * @brief Clear frozen ctl parameters.
+ */
 void ModelRun::clear_frozen_ctl_parameters()
 {
 	frozen_ctl_par_names.clear();
 }
 
+/**
+ * @brief Set ctl parameters.
+ *
+ * @param pars Description.
+ */
 void ModelRun::set_ctl_parameters(const Parameters &pars)
 {
 	ctl_pars = pars;
 }
 
+/**
+ * @brief Update ctl.
+ *
+ * @param ctl_pars Description.
+ * @param obs Description.
+ */
 void ModelRun::update_ctl(Parameters &ctl_pars, Observations &obs)
 {
 	set_ctl_parameters(ctl_pars);
@@ -89,6 +131,11 @@ void ModelRun::update_ctl(Parameters &ctl_pars, Observations &obs)
 	set_observations(obs);
 }
 
+/**
+ * @brief Set observations.
+ *
+ * @param observations Description.
+ */
 void ModelRun::set_observations(const Observations &observations)
 {
 	sim_obs = observations;
@@ -108,6 +155,11 @@ const Observations &ModelRun::get_obs() const
 	return sim_obs;
 }
 
+/**
+ * @brief Get obs template.
+ *
+ * @return Description.
+ */
 Observations ModelRun::get_obs_template() const
 {
 	Observations ret_val(sim_obs);
@@ -118,6 +170,14 @@ Observations ModelRun::get_obs_template() const
 	return ret_val;
 }
 
+/**
+ * @brief Get phi.
+ *
+ * @param dynamic_reg Description.
+ * @param norm Description.
+ *
+ * @return Description.
+ */
 double ModelRun::get_phi(const DynamicRegularization &dynamic_reg, double norm)
 {
 	PhiComponets phi_comp_temp = get_phi_comp(dynamic_reg, norm);
@@ -125,6 +185,14 @@ double ModelRun::get_phi(const DynamicRegularization &dynamic_reg, double norm)
 }
 
 
+/**
+ * @brief Get phi comp.
+ *
+ * @param dynamic_reg Description.
+ * @param norm Description.
+ *
+ * @return Description.
+ */
 PhiComponets ModelRun::get_phi_comp(const DynamicRegularization &dynamic_reg, double norm) const
 {
 	PhiComponets phi_comp = obj_func_ptr->get_phi_comp(sim_obs, get_ctl_pars(), dynamic_reg, norm);
@@ -132,6 +200,13 @@ PhiComponets ModelRun::get_phi_comp(const DynamicRegularization &dynamic_reg, do
 }
 
 
+/**
+ * @brief Get residuals vec.
+ *
+ * @param obs_names Description.
+ *
+ * @return Description.
+ */
 vector<double> ModelRun::get_residuals_vec(const vector<string> &obs_names)
 {
 	return obj_func_ptr->get_residuals_vec(get_obs(), get_ctl_pars(), obs_names);
@@ -148,11 +223,25 @@ vector<double> ModelRun::get_residuals_vec(const vector<string> &obs_names)
 //}
 
 
+/**
+ * @brief Obs valid.
+ *
+ * @return Description.
+ */
 bool ModelRun::obs_valid() const
 {
 	return obs_is_valid;
 }
 
+/**
+ * @brief Cmp lt.
+ *
+ * @param r1 Description.
+ * @param r2 Description.
+ * @param reg Description.
+ *
+ * @return Description.
+ */
 bool ModelRun::cmp_lt(const ModelRun &r1, const ModelRun &r2, const DynamicRegularization &reg)
 {
 	bool cmp_flg = 0;
@@ -181,6 +270,9 @@ bool ModelRun::cmp_lt(const ModelRun &r1, const ModelRun &r2, const DynamicRegul
 	return cmp_flg;
 }
 
+/**
+ * @brief Destructor for .
+ */
 ModelRun::~ModelRun()
 {
 }

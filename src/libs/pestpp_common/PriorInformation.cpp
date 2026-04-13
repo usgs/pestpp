@@ -16,6 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file PriorInformation.cpp
+ * @brief Implementation of PriorInformation.
+ */
+
 #include "PriorInformation.h"
 #include <string>
 #include <vector>
@@ -27,6 +32,15 @@
 using namespace::std;
 using namespace pest_utils;
 
+/**
+ * @brief P i atom.
+ *
+ * @param _par_name Description.
+ * @param _log_trans Description.
+ * @param _factor Description.
+ *
+ * @return Description.
+ */
 PIAtom::PIAtom(const string &_par_name, bool _log_trans, double _factor)
 	: par_name(_par_name), log_trans(_log_trans), factor(_factor)
 {
@@ -39,6 +53,13 @@ PriorInformationRec::PriorInformationRec(double _pival, double _weight,
 {
 }
 
+/**
+ * @brief Prior information rec.
+ *
+ * @param rhs Description.
+ *
+ * @return Description.
+ */
 PriorInformationRec::PriorInformationRec(const PriorInformationRec &rhs)
 {
 	*this = rhs;
@@ -53,6 +74,11 @@ const PriorInformationRec& PriorInformationRec::operator=(const PriorInformation
 	return *this;
 }
 
+/**
+ * @brief Get atom factors.
+ *
+ * @return Description.
+ */
 map<string, double> PriorInformationRec::get_atom_factors()
 {
 	map<string, double> piatom_factors;
@@ -61,6 +87,13 @@ map<string, double> PriorInformationRec::get_atom_factors()
 	return piatom_factors;
 }
 
+/**
+ * @brief Calc residual.
+ *
+ * @param pars Description.
+ *
+ * @return Description.
+ */
 double PriorInformationRec::calc_residual(const Parameters &pars) const
 {
 	double sim_value = 0;
@@ -80,6 +113,13 @@ double PriorInformationRec::calc_residual(const Parameters &pars) const
 }
 
 
+/**
+ * @brief Calc sim and resid.
+ *
+ * @param pars Description.
+ *
+ * @return Description.
+ */
 pair<double,double> PriorInformationRec::calc_sim_and_resid(const Parameters &pars) const
 {
 	double sim_value = 0;
@@ -98,6 +138,11 @@ pair<double,double> PriorInformationRec::calc_sim_and_resid(const Parameters &pa
 	return pair<double,double>(sim_value,(sim_value - pival));
 }
 
+/**
+ * @brief Is regularization.
+ *
+ * @return Description.
+ */
 bool PriorInformationRec::is_regularization() const
 {
 	bool is_reg = false;
@@ -106,11 +151,22 @@ bool PriorInformationRec::is_regularization() const
 	return is_reg;
 }
 
+/**
+ * @brief Destructor for .
+ */
 PriorInformationRec::~PriorInformationRec(void)
 {
 }
 
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param out Description.
+ * @param rhs Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream& out, const PriorInformationRec &rhs)
 {
 	struct Local {
@@ -138,6 +194,12 @@ ostream& operator<< (ostream& out, const PriorInformationRec &rhs)
 	return out;
 }
 
+/**
+ * @brief Add record.
+ *
+ * @param name Description.
+ * @param pi_rec_ptr Description.
+ */
 void PriorInformation::AddRecord(const string &name, const PriorInformationRec* pi_rec_ptr)
 {
 	PriorInformationRec pi_rec(pi_rec_ptr->get_obs_value(), pi_rec_ptr->get_weight(), pi_rec_ptr->get_group(), pi_rec_ptr->get_atoms());
@@ -145,6 +207,13 @@ void PriorInformation::AddRecord(const string &name, const PriorInformationRec* 
 
 }
 
+/**
+ * @brief Add record.
+ *
+ * @param pi_line Description.
+ *
+ * @return Description.
+ */
 pair<string, string> PriorInformation::AddRecord(const string& pi_line)
 {
 	vector<string> tokens;
@@ -204,6 +273,13 @@ pair<string, string> PriorInformation::AddRecord(const string& pi_line)
 }
 
 
+/**
+ * @brief Add record.
+ *
+ * @param tokens Description.
+ *
+ * @return Description.
+ */
 pair<string, string> PriorInformation::AddRecord(const vector<string> tokens)
 {
 	//here we expect tokens to have the entire pi equation as a string, so we need to split it up and insert it into tokens
@@ -263,6 +339,11 @@ pair<string, string> PriorInformation::AddRecord(const vector<string> tokens)
 	return pair<string, string>(prior_info_name, group);
 }
 
+/**
+ * @brief Get keys.
+ *
+ * @return Description.
+ */
 vector<string> PriorInformation::get_keys() const
 {
 	vector<string> ret_val;
@@ -275,6 +356,11 @@ vector<string> PriorInformation::get_keys() const
 	return ret_val;
 }
 
+/**
+ * @brief Get nnz pi.
+ *
+ * @return Description.
+ */
 int PriorInformation::get_nnz_pi() const
 {
 	int nnz = 0;

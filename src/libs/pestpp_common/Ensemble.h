@@ -18,6 +18,7 @@
 
 const string BASE_REAL_NAME = "BASE";
 const string MEDIAN_CENTER_ON_NAME = "_MEDIAN_";
+const string MEAN_REAL_NAME = "MEAN";
 
 class Ensemble
 {
@@ -208,7 +209,7 @@ private:
 	transStatus tstat;
 	void save_fixed(vector<string>& fixed_names);
 	void fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names);
-	void replace_fixed(string real_name,Parameters &pars);
+	void replace_fixed(string real_name,Parameters &pars,bool to_model=false);
 	void prep_par_ensemble_after_read(map<string,int>& header_info);
 	FixedParInfo pfinfo;
 };

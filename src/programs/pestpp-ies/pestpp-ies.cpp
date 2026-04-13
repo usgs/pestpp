@@ -1,3 +1,7 @@
+/**
+ * @file pestpp-ies.cpp
+ * @brief Implementation of pestpp-ies.
+ */
 // pestpp-ies.cpp : Defines the entry point for the console application.
 //
 
@@ -28,13 +32,22 @@
 #include "logger.h"
 #include "Ensemble.h"
 #include "EnsembleSmoother.h"
+#include "../../libs/run_managers/external/RunManagerExternal.h"
 
 using namespace std;
 using namespace pest_utils;
 
-
+/**
+ * @brief Main.
+ *
+ * @param argc Description.
+ * @param argv Description.
+ *
+ * @return Description.
+ */
 int main(int argc, char* argv[])
 {
+
 #ifndef _DEBUG
 	try {
 #endif
@@ -43,11 +56,9 @@ int main(int argc, char* argv[])
         cout << "             pestpp-ies: a GLM iterative ensemble smoother" << endl << endl;
         //cout << "                     for PEST(++) datasets " << endl << endl;
         cout << "                   by the PEST++ development team" << endl;
-        cout << endl << endl << "version: " << version << endl;
-        cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+        cout << endl;
         auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
-        cout << "started at " << start_string << endl;
         CmdLine cmdline(argc, argv);
 
         if (quit_file_found()) {
@@ -72,6 +83,8 @@ int main(int argc, char* argv[])
                 ofstream frec("panther_worker.rec");
                 if (frec.bad())
                     throw runtime_error("error opening 'panther_worker.rec'");
+                cmdline.startup_report(frec,start_string);
+                cmdline.startup_report(cout,start_string);
                 PANTHERAgent yam_agent(frec);
                 string ctl_file = "";
                 try {
@@ -108,11 +121,11 @@ int main(int argc, char* argv[])
             return 1;
 
         }
-        if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL) {
-            cerr << "external run manager ('/e') no supported in PESTPP-IES, please use PANTHER instead" << endl;
-            return 1;
-
-        }
+        // if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL) {
+        //     cerr << "external run manager ('/e') no supported in PESTPP-IES, please use PANTHER instead" << endl;
+        //     return 1;
+        //
+        // }
 
         RestartController restart_ctl;
 
@@ -133,24 +146,13 @@ int main(int argc, char* argv[])
         ofstream &fout_rec = file_manager.rec_ofstream();
         PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
-        if (!restart_flag || save_restart_rec_header) {
-            fout_rec << "             pestpp-ies - a GLM iterative Ensemble Smoother" << endl
-                     << "                      for PEST(++) datasets " << endl << endl;
-            fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
-            fout_rec << endl;
-            fout_rec << endl << endl << "version: " << version << endl;
-            fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-            fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-            fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-            fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
-            fout_rec << "started at " << start_string << endl << endl;
 
-        }
-
-        cout << endl;
-        cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-        cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-        cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+        fout_rec << "             pestpp-ies - a GLM iterative Ensemble Smoother" << endl
+                 << "                      for PEST(++) datasets " << endl << endl;
+        fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
+        fout_rec << endl;
+        cmdline.startup_report(fout_rec,start_string);
+        cmdline.startup_report(cout,start_string);
 
         // create pest run and process control file to initialize it
         Pest pest_scenario;
@@ -227,7 +229,7 @@ int main(int argc, char* argv[])
                      << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..."
                      << endl << endl;
             }
-            const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+
             run_manager_ptr = new RunManagerPanther(
                     rns_file, cmdline.panther_port,
                     file_manager.open_ofile_ext("rmr"),
@@ -239,8 +241,18 @@ int main(int argc, char* argv[])
                     vector<string>{}, vector<string>{},
                     pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
-                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
-        } else {
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
+                    pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
+        }
+        else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+        {
+            const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+            run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+            exi.tplfile_vec, exi.inpfile_vec,
+           exi.insfile_vec, exi.outfile_vec,
+            rns_file);
+        }
+	    else {
             performance_log.log_event("starting basic model IO error checking");
             cout << "checking model IO files...";
             pest_scenario.check_io(fout_rec);

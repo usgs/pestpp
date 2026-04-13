@@ -1,5 +1,9 @@
 # This is the top-level CMake file for PEST++
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.15)
+set(CMAKE_VERBOSE_MAKEFILE,ON)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_definitions(_DEBUG)
+endif()
 
 # Get PESTPP_VERSION from common source header
 file(READ "${CMAKE_SOURCE_DIR}/src/libs/common/config_os.h" _file)
@@ -14,9 +18,12 @@ message(STATUS
   "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION}")
 
 # This logic needs to be considered before project()
+if(MSVC)
+    add_compile_options(/bigobj)
+endif()
 set(_change_MSVC_flags FALSE)
 if(WIN32)
-  add_compile_options(/bigobj)
+  add_compile_definitions(NOMINMAX)
   if(CMAKE_VERSION VERSION_LESS 3.15.0)
     set(_change_MSVC_flags TRUE)
   else()
@@ -28,27 +35,12 @@ endif()
 
 project(PESTPP
   VERSION ${PESTPP_VERSION}
+  HOMEPAGE_URL "https://github.com/usgs/pestpp/"
   LANGUAGES CXX)
 
 # Prevent running cmake in source dir
 if("${PESTPP_SOURCE_DIR}" STREQUAL "${PESTPP_BINARY_DIR}")
    message(SEND_ERROR "In-source builds are not allowed")
-endif()
-
-if(_change_MSVC_flags)
-  # Modify compile flags to change MSVC runtime from /MD to /MT
-  set(_re_match "([\\/\\-]M)D")
-  set(_re_replace "\\1T")
-  string(REGEX REPLACE ${_re_match} ${_re_replace}
-    CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  string(REGEX REPLACE ${_re_match} ${_re_replace}
-    CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-  string(REGEX REPLACE ${_re_match} ${_re_replace}
-    CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-  string(REGEX REPLACE ${_re_match} ${_re_replace}
-    CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL}")
-  string(REGEX REPLACE ${_re_match} ${_re_replace}
-    CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 endif()
 
 # Fortran is not required (anymore), but can be enabled using either:
@@ -85,6 +77,7 @@ message(STATUS "CMAKE_THREAD_LIBS_INIT=${CMAKE_THREAD_LIBS_INIT}")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE)
 
 add_compile_definitions(_HAS_STD_BYTE=0)
 

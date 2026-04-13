@@ -1,3 +1,7 @@
+/**
+ * @file utilities.cpp
+ * @brief Implementation of utilities.
+ */
 #include <stdio.h>
 #include <string>
 #include <cctype>
@@ -16,6 +20,7 @@
 #include "network_package.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include "network_wrapper.h"
 
 
 //template <class T> const T& min ( const T& a, const T& b );
@@ -28,6 +33,14 @@
 
 using namespace std;
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 std::ostream& operator<< (std::ostream &os, const std::set<std::string> val)
 {
 	for (const auto &i : val)
@@ -37,6 +50,14 @@ std::ostream& operator<< (std::ostream &os, const std::set<std::string> val)
 	return os;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 std::ostream& operator<< (std::ostream &os, const std::vector<std::string> val)
 {
 	for (const auto &i : val)
@@ -46,6 +67,13 @@ std::ostream& operator<< (std::ostream &os, const std::vector<std::string> val)
 	return os;
 }
 
+/**
+ * @brief Print.
+ *
+ * @param val Description.
+ * @param os Description.
+ * @param indent Description.
+ */
 void print(std::set<std::string> val, std::ostream &os, int indent)
 {
 	string space(indent, ' ');
@@ -66,6 +94,45 @@ double get_duration_sec(std::chrono::system_clock::time_point start_time)
 {
 	chrono::system_clock::duration dt = chrono::system_clock::now() - start_time;
 	return (double)std::chrono::duration_cast<std::chrono::milliseconds>(dt).count() / 1000.0;
+}
+
+// Split `input` on whitespace into tokens.  Single and double quotes may be
+// nested inside each other; all quote characters (at every nesting level) are
+// stripped from the output.  Empty and whitespace-only tokens are omitted.
+// Throws std::runtime_error if a quoted section is never closed.
+std::vector<std::string> tokenize_w_quotes(const std::string& input) {
+    std::vector<std::string> tokens;
+    std::string current;
+    std::vector<char> quote_stack; // innermost open-quote char at back
+
+    for (char c : input) {
+        if (!quote_stack.empty() && c == quote_stack.back()) {
+            // Closing quote matches the innermost open quote — pop it.
+            // The quote character itself is not copied into the token.
+            quote_stack.pop_back();
+        } else if (c == '"' || c == '\'') {
+            // Opening quote (or an inner quote of the other type) — push it.
+            // The quote character itself is not copied into the token.
+            quote_stack.push_back(c);
+        } else if (quote_stack.empty() && (c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+            // Whitespace outside all quotes — flush non-empty token.
+            if (!current.empty()) {
+                tokens.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += c;
+        }
+    }
+
+    if (!quote_stack.empty()) {
+        throw std::runtime_error("unterminated quoted string: '" + input + "'");
+    }
+    if (!current.empty()) {
+        tokens.push_back(current);
+    }
+
+    return tokens;
 }
 
 template < class ContainerT >
@@ -111,6 +178,17 @@ enough to be able to accept some of these foreign types naturally.
 // Instantiate tokenize for the explicitly specified vector<string> container
 template void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty);
 template void tokenize(const std::string& str, list<string>& tokens, const std::string& delimiters, const bool trimEmpty);
+
+bool invalidChar (char c)
+{
+	return !(c>=0 && (unsigned char)c<128);
+}
+
+void strip_nonascii_ip(string &s) {
+	s.erase(remove_if(s.begin(),s.end(), invalidChar), s.end());
+
+}
+
 
 std::string& strip_ip(string &s, const string &op, const string &delimiters)
 {
@@ -1501,6 +1579,11 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 	jout.close();
 }
 
+bool cmp_pair(pair<string,double>& first, pair<string,double>& second)
+{
+	return first.second > second.second;
+}
+
 void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data)
 {
     if (!out.good())
@@ -1739,6 +1822,34 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string 
 	int idx = get_row_idx(key, col_name);
 	return get_row_map(idx,include_cols);
 }
+void ExternalCtlFile::set_data_value(const string& row_name, const string &col_name, const string &value, bool forgive) {
+	map<string,int> idx_map;
+	vector<string> col_vector = get_col_string_vector(index_col_name);
+	for (int i=0;i<col_vector.size();i++) {
+		idx_map[col_vector[i]] = i;
+	}
+	if (idx_map.find(row_name) == idx_map.end()) {
+		if (forgive) {
+			return;
+		}
+		else {
+			throw_externalctrlfile_error("row_name '" + row_name + "' not found");
+		}
+	}
+	int row_idx = idx_map[row_name];
+
+
+	set<string> col_names = get_col_set();
+	if (col_names.find(col_name) == col_names.end()) {
+		if (forgive) {
+			return;
+		}
+		else {
+			throw_externalctrlfile_error("set_data_value(): col_name '"+col_name + "' not found");
+		}
+	}
+	data.at(row_idx).at(col_name) = value;
+}
 
 map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<string> include_cols)
 {
@@ -1880,16 +1991,20 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		
 		//check for double quotes
 		tokenize(next_line, quote_tokens, "\"", false);
+        bool stripped_last = false;
+
         if (quote_tokens[quote_tokens.size()-1].size() == 0)
         {
             quote_tokens.pop_back();
+            stripped_last = true;
         }
         if (quote_tokens.size() > 1)
 		{
 			int nqt = quote_tokens.size();
-			if (nqt % 2 != 0)
+			if ((!stripped_last) && (nqt % 2 == 0))
 				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
 			tokens.clear();
+        	bool last_empty_with_delim = false;
 			for (int i = 0; i < nqt; i++)
 			{
 				
@@ -1903,13 +2018,26 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 					tokenize(strip_cp(quote_tokens[i]), temp_tokens, ddelim,false);
 					
 					last_size = quote_tokens[i].size();
-					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
-						temp_tokens.pop_back();
-					for (auto t : temp_tokens)
-						tokens.push_back(t);
+					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim) {
+						if (quote_tokens[i].substr(last_size-2,1) == ddelim) {
+							temp_tokens.pop_back();
+							last_empty_with_delim = true;
+						}
+					}
+					for (auto& t : temp_tokens)
+                    {
+                        if (t.empty())
+                            continue;
+                        tokens.push_back(t);
+                    }
+
 				}
 				else if (quote_tokens[i].size() > 0)
 					tokens.push_back(quote_tokens[i]);
+				if (last_empty_with_delim) {
+					tokens.push_back("");
+					last_empty_with_delim = false;
+				}
 
 			}
 
@@ -1922,7 +2050,8 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 			ss.str("");
 			ss << "wrong number of tokens on line " << lcount;
 			ss << " of file '" << filename << "'.  Expecting ";
-			ss << hsize << ", found " << tokens.size();
+			ss << hsize << ", found " << tokens.size() << endl;
+            ss << "line:" << next_line;
 			throw_externalctrlfile_error(ss.str());
 		}
 		row_map.clear();
@@ -2147,9 +2276,19 @@ bool try_remove_quit_file()
 CmdLine::CmdLine(int argc, char* argv[]) :
 	ctl_file_name(""), panther_host_name(""), panther_port(""), 
 	runmanagertype(RunManagerType::SERIAL),org_cmdline_str(""),
-	restart(false),jac_restart(false)
+	restart(false),jac_restart(false),opersys("unknown"),
+	cwd(".")
 {
-	for (int i = 0; i < argc; ++i)
+#ifdef OS_LINUX
+	opersys = "linux";
+#endif
+#ifdef OS_WIN
+    opersys = "windows";
+#endif
+#ifdef OS_MAC
+    opersys = "apple";
+#endif
+for (int i = 0; i < argc; ++i)
 	{
 		org_cmdline_str.append(" ");
 		org_cmdline_str.append(argv[i]);
@@ -2195,10 +2334,17 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 	org_cmdline_vec = temp;
 	lower_cmdline_vec = temp_lower;
 
-
+    cwd = OperSys::getcwd();
+    string clean_path = cwd;
+    pest_utils::strip_nonascii_ip(clean_path);
+    if ((cwd != clean_path) && (opersys == "windows"))
+    {
+        throw_cmdline_error("non-ascii character(s) in current working directory path: \""+ cwd +"\", windows does not like this...");
+    }
 	if ((lower_cmdline_vec.size() == 3) || (lower_cmdline_vec.size() > 4))
 	{
-		throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
+		if (lower_cmdline_vec[2] != "/e")
+			throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
 	}
 	
 	//serial run mgr...done
@@ -2230,8 +2376,7 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 		throw_cmdline_error("unrecognized commandline arg '" + third_arg + "', expecting '/h','/e','/g'");
 	}
 
-	if (runmanagertype == RunManagerType::PANTHER_WORKER)
-	{
+	if (runmanagertype == RunManagerType::PANTHER_WORKER) {
 		string forth_arg = org_cmdline_vec[3];
 		if (forth_arg.find(":") == string::npos)
 		{
@@ -2272,13 +2417,12 @@ CmdLine::CmdLine(int argc, char* argv[]) :
 			cout << "...using panther run manager in worker mode using hostname '" << panther_host_name << "' and port " << panther_port << endl;
 		}
 	}
-	return;
-
 }
  
 
 void CmdLine::throw_cmdline_error(string message)
 {
+	startup_report(cerr,"");
 	cerr << "--------------------------------------------------------" << endl;
 	cerr << "COMMAND LINE ERROR: " << message << endl;
 	cerr << "usage:" << endl << endl;
@@ -2292,6 +2436,24 @@ void CmdLine::throw_cmdline_error(string message)
 	cerr << " additional options can be found in the PEST++ users manual" << endl;
 	cerr << "--------------------------------------------------------" << endl;
 	exit(1);
+}
+
+void CmdLine::startup_report(std::ostream &s, string start_string) {
+
+	string version = PESTPP_VERSION;
+	s << endl << endl << "version: " << version << endl;
+	s << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl;
+	s << "using control file: \"" << ctl_file_name << "\"" << endl;
+	s << "in directory: \"" << cwd << "\"" << endl;
+	s << "on host: \"" << w_get_hostname() << "\"" << endl;
+	s << "on a(n) " << opersys << " operating system" << endl;
+#ifdef _DEBUG
+	s << "with debugging configuration" << endl;
+#else
+	s << "with release configuration" << endl;
+#endif
+	if (start_string.size() > 0)
+		s << "started at " << start_string << endl << endl;
 }
 
 // end of namespace pest_utils

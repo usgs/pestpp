@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file eigen_tools.cpp
+ * @brief Implementation of eigen_tools.
+ */
+
 #include "eigen_tools.h"
 #include <Eigen/Dense>
 #include "Transformable.h"
@@ -31,6 +36,14 @@ using namespace Eigen;
 using namespace std;
 
 
+/**
+ * @brief Get  matrix xd row abs max.
+ *
+ * @param m Description.
+ * @param row Description.
+ * @param max_col Description.
+ * @param max_val Description.
+ */
 void get_MatrixXd_row_abs_max(const MatrixXd &m, int row, int *max_col, double *max_val)
 {
 	size_t nrows = m.rows();
@@ -49,6 +62,13 @@ void get_MatrixXd_row_abs_max(const MatrixXd &m, int row, int *max_col, double *
 	}
 }
 
+/**
+ * @brief Stlvec 2 eigenvec.
+ *
+ * @param stl_vec Description.
+ *
+ * @return Description.
+ */
 VectorXd stlvec_2_eigenvec(const std::vector<double> &stl_vec)
 {
 	size_t len = stl_vec.size();
@@ -60,6 +80,13 @@ VectorXd stlvec_2_eigenvec(const std::vector<double> &stl_vec)
 	return la_vec;
 }
 
+/**
+ * @brief Eigenvec 2 stlvec.
+ *
+ * @param eigen_vec Description.
+ *
+ * @return Description.
+ */
 vector<double> eigenvec_2_stlvec(const VectorXd &eigen_vec)
 {
 	size_t len = eigen_vec.size();
@@ -73,6 +100,14 @@ vector<double> eigenvec_2_stlvec(const VectorXd &eigen_vec)
 }
 
 
+/**
+ * @brief Transformable 2 eigen vec.
+ *
+ * @param data Description.
+ * @param oredered_names Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd transformable_2_eigen_vec(const Transformable &data, vector<string> oredered_names)
 {
 	size_t len = oredered_names.size();
@@ -89,6 +124,14 @@ Eigen::VectorXd transformable_2_eigen_vec(const Transformable &data, vector<stri
 }
 
 
+/**
+ * @brief Matrix del rows cols.
+ *
+ * @param mat Description.
+ * @param id_vec Description.
+ * @param perm_rows Description.
+ * @param perm_cols Description.
+ */
 void matrix_del_rows_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t> &id_vec, bool perm_rows, bool perm_cols)
 {
 	if (!id_vec.empty())
@@ -139,6 +182,13 @@ void matrix_del_rows_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t>
 	}
 }
 
+/**
+ * @brief Get diag matrix.
+ *
+ * @param mat Description.
+ *
+ * @return Description.
+ */
 Eigen::SparseMatrix<double> get_diag_matrix(const Eigen::SparseMatrix<double> &mat)
 {
 	auto  ncols = mat.cols();
@@ -164,6 +214,12 @@ Eigen::SparseMatrix<double> get_diag_matrix(const Eigen::SparseMatrix<double> &m
 	return diag_matrix;
 }
 
+/**
+ * @brief Print.
+ *
+ * @param mat Description.
+ * @param fout Description.
+ */
 void print(const MatrixXd &mat, ostream & fout)
 {
 	size_t nrows = mat.rows();
@@ -181,6 +237,13 @@ void print(const MatrixXd &mat, ostream & fout)
 
 }
 
+/**
+ * @brief Print.
+ *
+ * @param mat Description.
+ * @param fout Description.
+ * @param n_per_line Description.
+ */
 void print(const MatrixXd &mat, ostream & fout, int n_per_line)
 {
 	size_t nrows = mat.rows();
@@ -201,6 +264,13 @@ void print(const MatrixXd &mat, ostream & fout, int n_per_line)
 
 }
 
+/**
+ * @brief Print.
+ *
+ * @param vec Description.
+ * @param fout Description.
+ * @param n_per_line Description.
+ */
 void print(const VectorXd &vec, ostream & fout, int n_per_line)
 {
 	size_t n = vec.size();
@@ -216,6 +286,14 @@ void print(const VectorXd &vec, ostream & fout, int n_per_line)
 	}
 }
 
+/**
+ * @brief Save triplets bin.
+ *
+ * @param mat Description.
+ * @param fout Description.
+ *
+ * @return Description.
+ */
 bool save_triplets_bin(const SparseMatrix<double> &mat, ostream &fout)
 {
 	int32_t xyn[3] = { static_cast<int32_t>(mat.rows()), static_cast<int32_t>(mat.cols()), static_cast<int32_t>(mat.nonZeros()) };
@@ -235,6 +313,14 @@ bool save_triplets_bin(const SparseMatrix<double> &mat, ostream &fout)
 	return true;
 }
 
+/**
+ * @brief Save vector bin.
+ *
+ * @param vec Description.
+ * @param fout Description.
+ *
+ * @return Description.
+ */
 bool save_vector_bin(const VectorXd &vec, ostream &fout)
 {
 	int32_t size = vec.size();
@@ -244,6 +330,14 @@ bool save_vector_bin(const VectorXd &vec, ostream &fout)
 	return true;
 }
 
+/**
+ * @brief Load vector bin.
+ *
+ * @param vec Description.
+ * @param fin Description.
+ *
+ * @return Description.
+ */
 bool load_vector_bin(VectorXd &vec, istream &fin)
 {
 	int32_t size = 0;
@@ -253,6 +347,14 @@ bool load_vector_bin(VectorXd &vec, istream &fin)
 	return true;
 }
 
+/**
+ * @brief Load triplets bin.
+ *
+ * @param a Description.
+ * @param fin Description.
+ *
+ * @return Description.
+ */
 bool load_triplets_bin(SparseMatrix<double> &a, istream &fin)
 {
 	int32_t xyn[3];
@@ -273,6 +375,13 @@ bool load_triplets_bin(SparseMatrix<double> &a, istream &fin)
 	return true;
 }
 
+/**
+ * @brief Eigenvec 2 diagsparse.
+ *
+ * @param vec Description.
+ *
+ * @return Description.
+ */
 Eigen::SparseMatrix<double> eigenvec_2_diagsparse(Eigen::VectorXd vec)
 {
 	vector<Eigen::Triplet<double>> triplet_list;

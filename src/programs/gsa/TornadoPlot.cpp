@@ -1,3 +1,7 @@
+/**
+ * @file TornadoPlot.cpp
+ * @brief Implementation of TornadoPlot.
+ */
 #include <vector>
 #include <cassert>
 #include <numeric>
@@ -30,6 +34,11 @@ TornadoPlot::TornadoPlot(const vector<string> &_adj_par_name_vec, const Paramete
 	log_trans_pars = _log_trans_pars;
 }
 
+/**
+ * @brief Assemble runs.
+ *
+ * @param run_manager Description.
+ */
 void TornadoPlot::assemble_runs(RunManagerAbstract &run_manager)
 {
 	Parameters pars = fixed_ctl_pars;
@@ -57,6 +66,12 @@ void TornadoPlot::assemble_runs(RunManagerAbstract &run_manager)
 		run_id = run_manager.add_run(tmp_pars, ipar + " U", Parameters::no_data);
 	}
 }
+/**
+ * @brief Calc sen.
+ *
+ * @param run_manager Description.
+ * @param model_run Description.
+ */
 void  TornadoPlot::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 {
 	int n_runs = run_manager.get_nruns();
@@ -92,6 +107,14 @@ void  TornadoPlot::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 	file_manager_ptr->close_file("toi");
 }
 
+/**
+ * @brief Tornado calc.
+ *
+ * @param run_manager Description.
+ * @param model_run Description.
+ * @param fout Description.
+ * @param obs_name Description.
+ */
 void  TornadoPlot::tornado_calc(RunManagerAbstract &run_manager, ModelRun model_run, ofstream &fout, const string obs_name)
 {
 	// if obs_name == "" compute Tornado Polt for the global phi.
@@ -252,6 +275,9 @@ void  TornadoPlot::tornado_calc(RunManagerAbstract &run_manager, ModelRun model_
 
 
 
+/**
+ * @brief Destructor for .
+ */
 TornadoPlot::~TornadoPlot()
 {
 }

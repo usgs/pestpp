@@ -1,3 +1,7 @@
+/**
+ * @file linear_analysis.cpp
+ * @brief Implementation of linear_analysis.
+ */
 #include <vector>
 #include <string>
 #include <sstream>
@@ -14,6 +18,14 @@
 #include "PerformanceLog.h"
 #include "EnsembleSmoother.h"
 
+/**
+ * @brief Get common.
+ *
+ * @param v1 Description.
+ * @param v2 Description.
+ *
+ * @return Description.
+ */
 vector<string> get_common(vector<string> v1, vector<string> v2)
 {
 	vector<string> common;
@@ -23,6 +35,13 @@ vector<string> get_common(vector<string> v1, vector<string> v2)
 	return common;
 }
 
+/**
+ * @brief Get obj comps.
+ *
+ * @param filename Description.
+ *
+ * @return Description.
+ */
 map<string, double> get_obj_comps(string &filename)
 {
 	ifstream ifile(filename);
@@ -74,6 +93,13 @@ map<string, double> get_obj_comps(string &filename)
 }
 
 
+/**
+ * @brief Get nnz group.
+ *
+ * @param pest_scenario Description.
+ *
+ * @return Description.
+ */
 map<string, int> get_nnz_group(Pest &pest_scenario)
 {
 	vector<string> ogrp_names = pest_scenario.get_ctl_ordered_obs_group_names();
@@ -91,79 +117,34 @@ map<string, int> get_nnz_group(Pest &pest_scenario)
 	return grp_nnz;
 }
 
-ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, PhiData obj_comps)
-{
-	ObservationInfo obs_info = pest_scenario.get_ctl_observation_info();
-	map<string, string> pst_grps = pest_scenario.get_observation_groups();
-	vector<string> ogrp_names = pest_scenario.get_ctl_ordered_obs_group_names();
-	map<string, int> grp_nnz = get_nnz_group(pest_scenario);
 
-	const ObservationRec* obs_rec;
-	double weight;
-	double exp_obj = 0.0;
-	if (exp_obj > 0.0)
-	{
-		if (pest_scenario.get_regul_scheme_ptr())
-		{
-			cout << " WARNING:  can't use EXPECTED_OBJ option with dynamic" << endl;
-			cout << "           regularization - using PHIMACCEPT instead." << endl;
-		}
-		double tot_obj = obj_comps.meas;
-		if (tot_obj > 0.0)
-		{
-			double mult = exp_obj / tot_obj;
-			for (auto &oc : obj_comps.group_phi)
-			{
-				obj_comps.group_phi[oc.first] = mult * oc.second;
-			}
-		}
-	}
-	//if using regularization, we need to check if scaling is needed -> is phimaccept been satisfied
-	/*if ((pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg()))
-	{
-		double phimlim = pest_scenario.get_regul_scheme_ptr()->get_phimlim();
-		double phimaccept = pest_scenario.get_regul_scheme_ptr()->get_phimaccept();
-		double tot_obj = obj_comps.meas;
-		if (tot_obj > phimaccept)
-		{
-			double mult = phimaccept / tot_obj;
-			for (auto &oc : obj_comps.group_phi)
-				obj_comps.group_phi[oc.first] = mult * oc.second;
-		}
-		else
-		{
-			for (auto &oc : obj_comps.group_phi)
-				obj_comps.group_phi[oc.first] = 0.0;
-		}
-	}
-*/
-	for (auto &ogrp : pst_grps)
-	{
-		if (obj_comps.group_phi[ogrp.second] <= numeric_limits<double>::min())
-			continue;
-		obs_rec = obs_info.get_observation_rec_ptr(ogrp.first);
-		if (obs_rec->weight > 0.0)
-		{
-			weight = obs_info.get_observation_rec_ptr(ogrp.first)->weight *
-				sqrt(((double)grp_nnz[ogrp.second]) / obj_comps.group_phi[ogrp.second]);
-			if (weight <= numeric_limits<double>::min())
-				weight = 0.0;
-			else if (weight >= numeric_limits<double>::max())
-				weight = 1.0e+30;
-			obs_info.set_weight(ogrp.first, weight);
-		}
-	}
-
-	return obs_info;
-}
-
-ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations &sim)
+/**
+ * @brief Normalize weights by residual.
+ *
+ * @param pest_scenario Description.
+ * @param sim Description.
+ *
+ * @return Description.
+ */
+pair<ObservationInfo,map<string,double>> normalize_weights_by_residual(Pest &pest_scenario, Observations &sim)
 {
 	ObservationInfo obs_info(pest_scenario.get_ctl_observation_info());
 	Observations obs = pest_scenario.get_ctl_observations();
-
+	string sname = "STANDARD_DEVIATION";
+	string efile_name = "OBSERVATION DATA EXTERNAL";
+	map<string, double> obs_std = pest_scenario.get_ext_file_double_map(efile_name, sname);
+	map<string,vector<pest_utils::ExternalCtlFile>>& efiles_map = pest_scenario.get_efiles_map();
+	vector<pest_utils::ExternalCtlFile> obs_efiles;
+	if (efiles_map.find(efile_name) != efiles_map.end()) {
+		obs_efiles = efiles_map.at(efile_name);
+	}
+	set<string> col_set;
+	map<string,string> idx_map;
+	string sval;
+	string idx_col;
 	const ObservationRec* obs_rec;
 	double weight,swr,new_weight;
+	stringstream ss;
 
 	for (auto &oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
@@ -178,12 +159,21 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations 
 		else if (new_weight >= numeric_limits<double>::max())
 			new_weight = 1.0e+30;
 		obs_info.set_weight(oname, new_weight);
-		
+		if (obs_std.find(oname) != obs_std.end()) {
+			new_weight = 1.0 / new_weight;
+			if (new_weight < obs_std.at(oname))
+				new_weight = obs_std.at(oname);
+			else if (new_weight <= numeric_limits<double>::min())
+				new_weight = 1e-30;
+			else if (new_weight >= numeric_limits<double>::max())
+				new_weight = 1.0e+30;
+			obs_std[oname] = new_weight;
+		}
 	}
-	return obs_info;
+	return pair<ObservationInfo,map<string,double>>(obs_info,obs_std);
 }
 
-ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter,
+void LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter,
 	RunManagerAbstract* run_mgr_ptr)
 {
 	ofstream& fout_rec = file_manager.rec_ofstream();
@@ -212,18 +202,10 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 		//get a new obs info instance that accounts for residual phi (and expected objection value if passed)
 		// and report new weights to the rec file
 	fout_rec << endl;
-	ObservationInfo reweight;
+	//ObservationInfo reweight;
 	Observations sim = optimum_run.get_obs();
-	reweight = normalize_weights_by_residual(pest_scenario, sim);
-	
-	/*fout_rec << "Note: The observation covariance matrix has been constructed from " << endl;
-	fout_rec << "      weights listed in the pest control file that have been scaled by " << endl;
-	fout_rec << "      by the final residuals to account for " << endl;
-	fout_rec << "      the level of measurement noise implied by the original weights so" << endl;
-	fout_rec << "      the total objective function is equal to the number of  " << endl;
-	fout_rec << "      non-zero weighted observations." << endl;
-	fout_rec << endl;*/
-
+	pair<ObservationInfo,map<string,double>> adjust_info;
+	adjust_info = normalize_weights_by_residual(pest_scenario, sim);
 	ss.str("");
 	if (iter != -999)
 		ss << file_manager.get_base_filename() << "." << iter << ".fosm_reweight.rei";
@@ -233,13 +215,24 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 	ofstream reres_of(reres_filename);
 
 	Observations obs = pest_scenario.get_ctl_observations();
-	output_file_writer.obs_report(reres_of, obs, sim, reweight);
+	output_file_writer.obs_report(reres_of, obs, sim, adjust_info.first);
 	//fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
 
 	//reset the obscov using the scaled residuals - pass empty prior info names so none are included
 	pfm.log_event("loading obscov");
 	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
-	obscov.from_observation_weights(file_manager.rec_ofstream(), obscov.get_col_names(), reweight, vector<string>(), 
+	for (auto& item : adjust_info.second) {
+		obs_std[item.first] = item.second;
+	}
+	if (obs_std.size() > 0) {
+		ss.str("");
+		fout_rec << "...(potentially adjusted) standard deviation values being used for the following observations" << endl;
+		for (auto& item : obs_std) {
+			fout_rec << "     " << item.first << " : " << item.second << endl;
+		}
+	}
+
+	obscov.from_observation_weights(file_manager.rec_ofstream(), obscov.get_col_names(), adjust_info.first, vector<string>(),
 		pest_scenario.get_prior_info_ptr(),obs_std);
 
 	//reset the parcov since pars are being frozen and unfrozen iter by iter
@@ -381,7 +374,7 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 		fout_rec << "Note : the above forecast uncertainty summary was written to file '" + predsum_filename +
 			"'" << endl << endl;
 	}
-	return reweight;
+
 }
 
 pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, 
@@ -521,6 +514,11 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 }
 
 
+/**
+ * @brief Throw error.
+ *
+ * @param message Description.
+ */
 void LinearAnalysis::throw_error(const string &message)
 {
 	pfm.log_event("Error in LinearAnalysis:" + message);
@@ -528,6 +526,12 @@ void LinearAnalysis::throw_error(const string &message)
 }
 
 
+/**
+ * @brief Load pst.
+ *
+ * @param pest_scenario Description.
+ * @param pst_filename Description.
+ */
 void LinearAnalysis::load_pst(Pest &pest_scenario, const string &pst_filename)
 {
 	ifstream ipst(pst_filename);
@@ -545,6 +549,12 @@ void LinearAnalysis::load_pst(Pest &pest_scenario, const string &pst_filename)
 }
 
 
+/**
+ * @brief Load jco.
+ *
+ * @param jco Description.
+ * @param jco_filename Description.
+ */
 void LinearAnalysis::load_jco(Mat& jco, const string& jco_filename)
 {
 	pfm.log_event("LinearAnalysis::load_jco");
@@ -577,6 +587,11 @@ void LinearAnalysis::load_jco(Mat& jco, const string& jco_filename)
 }
 
 
+/**
+ * @brief Load parcov.
+ *
+ * @param parcov_filename Description.
+ */
 void LinearAnalysis::load_parcov(const string &parcov_filename)
 {
 	pfm.log_event("Linear_Analysis::load_parcov from "+parcov_filename);
@@ -622,6 +637,11 @@ void LinearAnalysis::load_parcov(const string &parcov_filename)
 }
 
 
+/**
+ * @brief Load obscov.
+ *
+ * @param obscov_filename Description.
+ */
 void LinearAnalysis::load_obscov(const string &obscov_filename)
 {
 	pfm.log_event("LinearAnalysis::load_obscov from "+obscov_filename);
@@ -728,12 +748,20 @@ LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager
 	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
 }
 
+/**
+ * @brief Set parcov.
+ *
+ * @param _parcov Description.
+ */
 void  LinearAnalysis::set_parcov(Mat& _parcov)
 {
 	parcov = _parcov;
 }
 
 
+/**
+ * @brief Align.
+ */
 void LinearAnalysis::align()
 {
 	pfm.log_event("LinearAnalysis::align");
@@ -789,6 +817,11 @@ void LinearAnalysis::align()
 }
 
 
+/**
+ * @brief Prior parameter variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::prior_parameter_variance()
 {
 	map<string, double> results;
@@ -797,7 +830,13 @@ map<string, double> LinearAnalysis::prior_parameter_variance()
 	return results;
 }
 
-
+/**
+ * @brief Prior parameter variance.
+ *
+ * @param par_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::prior_parameter_variance(string &par_name)
 {
 	//pfm.log_event("prior_parameter_variance");
@@ -820,6 +859,11 @@ double LinearAnalysis::prior_parameter_variance(string &par_name)
 }
 
 
+/**
+ * @brief Posterior parameter variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::posterior_parameter_variance()
 {
 	map<string, double> results;
@@ -829,6 +873,13 @@ map<string, double> LinearAnalysis::posterior_parameter_variance()
 }
 
 
+/**
+ * @brief Posterior parameter variance.
+ *
+ * @param par_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::posterior_parameter_variance(string &par_name)
 {
 	//pfm.log_event("posterior_parameter_variance");
@@ -852,12 +903,22 @@ double LinearAnalysis::posterior_parameter_variance(string &par_name)
 }
 
 
+/**
+ * @brief Posterior parameter matrix.
+ *
+ * @return Description.
+ */
 Mat LinearAnalysis::posterior_parameter_matrix()
 {
 	if (posterior.nrow() == 0) calc_posterior();
 	return posterior;
 }
 
+/**
+ * @brief Posterior parameter ptr.
+ *
+ * @return Description.
+ */
 Mat* LinearAnalysis::posterior_parameter_ptr()
 {
 	if (posterior.nrow() == 0) calc_posterior();
@@ -865,6 +926,11 @@ Mat* LinearAnalysis::posterior_parameter_ptr()
 	return ptr;
 }
 
+/**
+ * @brief Posterior parameter covariance matrix.
+ *
+ * @return Description.
+ */
 Covariance LinearAnalysis::posterior_parameter_covariance_matrix()
 {
 	if (posterior.nrow() == 0) calc_posterior();
@@ -872,6 +938,13 @@ Covariance LinearAnalysis::posterior_parameter_covariance_matrix()
 }
 
 
+/**
+ * @brief Prior prediction variance.
+ *
+ * @param pred_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::prior_prediction_variance(string &pred_name)
 {
 	pest_utils::upper_ip(pred_name);
@@ -894,6 +967,11 @@ double LinearAnalysis::prior_prediction_variance(string &pred_name)
 	return val;
 }
 
+/**
+ * @brief Prior prediction variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::prior_prediction_variance()
 {
 	pfm.log_event("LinearAnalysis::prior_prediction_variance");
@@ -906,6 +984,13 @@ map<string, double> LinearAnalysis::prior_prediction_variance()
 	return result;
 }
 
+/**
+ * @brief Posterior prediction variance.
+ *
+ * @param pred_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 {
 	pest_utils::upper_ip(pred_name);
@@ -930,6 +1015,11 @@ double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 
 }
 
+/**
+ * @brief Posterior prediction variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::posterior_prediction_variance()
 {
 	pfm.log_event("LinearAnalysis::prior_prediction_variance");
@@ -942,6 +1032,9 @@ map<string, double> LinearAnalysis::posterior_prediction_variance()
 	return result;
 }
 
+/**
+ * @brief Calc posterior.
+ */
 void LinearAnalysis::calc_posterior()
 {
 	pfm.log_event("LinearAnalysis::calc_posterior");
@@ -988,6 +1081,12 @@ void LinearAnalysis::calc_posterior()
 }
 
 
+/**
+ * @brief Set predictions.
+ *
+ * @param preds Description.
+ * @param forgive Description.
+ */
 void LinearAnalysis::set_predictions(vector<string> preds, bool forgive)
 {
 	pfm.log_event("set_predictions");
@@ -1108,6 +1207,13 @@ void LinearAnalysis::set_predictions(vector<string> preds, bool forgive)
 
 
 
+/**
+ * @brief Like preds.
+ *
+ * @param val Description.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::like_preds(double val)
 {
 	map<string, double> result;
@@ -1250,6 +1356,11 @@ void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filena
 }
 
 
+/**
+ * @brief Drop prior information.
+ *
+ * @param pest_scenario Description.
+ */
 void LinearAnalysis::drop_prior_information(const Pest &pest_scenario)
 {
 	vector<string> pi_names;
@@ -1291,6 +1402,9 @@ void LinearAnalysis::drop_prior_information(const Pest &pest_scenario)
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 LinearAnalysis::~LinearAnalysis()
 {
 }

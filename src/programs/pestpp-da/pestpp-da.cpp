@@ -1,3 +1,7 @@
+/**
+ * @file pestpp-da.cpp
+ * @brief Implementation of pestpp-da.
+ */
 // pestpp-da.cpp : Defines the entry point for the console application.
 //
 
@@ -30,12 +34,21 @@
 #include "Ensemble.h"
 #include "EnsembleSmoother.h"
 #include "DataAssimilator.h"
+#include "RunManagerExternal.h"
 
 
 using namespace std;
 using namespace pest_utils;
 
 
+/**
+ * @brief Main.
+ *
+ * @param argc Description.
+ * @param argv Description.
+ *
+ * @return Description.
+ */
 int main(int argc, char* argv[])
 {
 #ifndef _DEBUG
@@ -43,39 +56,14 @@ int main(int argc, char* argv[])
 	{
 #endif
 
-//		string version = PESTPP_VERSION;
-//		cout << endl << endl;
-//		cout << "             ==============================================" << endl;
-//		cout << "             pestpp-da: Model Independent Data Assimilation" << endl;
-//		cout << "             ==============================================" << endl << endl;
-//
-//		//cout << "                     for PEST(++) datasets " << endl << endl;
-//		cout << "               Developed by the PEST++ development team" << endl;
-//		cout << endl << endl << "version: " << version << endl;
-//		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-//        auto start = chrono::steady_clock::now();
-//        string start_string = get_time_string();
-//        cout << "started at " << start_string << endl;
-//		CmdLine cmdline(argc, argv);
-//
-//        if (quit_file_found())
-//        {
-//            cerr << "'pest.stp' found, please remove this file " << endl;
-//            return 1;
-//        }
-
-
-
         string version = PESTPP_VERSION;
         cout << endl << endl;
         cout << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
         //cout << "                     for PEST(++) datasets " << endl << endl;
         cout << "                            by the PEST++ development team" << endl;
-        cout << endl << endl << "version: " << version << endl;
-        cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+        cout << endl;
         auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
-        cout << "started at " << start_string << endl;
         CmdLine cmdline(argc, argv);
 
         if (quit_file_found())
@@ -93,11 +81,7 @@ int main(int argc, char* argv[])
 		string rns_file = file_manager.build_filename("rns");
 		int flag = remove(rns_file.c_str());
 
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
-		{
-			cerr << "External run manager ('/e') not supported by pestpp-da, please use panther instead" << endl;
-			exit(1);
-		}
+
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::GENIE)
 		{
 			cerr << "genie run manager ('/g') not supported by pestpp-da, please use panther instead" << endl;
@@ -114,6 +98,8 @@ int main(int argc, char* argv[])
 				ofstream frec("panther_agent.rec");
 				if (frec.bad())
 					throw runtime_error("error opening 'panther_agent.rec'");
+				cmdline.startup_report(frec,start_string);
+				cmdline.startup_report(cout,start_string);
 				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
@@ -171,24 +157,12 @@ int main(int argc, char* argv[])
 		ofstream& fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
-		if (!restart_flag || save_restart_rec_header)
-		{
-            cout << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
-            //cout << "                     for PEST(++) datasets " << endl << endl;
-            cout << "                            by the PEST++ development team" << endl;
-            fout_rec << endl;
-            fout_rec << endl << endl << "version: " << version << endl;
-            fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-            fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-            fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-            fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
-            fout_rec << "started at " << start_string << endl << endl;
-		}
 
-		cout << endl;
-		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-		cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+		fout_rec << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
+		fout_rec << "                            by the PEST++ development team" << endl;
+		fout_rec << endl;
+		cmdline.startup_report(fout_rec,start_string);
+		cmdline.startup_report(cout,start_string);
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -312,7 +286,6 @@ int main(int argc, char* argv[])
             DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
             da.initialize_dynamic_states();
             da.sanity_checks();
-            run_manager_ptr = 0;
             delete(run_manager_ptr);
 
             //now check the cycles
@@ -496,9 +469,19 @@ int main(int argc, char* argv[])
 				pest_scenario.get_ctl_ordered_obs_names(),
                 pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                 pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
-                pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+                pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
+				pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
+        else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+        {
+
+        	const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+        	run_manager_ptr = new RunManagerExternal(exi.comline_vec,
+			exi.tplfile_vec, exi.inpfile_vec,
+		   exi.insfile_vec, exi.outfile_vec,
+			rns_file);
+        }
 		else
 		{
 			performance_log.log_event("starting basic model IO error checking");
@@ -631,8 +614,7 @@ int main(int argc, char* argv[])
 				}
 			}
 			//check for entries in the obs cycle table
-			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << pest_scenario.get_observation_info_ptr()->get_weight("GAGE_1") << endl;
-			if ((obs_cycle_info.find(*icycle) != obs_cycle_info.end()) || (false))
+			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 
 			{
 				performance_log.log_event("updating obs using da obs cycle table info");
@@ -796,7 +778,8 @@ int main(int argc, char* argv[])
                     }
                 }
 				da.set_noise_oe(cycle_curr_noise);
-				cycle_curr_noise.to_csv("cycle_curr_noise.csv");
+				if (verbose_level >= 3)
+					cycle_curr_noise.to_csv("cycle_curr_noise.csv");
 			}
 			else
             {

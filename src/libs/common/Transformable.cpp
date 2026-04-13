@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file Transformable.cpp
+ * @brief Implementation of Transformable.
+ */
+
 #include "network_wrapper.h"
 #include <ostream>
 #include <string>
@@ -46,15 +51,37 @@ using namespace Eigen;
 
 const double Transformable::no_data = -9.99E99;
 
+/**
+ * @brief Transformable.
+ *
+ * @param copyin Description.
+ *
+ * @return Description.
+ */
 Transformable::Transformable(const Transformable &copyin) : items(copyin.items)
 {
 }
 
+/**
+ * @brief Transformable.
+ *
+ * @param copyin Description.
+ *
+ * @return Description.
+ */
 Transformable::Transformable(const Transformable &&copyin)
 {
 	items = std::move(copyin.items);
 }
 
+/**
+ * @brief Transformable.
+ *
+ * @param copyin Description.
+ * @param copy_names Description.
+ *
+ * @return Description.
+ */
 Transformable::Transformable(const Transformable &copyin, const vector<string> &copy_names)
 {
 	for (vector<string>::const_iterator b=copy_names.begin(), e=copy_names.end(); b!=e; ++b) {
@@ -62,6 +89,14 @@ Transformable::Transformable(const Transformable &copyin, const vector<string> &
 	}
 }
 
+/**
+ * @brief Transformable.
+ *
+ * @param names Description.
+ * @param values Description.
+ *
+ * @return Description.
+ */
 Transformable::Transformable(const vector<string> &names, const Eigen::VectorXd &values)
 {
 	assert(names.size() == values.size());
@@ -156,6 +191,11 @@ double &Transformable::operator[](const string &name)
 	return items[name];
 }
 
+/**
+ * @brief Get notnormal keys.
+ *
+ * @return Description.
+ */
 vector<string> Transformable::get_notnormal_keys()
 {
 	vector<string> not_normal;
@@ -168,17 +208,38 @@ vector<string> Transformable::get_notnormal_keys()
 	return not_normal;
 }
 
+/**
+ * @brief Insert.
+ *
+ * @param name Description.
+ * @param value Description.
+ *
+ * @return Description.
+ */
 pair<Transformable::iterator,bool> Transformable::insert(const string &name, double value)
 {
 	pair<string, double> rec(name, value);
 	return items.insert(rec);
 }
 
+/**
+ * @brief Insert.
+ *
+ * @param x Description.
+ *
+ * @return Description.
+ */
 pair<Transformable::iterator,bool>  Transformable::insert(const pair<string, double> &x)
 {
 	return items.insert(x);
 }
 
+/**
+ * @brief Insert.
+ *
+ * @param name_vec Description.
+ * @param value_vec Description.
+ */
 void Transformable::insert(const vector<string> &name_vec, const vector<double> &value_vec)
 {
 	assert(name_vec.size() == value_vec.size());
@@ -190,11 +251,22 @@ void Transformable::insert(const vector<string> &name_vec, const vector<double> 
 	}
 }
 
+/**
+ * @brief Insert.
+ *
+ * @param first Description.
+ * @param last Description.
+ */
 void Transformable::insert(iterator first, iterator last )
 {
 	items.insert(first, last);
 }
 
+/**
+ * @brief Insert.
+ *
+ * @param insert_items Description.
+ */
 void Transformable::insert(const Transformable &insert_items)
 {
 	for(auto &ipar : insert_items)
@@ -203,16 +275,33 @@ void Transformable::insert(const Transformable &insert_items)
 	}
 }
 
+/**
+ * @brief Erase.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 size_t Transformable::erase(const string &name)
 {
 	return items.erase(name);
 }
 
+/**
+ * @brief Erase.
+ *
+ * @param position Description.
+ */
 void Transformable::erase(iterator position)
 {
 	items.erase(position);
 }
 
+/**
+ * @brief Erase.
+ *
+ * @param erase_pars Description.
+ */
 void Transformable::erase(const Parameters &erase_pars)
 {
 	auto end_erase_pars = erase_pars.end();
@@ -231,6 +320,11 @@ void Transformable::erase(const Parameters &erase_pars)
 	}
 }
 
+/**
+ * @brief Erase.
+ *
+ * @param erase_par_names Description.
+ */
 void Transformable::erase(const vector<string> &erase_par_names)
 {
 	auto end_erase_pars = erase_par_names.end();
@@ -249,11 +343,25 @@ void Transformable::erase(const vector<string> &erase_par_names)
 	}
 }
 
+/**
+ * @brief Find.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 Transformable::iterator Transformable::find(const string &name)
 {
 	return items.find(name);
 }
 
+/**
+ * @brief Find.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 Transformable::const_iterator Transformable::find(const string &name) const
 {
 	return items.find(name);
@@ -269,6 +377,13 @@ const double* Transformable::get_rec_ptr(const string &name) const
 	return ret_val;
 }
 
+/**
+ * @brief Get rec.
+ *
+ * @param name Description.
+ *
+ * @return Description.
+ */
 double Transformable::get_rec(const string &name) const
 {
 	double ret_val = no_data;
@@ -282,6 +397,12 @@ double Transformable::get_rec(const string &name) const
 	return ret_val;
 }
 
+/**
+ * @brief Update rec.
+ *
+ * @param name Description.
+ * @param value Description.
+ */
 void Transformable::update_rec(const string &name, double value)
 {
 	Transformable::iterator iter = find(name);
@@ -294,6 +415,12 @@ void Transformable::update_rec(const string &name, double value)
 	}
 }
 
+/**
+ * @brief Update.
+ *
+ * @param names Description.
+ * @param values Description.
+ */
 void Transformable::update(const vector<string>& names, const Eigen::VectorXd& values)
 {
 	items.clear();
@@ -306,6 +433,12 @@ void Transformable::update(const vector<string>& names, const Eigen::VectorXd& v
 	}
 }
 
+/**
+ * @brief Update.
+ *
+ * @param names Description.
+ * @param values Description.
+ */
 void Transformable::update(const vector<string> &names, const vector<double> &values)
 {
 	items.clear();
@@ -317,6 +450,12 @@ void Transformable::update(const vector<string> &names, const vector<double> &va
 		items.insert(make_pair(names[i], values[i]));
 	}
 }
+/**
+ * @brief Update without clear.
+ *
+ * @param names Description.
+ * @param values Description.
+ */
 void Transformable::update_without_clear(const vector<string> &names, const vector<double> &values)
 {
 	assert(names.size() == values.size());
@@ -328,6 +467,12 @@ void Transformable::update_without_clear(const vector<string> &names, const vect
 	}
 }
 
+/**
+ * @brief Update without clear.
+ *
+ * @param names Description.
+ * @param values Description.
+ */
 void Transformable::update_without_clear(const vector<string> &names, const Eigen::VectorXd &values)
 {
 	assert(names.size() == values.size());
@@ -339,6 +484,13 @@ void Transformable::update_without_clear(const vector<string> &names, const Eige
 	}
 }
 
+/**
+ * @brief Get data vec.
+ *
+ * @param keys Description.
+ *
+ * @return Description.
+ */
 vector<double> Transformable::get_data_vec(const vector<string> &keys) const
 {
 	vector<double> v;
@@ -357,6 +509,13 @@ vector<double> Transformable::get_data_vec(const vector<string> &keys) const
 }
 
 
+/**
+ * @brief Get data eigen vec.
+ *
+ * @param keys Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd Transformable::get_data_eigen_vec(const vector<string> &keys) const
 {
 	VectorXd vec;
@@ -369,6 +528,13 @@ Eigen::VectorXd Transformable::get_data_eigen_vec(const vector<string> &keys) co
 	return vec;
 }
 
+/**
+ * @brief Get partial data eigen vec.
+ *
+ * @param keys Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd Transformable::get_partial_data_eigen_vec(const vector<string> &keys) const
 {
 	VectorXd vec;
@@ -395,6 +561,11 @@ Eigen::VectorXd Transformable::get_partial_data_eigen_vec(const vector<string> &
 
 
 
+/**
+ * @brief Get keys.
+ *
+ * @return Description.
+ */
 vector<string> Transformable::get_keys() const
 {
 	vector<string> ret_val;
@@ -407,6 +578,11 @@ vector<string> Transformable::get_keys() const
 	return ret_val;
 }
 
+/**
+ * @brief L2 norm.
+ *
+ * @return Description.
+ */
 double Transformable::l2_norm() const
 {
    double norm=0;
@@ -419,6 +595,14 @@ double Transformable::l2_norm() const
 }
 
 
+/**
+ * @brief L2 norm.
+ *
+ * @param d1 Description.
+ * @param d2 Description.
+ *
+ * @return Description.
+ */
 double  Transformable::l2_norm(const Transformable &d1, const Transformable &d2)
 {
 	double norm = 0.0;
@@ -440,6 +624,14 @@ double  Transformable::l2_norm(const Transformable &d1, const Transformable &d2)
 	return norm;
 }
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param out Description.
+ * @param rhs Description.
+ *
+ * @return Description.
+ */
 ostream& operator<<(ostream& out, const Transformable &rhs)
 {
 	for(Transformable::const_iterator b=rhs.begin(), e=rhs.end();
@@ -453,6 +645,13 @@ ostream& operator<<(ostream& out, const Transformable &rhs)
 
 
 
+/**
+ * @brief Read par file.
+ *
+ * @param fin Description.
+ * @param offset Description.
+ * @param scale Description.
+ */
 void Parameters::read_par_file(ifstream &fin,  map<string, double> &offset, map<string, double> &scale)
 {
 	clear();

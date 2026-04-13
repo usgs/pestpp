@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <Eigen/Dense>
 #include "network_package.h"
+#include "Pest.h"
 
 class Parameters;
 class Observations;
@@ -87,6 +88,7 @@ public:
 	void free_memory();
 	std::string get_filename() { return filename; }
 	void print_run_summary(std::ostream &fout);
+
 	~RunStorage();
 private:
 	static const int info_txt_length = NetPackage::DESC_LEN;

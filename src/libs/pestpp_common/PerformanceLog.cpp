@@ -1,3 +1,7 @@
+/**
+ * @file PerformanceLog.cpp
+ * @brief Implementation of PerformanceLog.
+ */
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -10,6 +14,12 @@
 using namespace std;
 using std::chrono::system_clock;
 
+/**
+ * @brief Writetime.
+ *
+ * @param os Description.
+ * @param tc Description.
+ */
 void PerformanceLog::writetime(stringstream &os, time_t tc) {
 	// alternative to put_time iomanip
         // as put_time is not implemented in gcc4.8
@@ -19,6 +29,13 @@ void PerformanceLog::writetime(stringstream &os, time_t tc) {
 	tp.put(os,os,' ',localtime(&tc),pat,pat+strlen(pat));
 }
 
+/**
+ * @brief Performance log.
+ *
+ * @param _fout Description.
+ *
+ * @return Description.
+ */
 PerformanceLog::PerformanceLog(ofstream &_fout)
 : fout(_fout)
 {
@@ -29,6 +46,11 @@ PerformanceLog::PerformanceLog(ofstream &_fout)
 
 }
 
+/**
+ * @brief Log event.
+ *
+ * @param message Description.
+ */
 void PerformanceLog::log_event(const string &message)
 {
 	system_clock::time_point time_now = system_clock::now();
@@ -38,6 +60,13 @@ void PerformanceLog::log_event(const string &message)
 	fout.flush();
 }
 
+/**
+ * @brief Time to string.
+ *
+ * @param tmp_time Description.
+ *
+ * @return Description.
+ */
 string PerformanceLog::time_to_string(const std::chrono::system_clock::time_point &tmp_time)
 {
 	stringstream time_str;
@@ -51,6 +80,14 @@ string PerformanceLog::time_to_string(const std::chrono::system_clock::time_poin
 	return time_str.str();
 }
 
+/**
+ * @brief Elapsed time to string.
+ *
+ * @param current_time Description.
+ * @param prev_time Description.
+ *
+ * @return Description.
+ */
 string PerformanceLog::elapsed_time_to_string(std::chrono::system_clock::time_point &current_time, std::chrono::system_clock::time_point &prev_time)
 {
 	ostringstream ss;
@@ -83,6 +120,9 @@ string PerformanceLog::elapsed_time_to_string(std::chrono::system_clock::time_po
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 PerformanceLog::~PerformanceLog()
 {
 }

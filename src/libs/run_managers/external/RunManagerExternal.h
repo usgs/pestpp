@@ -28,15 +28,15 @@ class RunManagerExternal :
 	public RunManagerAbstract
 {
 public:
-	RunManagerExternal(const std::vector<std::string> _comline_vec,
-		const std::vector<std::string> _tplfile_vec, const std::vector<std::string> _inpfile_vec,
-		const std::vector<std::string> _insfile_vec, const std::vector<std::string> _outfile_vec,
-		const std::string &stor_filename, const std::string &_ext_filename, const std::string &_exi_filename, int _max_n_failure = 1);
+	RunManagerExternal(std::vector<std::string> _comline_vec,
+		std::vector<std::string> _tplfile_vec, std::vector<std::string> _inpfile_vec,
+		std::vector<std::string> _insfile_vec, std::vector<std::string> _outfile_vec,
+		std::string &stor_filename,
+		int _max_n_failure = 1,int _sleep_ms=10);
 	virtual ~RunManagerExternal();
 	virtual void run();
 private:
-	std::string ext_filename;
-	std::string exi_filename;
+	int sleep_ms;
 };
 
 #endif /* _RUNMANAGEEXTERNAL_H_ */

@@ -16,6 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file ObjectiveFunc.cpp
+ * @brief Implementation of ObjectiveFunc.
+ */
+
 #include <ostream>
 #include <list>
 #include <iomanip>
@@ -34,6 +39,16 @@ const PhiComponets& PhiComponets::operator=(const PhiComponets &rhs)
 	return * this;
 }
 
+/**
+ * @brief Get phi.
+ *
+ * @param sim_obs Description.
+ * @param pars Description.
+ * @param dynamic_reg Description.
+ * @param norm Description.
+ *
+ * @return Description.
+ */
 double ObjectiveFunc::get_phi(const Observations &sim_obs, const Parameters &pars, const DynamicRegularization &dynamic_reg, double norm) const
 {
 	double phi;
@@ -43,6 +58,16 @@ double ObjectiveFunc::get_phi(const Observations &sim_obs, const Parameters &par
 	return phi;
 }
 
+/**
+ * @brief Get phi comp.
+ *
+ * @param sim_obs Description.
+ * @param pars Description.
+ * @param dynamic_reg Description.
+ * @param norm Description.
+ *
+ * @return Description.
+ */
 PhiComponets ObjectiveFunc::get_phi_comp(const Observations &sim_obs, const Parameters &pars, const DynamicRegularization &dynamic_reg, double norm) const
 {
 	unordered_map<string, ObservationRec>::const_iterator info_iter;
@@ -207,6 +232,15 @@ map<string, double> ObjectiveFunc::get_group_phi(const Observations &sim_obs, co
 	return group_phi;
 }
 
+/**
+ * @brief Phi report.
+ *
+ * @param sim_obs Description.
+ * @param pars Description.
+ * @param dynamic_reg Description.
+ *
+ * @return Description.
+ */
 PhiData ObjectiveFunc::phi_report(const Observations &sim_obs, const Parameters &pars, const DynamicRegularization &dynamic_reg) const
 {
 	PhiData phi_data;
@@ -218,6 +252,15 @@ PhiData ObjectiveFunc::phi_report(const Observations &sim_obs, const Parameters 
 }
 
 
+/**
+ * @brief Get residuals vec.
+ *
+ * @param sim_obs Description.
+ * @param pars Description.
+ * @param obs_names Description.
+ *
+ * @return Description.
+ */
 vector<double> ObjectiveFunc::get_residuals_vec(const Observations &sim_obs, const Parameters &pars, const vector<string> &obs_names) const
 {
 	vector<double> residuals_vec;

@@ -1,11 +1,25 @@
+/**
+ * @file PooledVariance.cpp
+ * @brief Implementation of PooledVariance.
+ */
 #include "PooledVariance.h"
 #include <regex>
 
 using namespace std;
 
+/**
+ * @brief Pooled variance.
+ *
+ * @return Description.
+ */
 PooledVariance::PooledVariance()
 {
 }
+/**
+ * @brief Process pva file.
+ *
+ * @param fin Description.
+ */
 void PooledVariance::process_pva_file(std::ifstream &fin)
 {
 	regex r("regex\"[^\"]+\"", regex_constants::icase);
@@ -25,6 +39,9 @@ void PooledVariance::process_pva_file(std::ifstream &fin)
 //for (auto &i : res_match) cout << i << endl;
 }
 
+/**
+ * @brief Destructor for .
+ */
 PooledVariance::~PooledVariance()
 {
 }
