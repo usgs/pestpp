@@ -584,10 +584,33 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
         JtQJ = jac.transpose() * q_mat * jac;
         Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 
-        // Calculate scaling factors SC = 1 / sqrt(diag(JtQJ))
         Eigen::VectorXd d = JtQJ.diagonal();
-        Eigen::VectorXd SC = d.array().inverse().sqrt();
+		Eigen::VectorXd SC = Eigen::VectorXd::Zero(d.size());
 
+		int no_effect_count = 0;
+		double sensitivity_threshold = 1.0e-30; // Anything smaller is numerical noise
+
+		for (int i = 0; i < d.size(); ++i) {
+			if (d(i) > sensitivity_threshold) {
+				// Parameter has effect: Calculate SC as 1/sqrt(diag)
+				SC(i) = 1.0 / sqrt(d(i));
+				
+				// Apply the upper bound clamp to keep the matrix well-conditioned
+				if (SC(i) > 1.0e8) {
+					SC(i) = 1.0e8;
+				}
+			} else {
+				// Parameter has NO effect: Set scaling to 0 to "freeze" it
+				SC(i) = 0.0;
+				no_effect_count++;
+			}
+		}
+
+		if (no_effect_count > 0) {
+			stringstream ss;
+			ss << "Warning: " << no_effect_count << " parameters have no effect and will be zeroed in this iteration by the scaling matrix.";
+			performance_log->log_event(ss.str());
+		}
 		// diagonal of 1.0.
         Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
         JtQJ = SC_mat * JtQJ * SC_mat;
@@ -610,7 +633,14 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
         svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
         
         output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
-        VectorXd Sigma_inv = Sigma.array().inverse();
+        VectorXd Sigma_inv = Sigma;
+		for (int i = 0; i < Sigma.size(); ++i) {
+			if (Sigma(i) > 1e-15) { // Or use a relative threshold based on Sigma.maxCoeff()
+				Sigma_inv(i) = 1.0 / Sigma(i);
+			} else {
+				Sigma_inv(i) = 0.0; // Truncate the singular value
+			}
+		}
 
         // Compute upgrade vector and unscale by SC
         upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
