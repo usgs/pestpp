@@ -1866,137 +1866,72 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	// if we don't have tied parameters, use clamping logic instead.
 	else
 	{
-		for (auto &p : upgrade_active_ctl_pars)
+		// Transform current and previous parameters to physical (control) space
+		Parameters upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
+		Parameters last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
+
+		for (auto &p : upgrade_ctl_pars)
 		{
-			
-			last_val = last_active_ctl_pars.get_rec(p.first);
+			// Now p.second and last_val are in physical units, making comparisons simple
+			last_val = last_ctl_pars.get_rec(p.first);
 			p_rec = p_info.get_parameter_rec_ptr(p.first);
 			parchglim = p_rec->chglim;
+
 			if (parchglim == "RELATIVE" && last_val == 0.0)
 			{
 				throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
 			}
 
-			
-
-			if (p.second == 0.0)
-				p.second = p_rec->ubnd / 4.0;
+			// Apply same logic for zero-initialization handling
+			if (p.second == 0.0) p.second = p_rec->ubnd / 4.0;
 			orig_val = ctl_parameters.get_rec(p.first);
-			if (orig_val == 0.0)
-				orig_val = p_rec->ubnd / 4.0;
+			if (orig_val == 0.0) orig_val = p_rec->ubnd / 4.0;
 
-			//calc fac lims
-			if (last_val > 0.0)
-			{
+			// Calculate change limits in physical space
+			if (last_val > 0.0) {
 				fac_lb = last_val / fpm;
 				fac_ub = last_val * fpm;
 			}
-		
-			else
-			{
+			else {
 				fac_lb = last_val * fpm;
 				fac_ub = last_val / fpm;
-				
+			}
+			rel_lb = last_val - (abs(last_val) * rpm);
+			rel_ub = last_val + (abs(last_val) * rpm);
+
+			if (parchglim == "FACTOR") {
+				chg_lb = fac_lb; chg_ub = fac_ub;
+			}
+			else {
+				chg_lb = rel_lb; chg_ub = rel_ub;
 			}
 
-			//calc rel lims
-			rel_lb = last_active_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
-			rel_ub = last_active_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
-
-			if (parchglim == "FACTOR")
-			{
-				chg_lb = fac_lb;
-				chg_ub = fac_ub;
-			}
-			else if (parchglim == "RELATIVE")
-			{
-				chg_lb = rel_lb;
-				chg_ub = rel_ub;
-			}
-			else
-			{
-				throw runtime_error("Pest::enforce_par_limits() error: unrecognized 'parchglim': " + parchglim);
-			}
-
-
-			// double temp = 1.0;
-
-			// New logic for enforcing chglim and bounds
-			// First, we'll check the change limits.
-			// Next, we'll check parameter bounds.
-			// If anything violates, clamp to the offending bound.
-
+			// Apply clamping to change limits
 			if (enforce_chglim)
-			// similar to below, clamp rather than shrink every parameter if a parameter violates change limits
 			{ 
-				if (p.second > chg_ub)
-				{
-					temp = abs((chg_ub - last_val) / (p.second - last_val));
-					if ((temp > 1.0) || (temp < 0.0))
-					{
-						ss.str("");
-						ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
-						ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-						throw runtime_error(ss.str());
-					}
-					p.second = chg_ub;
-				}
-				else if (p.second < chg_lb)
-				{
-					temp = abs((last_val - chg_lb) / (last_val - p.second));
-					if ((temp > 1.0) || (temp < 0.0))
-					{
-						ss.str("");
-						ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
-						ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-						throw runtime_error(ss.str());
-					}
-					p.second = chg_lb;
-				}
+				if (p.second > chg_ub) p.second = chg_ub;
+				else if (p.second < chg_lb) p.second = chg_lb;
 
-				//apply facorig correction if needed
-				if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+				if (p_rec->tranform_type == ParameterRec::TRAN_TYPE::NONE)
 				{
-					if (abs(p.second) < abs(orig_val) * facorig)
-						p.second = orig_val * facorig;
-					if (abs(last_val) < abs(orig_val * facorig))
-						last_val = orig_val * facorig;
+					if (abs(p.second) < abs(orig_val) * facorig) p.second = orig_val * facorig;
 				}
 			}
 
+			// Apply clamping to physical boundaries
 			if (enforce_bounds)
 			{
-				// Use a tiny additive epsilon to ensure derivative steps
-				// don't immediately exit the bounds. Works correctly for
-				// both positive and negative parameter values.
 				const double eps = 1e-9;
 				double range = std::abs(p_rec->ubnd - p_rec->lbnd);
 				double nudge = (range > 0) ? range * eps : eps;
 
-				if (p.second > p_rec->ubnd)
-				{
-					p.second = p_rec->ubnd - nudge;
-				}
-				else if (p.second < p_rec->lbnd)
-				{
-					p.second = p_rec->lbnd + nudge;
-				}
+				if (p.second > p_rec->ubnd) p.second = p_rec->ubnd - nudge;
+				else if (p.second < p_rec->lbnd) p.second = p_rec->lbnd + nudge;
 			}
 		}
 
-		// Second pass: catch any residual out-of-bounds values (e.g. from
-		// facorig correction nudging a parameter just past a bound).
-		if (enforce_bounds)
-		{
-			for (auto &p : upgrade_active_ctl_pars)
-			{
-				p_rec = p_info.get_parameter_rec_ptr(p.first);
-				if (p.second < p_rec->lbnd)
-					p.second = p_rec->lbnd;
-				else if (p.second > p_rec->ubnd)
-					p.second = p_rec->ubnd;
-			}
-		}
+		// 2. Transform the clamped physical parameters back into active-control space
+		upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_ctl_pars);
 	}
 
 	pair<string, double> _control_info(ss.str(), scaling_factor);
