@@ -1966,27 +1966,35 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 
 			if (enforce_bounds)
 			{
-				// Use a tiny additive epsilon to ensure derivative steps 
-				// don't immediately exit the bounds. 
-				const double eps = 1e-9; 
+				// Use a tiny additive epsilon to ensure derivative steps
+				// don't immediately exit the bounds. Works correctly for
+				// both positive and negative parameter values.
+				const double eps = 1e-9;
+				double range = std::abs(p_rec->ubnd - p_rec->lbnd);
+				double nudge = (range > 0) ? range * eps : eps;
 
-				for (auto &p : upgrade_active_ctl_pars)
+				if (p.second > p_rec->ubnd)
 				{
-					const ParameterRec* p_rec = p_info.get_parameter_rec_ptr(p.first);
-					double range = std::abs(p_rec->ubnd - p_rec->lbnd);
-					double nudge = (range > 0) ? range * eps : eps;
-
-					if (p.second > p_rec->ubnd)
-					{
-						// Set exactly to bound or nudge slightly inside
-						p.second = p_rec->ubnd - nudge;
-					}
-					else if (p.second < p_rec->lbnd)
-					{
-						// Set exactly to bound or nudge slightly inside
-						p.second = p_rec->lbnd + nudge;
-					}
+					p.second = p_rec->ubnd - nudge;
 				}
+				else if (p.second < p_rec->lbnd)
+				{
+					p.second = p_rec->lbnd + nudge;
+				}
+			}
+		}
+
+		// Second pass: catch any residual out-of-bounds values (e.g. from
+		// facorig correction nudging a parameter just past a bound).
+		if (enforce_bounds)
+		{
+			for (auto &p : upgrade_active_ctl_pars)
+			{
+				p_rec = p_info.get_parameter_rec_ptr(p.first);
+				if (p.second < p_rec->lbnd)
+					p.second = p_rec->lbnd;
+				else if (p.second > p_rec->ubnd)
+					p.second = p_rec->ubnd;
 			}
 		}
 	}
