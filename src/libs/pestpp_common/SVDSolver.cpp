@@ -1465,10 +1465,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters lam_frozen_active_ctl_pars = frozen_active_ctl_pars;	
 			try
 			{
-				//test for pars to freeze
-				test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
-					obs_names_vec, base_run_active_ctl_par,
-					tmp_new_par);
+				// test for pars to freeze
+				// test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
+				//	obs_names_vec, base_run_active_ctl_par,
+				//	tmp_new_par);
 
 				calc_upgrade_vec(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 					obs_names_vec, base_run_active_ctl_par, new_pars, limit_type);
