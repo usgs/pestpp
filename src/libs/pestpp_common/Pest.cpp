@@ -1966,31 +1966,28 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 
 			if (enforce_bounds)
 			{
-				if (p.second > p_rec->ubnd)
-				{
-					p.second = p_rec->ubnd;
-					// clamp to 95% of range just to avoid any weird floating point issues that might push a value beyond its limit
-					p.second *= 0.95; 
-				}
-				else if (p.second < p_rec->lbnd)
-				{
-					p.second = p_rec->lbnd;
-					// clamp to 5% of range just to avoid any weird floating point issues that might push a value beyond its limit
-					p.second *= 1.05;
-				}
-			}	
-		}
+				// Use a tiny additive epsilon to ensure derivative steps 
+				// don't immediately exit the bounds. 
+				const double eps = 1e-9; 
 
-		// do a second pass to check for slightly out of bounds
-		// seems to still come up as an issue for some strange reason
-		for (auto &p : upgrade_ctl_pars)
-		{
-			p_rec = p_info.get_parameter_rec_ptr(p.first);
-			if (p.second < p_rec->lbnd)
-				p.second = p_rec->lbnd;
-			else if (p.second > p_rec->ubnd)
-				p.second = p_rec->ubnd;
+				for (auto &p : upgrade_active_ctl_pars)
+				{
+					const ParameterRec* p_rec = p_info.get_parameter_rec_ptr(p.first);
+					double range = std::abs(p_rec->ubnd - p_rec->lbnd);
+					double nudge = (range > 0) ? range * eps : eps;
 
+					if (p.second > p_rec->ubnd)
+					{
+						// Set exactly to bound or nudge slightly inside
+						p.second = p_rec->ubnd - nudge;
+					}
+					else if (p.second < p_rec->lbnd)
+					{
+						// Set exactly to bound or nudge slightly inside
+						p.second = p_rec->lbnd + nudge;
+					}
+				}
+			}
 		}
 	}
 
