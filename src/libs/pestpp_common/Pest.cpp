@@ -1866,71 +1866,80 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	// if we don't have tied parameters, use clamping logic instead.
 	else
 	{
-		// Transform current and previous parameters to physical (control) space
+		// 1. Generate the full physical parameter set (Adjustable + Tied)
 		Parameters upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		Parameters last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
 
 		for (auto &p : upgrade_ctl_pars)
 		{
-			// Now p.second and last_val are in physical units, making comparisons simple
+			// last_val and p.second are now in physical (control) space
 			last_val = last_ctl_pars.get_rec(p.first);
 			p_rec = p_info.get_parameter_rec_ptr(p.first);
 			parchglim = p_rec->chglim;
-
-			if (parchglim == "RELATIVE" && last_val == 0.0)
-			{
-				throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
-			}
-
-			// Apply same logic for zero-initialization handling
-			if (p.second == 0.0) p.second = p_rec->ubnd / 4.0;
 			orig_val = ctl_parameters.get_rec(p.first);
-			if (orig_val == 0.0) orig_val = p_rec->ubnd / 4.0;
 
-			// Calculate change limits in physical space
-			if (last_val > 0.0) {
-				fac_lb = last_val / fpm;
-				fac_ub = last_val * fpm;
-			}
-			else {
-				fac_lb = last_val * fpm;
-				fac_ub = last_val / fpm;
-			}
-			rel_lb = last_val - (abs(last_val) * rpm);
-			rel_ub = last_val + (abs(last_val) * rpm);
-
-			if (parchglim == "FACTOR") {
-				chg_lb = fac_lb; chg_ub = fac_ub;
-			}
-			else {
-				chg_lb = rel_lb; chg_ub = rel_ub;
-			}
-
-			// Apply clamping to change limits
-			if (enforce_chglim)
-			{ 
-				if (p.second > chg_ub) p.second = chg_ub;
-				else if (p.second < chg_lb) p.second = chg_lb;
-
-				if (p_rec->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+			// 2. ENFORCE CHANGE LIMITS (Adjustable parameters only)
+			// Check if this parameter is in the adjustable set passed to the function
+			if (upgrade_active_ctl_pars.find(p.first) != upgrade_active_ctl_pars.end())
+			{
+				if (enforce_chglim)
 				{
-					if (abs(p.second) < abs(orig_val) * facorig) p.second = orig_val * facorig;
+					if (parchglim == "RELATIVE" && last_val == 0.0)
+					{
+						throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
+					}
+
+					// Calculate change limits in physical space
+					if (last_val > 0.0) {
+						fac_lb = last_val / fpm; fac_ub = last_val * fpm;
+					}
+					else {
+						fac_lb = last_val * fpm; fac_ub = last_val / fpm;
+					}
+					rel_lb = last_val - (abs(last_val) * rpm);
+					rel_ub = last_val + (abs(last_val) * rpm);
+
+					if (parchglim == "FACTOR") {
+						chg_lb = fac_lb; chg_ub = fac_ub;
+					}
+					else {
+						chg_lb = rel_lb; chg_ub = rel_ub;
+					}
+
+					// Clamp to change limits
+					if (p.second > chg_ub) p.second = chg_ub;
+					else if (p.second < chg_lb) p.second = chg_lb;
+
+					// Apply facorig logic (prevents parameters from stalling at 0)
+					if (p_rec->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+					{
+						if (abs(p.second) < abs(orig_val) * facorig) p.second = orig_val * facorig;
+					}
 				}
 			}
 
-			// Apply clamping to physical boundaries
+			// 3. ENFORCE PHYSICAL BOUNDS (All parameters: Adjustable + Tied)
+			// This ensures Test 5 passes by checking children/tied pars too
 			if (enforce_bounds)
 			{
 				const double eps = 1e-9;
 				double range = std::abs(p_rec->ubnd - p_rec->lbnd);
 				double nudge = (range > 0) ? range * eps : eps;
 
-				if (p.second > p_rec->ubnd) p.second = p_rec->ubnd - nudge;
-				else if (p.second < p_rec->lbnd) p.second = p_rec->lbnd + nudge;
+				if (p.second > p_rec->ubnd)
+				{
+					p.second = p_rec->ubnd - nudge;
+				}
+				else if (p.second < p_rec->lbnd)
+				{
+					p.second = p_rec->lbnd + nudge;
+				}
 			}
 		}
 
-		// 2. Transform the clamped physical parameters back into active-control space
+		// 4. Map the clamped values back to the adjustable (active) set
+		// ctl2active_ctl_cp will correctly strip out the tied parameters and 
+		// handle any transformation logic (like scale/offset) registered in the sequence.
 		upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_ctl_pars);
 	}
 
