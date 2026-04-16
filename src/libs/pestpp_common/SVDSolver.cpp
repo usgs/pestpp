@@ -576,75 +576,72 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 
 	}
 	else if (glm_normal_form == PestppOptions::GLMNormalForm::HP)
-    {
-        performance_log->log_event("commencing HP-style scaling (PEST_HP logic)");
-		// scale diagonal elements similar to how HP handles it.
-		// Around lines 6275 - 6331 in runpest.F
-        // Form the raw normal matrix and innovation (RHS)
-        JtQJ = jac.transpose() * q_mat * jac;
-        Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
+	{
+		performance_log->log_event("commencing HP-style scaling (PEST_HP logic) with robust guards");
 
-        Eigen::VectorXd d = JtQJ.diagonal();
+		// 1. Form the raw normal matrix and innovation (RHS)
+		JtQJ = jac.transpose() * q_mat * jac;
+		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
+
+		// 2. Robust Calculation of Scaling Factors (SC)
+		Eigen::VectorXd d = JtQJ.diagonal();
 		Eigen::VectorXd SC = Eigen::VectorXd::Zero(d.size());
-
 		int no_effect_count = 0;
-		double sensitivity_threshold = 1.0e-30; // Anything smaller is numerical noise
+		double sensitivity_threshold = 1.0e-30; 
+		double sc_upper_bound = 1.0e8; 
 
 		for (int i = 0; i < d.size(); ++i) {
 			if (d(i) > sensitivity_threshold) {
-				// Parameter has effect: Calculate SC as 1/sqrt(diag)
 				SC(i) = 1.0 / sqrt(d(i));
-				
-				// Apply the upper bound clamp to keep the matrix well-conditioned
-				if (SC(i) > 1.0e8) {
-					SC(i) = 1.0e8;
-				}
+				if (SC(i) > sc_upper_bound) SC(i) = sc_upper_bound;
 			} else {
-				// Parameter has NO effect: Set scaling to 0 to "freeze" it
-				SC(i) = 0.0;
+				SC(i) = 0.0; // Freeze parameter
 				no_effect_count++;
 			}
 		}
 
 		if (no_effect_count > 0) {
 			stringstream ss;
-			ss << "Warning: " << no_effect_count << " parameters have no effect and will be zeroed in this iteration by the scaling matrix.";
+			ss << "Warning: " << no_effect_count << " parameters have zero sensitivity and are frozen this iteration.";
 			performance_log->log_event(ss.str());
 		}
-		// diagonal of 1.0.
-        Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
-        JtQJ = SC_mat * JtQJ * SC_mat;
 
-  		// Scale the innovation vector: innovation_i = innovation_i * SC_i
-        innovation = SC.cwiseProduct(innovation);
+		// 3. Apply Scaling
+		Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
+		JtQJ = SC_mat * JtQJ * SC_mat;
+		innovation = SC.cwiseProduct(innovation);
 
-        // RTEMP = max(SC), RRTEMP = lambda / RTEMP^2
-        double max_sc = SC.maxCoeff();
-        double rrtemp = (max_sc > 0) ? (lambda / (max_sc * max_sc)) : 0.0;
+		// 4. Calculate Damping (rrtemp) and Apply to Diagonal
+		double max_sc = SC.maxCoeff();
+		double rrtemp = (max_sc > 0) ? (lambda / (max_sc * max_sc)) : 0.0;
 
-        // Apply damping to the diagonal: LHS_ii = 1.0 + (SC_i^2 * RRTEMP)
-        Eigen::VectorXd damping = SC.array().square() * rrtemp;
-        for (int i = 0; i < JtQJ.rows(); ++i)
-        {
-            JtQJ.coeffRef(i, i) += damping(i);
-        }
-
-        performance_log->log_event("commencing SVD factorization of HP-scaled JtQJ");
-        svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
-        
-        output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
-        VectorXd Sigma_inv = Sigma;
-		for (int i = 0; i < Sigma.size(); ++i) {
-			if (Sigma(i) > 1e-15) { // Or use a relative threshold based on Sigma.maxCoeff()
-				Sigma_inv(i) = 1.0 / Sigma(i);
-			} else {
-				Sigma_inv(i) = 0.0; // Truncate the singular value
-			}
+		Eigen::VectorXd damping = SC.array().square() * rrtemp;
+		for (int i = 0; i < JtQJ.rows(); ++i)
+		{
+			// Adding 1.0 (Standard HP) + damping + a tiny epsilon for Cholesky stability
+			JtQJ.coeffRef(i, i) += damping(i) + 1e-12; 
 		}
 
-        // Compute upgrade vector and unscale by SC
-        upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
-    }
+		// 5. Factorization
+		performance_log->log_event("commencing SVD factorization of HP-scaled JtQJ");
+		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
+		
+		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
+
+		// 6. Robust Sigma Inversion (Prevents NaNs/Infs in the upgrade vector)
+		VectorXd Sigma_inv = Sigma;
+		for (int i = 0; i < Sigma.size(); ++i)
+		{
+			// Guard against dividing by zero if the matrix is rank-deficient
+			Sigma_inv(i) = (Sigma(i) > 1e-15) ? (1.0 / Sigma(i)) : 0.0;
+		}
+
+		// 7. Compute final upgrade vector and unscale by SC
+		// Note: If SC(i) was 0, upgrade_vec(i) will be 0, effectively freezing the parameter.
+		upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
+		
+		performance_log->log_event("upgrade calculation complete");
+	}
 	else
 		throw runtime_error("unrecognized marquardt scaling type");
 
