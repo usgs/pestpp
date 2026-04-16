@@ -1869,7 +1869,11 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		// 1. Generate the full physical parameter set (Adjustable + Tied)
 		Parameters upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		Parameters last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
-
+		ss << "--- Upgrade Control Parameters at start of enforce_par_limits ---\n";
+		for (auto const& p : upgrade_ctl_pars)
+		{
+			ss << p.first << ": " << p.second << "\n";
+		}
 		for (auto &p : upgrade_ctl_pars)
 		{
 			// last_val and p.second are now in physical (control) space
@@ -1940,7 +1944,18 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		// 4. Map the clamped values back to the adjustable (active) set
 		// ctl2active_ctl_cp will correctly strip out the tied parameters and 
 		// handle any transformation logic (like scale/offset) registered in the sequence.
+		ss << "--- Active Control Parameters at end of enforce_par_limits ---\n";
+		for (auto const& p : upgrade_ctl_pars)
+		{
+			ss << p.first << ": " << p.second << "\n";
+		}
 		upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_ctl_pars);
+		// Print Base Run Parameters
+		ss << "--- Upgrade Active Control Parameters at end of enforce_par_limits ---\n";
+		for (auto const& p : upgrade_active_ctl_pars)
+		{
+			ss << p.first << ": " << p.second << "\n";
+		}
 	}
 
 	pair<string, double> _control_info(ss.str(), scaling_factor);

@@ -746,8 +746,19 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	Parameters notfrozen_upgrade_active_ctl_pars = upgrade_active_ctl_pars;
 	notfrozen_upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars.get_keys());
 	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
-	
-	ss.str("");
+	// Print Base Run Parameters
+	ss << "--- Base Run Active Control Parameters in calc_upgrade_vector ---\n";
+	for (auto const& p : base_run_active_ctl_pars)
+	{
+		ss << p.first << ": " << p.second << "\n";
+	}
+
+	// Print Not-Frozen Upgrade Parameters
+	ss << "--- Not-Frozen Upgrade Active Control Parameters in calc_upgrade_vector ---\n";
+	for (auto const& p : notfrozen_upgrade_active_ctl_pars)
+	{
+		ss << p.first << ": " << p.second << "\n";
+	}
 	ss << "change limit/bound enforcement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
 	performance_log->log_event(ss.str());
 	if (ctl_info.second < 0.01)
@@ -1466,9 +1477,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			try
 			{
 				// test for pars to freeze
-				// test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
-				//	obs_names_vec, base_run_active_ctl_par,
-				//	tmp_new_par);
+				test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
+				obs_names_vec, base_run_active_ctl_par,
+				tmp_new_par);
 
 				calc_upgrade_vec(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 					obs_names_vec, base_run_active_ctl_par, new_pars, limit_type);
