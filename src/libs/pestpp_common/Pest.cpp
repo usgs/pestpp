@@ -1858,7 +1858,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	}
 	
 	//check for slightly out of bounds
-	for (auto &p : upgrade_ctl_pars)
+	for (auto &p : upgrade_active_ctl_pars)
 	{
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
 		if (p.second < p_rec->lbnd)
