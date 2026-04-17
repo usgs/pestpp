@@ -738,7 +738,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	}
 	performance_log->log_event("commencing check of parameter bounds");
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,false);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,true);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 
 
@@ -796,7 +796,7 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
 	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, 
-		grad_ctl_del_pars,false);
+		grad_ctl_del_pars,true);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 	if (new_frozen_active_ctl_pars.size() == upgrade_active_ctl_pars.size())
 		throw runtime_error("SVDSolver::test_upgrade_to_find_freeze_pars() error: all parameters at/near bounds and heading out - cannot continue");
@@ -1499,17 +1499,17 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
 				
-				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
-				// pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_par,false,true);
-				// scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+				Parameters scaled_active_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
+				pest_scenario.enforce_par_limits(performance_log,scaled_active_ctl_pars,base_run_active_ctl_par,true,true);
+				scaled_pars = par_transform.active_ctl2model_cp(scaled_active_ctl_pars);
                 //now flip back to all ctl pars not just active...
                 // scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
-					0, i_lambda, i_scale, scaled_ctl_pars);
+					0, i_lambda, i_scale, scaled_active_ctl_pars);
 
 				stringstream ss;
 				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
-				par_transform.numeric2model_ip(scaled_pars);
+				// par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
 				num_lamb_runs++;
 				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
