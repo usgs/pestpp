@@ -579,11 +579,11 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	{
 		performance_log->log_event("commencing HP-style scaling (PEST_HP logic) with robust guards");
 
-		// 1. Form the raw normal matrix and innovation (RHS)
+		// Form the raw normal matrix and innovation (RHS)
 		JtQJ = jac.transpose() * q_mat * jac;
 		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 
-		// 2. Robust Calculation of Scaling Factors (SC)
+		// Robust Calculation of Scaling Factors (SC)
 		Eigen::VectorXd d = JtQJ.diagonal();
 		Eigen::VectorXd SC = Eigen::VectorXd::Zero(d.size());
 		int no_effect_count = 0;
@@ -606,12 +606,12 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 			performance_log->log_event(ss.str());
 		}
 
-		// 3. Apply Scaling
+		// Apply Scaling
 		Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
 		JtQJ = SC_mat * JtQJ * SC_mat;
 		innovation = SC.cwiseProduct(innovation);
 
-		// 4. Calculate Damping (rrtemp) and Apply to Diagonal
+		// Calculate Damping (rrtemp) and Apply to Diagonal
 		double max_sc = SC.maxCoeff();
 		double rrtemp = (max_sc > 0) ? (lambda / (max_sc * max_sc)) : 0.0;
 
@@ -622,13 +622,13 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 			JtQJ.coeffRef(i, i) += damping(i) + 1e-12; 
 		}
 
-		// 5. Factorization
+		// Factorization
 		performance_log->log_event("commencing SVD factorization of HP-scaled JtQJ");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 
-		// 6. Robust Sigma Inversion (Prevents NaNs/Infs in the upgrade vector)
+		// Robust Sigma Inversion (Prevents NaNs/Infs in the upgrade vector)
 		VectorXd Sigma_inv = Sigma;
 		for (int i = 0; i < Sigma.size(); ++i)
 		{
@@ -636,7 +636,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 			Sigma_inv(i) = (Sigma(i) > 1e-15) ? (1.0 / Sigma(i)) : 0.0;
 		}
 
-		// 7. Compute final upgrade vector and unscale by SC
+		// Compute final upgrade vector and unscale by SC
 		// Note: If SC(i) was 0, upgrade_vec(i) will be 0, effectively freezing the parameter.
 		upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
 		
@@ -2043,81 +2043,95 @@ bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd
 }
 
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
-	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
-	bool include_bound)
+    const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
+    bool include_bound)
 {
-	double tolerance = 1.0e-7;
-	int num_upgrade_out_grad_in = 0;
-	double p_org;
-	double p_new;
-	double upper_bnd;
-	double lower_bnd;
-	const string *name_ptr;
-	const auto it_end = upgrade_active_ctl_pars.end();
-	for (const auto &ipar : current_active_ctl_pars)
-	{
-		name_ptr = &(ipar.first);
-		const auto it = upgrade_active_ctl_pars.find(*name_ptr);
+    double tolerance = 1.0e-7;
+    int num_upgrade_out_grad_in = 0;
+    double p_org;
+    double p_new;
+    double upper_bnd;
+    double lower_bnd;
+    const string *name_ptr;
+    const auto it_end = upgrade_active_ctl_pars.end();
 
-		if (it != it_end)
-		{
-			//first check upgrade parameters
-			p_new = it->second;
-			p_org = current_active_ctl_pars.get_rec(*name_ptr);
-			upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->ubnd;
-			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->lbnd;
-			//these are active parameters so this is not really necessary - just being extra safe
-			bool par_active = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->is_active();
-			if (!par_active)
-				continue;
-			
-			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
-				// clamp at upper bound unless factor/relative change limits stop us
-				new_freeze_active_ctl_pars.insert(*name_ptr, upper_bnd);
-			else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
-				new_freeze_active_ctl_pars.insert(*name_ptr, lower_bnd);
-			else
-			{
-				int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-				if (par_going_out == 1)
-					new_freeze_active_ctl_pars.insert(*name_ptr, upper_bnd);
-				else if (par_going_out == 2)
-					new_freeze_active_ctl_pars.insert(*name_ptr, lower_bnd);
-			}
-		}
-	}
-	
-	if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
-	{
-		ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+	// helper function to freeze at bounds unless enforce_par_limits decreases that shift
+    auto enforce_and_freeze = [&](const string* n_ptr, double val) {
+        Parameters single_par;
+        single_par.insert(*n_ptr, val);
+        
+        pest_scenario.enforce_par_limits(performance_log, single_par, current_active_ctl_pars, true, true);
+        
+        new_freeze_active_ctl_pars.insert(*n_ptr, single_par.get_rec(*n_ptr));
+    };
 
-		TranTied* tt = par_transform.get_tied_ptr();
-		Parameters current_ctl_pars = current_active_ctl_pars;
-		tt->reverse(current_ctl_pars);
-		Parameters upgrade_ctl_pars = upgrade_active_ctl_pars;
-		tt->reverse(upgrade_ctl_pars);
-		auto items = tt->get_items();
-		pair<string, double> tt_item;
-		for (auto ipar : upgrade_ctl_pars)
-		{
-			if (items.find(ipar.first) == items.end())
-				continue;
+    for (const auto &ipar : current_active_ctl_pars)
+    {
+        name_ptr = &(ipar.first);
+        const auto it = upgrade_active_ctl_pars.find(*name_ptr);
 
-			tt_item = items.at(ipar.first);
+        if (it != it_end)
+        {
+            //first check upgrade parameters
+            p_new = it->second;
+            p_org = current_active_ctl_pars.get_rec(*name_ptr);
+            upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->ubnd;
+            lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->lbnd;
+            //these are active parameters so this is not really necessary - just being extra safe
+            bool par_active = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->is_active();
+            if (!par_active)
+                continue;
+            
+            if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
+                enforce_and_freeze(name_ptr, upper_bnd);
+            else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
+                enforce_and_freeze(name_ptr, lower_bnd);
+            else
+            {
+                int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+                if (par_going_out == 1)
+                    enforce_and_freeze(name_ptr, upper_bnd);
+                else if (par_going_out == 2)
+                    enforce_and_freeze(name_ptr, lower_bnd);
+            }
+        }
+    }
+    
+    if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
+    {
+        ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
 
-			p_new = ipar.second;
-			p_org = current_ctl_pars.get_rec(ipar.first);
-			upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->ubnd;
-			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->lbnd;
-			int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-			if (par_going_out > 0)
-			{
-				new_freeze_active_ctl_pars.insert(tt_item.first, current_ctl_pars.get_rec(tt_item.first));
-			}
-		}
-	}
-	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, new_freeze_active_ctl_pars, current_active_ctl_pars, true, true);
-	return num_upgrade_out_grad_in;
+        TranTied* tt = par_transform.get_tied_ptr();
+        Parameters current_ctl_pars = current_active_ctl_pars;
+        tt->reverse(current_ctl_pars);
+        Parameters upgrade_ctl_pars = upgrade_active_ctl_pars;
+        tt->reverse(upgrade_ctl_pars);
+        auto items = tt->get_items();
+        pair<string, double> tt_item;
+        for (auto ipar : upgrade_ctl_pars)
+        {
+            if (items.find(ipar.first) == items.end())
+                continue;
+
+            tt_item = items.at(ipar.first);
+
+            p_new = ipar.second;
+            p_org = current_ctl_pars.get_rec(ipar.first);
+            upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->ubnd;
+            lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->lbnd;
+            int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+            if (par_going_out > 0)
+            {
+                // Apply the same individual isolation for tied bounds
+                Parameters single_tied_par;
+                single_tied_par.insert(tt_item.first, current_ctl_pars.get_rec(tt_item.first));
+                pest_scenario.enforce_par_limits(performance_log, single_tied_par, current_active_ctl_pars, true, true);
+                new_freeze_active_ctl_pars.insert(tt_item.first, single_tied_par.get_rec(tt_item.first));
+            }
+        }
+    }
+    
+    return num_upgrade_out_grad_in;
 }
 //void SVDSolver::limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
 //	Pest::LimitType &limit_type, const Parameters &frozen_active_ctl_pars)

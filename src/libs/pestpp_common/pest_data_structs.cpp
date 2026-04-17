@@ -2143,7 +2143,11 @@ void PestppOptions::summary(ostream& os) const
 		norm_str = "IDENT";
 	else if (glm_normal_form == GLMNormalForm::PRIOR)
 		norm_str = "PRIOR";
+	else if (glm_normal_form == GLMNormalForm::HP)
+		norm_str = "HP";
 	os << "glm_normal_form: " << norm_str << endl;
+	os << "glm_hp_lambdas:" << glm_hp_lambdas << endl;
+	os << "glm_panther_lambdas" << glm_panther_lambdas << endl;
 	os << "glm_debug_der_fail: " << glm_debug_der_fail << endl;
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
