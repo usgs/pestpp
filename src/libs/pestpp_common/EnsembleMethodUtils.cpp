@@ -1558,7 +1558,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
     double eigthresh;
     bool use_approx;
     bool use_prior_scaling;
-
+	map<string,int> upgrade_map;
     while (true)
     {
         if (ctrl_guard.try_lock()) {
@@ -1567,7 +1567,8 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
             use_approx = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_approx();
             use_prior_scaling = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_prior_scaling();
             verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
-            ctrl_guard.unlock();
+			upgrade_map = pe_upgrade.get_real_map();
+        	ctrl_guard.unlock();
             break;
         }
 
@@ -1708,7 +1709,8 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
             if (put_guard.try_lock())
             {
                 //pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
-                pe_upgrade.add_2_row_ip(key,row_vec);
+                //pe_upgrade.add_2_row_ip(key,row_vec);
+            	pe_upgrade.get_eigen_ptr_4_mod()->row(upgrade_map.at(key)) += row_vec;
                 put_guard.unlock();
                 break;
             }
@@ -1844,7 +1846,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	bool use_prior_scaling;
 	bool use_localizer = false;
 	bool loc_by_obs = true;
-
+	map<string,int> upgrade_map;
 	while (true)
 	{
 		if (ctrl_guard.try_lock())
@@ -1855,6 +1857,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			use_prior_scaling = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_prior_scaling();
 			num_reals = pe_upgrade.shape().first;
 			verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
+			upgrade_map = pe_upgrade.get_var_map();
 			ctrl_guard.unlock();
 			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_localize_how()[0] == 'P')
 			if (how == Localizer::How::PARAMETERS)
@@ -2016,7 +2019,10 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		{
 			if (put_guard.try_lock())
 			{
-				pe_upgrade.add_2_cols_ip(par_names, upgrade_1);				
+				//pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
+				for (int i=0;i<par_names.size(); i++)
+					pe_upgrade.get_eigen_ptr_4_mod()->col(upgrade_map.at(par_names[i])) += upgrade_1.col(i);
+
 				put_guard.unlock();
 				break;
 			}
