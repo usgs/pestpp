@@ -2046,8 +2046,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
 	bool include_bound)
 {
-	// double tolerance = 1.0e-7;
-	double tolerance = 0.0;
+	double tolerance = 1.0e-7;
 	int num_upgrade_out_grad_in = 0;
 	double p_org;
 	double p_new;
@@ -2120,7 +2119,6 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, new_freeze_active_ctl_pars, current_active_ctl_pars, true, true);
 	return num_upgrade_out_grad_in;
 }
-
 //void SVDSolver::limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
 //	Pest::LimitType &limit_type, const Parameters &frozen_active_ctl_pars)
 //{
