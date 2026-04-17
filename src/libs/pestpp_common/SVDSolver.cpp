@@ -2073,6 +2073,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 				continue;
 			
 			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
+				// clamp at upper bound unless factor/relative change limits stop us
 				new_freeze_active_ctl_pars.insert(*name_ptr, upper_bnd);
 			else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
 				new_freeze_active_ctl_pars.insert(*name_ptr, lower_bnd);
@@ -2086,6 +2087,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 			}
 		}
 	}
+	
 	if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
 	{
 		ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
@@ -2115,6 +2117,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 			}
 		}
 	}
+	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, new_freeze_active_ctl_pars, current_active_ctl_pars, true, true);
 	return num_upgrade_out_grad_in;
 }
 
