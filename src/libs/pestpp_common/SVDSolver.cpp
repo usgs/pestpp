@@ -796,7 +796,7 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
 	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, 
-		grad_ctl_del_pars,true);
+		grad_ctl_del_pars,false);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 	if (new_frozen_active_ctl_pars.size() == upgrade_active_ctl_pars.size())
 		throw runtime_error("SVDSolver::test_upgrade_to_find_freeze_pars() error: all parameters at/near bounds and heading out - cannot continue");
