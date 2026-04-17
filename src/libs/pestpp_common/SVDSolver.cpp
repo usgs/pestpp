@@ -739,26 +739,13 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	}
 	performance_log->log_event("commencing check of parameter bounds");
 	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,false);
-	// prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
+	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 
 
 	performance_log->log_event("limiting out of bounds pars");
 	Parameters notfrozen_upgrade_active_ctl_pars = upgrade_active_ctl_pars;
 	notfrozen_upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars.get_keys());
 	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
-	// Print Base Run Parameters
-	ss << "--- Base Run Active Control Parameters in calc_upgrade_vector ---\n";
-	for (auto const& p : base_run_active_ctl_pars)
-	{
-		ss << p.first << ": " << p.second << "\n";
-	}
-
-	// Print Not-Frozen Upgrade Parameters
-	ss << "--- Not-Frozen Upgrade Active Control Parameters in calc_upgrade_vector ---\n";
-	for (auto const& p : notfrozen_upgrade_active_ctl_pars)
-	{
-		ss << p.first << ": " << p.second << "\n";
-	}
 	ss << "change limit/bound enforcement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
 	performance_log->log_event(ss.str());
 	if (ctl_info.second < 0.01)
@@ -2043,12 +2030,15 @@ bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd
 		out_of_bnd = true;
 	return out_of_bnd;*/
 
-	bool out_of_bnd = false;
+	int out_of_bnd = 0;
 	double tolerance = 1.0e-7;
 	if (((1.0 + tolerance) * p_org >= upper_bnd) && (p_new >= p_org))
-		out_of_bnd = true;
-	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org))
-		out_of_bnd = true;
+	{
+		out_of_bnd = 1;
+	}
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org)){
+		out_of_bnd = 2;
+	}
 	return out_of_bnd;
 }
 
@@ -2056,7 +2046,8 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
 	bool include_bound)
 {
-	double tolerance = 1.0e-7;
+	// double tolerance = 1.0e-7;
+	double tolerance = 0.0;
 	int num_upgrade_out_grad_in = 0;
 	double p_org;
 	double p_new;
@@ -2082,15 +2073,16 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 				continue;
 			
 			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
-				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+				new_freeze_active_ctl_pars.insert(*name_ptr, upper_bnd);
 			else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
-				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+				new_freeze_active_ctl_pars.insert(*name_ptr, lower_bnd);
 			else
 			{
-
-				bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-				if (par_going_out)
-					new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+				int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+				if (par_going_out == 1)
+					new_freeze_active_ctl_pars.insert(*name_ptr, upper_bnd);
+				else if (par_going_out == 2)
+					new_freeze_active_ctl_pars.insert(*name_ptr, lower_bnd);
 			}
 		}
 	}
@@ -2116,8 +2108,8 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 			p_org = current_ctl_pars.get_rec(ipar.first);
 			upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->ubnd;
 			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->lbnd;
-			bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-			if (par_going_out)
+			int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+			if (par_going_out > 0)
 			{
 				new_freeze_active_ctl_pars.insert(tt_item.first, current_ctl_pars.get_rec(tt_item.first));
 			}
