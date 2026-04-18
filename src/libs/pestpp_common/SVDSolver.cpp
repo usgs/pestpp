@@ -1490,31 +1490,56 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 
 			//Add Scaled Upgrade Vectors
-			Parameters new_numeric_pars = par_transform.model2numeric_cp(new_par_model);
-			Parameters base_numeric_pars = par_transform.model2numeric_cp(base_model_pars);
-			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
-			for (double i_scale : lambda_scale_vec)
-			{
-				if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
-					continue;
-				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				
-				Parameters scaled_active_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
-				pest_scenario.enforce_par_limits(performance_log,scaled_active_ctl_pars,base_run_active_ctl_par,true,true);
-				scaled_pars = par_transform.active_ctl2model_cp(scaled_active_ctl_pars);
+            Parameters new_numeric_pars = par_transform.model2numeric_cp(new_par_model);
+            Parameters base_numeric_pars = par_transform.model2numeric_cp(base_model_pars);
+            Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
+            
+            for (double i_scale : lambda_scale_vec)
+            {
+                if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
+                    continue;
+                Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
+                
+                Parameters scaled_active_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
+
+                // Take frozen parameters OUT of the active control parameters
+                vector<string> erased_frozen_pars;
+                for (const auto& frozen_par_name : lam_frozen_active_ctl_pars.get_keys())
+                {
+                    if (scaled_active_ctl_pars.find(frozen_par_name) != scaled_active_ctl_pars.end())
+                    {
+                        scaled_active_ctl_pars.erase(frozen_par_name);
+                        erased_frozen_pars.push_back(frozen_par_name);
+                    }
+                }
+
+                // Enforce limits strictly on the parameters that are still in the collection
+                pest_scenario.enforce_par_limits(performance_log, scaled_active_ctl_pars, base_run_active_ctl_par, true, true);
+
+                // Put the frozen parameters back IN with their exact base values using insert()
+                for (const auto& frozen_par_name : erased_frozen_pars)
+                {
+                    double base_val = base_run_active_ctl_par.get_rec(frozen_par_name);
+                    scaled_active_ctl_pars.insert(frozen_par_name, base_val);
+                }
+                // --------------------------------------------------
+
+                scaled_pars = par_transform.active_ctl2model_cp(scaled_active_ctl_pars);
+                
                 //now flip back to all ctl pars not just active...
                 // scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
-				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
-					0, i_lambda, i_scale, scaled_active_ctl_pars);
+                output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
+                    0, i_lambda, i_scale, scaled_active_ctl_pars);
 
-				stringstream ss;
-				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
-				// par_transform.numeric2model_ip(scaled_pars);
-				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
-				num_lamb_runs++;
-				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
-				save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
-			}
+                stringstream ss;
+                ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+                // par_transform.numeric2model_ip(scaled_pars);
+                int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
+                num_lamb_runs++;
+                fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
+                
+                save_frozen_pars(fout_frz, lam_frozen_active_ctl_pars, run_id);
+            }
 
 			////Try to extend the previous upgrade vector
 			/*if ((upgrade_augment) &&  (limit_type == Pest::LimitType::LBND || limit_type == Pest::LimitType::UBND))
