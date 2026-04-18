@@ -738,7 +738,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	}
 	performance_log->log_event("commencing check of parameter bounds");
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,true);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,true,true);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 
 
@@ -796,7 +796,7 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
 	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, 
-		grad_ctl_del_pars,false);
+		grad_ctl_del_pars,false,false);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 	if (new_frozen_active_ctl_pars.size() == upgrade_active_ctl_pars.size())
 		throw runtime_error("SVDSolver::test_upgrade_to_find_freeze_pars() error: all parameters at/near bounds and heading out - cannot continue");
@@ -2044,7 +2044,7 @@ bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd
 
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
     const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
-    bool include_bound)
+    bool include_bound, bool clamp)
 {
     double tolerance = 1.0e-7;
     int num_upgrade_out_grad_in = 0;
@@ -2061,6 +2061,14 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
         single_par.insert(*n_ptr, val);
         
         pest_scenario.enforce_par_limits(performance_log, single_par, current_active_ctl_pars, true, true);
+        
+        new_freeze_active_ctl_pars.insert(*n_ptr, single_par.get_rec(*n_ptr));
+    };
+
+	// if already at bounds, just freeze
+    auto just_freeze = [&](const string* n_ptr, double val) {
+        Parameters single_par;
+        single_par.insert(*n_ptr, val);
         
         new_freeze_active_ctl_pars.insert(*n_ptr, single_par.get_rec(*n_ptr));
     };
@@ -2082,17 +2090,25 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
             if (!par_active)
                 continue;
             
-            if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
+            if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (p_new != upper_bnd) && (clamp))
                 enforce_and_freeze(name_ptr, upper_bnd);
-            else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
+			else if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
+				just_freeze(name_ptr, upper_bnd);
+            else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd) && (p_new != lower_bnd) && (clamp))
                 enforce_and_freeze(name_ptr, lower_bnd);
+			else if ((include_bound) && ((1.0 + tolerance) * p_new <= lower_bnd))
+				just_freeze(name_ptr, lower_bnd);
             else
             {
                 int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-                if (par_going_out == 1)
+                if ((par_going_out == 1) && (clamp))
                     enforce_and_freeze(name_ptr, upper_bnd);
-                else if (par_going_out == 2)
+				else if (par_going_out == 1)
+					just_freeze(name_ptr, p_org);
+                else if ((par_going_out == 2) && (clamp))
                     enforce_and_freeze(name_ptr, lower_bnd);
+				else if (par_going_out == 2)
+					just_freeze(name_ptr, p_org);
             }
         }
     }
