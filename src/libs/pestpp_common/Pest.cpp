@@ -1785,6 +1785,22 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 
 		if (enforce_bounds)
 		{
+			// Adding logic to check if both last and current values are both at one of the bounds
+			// This parameter should have been frozen probably but somehow slipped through the cracks
+			// Perhaps due to tolerances or just barely being under/over
+            // Check if both p.second and last_val are within bnd_tol of the upper bound
+            bool skip_ub = (abs(p_rec->ubnd - p.second) <= bnd_tol) && 
+                           (abs(p_rec->ubnd - last_val) <= bnd_tol);
+
+            // Check if both p.second and last_val are within bnd_tol of the lower bound
+            bool skip_lb = (abs(p.second - p_rec->lbnd) <= bnd_tol) && 
+                           (abs(last_val - p_rec->lbnd) <= bnd_tol);
+
+            // If close to either bound, skip the rest of the bound checking for this parameter
+            if (skip_ub || skip_lb)
+            {
+                continue;
+            }
 			/*if (last_val >= p_rec->ubnd)
 			{
 				ss.str("");

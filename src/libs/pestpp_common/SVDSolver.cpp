@@ -2071,7 +2071,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
     const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
     bool include_bound, bool clamp)
 {
-    double tolerance = 1.0e-7;
+    double tolerance = 1.0e-3;
     int num_upgrade_out_grad_in = 0;
     double p_org;
     double p_new;
@@ -2115,10 +2115,12 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
             if (!par_active)
                 continue;
             
-            if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (p_new != upper_bnd) && (clamp))
+            //if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (abs(p_new - upper_bnd) <= tolerance) && (clamp))
+			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (p_new != upper_bnd) && (clamp))
                 enforce_and_freeze(name_ptr, upper_bnd);
 			else if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
 				just_freeze(name_ptr, upper_bnd);
+			//else if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (abs(p_new - lower_bnd) <= tolerance) && (clamp))
             else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd) && (p_new != lower_bnd) && (clamp))
                 enforce_and_freeze(name_ptr, lower_bnd);
 			else if ((include_bound) && ((1.0 + tolerance) * p_new <= lower_bnd))
