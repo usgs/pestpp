@@ -31,7 +31,6 @@ elif "darwin" in platform.platform().lower() or "mac" in platform.platform().low
     exe_path = os.path.join(bin_path, "mac", "pestpp-glm")
 else:
     exe_path = os.path.join(bin_path, "linux", "pestpp-glm")
-
 port = 4016
 
 
@@ -678,7 +677,7 @@ def tenpar_xsec_stress_test_4():
     
 def tenpar_xsec_stress_test_hp():
     model_d = "glm_10par_xsec"
-    test_d = os.path.join(model_d, "master_stress4")
+    test_d = os.path.join(model_d, "master_stressh")
     template_d = os.path.join(model_d, "template")
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
@@ -704,6 +703,42 @@ def tenpar_xsec_stress_test_hp():
     pst.pestpp_options["glm_iter_mc"] = True
     pst.pestpp_options["glm_normal_form"] = "HP"
     pst.pestpp_options["glm_hp_lambdas"] = True
+    #pst.reg_data.phimlim = 10
+    #pst.reg_data.fracphim = 0.5
+    #pst.reg_data.phimaccept = 11
+    #pst.reg_data.wfinit = 10
+    pst.write(os.path.join(template_d, "pest_stress.pst"))
+    pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
+                                 master_dir=test_d, verbose=True, worker_root=model_d,
+                                 port=port)
+    
+def tenpar_xsec_stress_test_panther():
+    model_d = "glm_10par_xsec"
+    test_d = os.path.join(model_d, "master_stressp")
+    template_d = os.path.join(model_d, "template")
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    # shutil.copytree(template_d, test_d)
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+    pst.pestpp_options = {}
+    par = pst.parameter_data
+    par.loc[:,"parubnd"] *= 1.25
+    par.loc[:,"parubnd"] *= 0.75
+    pst.svd_data.maxsing = 10
+    pst.control_data.pestmode = "regularization"
+    pst.prior_information = pst.null_prior
+    pyemu.helpers.zero_order_tikhonov(pst)
+    pst.control_data.noptmax = -1
+    pst.pestpp_options["glm_num_reals"] = 10
+    pst.pestpp_options["glm_debug_der_fail"] = False
+    pst.pestpp_options["glm_debug_lamb_fail"] = False
+    pst.pestpp_options["glm_accept_mc_phi"] = False
+    #pst.pestpp_options["glm_debug_high_2nd_iter_phi"] = True
+    pst.pestpp_options["glm_iter_mc"] = True
+    pst.pestpp_options["glm_panther_lambdas"] = True
     #pst.reg_data.phimlim = 10
     #pst.reg_data.fracphim = 0.5
     #pst.reg_data.phimaccept = 11
@@ -753,10 +788,11 @@ def tenpar_xsec_stress_test_5():
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_normal_form"] = "prior"
     pst.pestpp_options["glm_accept_mc_phi"] = True
+    pst.pestpp_options["lambda_scale_fac"] = [1.0, 1.1] #making sure lambda scales don't break par limits
     pst.write(os.path.join(template_d, "pest_stress.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
+                                 port=port, cleanup=False)
     pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
     print(pst.phi)
     assert os.path.exists(os.path.join(test_d,"pest_stress.4.par"))
@@ -833,8 +869,7 @@ def tenpar_fosm_external_stdev_test():
     diff = df1["post_stdev"] - df2["post_stdev"]
     print(diff)
     assert np.abs(diff.values).sum() < 1e-6
-
-
+    
 if __name__ == "__main__":
     #freyberg_stress_test()
     #tenpar_xsec_stress_test()
@@ -852,8 +887,9 @@ if __name__ == "__main__":
     #tenpar_xsec_stress_test_3()
     #tenpar_xsec_stress_test_5super()
     
-    #tenpar_xsec_stress_test_5()
-
+    #tenpar_xsec_stress_test_hp()
+    #tenpar_xsec_stress_test_panther()
+    #tenpar_xsec_stress_test_bnds()
     
 
         
