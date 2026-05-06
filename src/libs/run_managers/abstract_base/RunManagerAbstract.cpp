@@ -104,8 +104,7 @@ void RunManagerAbstract::reinitialize(const string &_filename)
 	vector<string> par_names = get_par_name_vec();
 	vector<string> obs_names = get_obs_name_vec();
 	file_stor.reset(par_names, obs_names, _filename);
-	// Note: failed_file_stor is intentionally NOT reset here so that
-	// failed runs accumulate across all iterations/batches.
+	failed_file_stor.reset(par_names, obs_names);
 }
 
 /**
