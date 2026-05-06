@@ -793,7 +793,7 @@ bool check_exist_out(std::string filename)
 
 void try_clean_up_run_storage_files(const string& case_name)
 {
-	vector<string> extensions{ ".rns",".rnj",".rnu",".rst",".rnf" };
+	vector<string> extensions{ ".rns",".rnj",".rnu",".rst" };
 	for (auto ext : extensions)
 	{
 		string filename = lower_cp(case_name) + ext;

@@ -5070,8 +5070,7 @@ def tenpar_xsec_combined_autoadaloc_mm_stress_test():
     
 
 if __name__ == "__main__":
-    tenpar_upgrade_on_disk_test_weight_ensemble_test()
-    #tenpar_xsec_combined_autoadaloc_mm_stress_test()
+    tenpar_xsec_combined_autoadaloc_mm_stress_test()
 
     #tenpar_adjust_weights_test()
     #large_invest()
