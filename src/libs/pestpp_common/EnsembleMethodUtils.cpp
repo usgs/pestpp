@@ -5381,7 +5381,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         {
             message(0,"WARNING: npar and/or nobs > 1e6, you are close to going out-of-range for jcb format.  Switching to dense format but using '.jcb' file extension");
             pest_scenario.get_pestpp_options_ptr()->set_save_dense(true);
-            dense_file_ext = "jcb";
+            dense_file_ext = ".jcb";
         }
     }
 
