@@ -1219,7 +1219,8 @@ void SeqQuadProgram::initialize()
 	if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
 	{
 		ss.str("");
-		ss << endl << "StoSAG-approx hessian: " << endl << hessian << endl;
+		ss << "hessian (iter 0):" << endl;
+		ss << hessian.e_ptr()->toDense() << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << ss.str() << endl;
 	}
@@ -2564,6 +2565,7 @@ void SeqQuadProgram::iterate_2_solution()
 			if (pest_scenario.get_pestpp_options().get_sqp_debug_hessian())
 			{
 				ss.str("");
+				ss << "hessian (iter " << iter << "):" << endl;
 				ss << hessian_dense << endl;
 				ofstream& frec = file_manager.rec_ofstream();
 				frec << ss.str() << endl;
