@@ -392,6 +392,9 @@ def basic_sqp_chance_test_highdim():
     pst.pestpp_options["opt_stack_size"] = stack_size
     pst.pestpp_options["opt_chance_points"] = "SINGLE"
     pst.pestpp_options["sqp_alpha_mults"] = "0.1, 0.5, 1.0"
+    pst.pestpp_options["sqp_enforce_bounds"] = "true"   
+    pst.pestpp_options["random_seed"] = 8
+
     pst.control_data.noptmax = 1
     pst_name = "freyberg_run_sqp_chance.pst"
     pst.write(os.path.join(t_d, pst_name), version=2)
@@ -530,7 +533,7 @@ if __name__ == "__main__":
     # basic_sqp_iter_test()
     # basic_sqp_direction_test()
     # basic_sqp_rosenbrock_chance_test()
-    # basic_sqp_chance_test_highdim()
+    basic_sqp_chance_test_highdim()
     # basic_sqp_bounds_test()
-    basic_sqp_hessian_test()
+    # basic_sqp_hessian_test()
 
