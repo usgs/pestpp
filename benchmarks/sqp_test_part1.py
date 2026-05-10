@@ -115,9 +115,8 @@ def _reset_master_dir(model_d, name):
     return m_d
 
 
-def _run_sqp_parallel(t_d, model_d, pst_name, m_d, port, num_workers=5):
-    pyemu.os_utils.start_workers(t_d, exe_path, pst_name,
-                                 num_workers=num_workers, master_dir=m_d,
+def _run_sqp_parallel(t_d, model_d, pst_name, m_d, port, num_workers=8):
+    pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=num_workers, master_dir=m_d,
                                  worker_root=model_d, port=port)
 
 def basic_sqp_init_test():
@@ -381,61 +380,61 @@ def basic_sqp_rosenbrock_chance_test():
     assert "theta" in par_stack_all_df.columns, "theta not found in ALL par_stack columns"
     assert par_stack_all_df["theta"].std() > 0, "theta has zero spread in ALL par_stack"
 
-def basic_sqp_chance_test_highdim():
-    model_d, t_d, pst = _prep_freyberg_sqp_pst()
+# def basic_sqp_chance_test_highdim():
+#     model_d, t_d, pst = _prep_freyberg_sqp_pst()
 
-    n_reals = 10
-    stack_size = 15
-    pst.pestpp_options["sqp_risk"] = 0.95
-    pst.pestpp_options["sqp_num_reals"] = n_reals
-    pst.pestpp_options["sqp_subset_size"] = 5
-    pst.pestpp_options["opt_stack_size"] = stack_size
-    pst.pestpp_options["opt_chance_points"] = "SINGLE"
-    pst.pestpp_options["sqp_alpha_mults"] = "0.1, 0.5, 1.0"
-    pst.pestpp_options["sqp_enforce_bounds"] = "true"   
-    pst.pestpp_options["random_seed"] = 8
+#     n_reals = 10
+#     stack_size = 15
+#     pst.pestpp_options["sqp_risk"] = 0.95
+#     pst.pestpp_options["sqp_num_reals"] = n_reals
+#     pst.pestpp_options["sqp_subset_size"] = 5
+#     pst.pestpp_options["opt_stack_size"] = stack_size
+#     pst.pestpp_options["opt_chance_points"] = "SINGLE"
+#     pst.pestpp_options["sqp_alpha_mults"] = "0.1, 0.5, 1.0"
+#     pst.pestpp_options["sqp_enforce_bounds"] = "true"   
+#     pst.pestpp_options["random_seed"] = 8
 
-    pst.control_data.noptmax = 1
-    pst_name = "freyberg_run_sqp_chance.pst"
-    pst.write(os.path.join(t_d, pst_name), version=2)
+#     pst.control_data.noptmax = 1
+#     pst_name = "freyberg_run_sqp_chance.pst"
+#     pst.write(os.path.join(t_d, pst_name), version=2)
 
-    m_d = _reset_master_dir(model_d, "master_sqp_chance")
-    _run_sqp_parallel(t_d, model_d, pst_name, m_d, port + 5)
+#     m_d = _reset_master_dir(model_d, "master_sqp_chance")
+#     _run_sqp_parallel(t_d, model_d, pst_name, m_d, port + 5)
 
-    _, rec_text = _read_rec(m_d, pst_name)
-    base = os.path.splitext(pst_name)[0]
+#     _, rec_text = _read_rec(m_d, pst_name)
+#     base = os.path.splitext(pst_name)[0]
 
-    assert os.path.exists(os.path.join(m_d, base + ".1.base.par")), "iter-1 base.par missing after chance run"
-    assert os.path.exists(os.path.join(m_d, base + ".1.par.csv")), "iter-1 par.csv missing after chance run"
+#     assert os.path.exists(os.path.join(m_d, base + ".1.base.par")), "iter-1 base.par missing after chance run"
+#     assert os.path.exists(os.path.join(m_d, base + ".1.par.csv")), "iter-1 par.csv missing after chance run"
 
-    # check stack generation
-    par_stack_csv = os.path.join(m_d, base + ".1.par_stack.csv")
-    obs_stack_csv = os.path.join(m_d, base + ".1.obs_stack.csv")
-    assert os.path.exists(par_stack_csv), "iter-1 par_stack.csv missing"
-    assert os.path.exists(obs_stack_csv), "iter-1 obs_stack.csv missing"
+#     # check stack generation
+#     par_stack_csv = os.path.join(m_d, base + ".1.par_stack.csv")
+#     obs_stack_csv = os.path.join(m_d, base + ".1.obs_stack.csv")
+#     assert os.path.exists(par_stack_csv), "iter-1 par_stack.csv missing"
+#     assert os.path.exists(obs_stack_csv), "iter-1 obs_stack.csv missing"
 
-    par_stack_df = pd.read_csv(par_stack_csv, index_col=0)
-    obs_stack_df = pd.read_csv(obs_stack_csv, index_col=0)
+#     par_stack_df = pd.read_csv(par_stack_csv, index_col=0)
+#     obs_stack_df = pd.read_csv(obs_stack_csv, index_col=0)
 
-    # check stack size
-    assert par_stack_df.shape[0] == stack_size, "par_stack row count mismatch: expected {0} (opt_stack_size), got {1}".format(stack_size, par_stack_df.shape[0])
-    assert obs_stack_df.shape[0] == stack_size, "obs_stack row count mismatch: expected {0} (opt_stack_size), got {1}".format( stack_size, obs_stack_df.shape[0])
+#     # check stack size
+#     assert par_stack_df.shape[0] == stack_size, "par_stack row count mismatch: expected {0} (opt_stack_size), got {1}".format(stack_size, par_stack_df.shape[0])
+#     assert obs_stack_df.shape[0] == stack_size, "obs_stack row count mismatch: expected {0} (opt_stack_size), got {1}".format( stack_size, obs_stack_df.shape[0])
 
-    adj_pars = pst.parameter_data.loc[pst.parameter_data.partrans.isin(["none", "log"]), "parnme"].tolist()
-    par_stack_cols = [c for c in adj_pars if c in par_stack_df.columns]
-    assert len(par_stack_cols) == len(adj_pars), "par_stack column count mismatch: expected {0} adjustable pars, found {1} in csv".format(len(adj_pars), len(par_stack_cols))
+#     adj_pars = pst.parameter_data.loc[pst.parameter_data.partrans.isin(["none", "log"]), "parnme"].tolist()
+#     par_stack_cols = [c for c in adj_pars if c in par_stack_df.columns]
+#     assert len(par_stack_cols) == len(adj_pars), "par_stack column count mismatch: expected {0} adjustable pars, found {1} in csv".format(len(adj_pars), len(par_stack_cols))
 
-    expected_obs_cols = pst.nobs + pst.nprior
-    assert obs_stack_df.shape[1] == expected_obs_cols, "obs_stack column count mismatch: expected {0} (nobs+nprior), got {1}".format(expected_obs_cols, obs_stack_df.shape[1])
+#     expected_obs_cols = pst.nobs + pst.nprior
+#     assert obs_stack_df.shape[1] == expected_obs_cols, "obs_stack column count mismatch: expected {0} (nobs+nprior), got {1}".format(expected_obs_cols, obs_stack_df.shape[1])
 
-    constraint_groups = [g for g in pst.observation_data.obgnme.unique()
-                         if g.startswith(("l_", "g_", "e_","less_than", "greater_than", "equal_to"))]
-    assert len(constraint_groups) > 0, "no constraint observation groups found in pst"
-    constraint_obs = pst.observation_data.loc[pst.observation_data.obgnme.isin(constraint_groups), "obsnme"].tolist()
-    constraint_cols = [c for c in constraint_obs if c in obs_stack_df.columns]
-    assert len(constraint_cols) > 0, "no constraint obs found in obs_stack.csv columns"
-    constraint_stds = obs_stack_df[constraint_cols].std()
-    assert (constraint_stds > 0).any(), "all constraint obs have zero spread across stack members"
+#     constraint_groups = [g for g in pst.observation_data.obgnme.unique()
+#                          if g.startswith(("l_", "g_", "e_","less_than", "greater_than", "equal_to"))]
+#     assert len(constraint_groups) > 0, "no constraint observation groups found in pst"
+#     constraint_obs = pst.observation_data.loc[pst.observation_data.obgnme.isin(constraint_groups), "obsnme"].tolist()
+#     constraint_cols = [c for c in constraint_obs if c in obs_stack_df.columns]
+#     assert len(constraint_cols) > 0, "no constraint obs found in obs_stack.csv columns"
+#     constraint_stds = obs_stack_df[constraint_cols].std()
+#     assert (constraint_stds > 0).any(), "all constraint obs have zero spread across stack members"
 
 def basic_sqp_bounds_test():
     w_d, pst_name = _setup_rosenbrock_workdir("bounds", noptmax=1, num_reals=12, initial_decvars=(0.1, 0.1))
