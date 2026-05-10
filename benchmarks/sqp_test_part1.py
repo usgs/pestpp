@@ -531,8 +531,8 @@ if __name__ == "__main__":
     # basic_sqp_init_test()
     # basic_sqp_iter_test()
     # basic_sqp_direction_test()
-    # basic_sqp_rosenbrock_chance_test()
-    basic_sqp_chance_test_highdim()
+    basic_sqp_rosenbrock_chance_test()
+    # basic_sqp_chance_test_highdim()
     # basic_sqp_bounds_test()
     # basic_sqp_hessian_test()
 

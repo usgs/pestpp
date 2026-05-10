@@ -19,7 +19,7 @@ else:
 bin_path = os.path.abspath("test_bin")
 os.environ["PATH"] += os.pathsep + bin_path
 
-bin_path = os.path.join("..","..","..","bin", "win")
+bin_path = os.path.join("..","..","..","bin")
 exe = ""
 if "windows" in platform.platform().lower():
     exe = ".exe"
