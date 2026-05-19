@@ -91,6 +91,7 @@ jobs:
           environment-file: etc/environment.yml
           cache-environment: false
           post-cleanup: 'all'
+          micromamba-version: '2.6.0-0'
 
     # - name: Add packages to pyemu environment using mamba or conda
     #   shell: bash -l {0}
