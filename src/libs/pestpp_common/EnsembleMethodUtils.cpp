@@ -31,10 +31,10 @@
 
 
 EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
-	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _am, L2PhiHandler& _ph,
 	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names, double _reg_factor) :
 	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), weights(_weights), localizer(_localizer),
-	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names), reg_factor(_reg_factor) {
+	parcov(_parcov), Am(_am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names), reg_factor(_reg_factor) {
     performance_log = _performance_log;
     use_localizer = _use_localizer;
     iter = _iter;
@@ -72,7 +72,7 @@ void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map
     catch (...) {
         eptr = current_exception();
     }
-    return;
+
 }
 
 void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
@@ -305,8 +305,8 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         Eigen::setNbThreads(1);
         vector<thread> threads;
         vector<exception_ptr> exception_ptrs;
-        vector<string> preal_names = pe.get_real_names();
-        vector<string> oreal_names = oe.get_real_names();
+        preal_names = pe.get_real_names();
+        oreal_names = oe.get_real_names();
         unordered_map<string,Eigen::VectorXd> real_vec_map;
         unordered_map<string,unordered_map<string,double>> neighbor_phi_map, neighbor_pardist_map;
         mm_q_vec_map.clear();
