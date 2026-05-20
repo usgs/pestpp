@@ -1998,8 +1998,16 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
     const ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	if (obs_std.size() > 0)
 	{
-		frec << "Note: the following observations have 'standard_deviation' defined - this will be used" << endl;
-		frec << "      instead of weight for the observation noise covariance matrix : " << endl;
+		bool echo = true;
+		if (obs_std.size() > 1000) {
+			frec << "Note: " << obs_std.size() << " observations have 'standard_deviation' defined - this will be used" << endl;
+			frec << "      instead of weight for the observation noise covariance matrix : " << endl;
+			echo = false;
+		}
+		if (echo) {
+			frec << "Note: the following observations have 'standard_deviation' defined - this will be used" << endl;
+			frec << "      instead of weight for the observation noise covariance matrix : " << endl;
+		}
 		for (auto oname : pest_scenario.get_ctl_ordered_obs_names())
 		{
 			if (obs_std.find(oname) != obs_std.end())
@@ -2008,13 +2016,14 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 					frec << "Warning: observation " << oname << " 'standard_deviation' less than or equal to zero, using weight" << endl;
 					remove.push_back(oname);
 				}
-				else
+				else if (echo)
 					frec << oname << ' ' << obs_std[oname] << endl;
 			}
 		}
 		for (auto r : remove)
 			obs_std.erase(r);
 	}
+
 
 	from_observation_weights(frec, pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_observation_info(),
 		pest_scenario.get_ctl_ordered_pi_names(), pest_scenario.get_prior_info_ptr(), obs_std);
