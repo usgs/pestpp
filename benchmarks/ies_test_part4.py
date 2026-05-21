@@ -5070,7 +5070,7 @@ def tenpar_xsec_combined_autoadaloc_mm_stress_test():
 
     pst.pestpp_options["ies_lambda_mults"] = [1.0]
     pst.pestpp_options["lambda_scale_fac"] = [1.0]
-    #pst.pestpp_options["ies_use_phi_lambda_iters"] = True
+    pst.pestpp_options["ies_use_phi_lambda_iters"] = True
     pst.write(os.path.join(template_d, "pest_aal_restart.pst"))
     pyemu.os_utils.run("{0} pest_aal_restart.pst".format(exe_path),cwd=template_d)
 
