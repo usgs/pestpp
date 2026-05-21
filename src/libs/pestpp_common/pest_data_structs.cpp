@@ -1369,6 +1369,11 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 		return true;
 	}
 
+	else if (key == "IES_USE_PHI_LAMBDA_ITERS")
+	{
+		ies_use_phi_lambda_iters = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 
 
     return false;
@@ -2365,6 +2370,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_reinflate_num_reals: " << endl;
 	for (auto v : ies_reinflate_num_reals)
 		os << v << ",";
+	os << endl;
+	os << "ies_use_phi_lambda_iters: " << ies_use_phi_lambda_iters << endl;
 	os << endl;
 
     os << endl << "pestpp-sen options: " << endl;

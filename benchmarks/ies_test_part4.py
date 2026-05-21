@@ -5061,12 +5061,20 @@ def tenpar_xsec_combined_autoadaloc_mm_stress_test():
     pst.pestpp_options["ies_debug_bad_phi"] = True
     pst.pestpp_options["ies_multimodal_alpha"] = 0.99
     
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 10
 
     pst.write(os.path.join(template_d, "pest_aal_restart.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_aal_restart.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
                                  port=port)
+
+    pst.pestpp_options["ies_lambda_mults"] = [1.0]
+    pst.pestpp_options["lambda_scale_fac"] = [1.0]
+    #pst.pestpp_options["ies_use_phi_lambda_iters"] = True
+    pst.write(os.path.join(template_d, "pest_aal_restart.pst"))
+    pyemu.os_utils.run("{0} pest_aal_restart.pst".format(exe_path),cwd=template_d)
+
+    
     
 
 if __name__ == "__main__":

@@ -639,6 +639,8 @@ public:
     string get_ies_run_realname() const {return ies_run_realname;}
 	void set_ies_reinflate_num_reals(vector<int> _vec)  { ies_reinflate_num_reals = _vec;}
 	vector<int> get_ies_reinflate_num_reals() const {return ies_reinflate_num_reals;}
+	void set_ies_use_phi_lambda_iters(bool _flag) { ies_use_phi_lambda_iters = _flag; }
+	bool get_ies_use_phi_lambda_iters() const { return ies_use_phi_lambda_iters; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -975,8 +977,7 @@ private:
     vector<string> ies_aal_indicator_pars;
     string ies_run_realname;
 	vector<int> ies_reinflate_num_reals;
-
-
+	bool ies_use_phi_lambda_iters;
 
 	// Data Assimilation parameters
 	/*string da_mode;

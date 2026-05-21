@@ -7725,7 +7725,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	//track this here for phi-based termination check
 	best_mean_phis.push_back(best_mean);
 
-
 	if ((best_mean < last_best_mean * acc_fac))
 	{
 		message(0, "updating parameter ensemble");
@@ -7814,6 +7813,18 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
+	}
+
+	if (pest_scenario.get_pestpp_options().get_ies_use_phi_lambda_iters()) {
+
+		double new_lam = get_lambda();
+		ss.str("");
+		ss << "using phi-based lambda for each iteration, lambda changing from " << last_best_lam << " to " << new_lam;
+		message(1,ss.str());
+		last_best_lam = new_lam;
+
+
+
 	}
 
 	return true;

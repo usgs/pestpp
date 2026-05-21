@@ -4215,6 +4215,11 @@ Note also that the number of control variables may change with time. Refer to th
 <td>list of ints</td>
 <td>The number of realizations to use between reinflation cycles.  If negative, new realizations are drawn from the current ensemble.</td>
 </tr>
+<tr class="even">
+<td><em>ies_use_phi_lambda_iters</em></td>
+<td>bool</td>
+<td>Flag to use phi-based lambda each iteration (instead just for the initial phi).</td>
+</tr>
 
 </tbody>
 </table>
