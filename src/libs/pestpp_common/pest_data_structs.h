@@ -378,6 +378,17 @@ public:
 	string get_sqp_search_method()const { return sqp_search_method; }
 	void set_sqp_solve_method(string _how) { sqp_solve_method = _how; }
 	string get_sqp_solve_method()const { return sqp_solve_method; }
+	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
+	int get_sqp_num_reals()const { return sqp_num_reals; }
+	void set_sqp_num_refined_search_pts(int _num_pts) { sqp_num_refined_search_pts = _num_pts; }
+	int get_sqp_num_refined_search_pts()const { return sqp_num_refined_search_pts; }
+	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
+	int get_sqp_subset_size()const { return sqp_subset_size; }
+	void set_sqp_subset_size(int _num_reals) { sqp_subset_size = _num_reals; }
+	bool get_sqp_update_hessian()const { return sqp_update_hessian; }
+	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
+	string get_sqp_hessian_update_method()const { return sqp_hessian_update_method; }
+	void set_sqp_hessian_update_method(string _how) { sqp_hessian_update_method = _how; }
 	vector<double> get_sqp_alpha_mults() const { return sqp_alpha_mults; } 
 	void set_sqp_alpha_mults(vector<double> _mults) { sqp_alpha_mults = _mults; }
 	double get_sqp_filter_tol() const { return sqp_filter_tol; }
@@ -740,7 +751,6 @@ public:
 
 
 
-
     //bool get_use_da_args() const { return use_da_args; }
 	//void set_use_dat_args(bool _flag) { use_da_args = _flag; }
 
@@ -876,6 +886,7 @@ private:
 	bool sqp_debug_cma;
 	bool sqp_debug_stosag_grad;
 	
+
 	int mou_population_size;
 	string mou_generator; 
 	string mou_dv_population_file;
@@ -982,6 +993,8 @@ private:
     string ies_run_realname;
 	vector<int> ies_reinflate_num_reals;
 	bool ies_use_phi_lambda_iters;
+
+
 
 	// Data Assimilation parameters
 	/*string da_mode;

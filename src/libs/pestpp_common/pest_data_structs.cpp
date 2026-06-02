@@ -16,11 +16,6 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
-/**
- * @file pest_data_structs.cpp
- * @brief Implementation of pest_data_structs.
- */
-
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -44,14 +39,6 @@ using namespace::std;
 using namespace::pest_utils;
 
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ControlInfo& val)
 {
 	os << "PEST Control Information" << endl;
@@ -84,9 +71,6 @@ ParameterGroupRec& ParameterGroupRec::operator=(const ParameterGroupRec &rhs)
 	return *this;
 }
 
-/**
- * @brief Set defaults.
- */
 void ParameterGroupRec::set_defaults()
 {
 	name = "PARGP";
@@ -100,14 +84,6 @@ void ParameterGroupRec::set_defaults()
 	splitreldiff = 0.5;
 }
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ParameterGroupRec& val)
 {
 	os << "PEST Parameter Group Information" << endl;
@@ -133,13 +109,6 @@ const ParameterGroupRec ParameterGroupInfo::get_group_rec(const string &name) co
 	return ret_val;
 }
 
-/**
- * @brief Get group rec ptr 4 mod.
- *
- * @param name Description.
- *
- * @return Description.
- */
 ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr_4_mod(const string &name)
 {
 	ParameterGroupRec* ret_val = 0;
@@ -152,35 +121,16 @@ ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr_4_mod(const string &nam
 	return ret_val;
 }
 
-/**
- * @brief Get group name.
- *
- * @param par_name Description.
- *
- * @return Description.
- */
 string ParameterGroupInfo::get_group_name(const string &par_name) const
 {
 	return get_group_rec(par_name).name;
 }
 
-/**
- * @brief Insert group.
- *
- * @param group_name Description.
- * @param rec Description.
- */
 void ParameterGroupInfo::insert_group(const string &group_name, ParameterGroupRec &rec)
 {
 	groups[group_name] = rec;
 }
 
-/**
- * @brief Insert parameter link.
- *
- * @param parameter_name Description.
- * @param group_name Description.
- */
 void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, const string & group_name)
 {
 	unordered_map<string, ParameterGroupRec>::const_iterator g_iter;
@@ -230,11 +180,6 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 //    return *this;
 //}
 
-/**
- * @brief Get group names.
- *
- * @return Description.
- */
 vector<string> ParameterGroupInfo::get_group_names() const
 {
 	vector<string> group_names;
@@ -243,11 +188,6 @@ vector<string> ParameterGroupInfo::get_group_names() const
 	return group_names;
 }
 
-/**
- * @brief Have switch derivative.
- *
- * @return Description.
- */
 bool ParameterGroupInfo::have_switch_derivative() const
 {
 	bool switch_der = false;
@@ -262,9 +202,6 @@ bool ParameterGroupInfo::have_switch_derivative() const
 	return switch_der;
 }
 
-/**
- * @brief Destructor for .
- */
 ParameterGroupInfo::~ParameterGroupInfo()
 {
 //	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
@@ -281,9 +218,6 @@ ParameterGroupInfo::~ParameterGroupInfo()
 //    }
 }
 
-/**
- * @brief Free mem.
- */
 void ParameterGroupInfo::free_mem()
 {
 
@@ -293,14 +227,6 @@ void ParameterGroupInfo::free_mem()
 
 }
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
 {
 	unordered_map<string, ParameterGroupRec>::const_iterator it(val.parameter2group.begin());
@@ -341,13 +267,6 @@ const ParameterRec* ParameterInfo::get_parameter_rec_ptr(const string &name) con
 	return ret_val;
 }
 
-/**
- * @brief Get parameter rec ptr 4 mod.
- *
- * @param name Description.
- *
- * @return Description.
- */
 ParameterRec* ParameterInfo::get_parameter_rec_ptr_4_mod(const string &name)
 {
 	ParameterRec *ret_val = 0;
@@ -360,13 +279,6 @@ ParameterRec* ParameterInfo::get_parameter_rec_ptr_4_mod(const string &name)
 	return ret_val;
 }
 
-/**
- * @brief Get low bnd.
- *
- * @param keys Description.
- *
- * @return Description.
- */
 Parameters ParameterInfo::get_low_bnd(const vector<string> &keys) const
 {
 	Parameters l_bnd;
@@ -385,13 +297,6 @@ Parameters ParameterInfo::get_low_bnd(const vector<string> &keys) const
 	return l_bnd;
 }
 
-/**
- * @brief Get up bnd.
- *
- * @param keys Description.
- *
- * @return Description.
- */
 Parameters ParameterInfo::get_up_bnd(const vector<string> &keys) const
 {
 	Parameters u_bnd;
@@ -410,13 +315,6 @@ Parameters ParameterInfo::get_up_bnd(const vector<string> &keys) const
 	return u_bnd;
 }
 
-/**
- * @brief Get init value.
- *
- * @param keys Description.
- *
- * @return Description.
- */
 Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 {
 	Parameters init_value;
@@ -435,22 +333,12 @@ Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 	return init_value;
 }
 
-/**
- * @brief Rectify ies da args.
- */
 void PestppOptions::rectify_ies_da_args()
 {
 	for (auto& a : passed_da_ies_args)
 		passed_args.emplace(a);
 }
 
-/**
- * @brief Parse plusplus line.
- *
- * @param line Description.
- *
- * @return Description.
- */
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
 	map<string, ARG_STATUS> arg_map;
@@ -479,14 +367,6 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 	return arg_map;
 }
 
-/**
- * @brief Assign value by key.
- *
- * @param key Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
 {
 	upper_ip(key);
@@ -968,15 +848,6 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 }
 
 
-/**
- * @brief Assign ies value by key.
- *
- * @param key Description.
- * @param value Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 bool PestppOptions::assign_ies_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	if ((use_da_args) && (key.find("IES") != string::npos))
@@ -1368,26 +1239,16 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 		}
 		return true;
 	}
-
-	else if (key == "IES_USE_PHI_LAMBDA_ITERS")
-	{
+	else if (key == "IES_USE_PHI_LAMBDA_ITERS") {
 		ies_use_phi_lambda_iters = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
 
 
+
     return false;
 }
 
-/**
- * @brief Assign da value by key.
- *
- * @param key Description.
- * @param value Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 bool PestppOptions::assign_da_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	//DA parameters
@@ -1470,15 +1331,6 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 }
 
 
-/**
- * @brief Assign value by key continued.
- *
- * @param key Description.
- * @param value Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value, const string& org_value)
 {
 	// This method was added as a workaround for a compiler limit of at most 128 nesting levels (MSVC); no more else if blocks could be added to assign_value_by_key()
@@ -1590,32 +1442,21 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
         return true;
 
     }
-
     else if (key == "PANTHER_PERSISTENT_WORKERS")
     {
-    	panther_persistent_workers = pest_utils::parse_string_arg_to_bool(value);
-    	return true;
+        panther_persistent_workers = pest_utils::parse_string_arg_to_bool(value);
+        return true;
     }
-
     else if (key == "PANTHER_PING_INTERVAL_SECS")
     {
     	convert_ip(value, panther_ping_interval_secs);
     	return true;
     }
-
+	
 	return false;
 }
 
 
-/**
- * @brief Assign mou value by key.
- *
- * @param key Description.
- * @param value Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	if (key == "MOU_GENERATOR")
@@ -1875,15 +1716,6 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 }
 
 
-/**
- * @brief Assign value by key sqp.
- *
- * @param key Description.
- * @param value Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& value, const string& org_value)
 {
 	if (key == "SQP_DV_EN")
@@ -2030,6 +1862,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_use_ensemble_approx_hessian = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	
 	else if (key == "SQP_RESCALE_SEARCH_DIR")
 	{
 		sqp_rescale_search_dir = pest_utils::parse_string_arg_to_bool(value);
@@ -2072,6 +1905,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	}
 	return false;
 }
+
 
 void PestppOptions::summary(ostream& os) const
 {
@@ -2128,8 +1962,6 @@ void PestppOptions::summary(ostream& os) const
     os << "panther_timeout_milliseconds: " << panther_timeout_milliseconds << endl;
     os << "panther_echo_interval_milliseconds: " << panther_echo_interval_milliseconds << endl;
     os << "panther_persistent_workers: " << panther_persistent_workers << endl;
-	os << "panther_ping_interval_secs: " << panther_ping_interval_secs << endl;
-
 
     os << endl;
 
@@ -2397,8 +2229,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_reinflate_num_reals: " << endl;
 	for (auto v : ies_reinflate_num_reals)
 		os << v << ",";
-	os << endl;
-	os << "ies_use_phi_lambda_iters: " << ies_use_phi_lambda_iters << endl;
+	os << "ies_use_phi_lambda_iters: " << ies_use_phi_lambda_iters;
 	os << endl;
 
     os << endl << "pestpp-sen options: " << endl;
@@ -2424,9 +2255,6 @@ void PestppOptions::summary(ostream& os) const
 }
 
 
-/**
- * @brief Set defaults.
- */
 void PestppOptions::set_defaults()
 {
 
@@ -2626,7 +2454,7 @@ void PestppOptions::set_defaults()
 	set_ies_loc_type("LOCAL");
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
-    set_ies_multimodal_alpha(0.0);
+    set_ies_multimodal_alpha(1.0);
     set_ensemble_output_precision(20);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
@@ -2635,6 +2463,7 @@ void PestppOptions::set_defaults()
     set_ies_reinflate_factor(vector < double > {1.0});
     set_ies_run_realname("");
 	set_ies_reinflate_num_reals(vector<int>{0});
+	set_ies_use_phi_lambda_iters(false);
 
     set_ies_updatebyreals(false);
     set_save_dense(false);
@@ -2691,14 +2520,6 @@ void PestppOptions::set_defaults()
 
 }
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ParameterInfo& val)
 {
 	for(unordered_map<string, ParameterRec>::const_iterator s=val.parameter_info.begin(),
@@ -2708,14 +2529,6 @@ ostream& operator<< (ostream &os, const ParameterInfo& val)
 	return os;
 }
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ObservationGroupRec& val)
 {
 	os << "    gtarg = " << val.gtarg << endl;
@@ -2723,14 +2536,6 @@ ostream& operator<< (ostream &os, const ObservationGroupRec& val)
 	return os;
 }
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ObservationRec& val)
 {
 	os << "    weight = " << val.weight << endl;
@@ -2738,13 +2543,6 @@ ostream& operator<< (ostream &os, const ObservationRec& val)
 	return os;
 }
 
-/**
- * @brief Is regularization.
- *
- * @param grp_name Description.
- *
- * @return Description.
- */
 bool ObservationGroupRec::is_regularization(const string &grp_name)
 {
 	bool is_reg = false;
@@ -2754,12 +2552,6 @@ bool ObservationGroupRec::is_regularization(const string &grp_name)
 
 }
 
-/**
- * @brief Reset group weights.
- *
- * @param group Description.
- * @param val Description.
- */
 void ObservationInfo::reset_group_weights(string &group, double val)
 {
 	for (auto &o : observations)
@@ -2773,12 +2565,6 @@ void ObservationInfo::reset_group_weights(string &group, double val)
 }
 
 
-/**
- * @brief Scale group weights.
- *
- * @param group Description.
- * @param scale_val Description.
- */
 void ObservationInfo::scale_group_weights(string &group, double scale_val)
 {
 	for (auto &o : observations)
@@ -2803,13 +2589,6 @@ const ObservationRec* ObservationInfo::get_observation_rec_ptr(const string &nam
 	return ret_val;
 }
 
-/**
- * @brief Get observation rec ptr 4 mod.
- *
- * @param name Description.
- *
- * @return Description.
- */
 ObservationRec* ObservationInfo::get_observation_rec_ptr_4_mod(const string& name)
 {
 	ObservationRec* ret_val = 0;
@@ -2835,11 +2614,6 @@ const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name
 	return ret_val;
 }
 
-/**
- * @brief Get groups.
- *
- * @return Description.
- */
 vector<string> ObservationInfo::get_groups() const
 {
 	vector<string> ogroups;
@@ -2850,11 +2624,6 @@ vector<string> ObservationInfo::get_groups() const
 	return ogroups;
 }
 
-/**
- * @brief Is regularization.
- *
- * @return Description.
- */
 bool ObservationRec::is_regularization() const
 {
 	bool is_reg = false;
@@ -2863,11 +2632,6 @@ bool ObservationRec::is_regularization() const
 	return is_reg;
 }
 
-/**
- * @brief Get nnz obs.
- *
- * @return Description.
- */
 int ObservationInfo::get_nnz_obs() const
 {
 	int nnz = 0;
@@ -2879,11 +2643,6 @@ int ObservationInfo::get_nnz_obs() const
 	return nnz;
 }
 
-/**
- * @brief Get nnz obs and reg.
- *
- * @return Description.
- */
 int ObservationInfo::get_nnz_obs_and_reg() const
 {
 	int nnz = 0;
@@ -2895,24 +2654,11 @@ int ObservationInfo::get_nnz_obs_and_reg() const
 	return nnz;
 }
 
-/**
- * @brief Get weight.
- *
- * @param obs_name Description.
- *
- * @return Description.
- */
 double ObservationInfo::get_weight(const string &obs_name) const
 {
 	return observations.find(obs_name)->second.weight;
 }
 
-/**
- * @brief Set weight.
- *
- * @param obs_name Description.
- * @param value Description.
- */
 void ObservationInfo::set_weight(const string &obs_name, double value)
 {
 	if (observations.find(obs_name) == observations.end())
@@ -2921,37 +2667,16 @@ void ObservationInfo::set_weight(const string &obs_name, double value)
 	observations[obs_name].weight = value;
 }
 
-/**
- * @brief Get group.
- *
- * @param obs_name Description.
- *
- * @return Description.
- */
 string ObservationInfo::get_group(const string &obs_name) const
 {
 	return observations.find(obs_name)->second.group;
 }
 
-/**
- * @brief Is regularization.
- *
- * @param obs_name Description.
- *
- * @return Description.
- */
 bool ObservationInfo::is_regularization(const string &obs_name) const
 {
 	return observations.find(obs_name)->second.is_regularization();
 }
 
-/**
- * @brief Get regulatization obs.
- *
- * @param obs_in Description.
- *
- * @return Description.
- */
 Observations ObservationInfo::get_regulatization_obs(const Observations &obs_in)
 {
 	Observations reg_obs;
@@ -2967,14 +2692,6 @@ Observations ObservationInfo::get_regulatization_obs(const Observations &obs_in)
 }
 
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const ObservationInfo& val)
 {
 	os << "PEST Observation Information" << endl;
@@ -2992,14 +2709,6 @@ ostream& operator<< (ostream &os, const ObservationInfo& val)
 	return os;
 }
 
-/**
- * @brief Overloaded operator << operator.
- *
- * @param os Description.
- * @param val Description.
- *
- * @return Description.
- */
 ostream& operator<< (ostream &os, const SVDInfo& val)
 {
 	os << "PEST SVD Information" << endl;
@@ -3008,15 +2717,6 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 	return os;
 }
 
-/**
- * @brief Assign value by key.
- *
- * @param key Description.
- * @param org_value Description.
- * @param f_rec Description.
- *
- * @return Description.
- */
 PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value, ofstream& f_rec)
 {
 	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
@@ -3096,9 +2796,6 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }
 
-/**
- * @brief Set defaults.
- */
 void ControlInfo::set_defaults()
 {
 	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
@@ -3123,19 +2820,11 @@ void ControlInfo::set_defaults()
 
 }
 
-/**
- * @brief S v d info.
- *
- * @return Description.
- */
 SVDInfo::SVDInfo()
 {
 	set_defaults();
 }
 
-/**
- * @brief Set defaults.
- */
 void SVDInfo::set_defaults()
 {
 	maxsing = 1000000;
@@ -3143,14 +2832,6 @@ void SVDInfo::set_defaults()
 	eigwrite = 0;
 }
 
-/**
- * @brief Assign value by key.
- *
- * @param key Description.
- * @param org_value Description.
- *
- * @return Description.
- */
 PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const string org_value)
 {
 	string value = upper_cp(org_value);
@@ -3171,13 +2852,6 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }
 
-/**
- * @brief Draw standard normal.
- *
- * @param rand_gen Description.
- *
- * @return Description.
- */
 double draw_standard_normal(std::mt19937& rand_gen)
 {	
 	using std::sqrt;
@@ -3194,16 +2868,6 @@ double draw_standard_normal(std::mt19937& rand_gen)
 	return r * sin(2.0 * pi * v2);
 }
 
-/**
- * @brief Uniform draws.
- *
- * @param num_reals Description.
- * @param lower_bound Description.
- * @param upper_bound Description.
- * @param rand_gen Description.
- *
- * @return Description.
- */
 vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen)
 {
 	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
@@ -3219,16 +2883,6 @@ vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bou
 	return vals;
 	
 }
-/**
- * @brief Uniform int draws.
- *
- * @param num_reals Description.
- * @param lower_bound Description.
- * @param upper_bound Description.
- * @param rand_gen Description.
- *
- * @return Description.
- */
 vector<int> uniform_int_draws(int num_reals, int lower_bound, int upper_bound, std::mt19937& rand_gen)
 {
 	vector<int> vals;

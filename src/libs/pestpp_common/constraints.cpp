@@ -4082,8 +4082,7 @@ void Constraints::augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_na
     
 
 }
-
-pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol) 
+pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol)
 {
     map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
     vector<string> working_set,working_set_pi;
