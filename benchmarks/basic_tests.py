@@ -2140,11 +2140,6 @@ def parse_pst_test():
 
 
 
-<<<<<<< HEAD
-if __name__ == "__main__":
-    #parse_pst_test()
-    basic_test()
-=======
 def save_failed_runs_test():
     """test that a .rnf file is created when runs fail"""
     model_d = "ies_10par_xsec"
@@ -2193,9 +2188,8 @@ def version_flag_test():
 
 if __name__ == "__main__":
     #parse_pst_test()
-    #basic_test()
+    basic_test()
     #mf6_v5_glm_test()
->>>>>>> origin/feat_savefails
     #nonascii_path_test()
 
     #mf6_v5_ies_nonpersistent_test()

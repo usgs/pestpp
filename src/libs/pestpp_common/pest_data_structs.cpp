@@ -2454,7 +2454,7 @@ void PestppOptions::set_defaults()
 	set_ies_loc_type("LOCAL");
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
-    set_ies_multimodal_alpha(1.0);
+    set_ies_multimodal_alpha(0.0);
     set_ensemble_output_precision(20);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
