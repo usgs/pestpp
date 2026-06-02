@@ -55,7 +55,9 @@ public:
 	double error_frac();
 	double error_percent();
 	void print(ostream &os);
+	void write(ostream &os);
 	bool operator< (const MuPoint &rhs) const;
+
 };
 
 

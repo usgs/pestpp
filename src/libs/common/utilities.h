@@ -50,6 +50,8 @@ namespace pest_utils
 	}
 
 
+	vector<string> tokenize_w_quotes(const std::string& input);
+
 	/* @brief Splits a string and returns the sub-strings.
 
 	String str is split into sub-strings using the characters specified

@@ -1,3 +1,7 @@
+/**
+ * @file linear_analysis.cpp
+ * @brief Implementation of linear_analysis.
+ */
 #include <vector>
 #include <string>
 #include <sstream>
@@ -14,6 +18,14 @@
 #include "PerformanceLog.h"
 #include "EnsembleSmoother.h"
 
+/**
+ * @brief Get common.
+ *
+ * @param v1 Description.
+ * @param v2 Description.
+ *
+ * @return Description.
+ */
 vector<string> get_common(vector<string> v1, vector<string> v2)
 {
 	vector<string> common;
@@ -23,6 +35,13 @@ vector<string> get_common(vector<string> v1, vector<string> v2)
 	return common;
 }
 
+/**
+ * @brief Get obj comps.
+ *
+ * @param filename Description.
+ *
+ * @return Description.
+ */
 map<string, double> get_obj_comps(string &filename)
 {
 	ifstream ifile(filename);
@@ -74,6 +93,13 @@ map<string, double> get_obj_comps(string &filename)
 }
 
 
+/**
+ * @brief Get nnz group.
+ *
+ * @param pest_scenario Description.
+ *
+ * @return Description.
+ */
 map<string, int> get_nnz_group(Pest &pest_scenario)
 {
 	vector<string> ogrp_names = pest_scenario.get_ctl_ordered_obs_group_names();
@@ -480,6 +506,11 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 }
 
 
+/**
+ * @brief Throw error.
+ *
+ * @param message Description.
+ */
 void LinearAnalysis::throw_error(const string &message)
 {
 	pfm.log_event("Error in LinearAnalysis:" + message);
@@ -487,6 +518,12 @@ void LinearAnalysis::throw_error(const string &message)
 }
 
 
+/**
+ * @brief Load pst.
+ *
+ * @param pest_scenario Description.
+ * @param pst_filename Description.
+ */
 void LinearAnalysis::load_pst(Pest &pest_scenario, const string &pst_filename)
 {
 	ifstream ipst(pst_filename);
@@ -504,6 +541,12 @@ void LinearAnalysis::load_pst(Pest &pest_scenario, const string &pst_filename)
 }
 
 
+/**
+ * @brief Load jco.
+ *
+ * @param jco Description.
+ * @param jco_filename Description.
+ */
 void LinearAnalysis::load_jco(Mat& jco, const string& jco_filename)
 {
 	pfm.log_event("LinearAnalysis::load_jco");
@@ -536,6 +579,11 @@ void LinearAnalysis::load_jco(Mat& jco, const string& jco_filename)
 }
 
 
+/**
+ * @brief Load parcov.
+ *
+ * @param parcov_filename Description.
+ */
 void LinearAnalysis::load_parcov(const string &parcov_filename)
 {
 	pfm.log_event("Linear_Analysis::load_parcov from "+parcov_filename);
@@ -581,6 +629,11 @@ void LinearAnalysis::load_parcov(const string &parcov_filename)
 }
 
 
+/**
+ * @brief Load obscov.
+ *
+ * @param obscov_filename Description.
+ */
 void LinearAnalysis::load_obscov(const string &obscov_filename)
 {
 	pfm.log_event("LinearAnalysis::load_obscov from "+obscov_filename);
@@ -687,12 +740,20 @@ LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager
 	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
 }
 
+/**
+ * @brief Set parcov.
+ *
+ * @param _parcov Description.
+ */
 void  LinearAnalysis::set_parcov(Mat& _parcov)
 {
 	parcov = _parcov;
 }
 
 
+/**
+ * @brief Align.
+ */
 void LinearAnalysis::align()
 {
 	pfm.log_event("LinearAnalysis::align");
@@ -748,6 +809,11 @@ void LinearAnalysis::align()
 }
 
 
+/**
+ * @brief Prior parameter variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::prior_parameter_variance()
 {
 	map<string, double> results;
@@ -778,6 +844,11 @@ double LinearAnalysis::prior_parameter_variance(string &par_name)
 }
 
 
+/**
+ * @brief Posterior parameter variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::posterior_parameter_variance()
 {
 	map<string, double> results;
@@ -787,6 +858,13 @@ map<string, double> LinearAnalysis::posterior_parameter_variance()
 }
 
 
+/**
+ * @brief Posterior parameter variance.
+ *
+ * @param par_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::posterior_parameter_variance(string &par_name)
 {
 	//pfm.log_event("posterior_parameter_variance");
@@ -810,12 +888,22 @@ double LinearAnalysis::posterior_parameter_variance(string &par_name)
 }
 
 
+/**
+ * @brief Posterior parameter matrix.
+ *
+ * @return Description.
+ */
 Mat LinearAnalysis::posterior_parameter_matrix()
 {
 	if (posterior.nrow() == 0) calc_posterior();
 	return posterior;
 }
 
+/**
+ * @brief Posterior parameter ptr.
+ *
+ * @return Description.
+ */
 Mat* LinearAnalysis::posterior_parameter_ptr()
 {
 	if (posterior.nrow() == 0) calc_posterior();
@@ -823,6 +911,11 @@ Mat* LinearAnalysis::posterior_parameter_ptr()
 	return ptr;
 }
 
+/**
+ * @brief Posterior parameter covariance matrix.
+ *
+ * @return Description.
+ */
 Covariance LinearAnalysis::posterior_parameter_covariance_matrix()
 {
 	if (posterior.nrow() == 0) calc_posterior();
@@ -830,6 +923,13 @@ Covariance LinearAnalysis::posterior_parameter_covariance_matrix()
 }
 
 
+/**
+ * @brief Prior prediction variance.
+ *
+ * @param pred_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::prior_prediction_variance(string &pred_name)
 {
 	pest_utils::upper_ip(pred_name);
@@ -852,6 +952,11 @@ double LinearAnalysis::prior_prediction_variance(string &pred_name)
 	return val;
 }
 
+/**
+ * @brief Prior prediction variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::prior_prediction_variance()
 {
 	pfm.log_event("LinearAnalysis::prior_prediction_variance");
@@ -864,6 +969,13 @@ map<string, double> LinearAnalysis::prior_prediction_variance()
 	return result;
 }
 
+/**
+ * @brief Posterior prediction variance.
+ *
+ * @param pred_name Description.
+ *
+ * @return Description.
+ */
 double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 {
 	pest_utils::upper_ip(pred_name);
@@ -888,6 +1000,11 @@ double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 
 }
 
+/**
+ * @brief Posterior prediction variance.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::posterior_prediction_variance()
 {
 	pfm.log_event("LinearAnalysis::prior_prediction_variance");
@@ -900,6 +1017,9 @@ map<string, double> LinearAnalysis::posterior_prediction_variance()
 	return result;
 }
 
+/**
+ * @brief Calc posterior.
+ */
 void LinearAnalysis::calc_posterior()
 {
 	pfm.log_event("LinearAnalysis::calc_posterior");
@@ -946,6 +1066,12 @@ void LinearAnalysis::calc_posterior()
 }
 
 
+/**
+ * @brief Set predictions.
+ *
+ * @param preds Description.
+ * @param forgive Description.
+ */
 void LinearAnalysis::set_predictions(vector<string> preds, bool forgive)
 {
 	pfm.log_event("set_predictions");
@@ -1066,6 +1192,13 @@ void LinearAnalysis::set_predictions(vector<string> preds, bool forgive)
 
 
 
+/**
+ * @brief Like preds.
+ *
+ * @param val Description.
+ *
+ * @return Description.
+ */
 map<string, double> LinearAnalysis::like_preds(double val)
 {
 	map<string, double> result;
@@ -1208,6 +1341,11 @@ void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filena
 }
 
 
+/**
+ * @brief Drop prior information.
+ *
+ * @param pest_scenario Description.
+ */
 void LinearAnalysis::drop_prior_information(const Pest &pest_scenario)
 {
 	vector<string> pi_names;
@@ -1249,6 +1387,9 @@ void LinearAnalysis::drop_prior_information(const Pest &pest_scenario)
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 LinearAnalysis::~LinearAnalysis()
 {
 }

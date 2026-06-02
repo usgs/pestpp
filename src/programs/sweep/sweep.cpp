@@ -16,6 +16,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file sweep.cpp
+ * @brief Implementation of sweep.
+ */
+
 #include "RunManagerPanther.h" //needs to be first because it includes winsock2.h
 //#include <vld.h> // Memory Leak Detection using "Visual Leak Detector"
 #include <iostream>
@@ -51,6 +56,15 @@ using namespace std;
 using namespace pest_utils;
 
 
+/**
+ * @brief Prepare parameter csv.
+ *
+ * @param pars Description.
+ * @param csv Description.
+ * @param forgive Description.
+ *
+ * @return Description.
+ */
 map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgive)
 {
 	if (!csv.good())
@@ -117,6 +131,16 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 	return header_info;
 }
 
+/**
+ * @brief Prepare parameter dense binary.
+ *
+ * @param pars Description.
+ * @param in Description.
+ * @param forgive Description.
+ * @param header_tokens Description.
+ *
+ * @return Description.
+ */
 map<string,int> prepare_parameter_dense_binary(Parameters pars, ifstream &in, bool forgive, vector<string>& header_tokens)
 {
     stringstream ss;
@@ -179,6 +203,16 @@ map<string,int> prepare_parameter_dense_binary(Parameters pars, ifstream &in, bo
 }
 
 //pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int> &header_info, ifstream &csv, int chunk, const Parameters &ctl_pars, vector<string> &run_ids, vector<Parameters> &sweep_pars)
+/**
+ * @brief Load parameters from csv.
+ *
+ * @param header_info Description.
+ * @param csv Description.
+ * @param chunk Description.
+ * @param ctl_pars Description.
+ * @param run_ids Description.
+ * @param sweep_pars Description.
+ */
 void load_parameters_from_csv(map<string, int>& header_info, ifstream& csv, int chunk, const Parameters& ctl_pars, vector<string>& run_ids, vector<Parameters>& sweep_pars)
 
 {
@@ -266,6 +300,16 @@ void load_parameters_from_csv(map<string, int>& header_info, ifstream& csv, int 
 	//return pair<vector<string>,vector<Parameters>> (run_ids,sweep_pars);
 }
 
+/**
+ * @brief Load parameters from dense binary.
+ *
+ * @param header_info Description.
+ * @param in Description.
+ * @param chunk Description.
+ * @param ctl_pars Description.
+ * @param run_ids Description.
+ * @param sweep_pars Description.
+ */
 void load_parameters_from_dense_binary(map<string, int>& header_info, ifstream& in, int chunk, const Parameters& ctl_pars, vector<string>& run_ids, vector<Parameters>& sweep_pars)
 
 {
@@ -324,6 +368,13 @@ void load_parameters_from_dense_binary(map<string, int>& header_info, ifstream& 
     //return pair<vector<string>,vector<Parameters>> (run_ids,sweep_pars);
 }
 
+/**
+ * @brief Prep sweep output file.
+ *
+ * @param pest_scenario Description.
+ * @param out Description.
+ * @param is_binary Description.
+ */
 void prep_sweep_output_file(Pest &pest_scenario, ofstream &out, bool& is_binary)
 {
 	//ofstream out(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
@@ -437,6 +488,14 @@ void process_sweep_runs(ofstream &out, Pest &pest_scenario, RunManagerAbstract* 
 }
 
 
+/**
+ * @brief Main.
+ *
+ * @param argc Description.
+ * @param argv Description.
+ *
+ * @return Description.
+ */
 int main(int argc, char* argv[])
 {
 #ifndef _DEBUG
@@ -636,7 +695,8 @@ int main(int argc, char* argv[])
                     vector<string>{}, vector<string>{},
                     pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
-                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
+					pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
 		}
 		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{

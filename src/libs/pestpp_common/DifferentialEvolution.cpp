@@ -1,3 +1,7 @@
+/**
+ * @file DifferentialEvolution.cpp
+ * @brief Implementation of DifferentialEvolution.
+ */
 #include <random>
 #include <iomanip>
 #include "DifferentialEvolution.h"
@@ -93,6 +97,12 @@ void DifferentialEvolution::solve(RunManagerAbstract &run_manager,
 }
 
 
+/**
+ * @brief Initialize population.
+ *
+ * @param run_manager Description.
+ * @param d Description.
+ */
 void DifferentialEvolution::initialize_population(RunManagerAbstract &run_manager, int d)
 {
 	ostream &fout_restart = file_manager.get_ofstream("rst");
@@ -141,6 +151,11 @@ void DifferentialEvolution::initialize_population(RunManagerAbstract &run_manage
 
 }
 
+/**
+ * @brief Initialize vector.
+ *
+ * @param numeric_pars Description.
+ */
 void DifferentialEvolution::initialize_vector(Parameters &numeric_pars)
 {
 	std::uniform_real_distribution<double> distribution(0.0, 1.0);
@@ -159,6 +174,14 @@ void DifferentialEvolution::initialize_vector(Parameters &numeric_pars)
 	}
 }
 
+/**
+ * @brief Mutation.
+ *
+ * @param run_manager Description.
+ * @param f Description.
+ * @param dither_f Description.
+ * @param cr Description.
+ */
 void DifferentialEvolution::mutation(RunManagerAbstract &run_manager, double f, bool dither_f, double cr)
 {
 	int d = gen_1.get_nruns();
@@ -243,6 +266,13 @@ void DifferentialEvolution::mutation(RunManagerAbstract &run_manager, double f, 
 	}
 }
 
+/**
+ * @brief Recombination.
+ *
+ * @param run_manager Description.
+ *
+ * @return Description.
+ */
 int DifferentialEvolution::recombination(RunManagerAbstract &run_manager)
 {
 	ostream &os = file_manager.rec_ofstream();
@@ -418,6 +448,9 @@ void DifferentialEvolution::write_run_summary(std::ostream &os,
 		//cout << "    children : runs=" << n_good_runs_new << ";  phi(avg=" << phi_avg_new << "; min=" << phi_min_new << "; max=" << phi_max_new << endl;
 
 }
+/**
+ * @brief Destructor for .
+ */
 DifferentialEvolution::~DifferentialEvolution()
 {
 }

@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file RunManagerAbstract.cpp
+ * @brief Implementation of RunManagerAbstract.
+ */
+
 #include "RunManagerAbstract.h"
 #include <iostream>
 #include <sstream>
@@ -27,11 +32,29 @@
 #include "Transformable.h"
 #include "utilities.h"
 
+/**
+ * @brief Derive the failed-run storage filename from the primary storage filename.
+ *
+ * Replaces the *.rns* extension with *.rnf*, or appends *.rnf* if no
+ * *.rns* extension is found.
+ *
+ * @param stor_filename  The primary run storage filename (*case.rns*).
+ * @return The corresponding failed-run storage filename (*case.rnf*).
+ */
+static string make_failed_filename(const string& stor_filename) {
+	string fn = stor_filename;
+	size_t pos = fn.rfind(".rns");
+	if (pos != string::npos) fn.replace(pos, 4, ".rnf");
+	else fn += ".rnf";
+	return fn;
+}
+
 RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
 	const vector<string> _tplfile_vec, const vector<string> _inpfile_vec,
 	const vector<string> _insfile_vec, const vector<string> _outfile_vec,
 	const string &stor_filename, int _max_n_failure)
   : total_runs(0), max_n_failure(_max_n_failure), file_stor(stor_filename),
+    failed_file_stor(make_failed_filename(stor_filename)),
     comline_vec(_comline_vec), tplfile_vec(_tplfile_vec),
     inpfile_vec(_inpfile_vec), insfile_vec(_insfile_vec), outfile_vec(_outfile_vec)
 {
@@ -45,47 +68,113 @@ RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
 	mgr_type = RUN_MGR_TYPE::NOTDEFINED;
 }
 
+/**
+ * @brief Initialize.
+ *
+ * @param model_pars Description.
+ * @param obs Description.
+ * @param _filename Description.
+ */
 void RunManagerAbstract::initialize(const Parameters &model_pars, const Observations &obs, const string &_filename)
 {
 	file_stor.reset(model_pars.get_keys(), obs.get_keys(), _filename);
+	failed_file_stor.reset(model_pars.get_keys(), obs.get_keys());
 }
 
+/**
+ * @brief Initialize.
+ *
+ * @param par_names Description.
+ * @param obs_names Description.
+ * @param _filename Description.
+ */
 void RunManagerAbstract::initialize(const std::vector<std::string> &par_names, std::vector<std::string> &obs_names, const string &_filename)
 {
 	file_stor.reset(par_names, obs_names, _filename);
+	failed_file_stor.reset(par_names, obs_names);
 }
 
+/**
+ * @brief Reinitialize.
+ *
+ * @param _filename Description.
+ */
 void RunManagerAbstract::reinitialize(const string &_filename)
 {
 	vector<string> par_names = get_par_name_vec();
 	vector<string> obs_names = get_obs_name_vec();
 	file_stor.reset(par_names, obs_names, _filename);
+	// Note: failed_file_stor is intentionally NOT reset here so that
+	// failed runs accumulate across all iterations/batches.
 }
 
+/**
+ * @brief Initialize restart.
+ *
+ * @param _filename Description.
+ */
 void RunManagerAbstract::initialize_restart(const std::string &_filename)
 {
-
 	file_stor.init_restart(_filename);
+	string failed_filename = make_failed_filename(_filename);
+	if (pest_utils::check_exist_in(failed_filename))
+		failed_file_stor.init_restart(failed_filename);
+	else
+		failed_file_stor.reset(file_stor.get_par_name_vec(), file_stor.get_obs_name_vec());
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunManagerAbstract::add_run(const vector<double> &model_pars, const string &info_txt, double info_value)
 {
 	int run_id = file_stor.add_run(model_pars, info_txt, info_value);
 	return run_id;
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunManagerAbstract::add_run(const Parameters &model_pars, const string &info_txt, double info_value)
 {
 	int run_id = file_stor.add_run(model_pars, info_txt, info_value);
 	return run_id;
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunManagerAbstract::add_run(const Eigen::VectorXd &model_pars, const string &info_txt, double info_value)
 {
 	int run_id = file_stor.add_run(model_pars, info_txt, info_value);
 	return run_id;
 }
 
+/**
+ * @brief Update run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ */
 void RunManagerAbstract::update_run(int run_id, const Parameters &pars, const Observations &obs)
 {
 
@@ -102,6 +191,13 @@ void RunManagerAbstract::update_run(int run_id, const Parameters &pars, const Ob
 	return file_stor.get_obs_name_vec();
 }
 
+/**
+ * @brief Run finished.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
  bool RunManagerAbstract::run_finished(int run_id)
  {
 	 int run_status;
@@ -112,11 +208,31 @@ void RunManagerAbstract::update_run(int run_id, const Parameters &pars, const Ob
 	 return run_finished;
  }
 
+/**
+ * @brief Get info.
+ *
+ * @param run_id Description.
+ * @param run_status Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ */
  void RunManagerAbstract::get_info(int run_id, int &run_status, std::string &info_txt, double &info_value)
  {
 	  file_stor.get_info(run_id, run_status, info_txt, info_value);
  }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ * @param clear_old Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::get_run(int run_id, Parameters &pars, Observations &obs, string &info_txt, double &info_value, bool clear_old)
 {
 	bool success = false;
@@ -125,6 +241,16 @@ bool RunManagerAbstract::get_run(int run_id, Parameters &pars, Observations &obs
 	return success;
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ * @param clear_old Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::get_run(int run_id, Parameters &pars, Observations &obs,  bool clear_old)
 {
 	string info_txt;
@@ -133,6 +259,17 @@ bool RunManagerAbstract::get_run(int run_id, Parameters &pars, Observations &obs
 	return get_run(run_id, pars, obs, info_txt, info_value, clear_old);
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars_vec Description.
+ * @param obs_vec Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::get_run(int run_id, vector<double> &pars_vec, vector<double> &obs_vec, string &info_txt, double &info_value)
 {
 	bool success = false;
@@ -141,6 +278,15 @@ bool RunManagerAbstract::get_run(int run_id, vector<double> &pars_vec, vector<do
 	return success;
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars_vec Description.
+ * @param obs_vec Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::get_run(int run_id, vector<double> &pars_vec, vector<double> &obs_vec)
 {
 	string info_txt;
@@ -149,6 +295,19 @@ bool RunManagerAbstract::get_run(int run_id, vector<double> &pars_vec, vector<do
 	return get_run(run_id, pars_vec, obs_vec, info_txt, info_value);
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param npars Description.
+ * @param obs Description.
+ * @param nobs Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 bool  RunManagerAbstract::get_run(int run_id, double *pars, size_t npars, double *obs, size_t nobs, string &info_txt, double &info_value)
 {
 	bool success = false;
@@ -157,6 +316,17 @@ bool  RunManagerAbstract::get_run(int run_id, double *pars, size_t npars, double
 	return success;
 }
 
+/**
+ * @brief Get run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param npars Description.
+ * @param obs Description.
+ * @param nobs Description.
+ *
+ * @return Description.
+ */
 bool  RunManagerAbstract::get_run(int run_id, double *pars, size_t npars, double *obs, size_t nobs)
 {
 	string info_txt;
@@ -166,10 +336,20 @@ bool  RunManagerAbstract::get_run(int run_id, double *pars, size_t npars, double
 }
 
 
+/**
+ * @brief Free memory.
+ */
 void  RunManagerAbstract::free_memory()
 {
 }
 
+/**
+ * @brief N run failures exceeded.
+ *
+ * @param id Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::n_run_failures_exceeded(int id)
 {
 	bool ret_val;
@@ -218,6 +398,11 @@ const std::set<int> RunManagerAbstract::get_failed_run_ids()
 	return failed_runs;
 }
 
+/**
+ * @brief Get num good runs.
+ *
+ * @return Description.
+ */
 int RunManagerAbstract::get_num_good_runs(void)
 {
 	int n_runs_ok = file_stor.get_num_good_runs();
@@ -225,6 +410,11 @@ int RunManagerAbstract::get_num_good_runs(void)
 }
 
 
+/**
+ * @brief Get num failed runs.
+ *
+ * @return Description.
+ */
 int RunManagerAbstract::get_num_failed_runs(void)
 {
 	int n_failed = 0;
@@ -239,6 +429,14 @@ int RunManagerAbstract::get_num_failed_runs(void)
 	 return n_failed;
 }
 
+/**
+ * @brief Get model parameters.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::get_model_parameters(int run_id, Parameters &pars)
  {
 	bool success = false;
@@ -247,6 +445,14 @@ bool RunManagerAbstract::get_model_parameters(int run_id, Parameters &pars)
         return success;
  }
 
+/**
+ * @brief Get observations vec.
+ *
+ * @param run_id Description.
+ * @param data_vec Description.
+ *
+ * @return Description.
+ */
 bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_vec)
 {
 	bool success = false;
@@ -255,6 +461,13 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 	return success;
 }
 
+/**
+ * @brief Get obs template.
+ *
+ * @param value Description.
+ *
+ * @return Description.
+ */
  Observations RunManagerAbstract::get_obs_template(double value) const
  {
 	Observations ret_obs;
@@ -266,11 +479,23 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 	}
 	return ret_obs;
  }
+/**
+ * @brief Get cur groupid.
+ *
+ * @return Description.
+ */
  int RunManagerAbstract::get_cur_groupid()
  {
 	 return cur_group_id;
  }
 
+/**
+ * @brief Run requried.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
  bool RunManagerAbstract::run_requried(int run_id)
  {
 	 bool ret_val;
@@ -286,6 +511,11 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 	 return ret_val;
  }
 
+/**
+ * @brief Get outstanding run ids.
+ *
+ * @return Description.
+ */
  vector<int> RunManagerAbstract::get_outstanding_run_ids()
  {
 	 vector<int> run_ids;
@@ -300,9 +530,34 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 	 return run_ids;
  }
 
+/**
+ * @brief Mark a run as failed in the primary storage and, if the failure
+ *        count has reached max_run_fail, copy its parameter values into
+ *        the failed-run storage file (*case.rnf*).
+ *
+ * The failure count is stored in the run-status byte of the *.rnf* record
+ * as the negative of the attempt count (e.g. -3 means the run was attempted
+ * three times).  The parameter values and metadata (info_txt, info_value) are
+ * copied from the primary storage so that users can later inspect which
+ * parameter combinations caused persistent model failure.
+ *
+ * @param run_id  The run manager ID of the failed run.
+ */
  void  RunManagerAbstract::update_run_failed(int run_id)
  {
 	 file_stor.update_run_failed(run_id);
+
+	 // If this run just crossed the failure threshold, record it in the failed runs file
+	 if (n_run_failures_exceeded(run_id))
+	 {
+		 vector<double> pars_vec, obs_vec;
+		 string info_txt;
+		 double info_value;
+		 file_stor.get_run(run_id, pars_vec, obs_vec, info_txt, info_value);
+		 int failed_id = failed_file_stor.add_run(pars_vec, info_txt, info_value);
+		 int nfail = -file_stor.get_run_status(run_id);
+		 failed_file_stor.set_run_nfailed(failed_id, nfail);
+	 }
  }
 
  const RunStorage& RunManagerAbstract::get_runstorage_ref() const
@@ -310,6 +565,28 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 	 return file_stor;
  }
 
+/**
+ * @brief Return a const reference to the failed-run storage (*case.rnf*).
+ *
+ * The returned RunStorage contains one entry for each run that exceeded
+ * the max_run_fail threshold.  Each entry holds the parameter values that
+ * were supplied to the model, associated metadata, and the number of
+ * failed attempts encoded in the run-status byte.
+ */
+ const RunStorage& RunManagerAbstract::get_failed_runstorage_ref() const
+ {
+	 return failed_file_stor;
+ }
+
+/**
+ * @brief Run until.
+ *
+ * @param condition Description.
+ * @param n_nops Description.
+ * @param sec Description.
+ *
+ * @return Description.
+ */
  RunManagerAbstract::RUN_UNTIL_COND RunManagerAbstract::run_until(RUN_UNTIL_COND condition, int n_nops, double sec)
  {
 	 run();

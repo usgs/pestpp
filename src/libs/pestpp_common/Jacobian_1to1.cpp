@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file Jacobian_1to1.cpp
+ * @brief Implementation of Jacobian_1to1.
+ */
+
 
 #include <cstdlib>
 #include <vector>
@@ -41,11 +46,22 @@
 using namespace std;
 using namespace pest_utils;
 
+/**
+ * @brief Jacobian 1to1.
+ *
+ * @param _file_manager Description.
+ * @param _output_file_writer Description.
+ *
+ * @return Description.
+ */
 Jacobian_1to1::Jacobian_1to1(FileManager &_file_manager, OutputFileWriter &_output_file_writer) : Jacobian(_file_manager)
 {
 	output_file_writer_ptr = &_output_file_writer;
 }
 
+/**
+ * @brief Destructor for .
+ */
 Jacobian_1to1::~Jacobian_1to1() {
 }
 
@@ -215,6 +231,11 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 }
 
 
+/**
+ * @brief Make runs.
+ *
+ * @param run_manager Description.
+ */
 void Jacobian_1to1::make_runs(RunManagerAbstract &run_manager)
 {
 	// make model runs
@@ -486,6 +507,11 @@ bool Jacobian_1to1::out_of_bounds(const Parameters &ctl_parameters,
 	return out_of_bounds;
 }
 
+/**
+ * @brief Report errors.
+ *
+ * @param fout Description.
+ */
 void Jacobian_1to1::report_errors(std::ostream &fout)
 {
 	if (failed_to_increment_parmaeters.size() > 0)

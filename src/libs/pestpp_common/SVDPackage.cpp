@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file SVDPackage.cpp
+ * @brief Implementation of SVDPackage.
+ */
+
 
 #include "SVDPackage.h"
 #include <string>
@@ -27,30 +32,64 @@
 
 using namespace Eigen;
 
+/**
+ * @brief S v d package.
+ *
+ * @param _descritpion Description.
+ * @param _n_max_sing Description.
+ * @param _eign_thres Description.
+ *
+ * @return Description.
+ */
 SVDPackage::SVDPackage(std::string _descritpion, int _n_max_sing, double _eign_thres) : description(_descritpion), n_max_sing(_n_max_sing), eign_thres(_eign_thres)
 {
 	performance_log = nullptr;
 }
 
 
+/**
+ * @brief Set performance log.
+ *
+ * @param _performance_log Description.
+ */
 void SVDPackage::set_performance_log(PerformanceLog *_performance_log)
 {
 	performance_log = _performance_log;
 }
 
+/**
+ * @brief Set max sing.
+ *
+ * @param _n_max_sing Description.
+ */
 void SVDPackage::set_max_sing(int _n_max_sing) {
 	n_max_sing = _n_max_sing;
 }
 
+/**
+ * @brief Set eign thres.
+ *
+ * @param _eign_thres Description.
+ */
 void SVDPackage::set_eign_thres(double _eign_thres)
 {
 	eign_thres = _eign_thres;
 }
 
+/**
+ * @brief Get max sing.
+ *
+ * @return Description.
+ */
 int SVDPackage::get_max_sing() {
 	return n_max_sing;
 }
 
+/**
+ * @brief Get eign thres.
+ *
+ * @return Description.
+ */
 double SVDPackage::get_eign_thres()
 {
 	return eign_thres;

@@ -94,7 +94,7 @@ public:
 	const TranFixed *get_fixed_ptr()const;
 	TranFixed* get_fixed_ptr_4_mod();
 	const TranLog10 *get_log10_ptr() const;
-	TranSVD *get_svda_ptr()const;
+	//TranSVD *get_svda_ptr()const;
 	TranFixed *get_svda_fixed_ptr()const;
 	TranTied *get_tied_ptr()const;
 

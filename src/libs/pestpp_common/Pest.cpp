@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file Pest.cpp
+ * @brief Implementation of Pest.
+ */
+
 
 #include <string>
 #include <fstream>
@@ -46,11 +51,19 @@ using namespace::pest_utils;
 
 
 
+/**
+ * @brief Pest.
+ *
+ * @return Description.
+ */
 Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0)
 {
 	set_defaults();
 }
 
+/**
+ * @brief Set defaults.
+ */
 void Pest::set_defaults()
 {
 	pestpp_options.set_defaults();
@@ -61,12 +74,23 @@ void Pest::set_defaults()
 
 }
 
+/**
+ * @brief Set default dynreg.
+ */
 void Pest::set_default_dynreg()
 {
     regul_scheme_ptr = new DynamicRegularization;
     regul_scheme_ptr->set_defaults();
 }
 
+/**
+ * @brief Check inputs.
+ *
+ * @param f_rec Description.
+ * @param forgive Description.
+ * @param forgive_parchglim Description.
+ * @param cycle Description.
+ */
 void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, int cycle)
 {
 	if (control_info.noptmax == 0)
@@ -395,6 +419,12 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 		}
 }
 
+/**
+ * @brief Check io.
+ *
+ * @param f_rec Description.
+ * @param echo_errors Description.
+ */
 void Pest::check_io(ofstream& f_rec, bool echo_errors)
 {
 	ModelInterface mi(model_exec_info.tplfile_vec,model_exec_info.inpfile_vec,
@@ -466,6 +496,11 @@ const map<string, string> Pest::get_observation_groups() const
 	return obs_grp_map;
 }
 
+/**
+ * @brief Get nonregul obs.
+ *
+ * @return Description.
+ */
 vector<string> Pest::get_nonregul_obs() const
 {
 	vector<string>ret_val;
@@ -478,12 +513,27 @@ vector<string> Pest::get_nonregul_obs() const
 	return ret_val;
 }
 
+/**
+ * @brief Process ctl file.
+ *
+ * @param fin Description.
+ * @param _pst_filename Description.
+ *
+ * @return Description.
+ */
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 {
 	ofstream f_out("ctl_process.out");
 	return process_ctl_file(fin, _pst_filename, f_out);
 }
 
+/**
+ * @brief Is quote.
+ *
+ * @param c Description.
+ *
+ * @return Description.
+ */
 bool IsQuote(char c)
 {
     switch(c)
@@ -496,6 +546,15 @@ bool IsQuote(char c)
     }
 }
 
+/**
+ * @brief Process ctl file.
+ *
+ * @param fin Description.
+ * @param _pst_filename Description.
+ * @param f_rec Description.
+ *
+ * @return Description.
+ */
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
 	cout << "processing control file " << _pst_filename << endl;
@@ -510,6 +569,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	int sec_begin_lnum, sec_lnum;
 	double value;
 	string name;
+	string quote_striped_line;
 	string* trans_type;
 	pair<string, string> pi_name_group;
 	int lnum;
@@ -563,12 +623,35 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		
 		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
 		{
+
 			strip_ip(line);
+			if (line[0] == '#')
+			{
+				continue;
+			}
 			line_upper = upper_cp(line);
 			tokens.clear();
 			tokens_case_sen.clear();
-			tokenize(line_upper, tokens);
-			tokenize(line, tokens_case_sen);
+			if ((line.find('\"') != std::string::npos) || (line.find('\'') != std::string::npos)) {
+				ss.str("");
+				ss << "Note: single and/or double quote char(s) found on line :" << line << endl;
+				f_rec << ss.str();
+				tokens = tokenize_w_quotes(line_upper);
+				tokens_case_sen = tokenize_w_quotes(line);
+				ss.str("");
+				for (auto& t : tokens_case_sen) {
+					ss << t << ' ';
+				}
+				quote_striped_line = ss.str();
+
+			}
+
+			else {
+				tokenize(line_upper, tokens);
+				tokenize(line, tokens_case_sen);
+				quote_striped_line = line;
+
+			}
 			sec_lnum = lnum - sec_begin_lnum;
 
 			if (lnum == 1)
@@ -584,11 +667,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				//skip blank line
 				lnum--;
 			}
-			else if (line[0] == '#')
-			{
-				
-				lnum--;
-			}
+
 			else if (line_upper.substr(0, 2) == "++")
 			{
 				if (sections_found.find("CONTROL DATA KEYWORD") != sections_found.end())
@@ -1058,47 +1137,14 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			}
 
 		
-			else if (section == "MODEL COMMAND LINE")
-			{
-                if ((line.find('\"') != std::string::npos) || (line.find('\'') != std::string::npos))
-                {
-                    ss.str("");
-                    ss << "WARNING: single and/or double quote char(s) found in model command line :" << line << endl;
-
-                    string temp_line = line;
-                    temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
-                    //pest_utils::strip_ip(temp_line);
-
-                    ss << "         new model command line: " << temp_line << endl;
-                    cout << ss.str();
-                    f_rec << ss.str();
-                    model_exec_info.comline_vec.push_back(string(temp_line));
-                }
-                else
-                {
-                    model_exec_info.comline_vec.push_back(line);
-                }
+			else if (section == "MODEL COMMAND LINE") {
+				model_exec_info.comline_vec.push_back(quote_striped_line);
 			}
-
 			else if (section == "MODEL INPUT")
 			{
+
 				if (tokens.size() != 2)
 					throw_control_file_error(f_rec, "wrong number of tokens on '* model input' line '" + line + "' expecting 2");
-				for (auto& token : tokens_case_sen)
-                {
-                    if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos))
-                    {
-                        ss.str("");
-                        ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token << endl;
-                        cout << ss.str();
-                        f_rec << ss.str();
-                        string temp_line = token;
-                        temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
-                        token = string(temp_line);
-                    }
-                }
-
-
                 model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
 				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
 			}
@@ -1127,9 +1173,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
                     for (auto& token: mi_tokens) {
                         if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos)) {
                             ss.str("");
-                            ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token
+                            ss << "Note: single and/or double quote char(s) found in model interface file: " << token
                                << endl;
-                            cout << ss.str();
                             f_rec << ss.str();
                             string temp_line = token;
                             temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote),
@@ -1153,18 +1198,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens.size() != 2)
 					throw_control_file_error(f_rec, "wrong number of tokens on '* model output' line '" + line + "' expecting 2");
-                for (auto& token : tokens_case_sen) {
-                    if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos)) {
-                        ss.str("");
-                        ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token
-                           << endl;
-                        cout << ss.str();
-                        f_rec << ss.str();
-                        string temp_line = token;
-                        temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
-                        token = string(temp_line);
-                    }
-                }
 				model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
 				model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
 			}
@@ -1194,8 +1227,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
                         if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos))
                         {
                             ss.str("");
-                            ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token << endl;
-                            cout << ss.str();
+                            ss << "Note: single and/or double quote char(s) found in model interface file: " << token << endl;
                             f_rec << ss.str();
                             string temp_line = token;
                             temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
@@ -1216,21 +1248,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			}
 			else if (section == "MODEL INPUT/OUTPUT")
 			{
+
 			if (tokens.size() != 2)
 				throw_control_file_error(f_rec, "wrong number of tokens on '* model input/output' line '" + line + "' expecting 2");
-                for (auto& token : tokens_case_sen)
-                {
-                    if ((token.find('\"') != std::string::npos) || (token.find('\'') != std::string::npos))
-                    {
-                        ss.str("");
-                        ss << "WARNING: single and/or double quote char(s) found in model interface file: " << token << endl;
-                        cout << ss.str();
-                        f_rec << ss.str();
-                        string temp_line = token;
-                        temp_line.erase(std::remove_if(temp_line.begin(), temp_line.end(), IsQuote), temp_line.end());
-                        token = string(temp_line);
-                    }
-                }
+
 				if (i_tpl_ins < num_tpl_file)
 				{
 					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
@@ -1612,6 +1633,17 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
+/**
+ * @brief Enforce par limits.
+ *
+ * @param performance_log Description.
+ * @param upgrade_active_ctl_pars Description.
+ * @param last_active_ctl_pars Description.
+ * @param enforce_chglim Description.
+ * @param enforce_bounds Description.
+ *
+ * @return Description.
+ */
 pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
 	if ((!enforce_chglim) && (!enforce_bounds)) {
@@ -1950,6 +1982,13 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	return _control_info;
 }
 
+/**
+ * @brief Get effective ctl lower upper bnd.
+ *
+ * @param pars Description.
+ *
+ * @return Description.
+ */
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
 {
 	vector<string> keys = pars.get_keys();
@@ -2000,6 +2039,13 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 	return pair<Parameters,Parameters>(lbnd,ubnd);
 }
 
+/**
+ * @brief Get child pest.
+ *
+ * @param icycle Description.
+ *
+ * @return Description.
+ */
 Pest Pest::get_child_pest(int icycle)
 {
 	// TODO: insert return statement here
@@ -2014,6 +2060,11 @@ Pest Pest::get_child_pest(int icycle)
 }
 
 
+/**
+ * @brief Assign da cycles.
+ *
+ * @param f_rec Description.
+ */
 void Pest::assign_da_cycles(ofstream &f_rec)
 {
 	vector<string> str_values, str_names;
@@ -2183,6 +2234,16 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	//TODO: prior info...with pi, need to check that parameters in each eqs are in the same cycle!
 }
 
+/**
+ * @brief Parse cycle str.
+ *
+ * @param raw_cycle_val Description.
+ * @param efilename Description.
+ * @param row Description.
+ * @param f_rec Description.
+ *
+ * @return Description.
+ */
 DaCycleInfo Pest::parse_cycle_str(string& raw_cycle_val, string& efilename, int row, ofstream& f_rec)
 {
     stringstream ss;
@@ -2349,6 +2410,15 @@ DaCycleInfo Pest::parse_cycle_str(string& raw_cycle_val, string& efilename, int 
     return dci;
 }
 
+/**
+ * @brief Extract cycle info.
+ *
+ * @param f_rec Description.
+ * @param section_name Description.
+ * @param possible_name_cols Description.
+ *
+ * @return Description.
+ */
 vector<pair<string, DaCycleInfo>> Pest::extract_cycle_info(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
 {
     vector<string> str_values, str_names;
@@ -2395,6 +2465,15 @@ vector<pair<string, DaCycleInfo>> Pest::extract_cycle_info(ofstream& f_rec, stri
     return cycle_map;
 }
 
+/**
+ * @brief Extract cycle numbers2.
+ *
+ * @param f_rec Description.
+ * @param section_name Description.
+ * @param possible_name_cols Description.
+ *
+ * @return Description.
+ */
 vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
 {
 	vector<string> str_values, str_names;
@@ -2452,6 +2531,12 @@ vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string s
 
 }
 
+/**
+ * @brief Child pest update.
+ *
+ * @param icycle Description.
+ * @param keep_order Description.
+ */
 void Pest::child_pest_update(int icycle, bool keep_order)
 {
 	/*
@@ -2645,6 +2730,14 @@ void Pest::child_pest_update(int icycle, bool keep_order)
 	//this.check_inputs();
 }
 
+/**
+ * @brief Get assim dci cycles.
+ *
+ * @param f_rec Description.
+ * @param unique_cycles Description.
+ *
+ * @return Description.
+ */
 vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles)
 {
     stringstream ss;
@@ -2718,6 +2811,14 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
     return vector<int>(scycles.begin(),scycles.end());
 }
 
+/**
+ * @brief Cycle in range.
+ *
+ * @param cycle Description.
+ * @param dci Description.
+ *
+ * @return Description.
+ */
 bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
     if ((dci.start == dci.stop) && (dci.start == cycle))
         return true;
@@ -2733,6 +2834,13 @@ bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
 
 }
 
+/**
+ * @brief Every cycle.
+ *
+ * @param dci Description.
+ *
+ * @return Description.
+ */
 bool every_cycle(const DaCycleInfo& dci)
 {
     if (dci.stop != -999)
@@ -2792,6 +2900,14 @@ bool every_cycle(const DaCycleInfo& dci)
 
 
 
+/**
+ * @brief Get pars at near bounds.
+ *
+ * @param pars Description.
+ * @param tol Description.
+ *
+ * @return Description.
+ */
 map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)
 {
 	 map<string, double> bnd_map;
@@ -2813,6 +2929,9 @@ map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, doubl
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 Pest::~Pest() {
 	if (regul_scheme_ptr != 0)
 	{
@@ -2827,6 +2946,14 @@ Pest::~Pest() {
     base_group_info.free_mem();
 }
 
+/**
+ * @brief Parse keyword line.
+ *
+ * @param f_rec Description.
+ * @param line Description.
+ *
+ * @return Description.
+ */
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
 {
 	string key;
@@ -2860,6 +2987,14 @@ pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &lin
 	return pair<string, string>(key,value);
 }
 
+/**
+ * @brief Throw control file error.
+ *
+ * @param f_rec Description.
+ * @param message Description.
+ * @param should_throw Description.
+ * @param echo Description.
+ */
 void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool should_throw, bool echo)
 {
 	stringstream ss;
@@ -2885,6 +3020,14 @@ void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool 
 	}	
 }
 
+/**
+ * @brief Check report assignment.
+ *
+ * @param f_rec Description.
+ * @param stat Description.
+ * @param key Description.
+ * @param org_value Description.
+ */
 void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value)
 {
 	if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
@@ -2897,6 +3040,12 @@ void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS st
 	}
 }
 
+/**
+ * @brief Tokens to par group rec.
+ *
+ * @param f_rec Description.
+ * @param tokens Description.
+ */
 void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens)
 {
 	ParameterGroupRec pgi;
@@ -2925,6 +3074,16 @@ void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens
 
 }
 
+/**
+ * @brief Tokens to par rec.
+ *
+ * @param f_rec Description.
+ * @param tokens Description.
+ * @param t_fixed Description.
+ * @param t_log Description.
+ * @param t_scale Description.
+ * @param t_offset Description.
+ */
 void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, TranFixed* t_fixed, TranLog10* t_log, TranScale* t_scale, TranOffset* t_offset)
 {
 	ParameterRec pi;
@@ -3024,6 +3183,12 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 
 }
 
+/**
+ * @brief Tokens to obs group rec.
+ *
+ * @param f_rec Description.
+ * @param tokens Description.
+ */
 void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens)
 {
 	string name = tokens[0];
@@ -3044,6 +3209,12 @@ void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens
 	}
 }
 
+/**
+ * @brief Tokens to obs rec.
+ *
+ * @param f_rec Description.
+ * @param tokens Description.
+ */
 void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
 {
 	ObservationRec obs_i;
@@ -3098,6 +3269,12 @@ void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
 	}
 }
 
+/**
+ * @brief Tokens to pi rec.
+ *
+ * @param f_rec Description.
+ * @param line_upper Description.
+ */
 void Pest::tokens_to_pi_rec(ofstream& f_rec, const string& line_upper)
 {
 	string first = line_upper.substr(0, 1);
@@ -3120,6 +3297,12 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const string& line_upper)
 }
 
 
+/**
+ * @brief Tokens to pi rec.
+ *
+ * @param f_rec Description.
+ * @param tokens Description.
+ */
 void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 {
 	
@@ -3137,6 +3320,9 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 	
 }
 
+/**
+ * @brief Rectify par groups.
+ */
 void Pest::rectify_par_groups()
 {
 	const ParameterRec *pr;
@@ -3164,6 +3350,14 @@ void Pest::rectify_par_groups()
 
 }
 
+/**
+ * @brief Calc par dss.
+ *
+ * @param jac Description.
+ * @param par_transform Description.
+ *
+ * @return Description.
+ */
 map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
 {
 	Parameters pars = jac.get_base_numeric_parameters();
@@ -3188,6 +3382,14 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 	return par_sens;
 }
 
+/**
+ * @brief Get ext file string map.
+ *
+ * @param section_name Description.
+ * @param col_name Description.
+ *
+ * @return Description.
+ */
 map<string,string> Pest::get_ext_file_string_map(const string& section_name, const string& col_name)
 {
 	string sname_upper = pest_utils::upper_cp(section_name);
@@ -3219,6 +3421,9 @@ map<string,string> Pest::get_ext_file_string_map(const string& section_name, con
 	return val_map;
 }
 
+/**
+ * @brief Release unused for agent.
+ */
 void Pest::release_unused_for_agent()
 {
     ctl_ordered_obs_names.clear();
@@ -3234,6 +3439,14 @@ void Pest::release_unused_for_agent()
 }
 
 
+/**
+ * @brief Get ext file double map.
+ *
+ * @param section_name Description.
+ * @param col_name Description.
+ *
+ * @return Description.
+ */
 map<string, double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
 {
 	string sname_upper = pest_utils::upper_cp(section_name);
@@ -3256,6 +3469,14 @@ map<string, double> Pest::get_ext_file_double_map(const string& section_name, co
 }
 
 
+/**
+ * @brief Overloaded operator << operator.
+ *
+ * @param os Description.
+ * @param val Description.
+ *
+ * @return Description.
+ */
 ostream& operator<< (ostream &os, const Pest& val)
 {
 	os << val.control_info;

@@ -26,7 +26,6 @@
 #include <chrono>
 #include <list>
 #include <thread>
-#include "network_wrapper.h"
 #include "network_package.h"
 #include "RunManagerAbstract.h"
 #include "RunStorage.h"
@@ -101,7 +100,8 @@ class RunManagerPanther : public RunManagerAbstract
 public:
 	RunManagerPanther(const std::string &stor_filename, const std::string &port, std::ofstream &_f_rmr, int _max_n_failure,
 		double overdue_reched_fac, double overdue_giveup_fac, double overdue_giveup_minutes, bool _should_echo = true, const vector<string>& par_names=vector<string>(),
-		const vector<string>& obs_names=vector<string>(),int _timeout_milliseconds=10,int _echo_interval_milliseconds=10, bool _persistent_workers=true);
+		const vector<string>& obs_names=vector<string>(),int _timeout_milliseconds=10,int _echo_interval_milliseconds=10,
+		bool _persistent_workers=true, int _min_ping_internal_secs=60);
 
 	virtual void initialize(const Parameters &model_pars, const Observations &obs, const std::string &_filename = std::string(""));
 	virtual void initialize_restart(const std::string &_filename);
@@ -122,7 +122,7 @@ private:
 	static const int BACKLOG;
 	static const int MAX_FAILED_PINGS;
 	static const int N_PINGS_UNRESPONSIVE;
-	static const int MIN_PING_INTERVAL_SECS;
+	//static const int MIN_PING_INTERVAL_SECS;
 	static const int MAX_PING_INTERVAL_SECS;
 	static const int MAX_CONCURRENT_RUNS_LOWER_LIMIT;
 	static const int IDLE_THREAD_SIGNAL_TIMEOUT_SECS;
@@ -131,6 +131,7 @@ private:
     //static const int TIMEOUT_MILLISECONDS;
     int echo_interval_milliseconds;
     int timeout_milliseconds;
+	int min_ping_interval_secs;
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;

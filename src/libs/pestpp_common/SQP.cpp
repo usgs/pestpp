@@ -1,4 +1,4 @@
-﻿#include <random>
+#include <random>
 #include <map>
 #include <iomanip>
 #include <mutex>
@@ -50,6 +50,14 @@ bool SqpFilter::accept(double obj_val, double violation_val, double violation_pa
 }
 
 
+/**
+ * @brief First partially dominates second.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 bool SqpFilter::first_partially_dominates_second(const FilterRec& first, const FilterRec& second)
 {
 	if (minimize)
@@ -68,6 +76,14 @@ bool SqpFilter::first_partially_dominates_second(const FilterRec& first, const F
 	}
 }
 
+/**
+ * @brief First strictly dominates second.
+ *
+ * @param first Description.
+ * @param second Description.
+ *
+ * @return Description.
+ */
 bool SqpFilter::first_strictly_dominates_second(const FilterRec& first, const FilterRec& second)
 {
     if (minimize)
@@ -86,6 +102,12 @@ bool SqpFilter::first_strictly_dominates_second(const FilterRec& first, const Fi
     }
 }
 
+/**
+ * @brief Report.
+ *
+ * @param frec Description.
+ * @param iter Description.
+ */
 void SqpFilter::report(ofstream& frec, int iter)
 {
 	frec << endl << "SQP filter members (" << obj_viol_pairs.size() << ") for iteration " << iter << ":" << endl;
@@ -224,6 +246,11 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	
 }
 
+/**
+ * @brief Throw sqp error.
+ *
+ * @param message Description.
+ */
 void SeqQuadProgram::throw_sqp_error(string message)
 {
 	performance_log->log_event("SeqQuadProgram error: " + message);
@@ -458,6 +485,12 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 
 }
 
+/**
+ * @brief Add current as bases.
+ *
+ * @param _dv Description.
+ * @param _oe Description.
+ */
 void SeqQuadProgram::add_current_as_bases(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
 	//check that 'base' isn't already in ensemble
@@ -520,6 +553,14 @@ void SeqQuadProgram::add_current_as_bases(ParameterEnsemble& _dv, ObservationEns
 }
 
 template<typename T, typename A>
+/**
+ * @brief Message.
+ *
+ * @param level Description.
+ * @param _message Description.
+ * @param _extras Description.
+ * @param echo Description.
+ */
 void SeqQuadProgram::message(int level, const string &_message, vector<T, A> _extras, bool echo)
 {
 	stringstream ss;
@@ -546,12 +587,25 @@ void SeqQuadProgram::message(int level, const string &_message, vector<T, A> _ex
 
 }
 
+/**
+ * @brief Message.
+ *
+ * @param level Description.
+ * @param _message Description.
+ */
 void SeqQuadProgram::message(int level, const string &_message)
 {
 	message(level, _message, vector<string>());
 }
 
 template<typename T>
+/**
+ * @brief Message.
+ *
+ * @param level Description.
+ * @param _message Description.
+ * @param extra Description.
+ */
 void SeqQuadProgram::message(int level, const string &_message, T extra)
 {
 	stringstream ss;
@@ -560,6 +614,9 @@ void SeqQuadProgram::message(int level, const string &_message, T extra)
 	message(level, s);
 }
 
+/**
+ * @brief Sanity checks.
+ */
 void SeqQuadProgram::sanity_checks()
 {
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -613,6 +670,9 @@ void SeqQuadProgram::sanity_checks()
 	}
 }
 
+/**
+ * @brief Initialize objfunc.
+ */
 void SeqQuadProgram::initialize_objfunc()
 {
 	//initialize the objective function
@@ -741,6 +801,11 @@ void SeqQuadProgram::initialize_objfunc()
 }
 
 
+/**
+ * @brief Initialize restart.
+ *
+ * @return Description.
+ */
 bool SeqQuadProgram::initialize_restart()
 {
 	stringstream ss;
@@ -858,6 +923,9 @@ bool SeqQuadProgram::initialize_restart()
 }
 
 
+/**
+ * @brief Initialize parcov.
+ */
 void SeqQuadProgram::initialize_parcov()
 {
 	stringstream ss;
@@ -917,6 +985,9 @@ void SeqQuadProgram::initialize_parcov()
 
 }
 
+/**
+ * @brief Initialize.
+ */
 void SeqQuadProgram::initialize()
 {	
 	message(0, "initializing");
@@ -1228,6 +1299,9 @@ void SeqQuadProgram::initialize()
 	message(0, "initialization complete");
 }
 
+/**
+ * @brief Save current dv obs.
+ */
 void SeqQuadProgram::save_current_dv_obs()
 {
     stringstream ss;
@@ -1256,6 +1330,9 @@ void SeqQuadProgram::save_current_dv_obs()
 
 }
 
+/**
+ * @brief Prep 4 fd grad.
+ */
 void SeqQuadProgram::prep_4_fd_grad()
 {
 	stringstream ss;
@@ -1343,6 +1420,13 @@ void SeqQuadProgram::prep_4_fd_grad()
 	save_current_dv_obs();
 }
 
+/**
+ * @brief Run jacobian.
+ *
+ * @param _current_ctl_dv_vals Description.
+ * @param _current_obs Description.
+ * @param init_obs Description.
+ */
 void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations& _current_obs, bool init_obs)
 {
 	stringstream ss;
@@ -1387,6 +1471,12 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 	}
 }
 
+/**
+ * @brief Make gradient runs.
+ *
+ * @param _current_dv_vals Description.
+ * @param _current_obs Description.
+ */
 void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs)
 {
 	stringstream ss;
@@ -1490,6 +1580,9 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 	}
 }
 
+/**
+ * @brief Prep 4 ensemble grad.
+ */
 void SeqQuadProgram::prep_4_ensemble_grad()
 {
 	stringstream ss;
@@ -1723,6 +1816,12 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 
 
 
+/**
+ * @brief Save mat.
+ *
+ * @param prefix Description.
+ * @param mat Description.
+ */
 void SeqQuadProgram::save_mat(string prefix, Eigen::MatrixXd &mat)
 {
 	stringstream ss;
@@ -2449,6 +2548,9 @@ bool SeqQuadProgram::isfullrank(const Eigen::MatrixXd& mat)
 	return (rank == min(mat.rows(), mat.cols()));
 }
 
+/**
+ * @brief Iterate 2 solution.
+ */
 void SeqQuadProgram::iterate_2_solution()
 {
 	stringstream ss;
@@ -2574,6 +2676,11 @@ void SeqQuadProgram::iterate_2_solution()
 	}
 }
 
+/**
+ * @brief Should terminate.
+ *
+ * @return Description.
+ */
 bool SeqQuadProgram::should_terminate()
 {
     stringstream ss;
@@ -2716,6 +2823,13 @@ bool SeqQuadProgram::should_terminate()
 }
 
 
+/**
+ * @brief Calc gradient vector from coeffs.
+ *
+ * @param _current_dv_values Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameters& _current_dv_values)
 {
 	Eigen::VectorXd grad(dv_names.size());
@@ -2754,6 +2868,14 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameter
 }
 
 
+/**
+ * @brief Calc gradient vector.
+ *
+ * @param _current_dv_values Description.
+ * @param _center_on Description.
+ *
+ * @return Description.
+ */
 Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values, string _center_on)
 {
 	stringstream ss;
@@ -4756,6 +4878,11 @@ FilterRec SeqQuadProgram::run_search_routine(Eigen::VectorXd& grad, ParameterEns
 	return FilterRec();
 }
 
+/**
+ * @brief Seek feasible.
+ *
+ * @return Description.
+ */
 bool SeqQuadProgram::seek_feasible()
 {
 	stringstream ss;
@@ -4972,6 +5099,14 @@ Eigen::VectorXd SeqQuadProgram::solve_constrained_trust_region_step(const Eigen:
 	return Z * s;
 }
 
+/**
+ * @brief Get obj value.
+ *
+ * @param _current_ctl_dv_vals Description.
+ * @param _current_obs Description.
+ *
+ * @return Description.
+ */
 double SeqQuadProgram::get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs)
 {
 	double v = 0;
@@ -4999,6 +5134,14 @@ double SeqQuadProgram::get_obj_value(Parameters& _current_ctl_dv_vals, Observati
 	return v;
 }
 
+/**
+ * @brief Get obj map.
+ *
+ * @param _dv Description.
+ * @param _oe Description.
+ *
+ * @return Description.
+ */
 map<string, double> SeqQuadProgram::get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
 	Eigen::VectorXd obj_vec = get_obj_vector(_dv, _oe);
@@ -5012,6 +5155,14 @@ map<string, double> SeqQuadProgram::get_obj_map(ParameterEnsemble& _dv, Observat
 
 }
 
+/**
+ * @brief Get obj vector.
+ *
+ * @param _dv Description.
+ * @param _oe Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
 	Eigen::VectorXd obj_vec(_dv.shape().first);
@@ -5432,6 +5583,13 @@ void SeqQuadProgram::report_and_save_ensemble(ParameterEnsemble& _dv, Observatio
 	save(_dv, _oe);
 }
 
+/**
+ * @brief Save.
+ *
+ * @param _dv Description.
+ * @param _oe Description.
+ * @param save_base Description.
+ */
 void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base)
 {
 	ofstream& frec = file_manager.rec_ofstream();
@@ -5634,6 +5792,9 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	return _oe;
 }
 
+/**
+ * @brief Queue chance runs.
+ */
 void SeqQuadProgram::queue_chance_runs()
 {
 	/* queue up chance-related runs using the class attributes dp and op*/
@@ -5676,6 +5837,15 @@ void SeqQuadProgram::queue_chance_runs()
 
 
 
+/**
+ * @brief Run ensemble.
+ *
+ * @param _pe Description.
+ * @param _oe Description.
+ * @param real_idxs Description.
+ *
+ * @return Description.
+ */
 vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
 {
 	run_mgr_ptr->reinitialize();
@@ -5768,6 +5938,9 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 }
 
 
+/**
+ * @brief Finalize.
+ */
 void SeqQuadProgram::finalize()
 {
 

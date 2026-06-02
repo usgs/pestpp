@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file RunManagerPanther.cpp
+ * @brief Implementation of RunManagerPanther.
+ */
+
 
 #include "network_wrapper.h"
 #include "RunManagerPanther.h"
@@ -47,14 +52,20 @@ using namespace pest_utils;
 const int RunManagerPanther::BACKLOG = 1000;
 const int RunManagerPanther::MAX_FAILED_PINGS = 60;
 const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
-const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
-const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
+const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each agent at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
 const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.01; //minimum avg runtime to try to kill and/or resched runs
 //const int RunManagerPanther::MILLISECONDS_BETWEEN_ECHOS = 10;
 //const int RunManagerPanther::TIMEOUT_MILLISECONDS = 10;
 
+/**
+ * @brief Agent info rec.
+ *
+ * @param _socket_fd Description.
+ *
+ * @return Description.
+ */
 AgentInfoRec::AgentInfoRec(int _socket_fd)
 {
 	socket_fd = _socket_fd;
@@ -76,6 +87,11 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 
 }
 
+/**
+ * @brief Overloaded operator  operator.
+ *
+ * @return Description.
+ */
 bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentInfoRec &b)
 {
 	bool ret = false;
@@ -91,56 +107,111 @@ bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentI
 }
 
 
+/**
+ * @brief Get socket fd.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::get_socket_fd() const
 {
 	return socket_fd;
 }
 
+/**
+ * @brief Set socket fd.
+ *
+ * @param _socket_fd Description.
+ */
 void AgentInfoRec::set_socket_fd(int _socket_fd)
 {
 	socket_fd = _socket_fd;
 }
 
+/**
+ * @brief Get hostname.
+ *
+ * @return Description.
+ */
 string AgentInfoRec::get_hostname()const
 {
 	return name_info_vec[0];
 }
 
+/**
+ * @brief Get port.
+ *
+ * @return Description.
+ */
 string AgentInfoRec::get_port()const
 {
 	return name_info_vec[1];
 }
 
+/**
+ * @brief Get socket name.
+ *
+ * @return Description.
+ */
 string AgentInfoRec::get_socket_name()const
 {
 	return name_info_vec[0] + ":" + name_info_vec[1];
 }
 
+/**
+ * @brief Get run id.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::get_run_id() const
 {
 	return run_id;
 }
 
+/**
+ * @brief Set run id.
+ *
+ * @param _run_id Description.
+ */
 void AgentInfoRec::set_run_id(int _run_id)
 {
 	run_id = _run_id;
 }
 
+/**
+ * @brief Get group id.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::get_group_id() const
 {
 	return group_id;
 }
 
+/**
+ * @brief Set group id.
+ *
+ * @param _group_id Description.
+ */
 void AgentInfoRec::set_group_id(int _group_id)
 {
 	group_id = _group_id;
 }
 
+/**
+ * @brief Get state.
+ *
+ * @return Description.
+ */
 AgentInfoRec::State AgentInfoRec::get_state() const
 {
 	return state;
 }
 
+/**
+ * @brief Set state.
+ *
+ * @param _state Description.
+ */
 void AgentInfoRec::set_state(const State &_state)
 {
 	if (_state == AgentInfoRec::State::ACTIVE)
@@ -150,6 +221,13 @@ void AgentInfoRec::set_state(const State &_state)
 	state = _state;
 }
 
+/**
+ * @brief Set state.
+ *
+ * @param _state Description.
+ * @param _run_id Description.
+ * @param _group_id Description.
+ */
 void AgentInfoRec::set_state(const State &_state, int _run_id, int _group_id)
 {
 	state = _state;
@@ -157,21 +235,37 @@ void AgentInfoRec::set_state(const State &_state, int _run_id, int _group_id)
 	group_id = _group_id;
 }
 
+/**
+ * @brief Set work dir.
+ *
+ * @param _work_dir Description.
+ */
 void AgentInfoRec::set_work_dir(const std::string &_work_dir)
 {
 	work_dir = _work_dir;
 }
 
+/**
+ * @brief Get work dir.
+ *
+ * @return Description.
+ */
 string AgentInfoRec::get_work_dir() const
 {
 	return work_dir;
 }
 
+/**
+ * @brief Start timer.
+ */
 void AgentInfoRec::start_timer()
 {
 	start_time = std::chrono::system_clock::now();
 }
 
+/**
+ * @brief End run.
+ */
 void AgentInfoRec::end_run()
 {
 	auto dt = std::chrono::system_clock::now() - start_time;
@@ -186,61 +280,112 @@ void AgentInfoRec::end_run()
 	}
 }
 
+/**
+ * @brief End linpack.
+ */
 void AgentInfoRec::end_linpack()
 {
 	linpack_time = std::chrono::system_clock::now() - start_time;
 }
 
+/**
+ * @brief Get duration sec.
+ *
+ * @return Description.
+ */
 double AgentInfoRec::get_duration_sec() const
 {
 	chrono::system_clock::duration dt = chrono::system_clock::now() - start_time;
 	return (double)std::chrono::duration_cast<std::chrono::milliseconds>(dt).count() / 1000.0;
 }
 
+/**
+ * @brief Get duration minute.
+ *
+ * @return Description.
+ */
 double AgentInfoRec::get_duration_minute() const
 {
 	return get_duration_sec() / 60.0;
 }
 
+/**
+ * @brief Get runtime sec.
+ *
+ * @return Description.
+ */
 double AgentInfoRec::get_runtime_sec() const
 {
 	return(double)std::chrono::duration_cast<std::chrono::milliseconds>(run_time).count() / 1000.0;
 }
 
+/**
+ * @brief Get runtime minute.
+ *
+ * @return Description.
+ */
 double AgentInfoRec::get_runtime_minute() const
 {
 	double run_minutes = std::chrono::duration_cast<std::chrono::milliseconds>(run_time).count() / 60000.0;
 	return run_minutes;
 }
 
+/**
+ * @brief Get runtime.
+ *
+ * @return Description.
+ */
 double AgentInfoRec::get_runtime() const
 {
 	return double(run_time.count());
 }
 
+/**
+ * @brief Get linpack time.
+ *
+ * @return Description.
+ */
 double AgentInfoRec::get_linpack_time() const
 {
 	return double(linpack_time.count());
 }
 
 
+/**
+ * @brief Reset failed pings.
+ */
 void AgentInfoRec::reset_failed_pings()
 {
 	failed_pings = 0;
 }
 
+/**
+ * @brief Add failed ping.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::add_failed_ping()
 {
 	failed_pings++;
 	return failed_pings;
 }
 
+/**
+ * @brief Add failed run.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::add_failed_run()
 {
 	failed_runs++;
 	return failed_runs;
 }
 
+/**
+ * @brief Set ping.
+ *
+ * @param val Description.
+ */
 void AgentInfoRec::set_ping(bool val)
 {
 	ping = val;
@@ -250,21 +395,39 @@ void AgentInfoRec::set_ping(bool val)
 	else reset_last_ping_time();
 }
 
+/**
+ * @brief Get ping.
+ *
+ * @return Description.
+ */
 bool AgentInfoRec::get_ping() const
 {
 	return ping;
 }
 
+/**
+ * @brief Get failed pings.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::get_failed_pings() const
 {
 	return failed_pings;
 }
 
+/**
+ * @brief Reset last ping time.
+ */
 void AgentInfoRec::reset_last_ping_time()
 {
 	last_ping_time = chrono::system_clock::now();
 }
 
+/**
+ * @brief Seconds since last ping time.
+ *
+ * @return Description.
+ */
 int AgentInfoRec::seconds_since_last_ping_time() const
 {
 	return chrono::duration_cast<std::chrono::seconds>
@@ -274,7 +437,8 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
 	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo, const vector<string>& par_names,
-	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds, bool _persistent_workers)
+	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds, bool _persistent_workers,
+	int _min_ping_interval_secs)
 
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
@@ -283,6 +447,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
 	idle_thread(nullptr), should_echo(_should_echo),nftx(0),timeout_milliseconds(_timeout_milliseconds),
     echo_interval_milliseconds(_echo_interval_milliseconds),persistent_workers(_persistent_workers)
+	,min_ping_interval_secs(_min_ping_interval_secs)
 {
 
 	const char * t =
@@ -361,6 +526,13 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	mgr_type = RUN_MGR_TYPE::PANTHER;
 }
 
+/**
+ * @brief Get n concurrent.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
 int RunManagerPanther::get_n_concurrent(int run_id)
 {
 	auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
@@ -375,6 +547,13 @@ int RunManagerPanther::get_n_concurrent(int run_id)
 	return n;
 }
 
+/**
+ * @brief Get active run iter.
+ *
+ * @param socket Description.
+ *
+ * @return Description.
+ */
 list<AgentInfoRec>::iterator RunManagerPanther::get_active_run_iter(int socket)
 {
 	auto iter = socket_to_iter_map.find(socket);
@@ -390,6 +569,13 @@ list<AgentInfoRec>::iterator RunManagerPanther::get_active_run_iter(int socket)
 }
 
 
+/**
+ * @brief Initialize.
+ *
+ * @param model_pars Description.
+ * @param obs Description.
+ * @param _filename Description.
+ */
 void RunManagerPanther::initialize(const Parameters &model_pars, const Observations &obs, const string &_filename)
 {
 	RunManagerAbstract::initialize(model_pars, obs, _filename);
@@ -397,6 +583,11 @@ void RunManagerPanther::initialize(const Parameters &model_pars, const Observati
 	
 }
 
+/**
+ * @brief Initialize restart.
+ *
+ * @param _filename Description.
+ */
 void RunManagerPanther::initialize_restart(const std::string &_filename)
 {
 	file_stor.init_restart(_filename);
@@ -408,6 +599,11 @@ void RunManagerPanther::initialize_restart(const std::string &_filename)
 	}
 }
 
+/**
+ * @brief Reinitialize.
+ *
+ * @param _filename Description.
+ */
 void RunManagerPanther::reinitialize(const std::string &_filename)
 {
 	free_memory();
@@ -415,6 +611,9 @@ void RunManagerPanther::reinitialize(const std::string &_filename)
 	cur_group_id = NetPackage::get_new_group_id();
 }
 
+/**
+ * @brief Free memory.
+ */
 void  RunManagerPanther::free_memory()
 {
 	waiting_runs.clear();
@@ -423,6 +622,15 @@ void  RunManagerPanther::free_memory()
 	active_runid_to_iterset_map.clear();
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunManagerPanther::add_run(const Parameters &model_pars, const string &info_txt, double info_value)
 {
 	int run_id = file_stor.add_run(model_pars, info_txt, info_value);
@@ -430,6 +638,15 @@ int RunManagerPanther::add_run(const Parameters &model_pars, const string &info_
 	return run_id;
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunManagerPanther::add_run(const std::vector<double> &model_pars, const string &info_txt, double info_value)
 {
 	int run_id = file_stor.add_run(model_pars, info_txt, info_value);
@@ -437,6 +654,15 @@ int RunManagerPanther::add_run(const std::vector<double> &model_pars, const stri
 	return run_id;
 }
 
+/**
+ * @brief Add run.
+ *
+ * @param model_pars Description.
+ * @param info_txt Description.
+ * @param info_value Description.
+ *
+ * @return Description.
+ */
 int RunManagerPanther::add_run(const Eigen::VectorXd &model_pars, const string &info_txt, double info_value)
 {
 	int run_id = file_stor.add_run(model_pars, info_txt, info_value);
@@ -444,6 +670,13 @@ int RunManagerPanther::add_run(const Eigen::VectorXd &model_pars, const string &
 	return run_id;
 }
 
+/**
+ * @brief Update run.
+ *
+ * @param run_id Description.
+ * @param pars Description.
+ * @param obs Description.
+ */
 void RunManagerPanther::update_run(int run_id, const Parameters &pars, const Observations &obs)
 {
 
@@ -464,11 +697,23 @@ void RunManagerPanther::update_run(int run_id, const Parameters &pars, const Obs
 	kill_runs(run_id, false, "run not required");
 }
 
+/**
+ * @brief Run.
+ */
 void RunManagerPanther::run()
 {
 	run_until(RUN_UNTIL_COND::NORMAL);
 }
 
+/**
+ * @brief Run until.
+ *
+ * @param condition Description.
+ * @param max_no_ops Description.
+ * @param max_time_sec Description.
+ *
+ * @return Description.
+ */
 RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
 {
 	RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL;
@@ -491,7 +736,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
 	cout << "    starting at " << pest_utils::get_time_string() << endl;
-	if (agent_info_set.size() == 0) // first entry is the listener, slave appears after this
+	if (agent_info_set.size() == 0) // first entry is the listener, agent appears after this
 	{
 		cout << endl << "    waiting for agents to appear..." << endl << endl;
 		//f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
@@ -719,6 +964,13 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	return terminate_reason;
 }
 
+/**
+ * @brief Ping.
+ *
+ * @param terminate Description.
+ *
+ * @return Description.
+ */
 bool RunManagerPanther::ping(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
 	vector<int> keys;
@@ -742,6 +994,9 @@ bool RunManagerPanther::ping(pest_utils::thread_flag* terminate/* = nullptr*/)
 	return ping_sent;
 }
 
+/**
+ * @brief Run idle async.
+ */
 void RunManagerPanther::run_idle_async()
 {
 	try
@@ -805,6 +1060,9 @@ void RunManagerPanther::run_idle_async()
 	idling.set(false);
 }
 
+/**
+ * @brief Start run idle async.
+ */
 void RunManagerPanther::start_run_idle_async()
 {
 	if(idle_thread)
@@ -825,6 +1083,9 @@ void RunManagerPanther::start_run_idle_async()
 	report("Started idle ping thread.", false);
 }
 
+/**
+ * @brief End run idle async.
+ */
 void RunManagerPanther::end_run_idle_async()
 {
 	if(!idle_thread)
@@ -866,6 +1127,9 @@ void RunManagerPanther::end_run_idle_async()
 	idle_thread = nullptr;
 }
 
+/**
+ * @brief Pause idle.
+ */
 void RunManagerPanther::pause_idle()
 {
 	if(!idle_thread)
@@ -901,6 +1165,9 @@ void RunManagerPanther::pause_idle()
     //delete idle_thread;
 }
 
+/**
+ * @brief Resume idle.
+ */
 void RunManagerPanther::resume_idle()
 {
 	// Start up the thread if it has not already been started
@@ -913,6 +1180,13 @@ void RunManagerPanther::resume_idle()
 	report("Panther idle ping thread resumed.", false);
 }
 
+/**
+ * @brief Get current sleep timeout milliseconds.
+ *
+ * @param org_timeout_milliseconds Description.
+ *
+ * @return Description.
+ */
 int RunManagerPanther::get_current_sleep_timeout_milliseconds(const int org_timeout_milliseconds)
 {
     double avg = get_global_runtime_minute() / 1000.0;
@@ -931,9 +1205,16 @@ int RunManagerPanther::get_current_sleep_timeout_milliseconds(const int org_time
     }
 
     //cout << timeout;
-    return timeout;
+    return static_cast<int>(std::round(timeout));
 }
 
+/**
+ * @brief Ping.
+ *
+ * @param i_sock Description.
+ *
+ * @return Description.
+ */
 bool RunManagerPanther::ping(int i_sock)
 {
 	bool ping_sent = false;
@@ -964,7 +1245,7 @@ bool RunManagerPanther::ping(int i_sock)
 	}
 	//check if it is time to ping again...
 	double duration = (double)agent_info_iter->seconds_since_last_ping_time();
-	double ping_time = min(double(MAX_PING_INTERVAL_SECS), max(double(MIN_PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec()));
+	double ping_time = min(double(MAX_PING_INTERVAL_SECS), max(double(min_ping_interval_secs), agent_info_iter->get_runtime_sec()));
 	if (duration >= ping_time)
 	{
 		ping_sent = true;
@@ -985,7 +1266,9 @@ bool RunManagerPanther::ping(int i_sock)
 			}
 		}
 		else agent_info_iter->set_ping(true);
-			//report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+		if (min_ping_interval_secs < 60) {
+			report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+		}
 
 #ifdef _DEBUG
 		report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
@@ -995,6 +1278,13 @@ bool RunManagerPanther::ping(int i_sock)
 }
 
 
+/**
+ * @brief Listen.
+ *
+ * @param terminate Description.
+ *
+ * @return Description.
+ */
 bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
 	bool got_message = false;
@@ -1007,7 +1297,7 @@ bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 	read_fds = master; // copy it
 	if (w_select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
 	{
-		// there are no slaves available.  W need to keep listening until at least one appears
+		// there are no agents available.  W need to keep listening until at least one appears
 		got_message = true;
 		return got_message;
 	}
@@ -1045,6 +1335,9 @@ bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 	return got_message;
 }
 
+/**
+ * @brief Close agents.
+ */
 void RunManagerPanther::close_agents()
 {
 	/*for (int i = 0; i <= fdmax; i++)
@@ -1053,6 +1346,8 @@ void RunManagerPanther::close_agents()
 		if (slave_info_iter != slave_info_set.end())
 			close_slave(slave_info_iter);
 	}*/
+	int tries = 0;
+	int max_tries = 1e6;
 	while (socket_to_iter_map.size() > 0)
 	{
 		listen();
@@ -1063,16 +1358,30 @@ void RunManagerPanther::close_agents()
 			close_agent(si);
 
 		w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
-
+		tries++;
+		if (tries >= max_tries) {
+			cout << "error closing agents, max attempts exceeded...continuing" << endl;
+			break;
+		}
 	}
 }
 
+/**
+ * @brief Close agent.
+ *
+ * @param i_sock Description.
+ */
 void RunManagerPanther::close_agent(int i_sock)
 {
 	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(i_sock);
 	close_agent(agent_info_iter);
 }
 
+/**
+ * @brief Close agent.
+ *
+ * @param agent_info_iter Description.
+ */
 void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter)
 {
 	int i_sock = agent_info_iter->get_socket_fd();
@@ -1097,12 +1406,19 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
 	if (open_file_socket_map.find(i_sock) != open_file_socket_map.end())
     {
 	    string fname = open_file_socket_map.at(i_sock);
-        pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fname,new ofstream));
-        ofstream& out = *ret.first->second;
+
+		pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fname,new ofstream));
+		auto it = open_file_trans_streams.find(fname);
+		/*ofstream& out = *ret.first->second;
         int file_size = out.tellp();
         out.flush();
-        out.close();
-        open_file_trans_streams.erase(ret.first);
+        out.close();*/
+		//open_file_trans_streams.erase(ret.first);
+		int file_size = it->second->tellp();
+		it->second->flush();
+		it->second->close();
+		delete it->second;
+		open_file_trans_streams.erase(it);
         stringstream ss;
         ss.str("");
         ss << "lost comms with agent, closed file:" << fname << " bytes:" << file_size << "  transferred";
@@ -1119,6 +1435,9 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
 }
 
 
+/**
+ * @brief Schedule runs.
+ */
 void RunManagerPanther::schedule_runs()
 {
 	NetPackage net_pack;
@@ -1280,6 +1599,15 @@ void RunManagerPanther::schedule_runs()
     }
 }
 
+/**
+ * @brief Schedule run.
+ *
+ * @param run_id Description.
+ * @param free_agent_list Description.
+ * @param n_responsive_agents Description.
+ *
+ * @return Description.
+ */
 int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents)
 {
 	int scheduled = -1;
@@ -1369,6 +1697,9 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 }
 
 
+/**
+ * @brief Echo.
+ */
 void RunManagerPanther::echo()
 {
 	if (!should_echo)
@@ -1387,6 +1718,12 @@ void RunManagerPanther::echo()
 		<< "|U" << setw(4) << left << stats_map["unavailable"] << ") " << setw(3) << left << open_file_trans_streams.size() << "\r" << flush;
 }
 
+/**
+ * @brief Report.
+ *
+ * @param message Description.
+ * @param to_cout Description.
+ */
 void RunManagerPanther::report(std::string message,bool to_cout)
 {
 	string t_str = pest_utils::get_time_string();
@@ -1394,6 +1731,11 @@ void RunManagerPanther::report(std::string message,bool to_cout)
 	if (to_cout) cout << endl << t_str << "->" << message << endl;
 }
 
+/**
+ * @brief Process message.
+ *
+ * @param i_sock Description.
+ */
 void RunManagerPanther::process_message(int i_sock)
 {
 	NetPackage net_pack;
@@ -1560,7 +1902,9 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::PING)
 	{
-		//report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
+		if (min_ping_interval_secs != 60) {
+			report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
+		}
 #ifdef _DEBUG
 		report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #endif
@@ -1719,6 +2063,15 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 }
 
+/**
+ * @brief Get recv filenames.
+ *
+ * @param net_pack Description.
+ * @param hostname Description.
+ * @param working_dir Description.
+ *
+ * @return Description.
+ */
 pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, string hostname, string working_dir)
 {
     //sanitize hostname and working_dir
@@ -1821,6 +2174,14 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
 }
 
 
+/**
+ * @brief Process model run.
+ *
+ * @param sock_id Description.
+ * @param net_pack Description.
+ *
+ * @return Description.
+ */
 bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 {
 	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(sock_id);
@@ -1854,6 +2215,12 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 	return use_run;
 }
 
+/**
+ * @brief Kill run.
+ *
+ * @param agent_info_iter Description.
+ * @param reason Description.
+ */
 void RunManagerPanther::kill_run(list<AgentInfoRec>::iterator agent_info_iter, const string &reason)
 {
 	int socket_id = agent_info_iter->get_socket_fd();
@@ -1886,6 +2253,13 @@ void RunManagerPanther::kill_run(list<AgentInfoRec>::iterator agent_info_iter, c
 }
 
 
+/**
+ * @brief Kill runs.
+ *
+ * @param run_id Description.
+ * @param update_failure_map Description.
+ * @param reason Description.
+ */
 void RunManagerPanther::kill_runs(int run_id, bool update_failure_map, const string &reason)
 {
 	auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
@@ -1905,12 +2279,15 @@ void RunManagerPanther::kill_runs(int run_id, bool update_failure_map, const str
 }
 
 
+/**
+ * @brief Kill all active runs.
+ */
 void RunManagerPanther::kill_all_active_runs()
 {
 	list<list<AgentInfoRec>::iterator> iter_list;
 	list<AgentInfoRec>::iterator iter_b, iter_e;
 	bool active_runs = true;
-	for (int n_tries = 0; active_runs && n_tries >= 100; ++n_tries)
+	for (int n_tries = 0; active_runs && n_tries < 100; ++n_tries)
 	{
 		init_agents();
 		active_runs = false;
@@ -1929,6 +2306,11 @@ void RunManagerPanther::kill_all_active_runs()
 	}
 }
 
+/**
+ * @brief Init agents.
+ *
+ * @param terminate Description.
+ */
  void RunManagerPanther::init_agents(pest_utils::thread_flag* terminate/* = nullptr*/)
  {
 	 for (auto &i_agent : agent_info_set)
@@ -2014,6 +2396,13 @@ void RunManagerPanther::kill_all_active_runs()
 	}
  }
 
+/**
+ * @brief Get overdue runs over kill threshold.
+ *
+ * @param run_id Description.
+ *
+ * @return Description.
+ */
  vector<int> RunManagerPanther::get_overdue_runs_over_kill_threshold(int run_id)
  {
 	 vector<int> sock_id_vec;
@@ -2046,6 +2435,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 return sock_id_vec;
  }
 
+/**
+ * @brief All runs complete.
+ *
+ * @return Description.
+ */
  bool RunManagerPanther::all_runs_complete()
  {
      int q = pest_utils::quit_file_found();
@@ -2055,7 +2449,7 @@ void RunManagerPanther::kill_all_active_runs()
         kill_all_active_runs();
         for (auto run_id : waiting_runs)
         {
-            file_stor.update_run_failed(run_id);
+            RunManagerAbstract::update_run_failed(run_id);
         }
         waiting_runs.clear();
         cout << endl << "'pest.stp' found, all remaining runs marked as fails. " << endl << endl;
@@ -2078,6 +2472,13 @@ void RunManagerPanther::kill_all_active_runs()
  }
 
 
+/**
+ * @brief Add agent.
+ *
+ * @param sock_id Description.
+ *
+ * @return Description.
+ */
  list<AgentInfoRec>::iterator RunManagerPanther::add_agent(int sock_id)
  {
 	 stringstream ss;
@@ -2095,6 +2496,11 @@ void RunManagerPanther::kill_all_active_runs()
 	return iter;
  }
 
+/**
+ * @brief Get global runtime minute.
+ *
+ * @return Description.
+ */
  double RunManagerPanther::get_global_runtime_minute() const
  {
 	 double global_runtime = 0;
@@ -2114,6 +2520,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 return global_runtime / (double)count;
  }
 
+/**
+ * @brief Unschedule run.
+ *
+ * @param agent_info_iter Description.
+ */
  void RunManagerPanther::unschedule_run(list<AgentInfoRec>::iterator agent_info_iter)
  {
 	 int run_id = agent_info_iter->get_run_id();
@@ -2133,6 +2544,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 }
  }
 
+/**
+ * @brief Get free agent list.
+ *
+ * @return Description.
+ */
  list<list<AgentInfoRec>::iterator> RunManagerPanther::get_free_agent_list()
  {
 	 list<list<AgentInfoRec>::iterator> iter_list;
@@ -2154,6 +2570,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 return iter_list;
  }
 
+/**
+ * @brief Get agent stats.
+ *
+ * @return Description.
+ */
  map<string, int> RunManagerPanther::get_agent_stats()
  {
 	 map<string, int> stats_map;
@@ -2185,6 +2606,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 return stats_map;
  }
 
+/**
+ * @brief Get n unique failures.
+ *
+ * @return Description.
+ */
  int RunManagerPanther::get_n_unique_failures()
  {
 	 set<int> run_id_set;
@@ -2195,6 +2621,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 return run_id_set.size();
  }
 
+/**
+ * @brief Get n responsive agents.
+ *
+ * @return Description.
+ */
  int RunManagerPanther::get_n_responsive_agents()
  {
 	 int n = 0;
@@ -2206,20 +2637,34 @@ void RunManagerPanther::kill_all_active_runs()
  }
 
 
+/**
+ * @brief Update run failed.
+ *
+ * @param run_id Description.
+ * @param socket_fd Description.
+ */
  void RunManagerPanther::update_run_failed(int run_id, int socket_fd)
  {
-	 file_stor.update_run_failed(run_id);
+	 RunManagerAbstract::update_run_failed(run_id);
 	 failure_map.insert(make_pair(run_id, socket_fd));
 	 list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(socket_fd);
 	 agent_info_iter->add_failed_run();
  }
 
+/**
+ * @brief Update run failed.
+ *
+ * @param run_id Description.
+ */
  void RunManagerPanther::update_run_failed(int run_id)
  {
 	 // must call void RunManagerPANTHER::update_run_failed(int run_id, int socket_fd) instead
 	 throw(PestError("Error: Unsupported function call  RunManagerPANTHER::update_run_failed(int run_id)"  ));
  }
 
+/**
+ * @brief Destructor for .
+ */
 RunManagerPanther::~RunManagerPanther(void)
 {
 	// Shut down idle agent management thread
@@ -2256,6 +2701,9 @@ RunManagerYAMRCondor::RunManagerYAMRCondor(const std::string & stor_filename,
 	parse_submit_file();
 }
 
+/**
+ * @brief Run.
+ */
 void RunManagerYAMRCondor::run()
 {
 	int cluster = submit();
@@ -2265,6 +2713,9 @@ void RunManagerYAMRCondor::run()
 
 }
 
+/**
+ * @brief Write submit file.
+ */
 void RunManagerYAMRCondor::write_submit_file()
 {
 	ofstream f_out("temp.sub");
@@ -2278,6 +2729,11 @@ void RunManagerYAMRCondor::write_submit_file()
 
 }
 
+/**
+ * @brief Get cluster.
+ *
+ * @return Description.
+ */
 int RunManagerYAMRCondor::get_cluster()
 {
 	string line, lower_line;
@@ -2334,6 +2790,11 @@ int RunManagerYAMRCondor::get_cluster()
 	return cluster;
 }
 
+/**
+ * @brief Submit.
+ *
+ * @return Description.
+ */
 int RunManagerYAMRCondor::submit()
 {
 	write_submit_file();
@@ -2342,6 +2803,11 @@ int RunManagerYAMRCondor::submit()
 	return get_cluster();
 }
 
+/**
+ * @brief Cleanup.
+ *
+ * @param cluster Description.
+ */
 void RunManagerYAMRCondor::cleanup(int cluster)
 {
 	RunManagerPanther::close_agents();
@@ -2357,6 +2823,9 @@ void RunManagerYAMRCondor::cleanup(int cluster)
 	cout << "   all agents freed " << endl << endl;
 }
 
+/**
+ * @brief Parse submit file.
+ */
 void RunManagerYAMRCondor::parse_submit_file()
 {
 	ifstream f_in(submit_file);

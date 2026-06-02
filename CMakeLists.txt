@@ -1,6 +1,6 @@
 # This is the top-level CMake file for PEST++
 cmake_minimum_required(VERSION 3.15)
-
+set(CMAKE_VERBOSE_MAKEFILE,ON)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(_DEBUG)
 endif()

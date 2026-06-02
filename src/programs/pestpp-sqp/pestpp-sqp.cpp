@@ -1,3 +1,7 @@
+/**
+ * @file pestpp-sqp.cpp
+ * @brief Implementation of pestpp-sqp.
+ */
 // pestpp-ies.cpp : Defines the entry point for the console application.
 //
 
@@ -33,6 +37,14 @@
 using namespace std;
 using namespace pest_utils;
 
+/**
+ * @brief Main.
+ *
+ * @param argc Description.
+ * @param argv Description.
+ *
+ * @return Description.
+ */
 int main(int argc, char* argv[])
 {
 #ifndef _DEBUG
@@ -217,7 +229,8 @@ int main(int argc, char* argv[])
                     vector<string>{}, vector<string>{},
                     pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
-                    pest_scenario.get_pestpp_options().get_panther_persistent_workers());
+                    pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
+					pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
 		}
 		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{

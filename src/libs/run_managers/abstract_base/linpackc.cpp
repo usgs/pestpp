@@ -21,6 +21,11 @@
 **
 **
 */
+/**
+ * @file linpackc.cpp
+ * @brief Implementation of linpackc.
+ */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,6 +69,11 @@ static REAL second   (void);
 static void *mempool;
 
 
+/**
+ * @brief Linpack wrap.
+ *
+ * @return Description.
+ */
 int linpack_wrap(void)
 
     {

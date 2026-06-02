@@ -1,3 +1,7 @@
+/**
+ * @file RestartController.cpp
+ * @brief Implementation of RestartController.
+ */
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -10,6 +14,11 @@
 using namespace std;
 using namespace::pest_utils;
 
+/**
+ * @brief Restart controller.
+ *
+ * @return Description.
+ */
 RestartController::RestartController(void)
 	: global_iter_no(0), local_iter_no(0), restart_option(RestartOption::NONE),
 	iteration_type(IterationType::BASE), nopt_count(0), nphinored_count(0),
@@ -17,44 +26,89 @@ RestartController::RestartController(void)
 {
 }
 
+/**
+ * @brief Write start iteration.
+ *
+ * @param fout Description.
+ * @param solver_type Description.
+ * @param _iter_num Description.
+ * @param _global_iter_num Description.
+ */
 void RestartController::write_start_iteration(ostream &fout, const string &solver_type, int _iter_num, int _global_iter_num)
 {
 	fout << "start_iteration " << _iter_num << "  " << _global_iter_num << "  " << solver_type << endl;
 
 }
 
+/**
+ * @brief Write start failed super.
+ *
+ * @param fout Description.
+ */
 void RestartController::write_start_failed_super(ostream &fout)
 {
 	fout << "failed_super" << endl;
 
 }
 
+/**
+ * @brief Write start parameters updated.
+ *
+ * @param fout Description.
+ * @param parameter_filename Description.
+ */
 void RestartController::write_start_parameters_updated(ostream &fout, const string &parameter_filename)
 {
 	fout << "parameter_file_save_started " << parameter_filename << endl;
 }
 
 
+/**
+ * @brief Write finish parameters updated.
+ *
+ * @param fout Description.
+ * @param parameter_filename Description.
+ */
 void RestartController::write_finish_parameters_updated(ostream &fout, const string &parameter_filename)
 {
 	fout << "parameter_file_save_finished " << parameter_filename << endl;
 }
 
+/**
+ * @brief Write jac runs built.
+ *
+ * @param fout Description.
+ */
 void RestartController::write_jac_runs_built(ostream &fout)
 {
 	fout << "jacobian_model_runs_built" << endl;
 }
 
+/**
+ * @brief Write upgrade runs built.
+ *
+ * @param fout Description.
+ */
 void RestartController::write_upgrade_runs_built(ostream &fout)
 {
 	fout << "upgrade_model_runs_built" << endl;
 }
 
+/**
+ * @brief Write iteration complete.
+ *
+ * @param fout Description.
+ */
 void RestartController::write_iteration_complete(ostream &fout)
 {
 	fout << "iteration_complete" << endl;
 }
 
+/**
+ * @brief Process rst file.
+ *
+ * @param fin Description.
+ */
 void RestartController::process_rst_file(std::ifstream &fin)
 {
 	string line;
@@ -135,6 +189,14 @@ void RestartController::process_rst_file(std::ifstream &fin)
 	}
 }
 
+/**
+ * @brief Get restart parameters.
+ *
+ * @param restart_par_file Description.
+ * @param prev_par_file Description.
+ *
+ * @return Description.
+ */
 Parameters RestartController::get_restart_parameters(const string &restart_par_file, const string &prev_par_file)
 {
 	Parameters new_pars;
@@ -156,6 +218,11 @@ Parameters RestartController::get_restart_parameters(const string &restart_par_f
 }
 
 
+/**
+ * @brief Update termination ctl.
+ *
+ * @param term_ctl Description.
+ */
 void RestartController::update_termination_ctl(TerminationController &term_ctl)
 {
 	term_ctl.nopt_count = nopt_count;
@@ -164,6 +231,9 @@ void RestartController::update_termination_ctl(TerminationController &term_ctl)
 	term_ctl.lowest_phi = lowest_phi;
 }
 
+/**
+ * @brief Destructor for .
+ */
 RestartController::~RestartController(void)
 {
 }

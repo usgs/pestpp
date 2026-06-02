@@ -223,7 +223,7 @@ class EnsembleSolver
 public:
 	EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
 		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer,
-		Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+		Covariance& _parcov,Eigen::MatrixXd& _am, L2PhiHandler& _ph,
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names,
 		double _reg_factor);
 
@@ -291,7 +291,7 @@ protected:
     unordered_map<string, Eigen::VectorXd>& weight_map;
 
     unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map;
-    unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, obs_err_map;
+    unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, & obs_err_map;
 
     mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
     mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
@@ -334,7 +334,7 @@ protected:
 	unordered_map<string, double>& weight_map;
 
 	unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map, & Am_map;
-	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, obs_err_map;
+	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, &obs_err_map;
 
 	mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
 	mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
@@ -372,7 +372,7 @@ public:
 	void message(int level, const string& _message);
 	//template<typename T>
 	//void message(int level, const string& _message, T extra);
-	void message(int level, const string& _message, string extra);
+	void message(int level, const string& _message, string extra, bool echo = true);
 	void message(int level, const string& _message, int extra);
 	void message(int level, const string& _message, double extra);
 	void message(int level, const string& _message, size_t extra);

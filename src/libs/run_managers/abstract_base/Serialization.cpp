@@ -16,6 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file Serialization.cpp
+ * @brief Implementation of Serialization.
+ */
+
 
 #include "network_wrapper.h"
 #include <string>
@@ -30,6 +35,13 @@ using namespace std;
 using namespace pest_utils;
 
 
+/**
+ * @brief Serialize.
+ *
+ * @param data Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(int64_t data)
 {
 	vector<int8_t> buf;
@@ -41,6 +53,15 @@ vector<int8_t> Serialization::serialize(int64_t data)
 }
 
 
+/**
+ * @brief Unserialize.
+ *
+ * @param buf Description.
+ * @param data Description.
+ * @param start_loc Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const vector<int8_t> &buf, int64_t &data, unsigned long start_loc)
 {
 	assert(buf.size()-start_loc >= sizeof(data));
@@ -50,6 +71,13 @@ unsigned long Serialization::unserialize(const vector<int8_t> &buf, int64_t &dat
 }
 
 
+/**
+ * @brief Serialize.
+ *
+ * @param tr_data Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const Transformable &tr_data)
 {
 	vector<int8_t> buf;
@@ -93,6 +121,13 @@ vector<int8_t> Serialization::serialize(const Transformable &tr_data)
 	return buf;
 }
 
+/**
+ * @brief Serialize.
+ *
+ * @param tr_vec Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const vector< const Transformable*> tr_vec)
 {
 	vector<int8_t> buf;
@@ -104,6 +139,13 @@ vector<int8_t> Serialization::serialize(const vector< const Transformable*> tr_v
 	return buf;
 }
 
+/**
+ * @brief Serialize.
+ *
+ * @param tr_vec Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const std::vector<Transformable*> &tr_vec)
 {
 	vector<const Transformable*> const_data_vec;
@@ -114,6 +156,14 @@ vector<int8_t> Serialization::serialize(const std::vector<Transformable*> &tr_ve
 	return serialize(const_data_vec);
 }
 
+/**
+ * @brief Serialize.
+ *
+ * @param pars Description.
+ * @param obs Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const Parameters &pars, const Observations &obs)
 {
 	 vector<const Transformable*> tr_vec;
@@ -122,6 +172,17 @@ vector<int8_t> Serialization::serialize(const Parameters &pars, const Observatio
 	 return serialize(tr_vec);
 }
 
+/**
+ * @brief Serialize.
+ *
+ * @param pars Description.
+ * @param par_names_vec Description.
+ * @param obs Description.
+ * @param obs_names_vec Description.
+ * @param run_time Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const Parameters &pars, const vector<string> &par_names_vec, const Observations &obs, const vector<string> &obs_names_vec, double run_time)
 {
 
@@ -147,6 +208,13 @@ vector<int8_t> Serialization::serialize(const Parameters &pars, const vector<str
 	return serial_data;
 }
 
+/**
+ * @brief Serialize.
+ *
+ * @param string_vec Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const vector<string> &string_vec)
 {
 	vector<int8_t> serial_data;
@@ -159,6 +227,13 @@ vector<int8_t> Serialization::serialize(const vector<string> &string_vec)
 	return serial_data;
 }
 
+/**
+ * @brief Serialize.
+ *
+ * @param string_vec_vec Description.
+ *
+ * @return Description.
+ */
 vector<int8_t> Serialization::serialize(const vector<vector<string>const*> &string_vec_vec)
 {
 	vector<int8_t> serial_data;
@@ -175,6 +250,15 @@ vector<int8_t> Serialization::serialize(const vector<vector<string>const*> &stri
 }
 
 
+/**
+ * @brief Unserialize.
+ *
+ * @param buf Description.
+ * @param tr_data Description.
+ * @param start_loc Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const std::vector<int8_t> &buf, Transformable &tr_data, unsigned long start_loc)
 {
 	// delete all existing items
@@ -206,6 +290,15 @@ unsigned long Serialization::unserialize(const std::vector<int8_t> &buf, Transfo
 	return bytes_read;
 }
 
+/**
+ * @brief Unserialize.
+ *
+ * @param ser_data Description.
+ * @param tr_vec Description.
+ * @param start_loc Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const std::vector<int8_t> &ser_data, std::vector<Transformable*> &tr_vec, unsigned long start_loc)
 {
 	unsigned i_tr=start_loc;
@@ -224,6 +317,16 @@ unsigned long Serialization::unserialize(const std::vector<int8_t> &ser_data, st
 	return total_bytes_read;
 }
 
+/**
+ * @brief Unserialize.
+ *
+ * @param data Description.
+ * @param pars Description.
+ * @param obs Description.
+ * @param start_loc Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const std::vector<int8_t> &data, Parameters &pars, Observations &obs, unsigned long start_loc)
 {
 	 unsigned total_bytes_read = 0;
@@ -234,6 +337,16 @@ unsigned long Serialization::unserialize(const std::vector<int8_t> &data, Parame
 	 return total_bytes_read;
 }
 
+/**
+ * @brief Unserialize.
+ *
+ * @param ser_data Description.
+ * @param string_vec Description.
+ * @param start_loc Description.
+ * @param max_read_bytes Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const vector<int8_t> &ser_data, vector<string> &string_vec, unsigned long start_loc, unsigned long max_read_bytes)
 {
 	unsigned total_bytes_read = 0;
@@ -248,6 +361,16 @@ unsigned long Serialization::unserialize(const vector<int8_t> &ser_data, vector<
 	return total_bytes_read;
 }
 
+/**
+ * @brief Unserialize.
+ *
+ * @param ser_data Description.
+ * @param items Description.
+ * @param names_vec Description.
+ * @param start_loc Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const vector<int8_t> &ser_data, Transformable &items, const vector<string> &names_vec, unsigned long start_loc)
 {
 	unsigned long total_bytes_read = 0;
@@ -269,6 +392,18 @@ unsigned long Serialization::unserialize(const vector<int8_t> &ser_data, Transfo
 	return total_bytes_read;
 }
 
+/**
+ * @brief Unserialize.
+ *
+ * @param ser_data Description.
+ * @param pars Description.
+ * @param par_names Description.
+ * @param obs Description.
+ * @param obs_names Description.
+ * @param run_time Description.
+ *
+ * @return Description.
+ */
 unsigned long Serialization::unserialize(const vector<int8_t> &ser_data, Parameters &pars, const vector<string> &par_names, Observations &obs, const vector<string> &obs_names, double &run_time)
 {
 	unsigned long bytes_read = 0;

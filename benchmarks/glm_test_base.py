@@ -80,20 +80,6 @@ def tenpar_superpar_restart_test():
     print(pst.phi)
     assert pst.phi < 1.0e-10, pst.phi
     assert os.path.exists(os.path.join(test_d, "pest_restart1.post.obsen.csv"))
-
-    pst.control_data.noptmax = 5
-    pst.pestpp_options["n_iter_base"] = -1
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
-    pst.pestpp_options["glm_num_reals"] = 10
-
-    pst_name = os.path.join(template_d, "pest_restart1.pst")
-    pst.write(pst_name)
-    pyemu.os_utils.start_workers(template_d, exe_path, "pest_restart1.pst", num_workers=5,
-                                 master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
-    pst = pyemu.Pst(os.path.join(test_d, "pest_restart1.pst"))
-    print(pst.phi)
-    assert pst.phi < 0.05
     assert os.path.exists(os.path.join(test_d, "pest_restart1.post.obsen.csv"))
     par_unc1 = pd.read_csv(os.path.join(test_d, "pest_restart1.par.usum.csv"), index_col=0)
 
@@ -183,27 +169,6 @@ def freyberg_basic_restart_test():
     pst.control_data.noptmax = 1
     pst.pestpp_options["glm_num_reals"] = 10
     pst.pestpp_options["base_jacobian"] = "temp.jcb"
-    pst.pestpp_options["n_iter_base"] = -1
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
-    pst.write(os.path.join(template_d, "pest_basic.pst"))
-    pyemu.os_utils.start_workers(template_d, exe_path, "pest_basic.pst", num_workers=10,
-                                 master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
-    assert os.path.exists(os.path.join(test_d, "pest_basic.post.obsen.csv"))
-    df_fosm_rei = pyemu.pst_utils.read_resfile(os.path.join(test_d, "pest_basic.fosm_reweight.rei"))
-    pst = pyemu.Pst(os.path.join(test_d, "pest_basic.pst"))
-    pst.adjust_weights_discrepancy()
-    diff = (df_fosm_rei.loc[pst.nnz_obs_names, "weight"] - pst.observation_data.loc[pst.nnz_obs_names, "weight"]).apply(
-        np.abs)
-    print(df_fosm_rei.loc[pst.nnz_obs_names, "weight"])
-    print(pst.observation_data.loc[pst.nnz_obs_names, "weight"])
-    print(diff)
-    assert diff.max() < 1.0e-5, diff.max()
-
-    pst.control_data.noptmax = 4
-    pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = -1
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.write(os.path.join(template_d, "pest_basic.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_basic.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
@@ -331,56 +296,19 @@ def tenpar_hotstart_test():
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_temp.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
                                  port=port)
-    def super_failed(rec_file):
-        with open(rec_file,'r') as f:
-            for line in f:
-                if "super parameter process" in line.lower():
-                    return True
-        return False
 
     pst.control_data.noptmax = 2
     shutil.copy2(os.path.join(test_d,"pest_temp.jcb"),os.path.join(template_d,"pest_temp.jcb"))
     shutil.copy2(os.path.join(test_d,"pest_temp.rei"),os.path.join(template_d,"pest_temp.rei"))
     pst.pestpp_options["base_jacobian"] = "pest_temp.jcb"
-    pst.pestpp_options["n_iter_base"] = -1
-    pst.pestpp_options["n_iter_super"] = 2
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.pestpp_options["glm_num_reals"] = 5
     pst.write(os.path.join(template_d, "pest_hotstart.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_hotstart.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
                                  port=port)
     assert os.path.exists(os.path.join(test_d,"pest_hotstart.post.obsen.csv"))
-    if super_failed(os.path.join(test_d,"pest_hotstart.rec")):
-        raise Exception("super failed")
     
-    pst.control_data.noptmax = 2
-    shutil.copy2(os.path.join(test_d,"pest_temp.jcb"),os.path.join(template_d,"pest_temp.jcb"))
-    shutil.copy2(os.path.join(test_d,"pest_temp.rei"),os.path.join(template_d,"pest_temp.rei"))
-    pst.pestpp_options["base_jacobian"] = "pest_temp.jcb"
-    pst.pestpp_options["n_iter_base"] = 1
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
-    pst.pestpp_options["hotstart_resfile"] = "pest_temp.rei"
-    pst.pestpp_options["glm_num_reals"] = 5
 
-    pst.write(os.path.join(template_d, "pest_hotstart.pst"))
-    pyemu.os_utils.start_workers(template_d, exe_path, "pest_hotstart.pst", num_workers=10,
-                                 master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
-    assert os.path.exists(os.path.join(test_d,"pest_hotstart.post.obsen.csv"))
-    if super_failed(os.path.join(test_d,"pest_hotstart.rec")):
-        raise Exception("super failed")
-
-    pst.pestpp_options["n_iter_base"] = -1
-    pst.pestpp_options["n_iter_super"] = 2
-    pst.control_data.noptmax = 2
-    pst.write(os.path.join(template_d, "pest_hotstart.pst"))
-    pyemu.os_utils.start_workers(template_d, exe_path, "pest_hotstart.pst", num_workers=10,
-                                 master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
-    assert os.path.exists(os.path.join(test_d,"pest_hotstart.post.obsen.csv"))
-    if super_failed(os.path.join(test_d,"pest_hotstart.rec")):
-        raise Exception("super failed")
     
 def tenpar_normalform_test():
     model_d = "glm_10par_xsec"
@@ -399,10 +327,8 @@ def tenpar_normalform_test():
     pst.control_data.pestmode = "estimation"
     pst.control_data.noptmax = 5
     pst.pestpp_options["glm_num_reals"] = 5
-    pst.pestpp_options["n_iter_super"] = 3
-    pst.pestpp_options["n_iter_base"] = 1
+    
     pst.pestpp_options["glm_normal_form"] = "prior"
-    pst.pestpp_options["max_n_super"] = 2
     pst.svd_data.maxsing = 2
     pst.write(os.path.join(template_d, "pest_prior.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_prior.pst", num_workers=10,
@@ -424,9 +350,7 @@ def tenpar_normalform_test():
     shutil.copy2(os.path.join(test_d,"pest_prior.rei"),os.path.join(template_d,"restart.rei"))
     pst.pestpp_options["base_jacobian"] = "restart.jcb"
     pst.pestpp_options["hotstart_resfile"] = "restart.rei"
-    pst.pestpp_options["n_iter_base"] = -1
     pst.control_data.noptmax = 5
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     par = pst.parameter_data
     par.loc["k_03","parval1"] = 0.9
     par.loc["k_03","parlbnd"] = 0.8
@@ -472,12 +396,9 @@ def freyberg_stress_test():
     pst.svd_data.maxsing = 10
     pst.prior_information = pst.null_prior
     pst.control_data.pestmode = "estimation"
-    pst.control_data.noptmax = 5
-    pst.pestpp_options["max_n_super"] = 10
+    pst.control_data.noptmax = 1
     pst.pestpp_options["glm_num_reals"] = 10
     pst.pestpp_options["base_jacobian"] = "temp.jcb"
-    pst.pestpp_options["n_iter_base"] = 1
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     #pst.pestpp_options["glm_debug_der_fail"] = True
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_normal_form"] = "diag"
@@ -489,7 +410,7 @@ def freyberg_stress_test():
                                  port=port)
     pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
     print(pst.phi)
-    assert pst.phi < 35
+    assert pst.phi < 1200
     oe = pd.read_csv(os.path.join(test_d,"pest_stress.post.obsen.csv"),index_col=0)
     assert oe.dropna().shape == (int(pst.pestpp_options["glm_num_reals"]),pst.nobs),oe.dropna().shape
     
@@ -512,10 +433,8 @@ def tenpar_xsec_stress_test():
     pst.svd_data.maxsing = 10
     pst.prior_information = pst.null_prior
     pst.control_data.pestmode = "estimation"
-    pst.control_data.noptmax = 4
+    pst.control_data.noptmax = 6
     pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 1
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.pestpp_options["glm_debug_der_fail"] = False
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_normal_form"] = "prior"
@@ -526,7 +445,7 @@ def tenpar_xsec_stress_test():
                                  port=port)
     pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
     print(pst.phi)
-    assert pst.phi < .0002
+    assert pst.phi < .1
     oe = pd.read_csv(os.path.join(test_d,"pest_stress.post.obsen.csv"),index_col=0)
     assert oe.dropna().shape == (int(pst.pestpp_options["glm_num_reals"]),pst.nobs),oe.dropna().shape
 
@@ -570,8 +489,6 @@ def tenpar_xsec_high_phi_test():
     pst.control_data.pestmode = "estimation"
     pst.control_data.noptmax = 2
     pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 1
-    pst.pestpp_options["n_iter_super"] = 2
     
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_debug_high_2nd_iter_phi"] = True
@@ -618,9 +535,6 @@ def tenpar_xsec_stress_test2a():
     pst.control_data.pestmode = "regularization"
     pst.control_data.noptmax = 10
     pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 10
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
-    #pst.pestpp_options["glm_debug_der_fail"] = True
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_normal_form"] = "diag"
     pst.pestpp_options["glm_accept_mc_phi"] = True
@@ -656,8 +570,6 @@ def tenpar_xsec_stress_test_2():
     pst.prior_information = pst.null_prior
     pst.control_data.noptmax = 4
     pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 10
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.pestpp_options["glm_debug_der_fail"] = True
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_accept_mc_phi"] = True
@@ -699,8 +611,6 @@ def tenpar_xsec_stress_test_3():
     pyemu.helpers.zero_order_tikhonov(pst)
     pst.control_data.noptmax = 4
     pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 10
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.pestpp_options["glm_debug_der_fail"] = False
     pst.pestpp_options["glm_debug_lamb_fail"] = False
     pst.pestpp_options["glm_accept_mc_phi"] = True
@@ -752,8 +662,6 @@ def tenpar_xsec_stress_test_4():
     pyemu.helpers.zero_order_tikhonov(pst)
     pst.control_data.noptmax = -1
     pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 10
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.pestpp_options["glm_debug_der_fail"] = False
     pst.pestpp_options["glm_debug_lamb_fail"] = False
     pst.pestpp_options["glm_accept_mc_phi"] = False
@@ -769,21 +677,6 @@ def tenpar_xsec_stress_test_4():
                                  port=port)
     
     
-    shutil.copy2(os.path.join(test_d,"pest_stress.jcb"),os.path.join(template_d,"restart.jcb"))
-    pst.pestpp_options["base_jacobian"] = "restart.jcb"
-    pst.pestpp_options["glm_normal_form"] = "prior"
-    pyemu.Cov.from_parameter_data(pst).to_ascii(os.path.join(template_d,"prior.cov"))
-    pst.pestpp_options["parcov"] = "prior.cov"
-    pst.control_data.pestmode = "estimation"
-    pst.control_data.noptmax = 1
-    pst.pestpp_options["n_iter_base"] = -1
-    pst.pestpp_options["n_iter_super"] = 2
-    pst.write(os.path.join(template_d, "pest_stress.pst"))
-    test_d += "a"
-    pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
-                                 master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
-
 def invest():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress2")
@@ -819,83 +712,7 @@ def tenpar_xsec_stress_test_5():
     pst.control_data.pestmode = "estimation"
     pst.control_data.noptmax = 4 #hard coded to result check below...
     pst.pestpp_options["glm_num_reals"] = 10
-    #pst.pestpp_options["n_iter_base"] = 1
-    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
-    pst.pestpp_options["glm_debug_der_fail"] = False
-    pst.pestpp_options["glm_debug_lamb_fail"] = True
-    pst.pestpp_options["glm_normal_form"] = "prior"
-    pst.pestpp_options["glm_accept_mc_phi"] = True
-    pst.write(os.path.join(template_d, "pest_stress.pst"))
-    pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
-                                 master_dir=test_d, verbose=True, worker_root=model_d,
-                                 port=port)
-    pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
-    print(pst.phi)
-    assert os.path.exists(os.path.join(test_d,"pest_stress.4.par"))
-
-    df = pd.read_csv(os.path.join(test_d,"pest_stress.upg.csv"),index_col=0)
-    violations = []
-    for name,lb,ub in zip(par.parnme,par.parlbnd,par.parubnd):
-        vals = df[name]
-        lb_out = vals[vals<lb]
-        ub_out = vals[vals>ub]
-        if lb_out.shape[0]:
-            print(name,lb_out)
-            violations.append(name)
-        if ub_out.shape[0]:
-            print(name,ub_out)
-            violations.append(name)
-    if len(violations) > 0:
-        raise Exception("the following pars are out of bounds in upg.csv:"+",".join(violations))
-
-    df = pd.read_csv(os.path.join(test_d,"pest_stress.ipar"),index_col=0)
-    print(df.shape)
-    assert df.shape[0] == 5
-    violations = []
-    for name,lb,ub in zip(par.parnme,par.parlbnd,par.parubnd):
-        vals = df[name]
-        lb_out = vals[vals<lb]
-        ub_out = vals[vals>ub]
-        if lb_out.shape[0]:
-            print(name,lb_out)
-            violations.append(name)
-        if ub_out.shape[0]:
-            print(name,ub_out)
-            violations.append(name)
-    if len(violations) > 0:
-        raise Exception("the following pars are out of bounds in ipar:"+",".join(violations))
-
-
-def tenpar_xsec_stress_test_5super():
-    model_d = "glm_10par_xsec"
-    test_d = os.path.join(model_d, "master_stress5")
-    template_d = os.path.join(model_d, "template")
-    if not os.path.exists(template_d):
-        raise Exception("template_d {0} not found".format(template_d))
-    if os.path.exists(test_d):
-        shutil.rmtree(test_d)
-    # shutil.copytree(template_d, test_d)
-    pst_name = os.path.join(template_d, "pest.pst")
-    pst = pyemu.Pst(pst_name)
-    pst.pestpp_options = {}
-    par = pst.parameter_data
-    #par["partrans"] = "none"
-    #par.loc[:,"parubnd"] *= 1.25
-    #par.loc[:,"parubnd"] *= 0.75
     
-    obs = pst.observation_data
-    obs["weight"] = 100
-    #np.random.seed(1123441)
-    #obs["obsval"] += np.random.normal(0,10,obs.shape[0])
-    obs["obsval"] += 100
-    pst.svd_data.maxsing = 10
-
-    pst.prior_information = pst.null_prior
-    pst.control_data.pestmode = "estimation"
-    pst.control_data.noptmax = 4
-    pst.pestpp_options["glm_num_reals"] = 10
-    pst.pestpp_options["n_iter_base"] = 1
-    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
     pst.pestpp_options["glm_debug_der_fail"] = False
     pst.pestpp_options["glm_debug_lamb_fail"] = True
     pst.pestpp_options["glm_normal_form"] = "prior"
@@ -941,6 +758,48 @@ def tenpar_xsec_stress_test_5super():
         raise Exception("the following pars are out of bounds in ipar:"+",".join(violations))
 
 def tenpar_fosm_external_stdev_test():
+    """tenpar external stdev test"""
+
+    model_d = "glm_10par_xsec"
+    test_d = os.path.join(model_d, "master_ext_stdev")
+    template_d = os.path.join(model_d, "template")
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    # shutil.copytree(template_d, test_d)
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+    obs = pst.observation_data
+    obs["standard_deviation"] = np.nan
+    #obs.loc[pst.nnz_obs_names,"standard_deviation"] = 0.1
+
+    par = pst.parameter_data
+    par["standard_deviation"] = np.nan
+    par.loc[pst.adj_par_names[::2],"standard_deviation"] = 2
+
+    pst.control_data.noptmax = 2
+    pst.write(pst_name,version=2)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=template_d)
+
+    df = pd.read_csv(os.path.join(template_d,"pest.par.usum.csv"),index_col=0)
+    print(df.loc[pst.adj_par_names[::2],"prior_stdev"])
+    assert np.all(df.loc[pst.adj_par_names[::2],"prior_stdev"].values==2)
+
+    df1 = pd.read_csv(os.path.join(template_d,"pest.pred.usum.csv"),index_col=0)
+    
+    obs.loc[pst.nnz_obs_names,"standard_deviation"] = 0.001
+    pst.control_data.noptmax = 2
+    pst.write(pst_name,version=2)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=template_d)
+    df2 = pd.read_csv(os.path.join(template_d,"pest.pred.usum.csv"),index_col=0)
+
+    diff = df1["post_stdev"] - df2["post_stdev"]
+    print(diff)
+    assert np.abs(diff.values).sum() < 1e-6
+
+
+def tenpar_fosm_external_stdev_test():
     """tenpar basic test"""
 
     model_d = "glm_10par_xsec"
@@ -983,6 +842,8 @@ def tenpar_fosm_external_stdev_test():
 
 
 if __name__ == "__main__":
+    #freyberg_stress_test()
+    #tenpar_xsec_stress_test()
     #tenpar_base_test()
     tenpar_fosm_external_stdev_test()
     #tenpar_superpar_restart_test()

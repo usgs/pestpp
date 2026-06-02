@@ -1,3 +1,7 @@
+/**
+ * @file Ensemble.cpp
+ * @brief Implementation of Ensemble.
+ */
 #include <random>
 #include <iomanip>
 #include <unordered_set>
@@ -21,10 +25,25 @@ rand_gen_ptr(_rand_gen_ptr)
 {
 }
 
+/**
+ * @brief Ensemble.
+ *
+ * @param _pest_scenario_ptr Description.
+ *
+ * @return Description.
+ */
 Ensemble::Ensemble(Pest* _pest_scenario_ptr): pest_scenario_ptr(_pest_scenario_ptr)
 {
 }
 
+/**
+ * @brief Try align other rows.
+ *
+ * @param performance_log Description.
+ * @param other Description.
+ *
+ * @return Description.
+ */
 bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& other)
 {
 	map<string, int> other_real_map = other.get_real_map(), this_real_map = get_real_map();
@@ -46,6 +65,9 @@ bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& o
 	return true;
 }
 
+/**
+ * @brief Check for dups.
+ */
 void Ensemble::check_for_dups()
 {
 	vector<string> dups;
@@ -72,6 +94,12 @@ void Ensemble::check_for_dups()
 
 }
 
+/**
+ * @brief Reserve.
+ *
+ * @param _real_names Description.
+ * @param _var_names Description.
+ */
 void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 {
 	reals.resize(_real_names.size(), _var_names.size());
@@ -81,6 +109,13 @@ void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 	org_real_names = real_names;
 }
 
+/**
+ * @brief Zeros like.
+ *
+ * @param nrows Description.
+ *
+ * @return Description.
+ */
 Ensemble Ensemble::zeros_like(int nrows)
 {
 	if (nrows < 0)
@@ -97,12 +132,24 @@ Ensemble Ensemble::zeros_like(int nrows)
 
 }
 
+/**
+ * @brief Broadcast vec2mat.
+ *
+ * @param other_var_names Description.
+ * @param mat Description.
+ */
 void Ensemble::broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
 {
 	//todo
 
 }
 
+/**
+ * @brief Replace col vals.
+ *
+ * @param other_var_names Description.
+ * @param mat Description.
+ */
 void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
 {
 
@@ -131,6 +178,12 @@ void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eig
 }
 
 
+/**
+ * @brief Add 2 row ip.
+ *
+ * @param real_name Description.
+ * @param row_vec Description.
+ */
 void Ensemble::add_2_row_ip(const string& real_name,const Eigen::VectorXd& row_vec)
 {
     if (shape().second != row_vec.size())
@@ -144,6 +197,12 @@ void Ensemble::add_2_row_ip(const string& real_name,const Eigen::VectorXd& row_v
     reals.row(real_map.at(real_name)) += row_vec;
 }
 
+/**
+ * @brief Add 2 cols ip.
+ *
+ * @param other_var_names Description.
+ * @param mat Description.
+ */
 void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen::MatrixXd &mat)
 {
 	
@@ -172,6 +231,11 @@ void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen:
 }
 
 
+/**
+ * @brief Add 2 cols ip.
+ *
+ * @param other Description.
+ */
 void Ensemble::add_2_cols_ip(Ensemble &other)
 {
 	//add values to (a subset of the) columns of reals
@@ -193,6 +257,17 @@ void Ensemble::add_2_cols_ip(Ensemble &other)
 }
 
 
+/**
+ * @brief Draw thread function.
+ *
+ * @param id Description.
+ * @param worker Description.
+ * @param num_reals Description.
+ * @param ies_verbose Description.
+ * @param idx_map Description.
+ * @param std_map Description.
+ * @param eptr Description.
+ */
 void draw_thread_function(int id, DrawThread &worker, int num_reals, int ies_verbose, map<string, int> idx_map, map<string, double> std_map, exception_ptr &eptr)
 {
 	try
@@ -395,6 +470,13 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 	}
 }
 
+/**
+ * @brief Get generic real names.
+ *
+ * @param num_reals Description.
+ *
+ * @return Description.
+ */
 vector<string> Ensemble::get_generic_real_names(int num_reals)
 {
 	//form some realization names
@@ -409,6 +491,13 @@ vector<string> Ensemble::get_generic_real_names(int num_reals)
 	return rnames;
 }
 
+/**
+ * @brief Get empirical cov matrices.
+ *
+ * @param file_manager_ptr Description.
+ *
+ * @return Description.
+ */
 pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* file_manager_ptr)
 {
 	//Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
@@ -453,6 +542,11 @@ pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* fi
 	return pair<Covariance,Covariance> (rcov,rcov_shrunk);
 }
 
+/**
+ * @brief Get diagonal cov matrix.
+ *
+ * @return Description.
+ */
 Covariance Ensemble::get_diagonal_cov_matrix()
 {
 	//build an empirical diagonal covariance matrix from the realizations
@@ -485,11 +579,27 @@ Covariance Ensemble::get_diagonal_cov_matrix()
 	return Covariance(var_names, mat, Covariance::MatType::DIAGONAL);
 }
 
+/**
+ * @brief Get eigen anomalies.
+ *
+ * @param on_real Description.
+ *
+ * @return Description.
+ */
 Eigen::MatrixXd Ensemble::get_eigen_anomalies(string on_real)
 {
 	return get_eigen_anomalies(vector<string>(),vector<string>(),on_real);
 }
 
+/**
+ * @brief Get eigen anomalies.
+ *
+ * @param _real_names Description.
+ * @param _var_names Description.
+ * @param on_real Description.
+ *
+ * @return Description.
+ */
 Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real)
 {
 	//get a matrix this is the differences of var_names  realized values from the mean realized value
@@ -579,6 +689,11 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	return _reals;
 }
 
+/**
+ * @brief Get mean stl var vector.
+ *
+ * @return Description.
+ */
 vector<double> Ensemble::get_mean_stl_var_vector()
 {
 	vector<double> mean_vec;
@@ -590,6 +705,12 @@ vector<double> Ensemble::get_mean_stl_var_vector()
 	return mean_vec;
 }
 
+/**
+ * @brief Fill moment maps.
+ *
+ * @param mean_map Description.
+ * @param std_map Description.
+ */
 void Ensemble::fill_moment_maps(map<string, double>& mean_map, map<string, double>& std_map)
 {
     mean_map.clear();
@@ -635,6 +756,13 @@ void Ensemble::fill_moment_maps(map<string, double>& mean_map, map<string, doubl
 //	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
 //}
 
+/**
+ * @brief Replace col.
+ *
+ * @param var_name Description.
+ * @param vec Description.
+ * @param update_map Description.
+ */
 void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec, bool update_map)
 {
 	if (update_map)
@@ -657,6 +785,13 @@ void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec, bool update_ma
 //
 //}
 
+/**
+ * @brief From eigen mat.
+ *
+ * @param _reals Description.
+ * @param _real_names Description.
+ * @param _var_names Description.
+ */
 void Ensemble::from_eigen_mat(Eigen::MatrixXd _reals, const vector<string> &_real_names, const vector<string> &_var_names)
 {
 	//create a new Ensemble from components
@@ -670,6 +805,11 @@ void Ensemble::from_eigen_mat(Eigen::MatrixXd _reals, const vector<string> &_rea
 	org_real_names = real_names;
 }
 
+/**
+ * @brief Set eigen.
+ *
+ * @param _reals Description.
+ */
 void Ensemble::set_eigen(Eigen::MatrixXd _reals)
 {
 	///reset the reals matrix attribute
@@ -681,6 +821,13 @@ void Ensemble::set_eigen(Eigen::MatrixXd _reals)
 }
 
 
+/**
+ * @brief Reorder.
+ *
+ * @param _real_names Description.
+ * @param _var_names Description.
+ * @param update_org_real_names Description.
+ */
 void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &_var_names, bool update_org_real_names)
 {
 	//reorder inplace
@@ -695,6 +842,12 @@ void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &
 	}
 }
 
+/**
+ * @brief Drop rows.
+ *
+ * @param row_idxs Description.
+ * @param update_org_real_names Description.
+ */
 void Ensemble::drop_rows(const vector<int> &row_idxs, bool update_org_real_names)
 {
 	//vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
@@ -713,6 +866,12 @@ void Ensemble::drop_rows(const vector<int> &row_idxs, bool update_org_real_names
 		org_real_names = keep_names;
 }
 
+/**
+ * @brief Drop rows.
+ *
+ * @param drop_names Description.
+ * @param update_org_real_names Description.
+ */
 void Ensemble::drop_rows(const vector<string> &drop_names, bool update_org_real_names)
 {
 	vector<string> keep_names;
@@ -732,6 +891,11 @@ void Ensemble::drop_rows(const vector<string> &drop_names, bool update_org_real_
 
 }
 
+/**
+ * @brief Drop cols.
+ *
+ * @param drop_names Description.
+ */
 void Ensemble::drop_cols(const vector<string>& drop_names)
 {
 	vector<string> keep_names;
@@ -752,6 +916,11 @@ void Ensemble::drop_cols(const vector<string>& drop_names)
 
 
 
+/**
+ * @brief Keep rows.
+ *
+ * @param row_idxs Description.
+ */
 void Ensemble::keep_rows(const vector<int> &row_idxs)
 {
 	vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
@@ -764,6 +933,11 @@ void Ensemble::keep_rows(const vector<int> &row_idxs)
 	keep_rows(keep_names);
 }
 
+/**
+ * @brief Keep rows.
+ *
+ * @param keep_names Description.
+ */
 void Ensemble::keep_rows(const vector<string> &keep_names)
 {
 	//make sure all names are in real_names
@@ -779,6 +953,15 @@ void Ensemble::keep_rows(const vector<string> &keep_names)
 }
 
 
+/**
+ * @brief Get eigen.
+ *
+ * @param row_names Description.
+ * @param col_names Description.
+ * @param update_vmap Description.
+ *
+ * @return Description.
+ */
 Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap)
 {
 	//get a dense eigen matrix from reals by row and col names
@@ -887,6 +1070,11 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 }
 
 
+/**
+ * @brief To csv.
+ *
+ * @param file_name Description.
+ */
 void Ensemble::to_csv(string file_name)
 {
 	///write the ensemble to a csv file
@@ -907,6 +1095,12 @@ void Ensemble::to_csv(string file_name)
 	csv.close();
 }
 
+/**
+ * @brief To csv by vars.
+ *
+ * @param csv Description.
+ * @param write_header Description.
+ */
 void Ensemble::to_csv_by_vars(ofstream &csv, bool write_header)
 {
 	if (write_header)
@@ -946,6 +1140,12 @@ void Ensemble::to_csv_by_vars(ofstream &csv, bool write_header)
 	}
 }
 
+/**
+ * @brief To csv by reals.
+ *
+ * @param csv Description.
+ * @param write_header Description.
+ */
 void Ensemble::to_csv_by_reals(ofstream &csv, bool write_header)
 {
 	if (write_header)
@@ -991,6 +1191,13 @@ const vector<string> Ensemble::get_real_names(vector<int> &indices)
 	return names;
 }
 
+/**
+ * @brief Get real vector.
+ *
+ * @param ireal Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 {
 	//get a row vector from reals by index
@@ -1004,6 +1211,13 @@ Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 }
 
 
+/**
+ * @brief Get var vector.
+ *
+ * @param var_name Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
 {
 	update_var_map();
@@ -1013,6 +1227,13 @@ Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
 
 }
 
+/**
+ * @brief Get real vector.
+ *
+ * @param real_name Description.
+ *
+ * @return Description.
+ */
 Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 {
 	//get a row vector from reals by realization name
@@ -1026,6 +1247,14 @@ Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 	return get_real_vector(idx);
 }
 
+/**
+ * @brief Get real map.
+ *
+ * @param real_name Description.
+ * @param forgive Description.
+ *
+ * @return Description.
+ */
 map<string,double> Ensemble::get_real_map(string real_name, bool forgive)
 {
     map<string,double> real_map;
@@ -1050,6 +1279,12 @@ map<string,double> Ensemble::get_real_map(string real_name, bool forgive)
 
 }
 
+/**
+ * @brief Update real ip.
+ *
+ * @param rname Description.
+ * @param real Description.
+ */
 void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 {
 	vector<string>::iterator idx = find(real_names.begin(), real_names.end(), rname);
@@ -1065,6 +1300,9 @@ void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 
 }
 
+/**
+ * @brief Update var map.
+ */
 void Ensemble::update_var_map()
 {
 	var_map.clear();
@@ -1079,6 +1317,12 @@ void Ensemble::update_var_map()
 	}
 }
 
+/**
+ * @brief Throw ensemble error.
+ *
+ * @param message Description.
+ * @param vec Description.
+ */
 void Ensemble::throw_ensemble_error(string message, vector<string> vec)
 {
 	stringstream ss;
@@ -1088,6 +1332,11 @@ void Ensemble::throw_ensemble_error(string message, vector<string> vec)
 	throw_ensemble_error(message + ss.str());
 }
 
+/**
+ * @brief Throw ensemble error.
+ *
+ * @param message Description.
+ */
 void Ensemble::throw_ensemble_error(string message)
 {
 	string full_message = "Ensemble Error: " + message;
@@ -1096,6 +1345,12 @@ void Ensemble::throw_ensemble_error(string message)
 	throw runtime_error(full_message);
 }
 
+/**
+ * @brief Set real names.
+ *
+ * @param _real_names Description.
+ * @param update_org_names Description.
+ */
 void Ensemble::set_real_names(vector<string>& _real_names, bool update_org_names)
 {
 	if (_real_names.size() != real_names.size())
@@ -1114,10 +1369,18 @@ void Ensemble::set_real_names(vector<string>& _real_names, bool update_org_names
 
 
 
+/**
+ * @brief Destructor for .
+ */
 Ensemble::~Ensemble()
 {
 }
 
+/**
+ * @brief Get real map.
+ *
+ * @return Description.
+ */
 map<string, int> Ensemble::get_real_map()
 {
 
@@ -1138,6 +1401,15 @@ map<string, int> Ensemble::get_real_map()
 //	
 //}
 
+/**
+ * @brief Prepare csv.
+ *
+ * @param names Description.
+ * @param csv Description.
+ * @param forgive Description.
+ *
+ * @return Description.
+ */
 pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<string> &names, ifstream &csv, bool forgive)
 {
 	//prepare the input csv for reading checks for compatibility with var_names, forgives extra names in csv
@@ -1197,31 +1469,22 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 	for (auto &_name : names)
 		if (hset.find(_name) == end)
 			missing_names.push_back(_name);
-	/*if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
-	{
-		if (missing_names.size() > 0)
-		{
-			stringstream ss;
-			ss << " the following names were not found in the csv file header:" << endl;
-			for (auto &n : missing_names) ss << n << endl;
-			if (!forgive)
-				throw runtime_error(ss.str());
-			else
-				cout << ss.str() << endl << "continuing anyway..." << endl;
-		}
-	}*/
+
 	if (missing_names.size() > 0)
 	{
 		stringstream ss;
 		if (csv_by_reals)
-			ss << " the following names were not found in the csv file header:" << endl;
+			ss << missing_names.size() << " names were not found in the csv file header:" << endl;
 		else
-			ss << " the following names were not found in the first column of the csv file:" << endl;
-		for (auto& n : missing_names) ss << n << endl;
-		if (!forgive)
+			ss << missing_names.size() << " names were not found in the first column of the csv file:" << endl;
+		cout << "..." << ss.str() << endl;
+		for (auto& n : missing_names) {
+			ss << n << endl;
+		}
+
+		if (!forgive) {
 			throw runtime_error(ss.str());
-		else
-			cout << ss.str() << endl << "continuing anyway..." << endl;
+		}
 	}
 
 	vector<string> header_names;
@@ -1268,6 +1531,12 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 
 }
 
+/**
+ * @brief Extend cols.
+ *
+ * @param _reals Description.
+ * @param _var_names Description.
+ */
 void Ensemble::extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_names)
 {
 	//add new columns to reals
@@ -1295,6 +1564,12 @@ void Ensemble::extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_n
 	update_var_map();
 }
 
+/**
+ * @brief Append other rows.
+ *
+ * @param _real_names Description.
+ * @param _reals Description.
+ */
 void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals)
 {
 
@@ -1332,6 +1607,12 @@ void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::Matri
 	real_names = new_real_names;
 }
 
+/**
+ * @brief Append other rows.
+ *
+ * @param other Description.
+ * @param reset_org_real_names Description.
+ */
 void Ensemble::append_other_rows(Ensemble &other, bool reset_org_real_names)
 {
 	//append rows to the end of reals
@@ -1376,6 +1657,12 @@ void Ensemble::append_other_rows(Ensemble &other, bool reset_org_real_names)
 		org_real_names = real_names;
 }
 
+/**
+ * @brief Append.
+ *
+ * @param real_name Description.
+ * @param trans Description.
+ */
 void Ensemble::append(string real_name, const Transformable &trans)
 {
 	stringstream ss;
@@ -1410,6 +1697,12 @@ void Ensemble::append(string real_name, const Transformable &trans)
 		org_real_names.push_back(real_name);
 }
 
+/**
+ * @brief Append.
+ *
+ * @param real_name Description.
+ * @param vec Description.
+ */
 void Ensemble::append(string real_name, const Eigen::VectorXd& vec)
 {
     stringstream ss;
@@ -1433,6 +1726,13 @@ void Ensemble::append(string real_name, const Eigen::VectorXd& vec)
         org_real_names.push_back(real_name);
 }
 
+/**
+ * @brief Replace.
+ *
+ * @param idx Description.
+ * @param trans Description.
+ * @param real_name Description.
+ */
 void Ensemble::replace(int idx, const Transformable &trans, string real_name)
 {
 	stringstream ss;
@@ -1468,6 +1768,11 @@ void Ensemble::replace(int idx, const Transformable &trans, string real_name)
 	}
 }
 
+/**
+ * @brief Check for normal.
+ *
+ * @param context Description.
+ */
 void Ensemble::check_for_normal(string context)
 {
 	stringstream ss;
@@ -1492,6 +1797,11 @@ void Ensemble::check_for_normal(string context)
 	}
 }
 
+/**
+ * @brief To dense.
+ *
+ * @param file_name Description.
+ */
 void Ensemble::to_dense(string file_name)
 {
     ofstream fout(file_name, ios::binary);
@@ -1558,6 +1868,12 @@ void Ensemble::to_dense(string file_name)
 }
 
 
+/**
+ * @brief To binary.
+ *
+ * @param file_name Description.
+ * @param transposed Description.
+ */
 void Ensemble::to_binary(string file_name, bool transposed)
 {
 	ofstream fout(file_name, ios::binary);
@@ -1631,6 +1947,15 @@ void Ensemble::to_binary(string file_name, bool transposed)
 	fout.close();
 }
 
+/**
+ * @brief From binary.
+ *
+ * @param file_name Description.
+ * @param names Description.
+ * @param transposed Description.
+ *
+ * @return Description.
+ */
 map<string, int> Ensemble::from_binary(string file_name, vector<string> &names, bool transposed)
 {
 	var_names.clear();
@@ -1655,6 +1980,15 @@ map<string, int> Ensemble::from_binary(string file_name, vector<string> &names, 
 }
 
 
+/**
+ * @brief From binary old.
+ *
+ * @param file_name Description.
+ * @param names Description.
+ * @param transposed Description.
+ *
+ * @return Description.
+ */
 map<string,int> Ensemble::from_binary_old(string file_name, vector<string> &names, bool transposed)
 {
 	//load an ensemble from a binary jco-type file.  if transposed=true, reals is transposed and row/col names are swapped for var/real names.
@@ -1828,6 +2162,14 @@ map<string,int> Ensemble::from_binary_old(string file_name, vector<string> &name
 
 
 
+/**
+ * @brief Read csv by reals.
+ *
+ * @param num_reals Description.
+ * @param csv Description.
+ * @param header_info Description.
+ * @param index_info Description.
+ */
 void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &header_info, map<string,int> &index_info)
 {
 	if (header_info.size() == 0)
@@ -1897,6 +2239,14 @@ void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &h
 }
 
 
+/**
+ * @brief Read csv by vars.
+ *
+ * @param num_reals Description.
+ * @param csv Description.
+ * @param header_info Description.
+ * @param index_info Description.
+ */
 void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &header_info, map<string, int> &index_info)
 {
 	//read a csv file to an Ensmeble
@@ -1963,6 +2313,14 @@ void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &
 
 
 
+/**
+ * @brief Parameter ensemble.
+ *
+ * @param _pest_scenario_ptr Description.
+ * @param rand_gen_ptr Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr):Ensemble(_pest_scenario_ptr, rand_gen_ptr)
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
@@ -1986,6 +2344,13 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 	set_fixed_names();
 }
 
+/**
+ * @brief Parameter ensemble.
+ *
+ * @param _pest_scenario_ptr Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble::ParameterEnsemble(Pest* _pest_scenario_ptr): 
 	Ensemble(_pest_scenario_ptr)
 {
@@ -1995,6 +2360,15 @@ ParameterEnsemble::ParameterEnsemble(Pest* _pest_scenario_ptr):
 }
 
 
+/**
+ * @brief Draw uniform.
+ *
+ * @param num_reals Description.
+ * @param par_names Description.
+ * @param plog Description.
+ * @param level Description.
+ * @param frec Description.
+ */
 void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec)
 {
 	var_names = par_names;
@@ -2027,6 +2401,18 @@ void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, Pe
 	tstat = ParameterEnsemble::transStatus::NUM;
 }
 
+/**
+ * @brief Draw.
+ *
+ * @param num_reals Description.
+ * @param par Description.
+ * @param cov Description.
+ * @param plog Description.
+ * @param level Description.
+ * @param frec Description.
+ *
+ * @return Description.
+ */
 map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	///draw a parameter ensemble
@@ -2118,6 +2504,11 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 
 }
 
+/**
+ * @brief Set pest scenario.
+ *
+ * @param _pest_scenario Description.
+ */
 void ParameterEnsemble::set_pest_scenario(Pest *_pest_scenario)
 {
 	pest_scenario_ptr = _pest_scenario;
@@ -2125,6 +2516,9 @@ void ParameterEnsemble::set_pest_scenario(Pest *_pest_scenario)
 	set_fixed_names();
 }
 
+/**
+ * @brief Set fixed names.
+ */
 void ParameterEnsemble::set_fixed_names()
 {
 	vector<string> fixed_names;
@@ -2139,11 +2533,21 @@ void ParameterEnsemble::set_fixed_names()
 	pfinfo.set_fixed_names(fixed_names);
 }
 
+/**
+ * @brief Set zeros.
+ */
 void ParameterEnsemble::set_zeros()
 {
 	reals.setZero();
 }
 
+/**
+ * @brief Zeros like.
+ *
+ * @param nrows Description.
+ *
+ * @return Description.
+ */
 ParameterEnsemble ParameterEnsemble::zeros_like(int nrows)
 {
 	if (nrows < 0)
@@ -2246,6 +2650,14 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 	return real_run_ids;
 }
 
+/**
+ * @brief From eigen mat.
+ *
+ * @param mat Description.
+ * @param _real_names Description.
+ * @param _var_names Description.
+ * @param _tstat Description.
+ */
 void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names, ParameterEnsemble::transStatus _tstat)
 {
 	//create a par ensemble from components
@@ -2272,6 +2684,12 @@ void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string>
 	tstat = _tstat;
 }
 
+/**
+ * @brief From binary.
+ *
+ * @param file_name Description.
+ * @param forgive Description.
+ */
 void ParameterEnsemble::from_binary(string file_name, bool forgive)
 {
 	//fixed_names.clear();
@@ -2338,6 +2756,12 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 //	//return ParameterEnsmeble(get_eigen(_real_names,_var_names),)
 //}
 
+/**
+ * @brief From csv.
+ *
+ * @param file_name Description.
+ * @param forgive Description.
+ */
 void ParameterEnsemble::from_csv(string file_name, bool forgive)
 {
 	//fixed_names.clear();
@@ -2410,6 +2834,11 @@ void ParameterEnsemble::from_csv(string file_name, bool forgive)
 
 }
 
+/**
+ * @brief Prep par ensemble after read.
+ *
+ * @param header_info Description.
+ */
 void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_info)
 {
 	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
@@ -2450,6 +2879,12 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 	update_var_map();
 }
 
+/**
+ * @brief Fill fixed.
+ *
+ * @param header_info Description.
+ * @param fixed_names Description.
+ */
 void ParameterEnsemble::fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names)
 {
 	
@@ -2478,6 +2913,11 @@ void ParameterEnsemble::fill_fixed(const map<string, int> &header_info, vector<s
 
 }
 
+/**
+ * @brief Save fixed.
+ *
+ * @param fixed_names Description.
+ */
 void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 {
 	if (fixed_names.size() == 0)
@@ -2522,6 +2962,14 @@ void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 
 }
 
+/**
+ * @brief Enforce change limits and bounds.
+ *
+ * @param plog Description.
+ * @param other Description.
+ *
+ * @return Description.
+ */
 map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other)
 {
 	string rname;
@@ -2564,6 +3012,14 @@ map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(Performan
 	return norm_map;
 }
 
+/**
+ * @brief Enforce bounds.
+ *
+ * @param plog Description.
+ * @param shrink Description.
+ *
+ * @return Description.
+ */
 map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool shrink)
 {
 	
@@ -2663,6 +3119,12 @@ map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool 
 	return norm_map;
 }
 
+/**
+ * @brief Keep rows.
+ *
+ * @param keep Description.
+ * @param update_fixed_map Description.
+ */
 void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map)
 {
 	vector<string> str_keep;
@@ -2681,6 +3143,12 @@ void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map
 
 }
 
+/**
+ * @brief Keep rows.
+ *
+ * @param keep Description.
+ * @param update_fixed_map Description.
+ */
 void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_map)
 {
 
@@ -2696,6 +3164,12 @@ void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_
 
 
 
+/**
+ * @brief Replace col vals and fixed.
+ *
+ * @param other_var_names Description.
+ * @param mat Description.
+ */
 void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
 {
 	//this is only used by pestpp-da in seq mode for moving fixed state pars forward thru cycles
@@ -2757,6 +3231,11 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 	}
 }
 
+/**
+ * @brief To binary.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_binary(string file_name)
 {
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_ordered_binary())
@@ -2765,6 +3244,11 @@ void ParameterEnsemble::to_binary(string file_name)
 		return to_binary_unordered(file_name);
 }
 
+/**
+ * @brief To binary unordered.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_binary_unordered(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
@@ -2904,6 +3388,11 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 	transform_ip(transStatus::NUM);
 }
 
+/**
+ * @brief To binary ordered.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_binary_ordered(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
@@ -3024,6 +3513,11 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 }
 
 
+/**
+ * @brief To dense ordered.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_dense_ordered(string file_name)
 {
 
@@ -3136,6 +3630,11 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 	fout.close();
 }
 
+/**
+ * @brief To dense.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_dense(string file_name)
 {
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_ordered_binary())
@@ -3144,6 +3643,11 @@ void ParameterEnsemble::to_dense(string file_name)
 		return to_dense_unordered(file_name);
 }
 
+/**
+ * @brief To dense unordered.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_dense_unordered(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
@@ -3265,6 +3769,11 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 
 
 
+/**
+ * @brief To csv.
+ *
+ * @param file_name Description.
+ */
 void ParameterEnsemble::to_csv(string file_name)
 {
 	//write the par ensemble to csv file - transformed back to CTL status
@@ -3283,6 +3792,12 @@ void ParameterEnsemble::to_csv(string file_name)
 }
 
 
+/**
+ * @brief To csv by vars.
+ *
+ * @param csv Description.
+ * @param write_header Description.
+ */
 void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
 {
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
@@ -3349,6 +3864,12 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
 	}
 }
 
+/**
+ * @brief To csv by reals.
+ *
+ * @param csv Description.
+ * @param write_header Description.
+ */
 void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 {
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
@@ -3407,6 +3928,13 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 	}
 }
 
+/**
+ * @brief Replace fixed.
+ *
+ * @param real_name Description.
+ * @param pars Description.
+ * @param to_model Description.
+ */
 void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars, bool to_model)
 {
 	
@@ -3429,6 +3957,11 @@ void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars, bool to
 
 }
 
+/**
+ * @brief Transform ip.
+ *
+ * @param to_tstat Description.
+ */
 void ParameterEnsemble::transform_ip(transStatus to_tstat)
 {
 	//transform the ensemble in place
@@ -3468,12 +4001,25 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 		throw_ensemble_error("ParameterEnsemble::transform_ip() only CTL to NUM implemented");
 
 }
+/**
+ * @brief Get diagonal cov matrix.
+ *
+ * @return Description.
+ */
 Covariance ParameterEnsemble::get_diagonal_cov_matrix()
 {
 	transform_ip(transStatus::NUM);
 	return Ensemble::get_diagonal_cov_matrix();
 }
 
+/**
+ * @brief Observation ensemble.
+ *
+ * @param _pest_scenario_ptr Description.
+ * @param _rand_gen_ptr Description.
+ *
+ * @return Description.
+ */
 ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): Ensemble(_pest_scenario_ptr, _rand_gen_ptr)
 {
 }
@@ -3490,11 +4036,23 @@ ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937*
 	real_names = _real_names;
 }
 
+/**
+ * @brief Observation ensemble.
+ *
+ * @param _pest_scenario Description.
+ *
+ * @return Description.
+ */
 ObservationEnsemble::ObservationEnsemble(Pest* _pest_scenario): Ensemble(_pest_scenario)
 {
 
 }
 
+/**
+ * @brief Initialize without noise.
+ *
+ * @param num_reals Description.
+ */
 void ObservationEnsemble::initialize_without_noise(int num_reals)
 {
 	var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
@@ -3517,6 +4075,15 @@ void ObservationEnsemble::initialize_without_noise(int num_reals)
 
 }
 
+/**
+ * @brief Draw.
+ *
+ * @param num_reals Description.
+ * @param cov Description.
+ * @param plog Description.
+ * @param level Description.
+ * @param frec Description.
+ */
 void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	//draw an obs ensemble using only nz obs names
@@ -3633,6 +4200,12 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 	
 }
 
+/**
+ * @brief Update from obs.
+ *
+ * @param row_idx Description.
+ * @param obs Description.
+ */
 void ObservationEnsemble::update_from_obs(int row_idx, Observations &obs)
 {
 	//update a row in reals from an int id
@@ -3642,6 +4215,12 @@ void ObservationEnsemble::update_from_obs(int row_idx, Observations &obs)
 	return;
 }
 
+/**
+ * @brief Update from obs.
+ *
+ * @param real_name Description.
+ * @param obs Description.
+ */
 void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
 {
 	//update a row in reals from a string id
@@ -3654,12 +4233,29 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
 	update_from_obs(real - start, obs);
 }
 
+/**
+ * @brief Update from runs.
+ *
+ * @param real_run_ids Description.
+ * @param run_mgr_ptr Description.
+ *
+ * @return Description.
+ */
 vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr)
 {
 	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
 	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
 }
 
+/**
+ * @brief Update from runs.
+ *
+ * @param real_run_ids Description.
+ * @param run_mgr_ptr Description.
+ * @param run_mgr_pe Description.
+ *
+ * @return Description.
+ */
 vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe)
 {
 	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the 
@@ -3697,6 +4293,11 @@ vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, R
 	return failed_real_idxs;
 }
 
+/**
+ * @brief From binary.
+ *
+ * @param file_name Description.
+ */
 void ObservationEnsemble::from_binary(string file_name)
 {
 	//load obs en from binary jco-type file
@@ -3750,6 +4351,11 @@ void ObservationEnsemble::from_binary(string file_name)
 	}
 }
 
+/**
+ * @brief From csv.
+ *
+ * @param file_name Description.
+ */
 void ObservationEnsemble::from_csv(string file_name)
 {
 	//load the obs en from a csv file
@@ -3789,6 +4395,13 @@ void ObservationEnsemble::from_csv(string file_name)
 		Ensemble::read_csv_by_vars(num_reals, csv, header_info, index_info);
 }
 
+/**
+ * @brief From eigen mat.
+ *
+ * @param mat Description.
+ * @param _real_names Description.
+ * @param _var_names Description.
+ */
 void ObservationEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names)
 {
 	//reset obs en from components
@@ -3814,6 +4427,15 @@ DrawThread::DrawThread(PerformanceLog * _performance_log, Covariance & _cov,
 }
 
 
+/**
+ * @brief Work.
+ *
+ * @param thread_id Description.
+ * @param num_reals Description.
+ * @param ies_verbose Description.
+ * @param idx_map Description.
+ * @param std_map Description.
+ */
 void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string, int> idx_map, map<string,double> std_map)
 {
 	stringstream ss;
@@ -4021,6 +4643,13 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 
 }
 
+/**
+ * @brief Fixed par info.
+ *
+ * @param _fixed_names Description.
+ *
+ * @return Description.
+ */
 FixedParInfo::FixedParInfo(vector<string> _fixed_names)
 {
 	fixed_names = _fixed_names;
@@ -4028,6 +4657,15 @@ FixedParInfo::FixedParInfo(vector<string> _fixed_names)
 	initialize();
 }
 
+/**
+ * @brief Get fixed value.
+ *
+ * @param pname Description.
+ * @param rname Description.
+ * @param value Description.
+ *
+ * @return Description.
+ */
 bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, double& value)
 {
 	if (fixed_names.size() == 0)
@@ -4047,6 +4685,13 @@ bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, dou
 	return true;
 }
 
+/**
+ * @brief Get par fixed values.
+ *
+ * @param pname Description.
+ *
+ * @return Description.
+ */
 map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
 {
 	if (!initialized)
@@ -4065,6 +4710,14 @@ map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
 	return fixed_info.at(pname);
 }
 
+/**
+ * @brief Get real fixed values.
+ *
+ * @param rname Description.
+ * @param pnames Description.
+ *
+ * @return Description.
+ */
 vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<string>& pnames)
 {
 	if (!initialized)
@@ -4089,6 +4742,13 @@ vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<s
 	return real_vals;
 }
 
+/**
+ * @brief Get real fixed values.
+ *
+ * @param rname Description.
+ *
+ * @return Description.
+ */
 map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
 {
 	if (!initialized)
@@ -4113,6 +4773,13 @@ map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
 	return rmap;
 }
 
+/**
+ * @brief Add realization.
+ *
+ * @param rname Description.
+ * @param rvals Description.
+ * @param pnames Description.
+ */
 void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames)
 {
 	if (!initialized)
@@ -4139,6 +4806,11 @@ void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<
 	}
 }
 
+/**
+ * @brief Get real names.
+ *
+ * @return Description.
+ */
 vector<string> FixedParInfo::get_real_names()
 {
     if (!initialized)
@@ -4161,6 +4833,11 @@ vector<string> FixedParInfo::get_real_names()
 
 }
 
+/**
+ * @brief Add realizations.
+ *
+ * @param other_fixed_info Description.
+ */
 void FixedParInfo::add_realizations(map<string,map<string,double>>& other_fixed_info)
 {
     if (!initialized)
@@ -4189,6 +4866,12 @@ void FixedParInfo::add_realizations(map<string,map<string,double>>& other_fixed_
 }
 
 
+/**
+ * @brief Add realization.
+ *
+ * @param rname Description.
+ * @param rvals Description.
+ */
 void FixedParInfo::add_realization(string rname, map<string, double>& rvals)
 {
     if (!initialized)
@@ -4210,6 +4893,11 @@ void FixedParInfo::add_realization(string rname, map<string, double>& rvals)
 
 }
 
+/**
+ * @brief Keep realizations.
+ *
+ * @param keep Description.
+ */
 void FixedParInfo::keep_realizations(const vector<string>& keep)
 {
 	if (!initialized)
@@ -4246,6 +4934,13 @@ void FixedParInfo::keep_realizations(const vector<string>& keep)
 }
 
 
+/**
+ * @brief Update realizations.
+ *
+ * @param other_var_names Description.
+ * @param other_real_names Description.
+ * @param other_mat Description.
+ */
 void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat)
 {
 	if (!initialized)
@@ -4267,6 +4962,11 @@ void FixedParInfo::update_realizations(const vector<string>& other_var_names, co
 	}
 }
 
+/**
+ * @brief Update par values.
+ *
+ * @param pval_map Description.
+ */
 void FixedParInfo::update_par_values(const map<string, double>& pval_map)
 {
 	for (auto& p : pval_map)
@@ -4282,6 +4982,12 @@ void FixedParInfo::update_par_values(const map<string, double>& pval_map)
 	}
 }
 
+/**
+ * @brief Fill fixed.
+ *
+ * @param fixed_map Description.
+ * @param rnames Description.
+ */
 void FixedParInfo::fill_fixed(map<string, double>& fixed_map, vector<string>& rnames)
 {
 	if (!initialized)
@@ -4303,6 +5009,9 @@ void FixedParInfo::fill_fixed(map<string, double>& fixed_map, vector<string>& rn
 
 
 
+/**
+ * @brief Initialize.
+ */
 void FixedParInfo::initialize()
 {
 	fixed_info.clear();

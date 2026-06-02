@@ -1,0 +1,56 @@
+# Doxyfile for PEST++
+# Doxygen generates XML consumed by Breathe/Sphinx for ReadTheDocs.
+
+PROJECT_NAME           = "PEST++"
+PROJECT_NUMBER         = 5
+PROJECT_BRIEF          = "Parameter ESTimation tool ++ - uncertainty analysis and data assimilation"
+
+OUTPUT_DIRECTORY       = docs/_doxygen
+
+# Input source directories (project code only, not third-party Eigen)
+INPUT                  = src/libs/common \
+                         src/libs/pestpp_common \
+                         src/libs/run_managers \
+                         src/programs/gsa \
+                         src/programs/pest++ \
+                         src/programs/pestpp-da \
+                         src/programs/pestpp-ies \
+                         src/programs/pestpp-mou \
+                         src/programs/pestpp-opt \
+                         src/programs/pestpp-sqp \
+                         src/programs/sweep
+
+RECURSIVE              = YES
+FILE_PATTERNS          = *.cpp *.h
+
+# Exclude third-party libraries
+EXCLUDE                = src/libs/Eigen \
+                         src/libs/mio \
+                         src/libs/propack
+
+EXCLUDE_PATTERNS       = */Eigen/* */mio/* */propack/*
+
+# Extract everything — even undocumented items
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+# Doxygen output: XML only (consumed by Breathe)
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+XML_PROGRAMLISTING     = NO
+
+# Enable Doxygen to follow #include chains
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+
+# Source browsing
+SOURCE_BROWSER         = NO
+INLINE_SOURCES         = NO
+
+# Warnings
+WARN_IF_UNDOCUMENTED   = NO
+QUIET                  = YES

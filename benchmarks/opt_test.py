@@ -1,8 +1,16 @@
 import os
 import shutil
 import platform
+import socket
 import numpy as np
 import pyemu
+
+
+def _get_free_port():
+    """Find an available TCP port by letting the OS assign one."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
 
 
 bin_path = os.path.join("test_bin")
@@ -120,7 +128,7 @@ def run_dewater_test():
     worker_d = os.path.join("opt_dewater_chance")
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "dewater_pest.base.pst",
                                 master_dir=os.path.join(worker_d, "master1"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
 
     opt = None
     with open(os.path.join(worker_d, "master1", "dewater_pest.base.rec"), 'r') as f:
@@ -134,7 +142,7 @@ def run_dewater_test():
     pst.write(os.path.join(worker_d,"template","test.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
                                 master_dir=os.path.join(worker_d, "master2"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
     
     with open(os.path.join(worker_d,"master2","test.rec")) as f:
         for line in f:
@@ -162,7 +170,7 @@ def run_dewater_test():
     pst.write(os.path.join(ws,"test.pst"))
     #pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
     #                            master_dir=os.path.join(worker_d, "master3"), worker_root=worker_d, num_workers=10,
-    #                            verbose=True,port=4200)
+    #                            verbose=True,port=_get_free_port())
     pyemu.os_utils.run("{0} {1}".format(exe_path,"test.pst"),cwd=ws)
     with open(os.path.join(ws,"test.rec")) as f:
         for line in f:
@@ -193,7 +201,7 @@ def run_dewater_test():
     pst.write(os.path.join(ws,"test.pst"))
     #pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
     #                            master_dir=os.path.join(worker_d, "master3"), worker_root=worker_d, num_workers=10,
-    #                            verbose=True,port=4200)
+    #                            verbose=True,port=_get_free_port())
     pyemu.os_utils.run("{0} {1}".format(exe_path,"test.pst"),cwd=ws)
     with open(os.path.join(ws,"test.rec")) as f:
         for line in f:
@@ -231,7 +239,7 @@ def run_dewater_test():
     pst.write(os.path.join(ws,"test.pst"))
     #pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
     #                            master_dir=os.path.join(worker_d, "master3"), worker_root=worker_d, num_workers=10,
-    #                            verbose=True,port=4200)
+    #                            verbose=True,port=_get_free_port())
     pyemu.os_utils.run("{0} {1}".format(exe_path,"test.pst"),cwd=ws)
     #with open(os.path.join(worker_d,"master3","test.rec")) as f:
     with open(os.path.join(ws,"test.rec")) as f:
@@ -312,7 +320,7 @@ def run_dewater_test():
     pst.write(os.path.join(worker_d,"template","test.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
                                 master_dir=os.path.join(worker_d, "master4"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
     with open(os.path.join(worker_d,"master4","test.rec")) as f:
         for line in f:
             if "iteration       obj func" in line:
@@ -332,7 +340,7 @@ def run_dewater_test():
     pst.write(os.path.join(worker_d,"template","test.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
                                 master_dir=os.path.join(worker_d, "master5"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
     with open(os.path.join(worker_d,"master5","test.rec")) as f:
         for line in f:
             if "iteration       obj func" in line:
@@ -360,7 +368,7 @@ def run_supply2_test():
     pst.write(os.path.join(worker_d,"template","test.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
                                 master_dir=os.path.join(worker_d, "master1"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
 
     opt = None
     with open(os.path.join(worker_d, "master1", "test.rec"), 'r') as f:
@@ -375,7 +383,7 @@ def run_supply2_test():
     pst.write(os.path.join(worker_d,"template","test.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "test.pst",
                                 master_dir=os.path.join(worker_d, "master2"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
     
     with open(os.path.join(worker_d,"master2","test.rec")) as f:
         for line in f:
@@ -406,7 +414,7 @@ def est_res_test():
     pst.write(os.path.join(t_d,"supply2_pest.base.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "supply2_pest.base.pst",
                                 master_dir=os.path.join(worker_d, "master"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
 
     opt = None
     with open(os.path.join(worker_d, "master", "supply2_pest.base.rec"), 'r') as f:
@@ -442,6 +450,13 @@ def stack_test():
     pst = pyemu.Pst(pst_file)
     par = pst.parameter_data
     par.loc[par.partrans=="fixed","partrans"] = "log"
+    obs = pst.observation_data
+    obs.loc["q1","obsval"] = 100
+    obs.loc["q1","obgnme"] = "equal_to"
+    obs.loc["q1","weight"] = 1.0
+    
+    pst.pestpp_options.pop("opt_constraint_groups",None)
+    pst.pestpp_options.pop("base_jacobian",None)
     pst.pestpp_options["opt_risk"] = 0.1
     pst.pestpp_options["opt_stack_size"] = 10
     pst.control_data.noptmax = 1
@@ -489,7 +504,7 @@ def stack_test():
     if os.path.exists(d):
         shutil.rmtree(d)
     shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
-    pst.pestpp_options.pop("base_jacobian")
+    pst.pestpp_options.pop("base_jacobian",None)
     pst.write(os.path.join(d,"test.pst"))
     pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)   
     rec4 = os.path.join(d,"test.rec")
@@ -545,7 +560,7 @@ def stack_test():
     # pst.write(os.path.join("opt_dewater_chance","template","test.pst"))
     # pyemu.os_utils.start_workers(os.path.join("opt_dewater_chance", "template"), exe_path, "test.pst",
     #                             master_dir=d, worker_root="opt_dewater_chance", num_workers=10,
-    #                             verbose=True,port=4200)
+    #                             verbose=True,port=_get_free_port())
 
 
 def dewater_restart_test():
@@ -563,7 +578,7 @@ def dewater_restart_test():
     pst.write(os.path.join(worker_d,"template","base.pst"))
     pyemu.os_utils.start_workers(os.path.join(worker_d, "template"), exe_path, "base.pst",
                                 master_dir=os.path.join(worker_d, "master_base1"), worker_root=worker_d, num_workers=10,
-                                verbose=True,port=4200)
+                                verbose=True,port=_get_free_port())
 
     with open(os.path.join(worker_d,"master_base1","base.rec")) as f:
         for line in f:
@@ -621,8 +636,6 @@ def fosm_invest():
         print(jcb.shape)
         sc = pyemu.Schur(jco=jcb,pst=pst,predictions=fnames)
         print(jcb_file,sc.get_forecast_summary().loc[:,"prior_var"].apply(lambda x: np.sqrt(x)))
-
-
 
 
 if __name__ == "__main__":

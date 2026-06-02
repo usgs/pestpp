@@ -17,6 +17,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file Jacobian.cpp
+ * @brief Implementation of Jacobian.
+ */
+
 
 #include <cstdlib>
 #include <vector>
@@ -41,25 +46,50 @@ using namespace std;
 using namespace pest_utils;
 using namespace Eigen;
 
+/**
+ * @brief Jacobian.
+ *
+ * @param _file_manager Description.
+ *
+ * @return Description.
+ */
 Jacobian::Jacobian(FileManager &_file_manager) : file_manager(_file_manager)
 {
 }
 
 
+/**
+ * @brief Set base numeric pars.
+ *
+ * @param _base_numeric_pars Description.
+ */
 void Jacobian::set_base_numeric_pars(Parameters _base_numeric_pars)
 {
 	base_numeric_parameters = _base_numeric_pars;
 }
 
+/**
+ * @brief Set base sim obs.
+ *
+ * @param _base_sim_obs Description.
+ */
 void Jacobian::set_base_sim_obs(Observations _base_sim_obs)
 {
 	base_sim_observations = _base_sim_obs;
 }
 
+/**
+ * @brief Destructor for .
+ */
 Jacobian::~Jacobian() {
 }
 
 
+/**
+ * @brief Remove cols.
+ *
+ * @param rm_parameter_names Description.
+ */
 void Jacobian::remove_cols(std::set<string> &rm_parameter_names)
 {
 	vector<size_t> del_col_ids;
@@ -82,6 +112,11 @@ void Jacobian::remove_cols(std::set<string> &rm_parameter_names)
 	matrix_del_rows_cols(matrix, del_col_ids,false,true);
 }
 
+/**
+ * @brief Remove rows.
+ *
+ * @param rm_obs_names Description.
+ */
 void Jacobian::remove_rows(std::set<string>& rm_obs_names)
 {
 	vector<size_t> del_row_ids;
@@ -105,6 +140,11 @@ void Jacobian::remove_rows(std::set<string>& rm_obs_names)
 	matrix_del_rows_cols(matrix, del_row_ids, true, false);
 }
 
+/**
+ * @brief Add cols.
+ *
+ * @param new_pars_names Description.
+ */
 void Jacobian::add_cols(set<string> &new_pars_names)
 {
 	//Note:  This method does not add the parameters in the base_numeric_parameters container.
@@ -146,6 +186,11 @@ const vector<string>& Jacobian::obs_and_reg_list() const
 	return base_sim_obs_names;
 }
 
+/**
+ * @brief Get par2col map.
+ *
+ * @return Description.
+ */
 unordered_map<string, int> Jacobian::get_par2col_map() const
 {
 	unordered_map<string, int> par2col_map;
@@ -158,6 +203,11 @@ unordered_map<string, int> Jacobian::get_par2col_map() const
 	return par2col_map;
 }
 
+/**
+ * @brief Get obs2row map.
+ *
+ * @return Description.
+ */
 unordered_map<string, int> Jacobian::get_obs2row_map() const
 {
 	unordered_map<string, int> obs2row_map;
@@ -171,6 +221,16 @@ unordered_map<string, int> Jacobian::get_obs2row_map() const
 }
 
 
+/**
+ * @brief Get matrix.
+ *
+ * @param obs_names Description.
+ * @param par_names Description.
+ * @param forgive_missing Description.
+ * @param n_cols Description.
+ *
+ * @return Description.
+ */
 Eigen::SparseMatrix<double> Jacobian::get_matrix(const vector<string> &obs_names, const vector<string> & par_names, bool forgive_missing, int n_cols) const
 {
     /* the n_cols arg is so you can reserve a sparse matrix with columns that are all zeros - this is for the LP solver in pestpp-opt when you have
@@ -298,7 +358,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 		debug_print(ipar_name);
 		del_numeric_par_vec.clear();
 		// need to optimize already computing model pars in get_derivative_parameters.  should not need to compute them again
-		bool success = get_derivative_parameters(ipar_name, numeric_pars, par_transform, group_info, ctl_par_info, del_numeric_par_vec, phiredswh_flag, out_of_bound_par);
+		bool success = fill_derivative_parameters(ipar_name, numeric_pars, par_transform, group_info, ctl_par_info, del_numeric_par_vec, phiredswh_flag, out_of_bound_par);
 		debug_print(out_of_bound_par);
 		if (success && !del_numeric_par_vec.empty())
 		{
@@ -341,6 +401,11 @@ bool Jacobian::build_runs(ModelRun &init_model_run, vector<string> numeric_par_n
 		out_of_bound_par, phiredswh_flag, calc_init_obs);
 }
 
+/**
+ * @brief Make runs.
+ *
+ * @param run_manager Description.
+ */
 void Jacobian::make_runs(RunManagerAbstract &run_manager)
 {
 	// make model runs
@@ -448,7 +513,7 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 	return true;
 }
 
-bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, 
+bool Jacobian::fill_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform,
 	const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
 		vector<double> &delta_numeric_par_vec, bool phiredswh_flag, set<string> &out_of_bound_par)
 {
@@ -739,6 +804,16 @@ bool Jacobian::out_of_bounds(const Parameters &ctl_parameters,
 	return out_of_bounds;
 }
 
+/**
+ * @brief Derivative inc.
+ *
+ * @param name Description.
+ * @param group_info Description.
+ * @param cur_par_value Description.
+ * @param central Description.
+ *
+ * @return Description.
+ */
 double Jacobian::derivative_inc(const string &name, const ParameterGroupInfo &group_info, double cur_par_value, bool central)
 {
 	ParameterGroupRec g_rec;
@@ -778,11 +853,22 @@ Jacobian& Jacobian::operator=(const Jacobian &rhs)
 	file_manager = rhs.file_manager;
 	return *this;
 }
+/**
+ * @brief Transform.
+ *
+ * @param par_trans Description.
+ * @param jac Description.
+ */
 void Jacobian::transform(const ParamTransformSeq &par_trans, void(ParamTransformSeq::*meth_prt)(Jacobian &jac) const)
 {
 	(par_trans.*meth_prt)(*this);
 }
 
+/**
+ * @brief Print.
+ *
+ * @param fout Description.
+ */
 void Jacobian::print(std::ostream &fout) const
 {
 	fout << "Jacobian:" << endl;
@@ -851,6 +937,11 @@ void Jacobian::print(std::ostream &fout) const
 //	file_manager.close_file(ext);
 //}
 
+/**
+ * @brief Save.
+ *
+ * @param ext Description.
+ */
 void Jacobian::save(const string &ext) const
 {
 	string filename = file_manager.build_filename(ext);
@@ -915,6 +1006,11 @@ void Jacobian::save(const string &ext) const
 	//file_manager.close_file(ext);
 }
 
+/**
+ * @brief Read.
+ *
+ * @param filename Description.
+ */
 void Jacobian::read(const string &filename)
 {
 	pest_utils::read_binary(filename,base_sim_obs_names, base_numeric_par_names, matrix);
@@ -1003,6 +1099,11 @@ void Jacobian::read(const string &filename)
 
 }
 
+/**
+ * @brief Report errors.
+ *
+ * @param fout Description.
+ */
 void Jacobian::report_errors(std::ostream &fout)
 {
 	if (failed_parameter_names.size() > 0)
@@ -1018,6 +1119,11 @@ void Jacobian::report_errors(std::ostream &fout)
 
 }
 
+/**
+ * @brief Get matrix ptr.
+ *
+ * @return Description.
+ */
 Eigen::SparseMatrix<double>* Jacobian::get_matrix_ptr()
 {
 	Eigen::SparseMatrix<double>* ptr = &matrix;

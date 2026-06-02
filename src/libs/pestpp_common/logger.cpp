@@ -1,3 +1,7 @@
+/**
+ * @file logger.cpp
+ * @brief Implementation of logger.
+ */
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -10,6 +14,12 @@
 using namespace std;
 using std::chrono::system_clock;
 
+/**
+ * @brief Writetime.
+ *
+ * @param os Description.
+ * @param tc Description.
+ */
 void Logger::writetime(stringstream &os, time_t tc) {
 	// alternative to put_time iomanip
 	// as put_time is not implemented in gcc4.8
@@ -19,6 +29,14 @@ void Logger::writetime(stringstream &os, time_t tc) {
 	tp.put(os, os, ' ', localtime(&tc), pat, pat + strlen(pat));
 }
 
+/**
+ * @brief Logger.
+ *
+ * @param _fout Description.
+ * @param _echo Description.
+ *
+ * @return Description.
+ */
 Logger::Logger(ofstream &_fout,bool _echo)
 {
 	fout = &_fout;
@@ -26,6 +44,11 @@ Logger::Logger(ofstream &_fout,bool _echo)
 	tagged_events.clear();
 }
 
+/**
+ * @brief Write.
+ *
+ * @param message Description.
+ */
 void Logger::write(const std::string &message)
 {
 	system_clock::time_point time_now = system_clock::now();
@@ -40,17 +63,32 @@ void Logger::write(const std::string &message)
 }
 
 
+/**
+ * @brief Error.
+ *
+ * @param message Description.
+ */
 void Logger::error(const std::string &message)
 {
 	write("EXECUTION ERROR: " + message);
 }
 
+/**
+ * @brief Warning.
+ *
+ * @param message Description.
+ */
 void Logger::warning(const std::string &message)
 {
 	write("WARNING: " + message);
 }
 
 
+/**
+ * @brief Log.
+ *
+ * @param message Description.
+ */
 void Logger::log(const string &message)
 {
 	system_clock::time_point time_now = system_clock::now();
@@ -92,6 +130,13 @@ void Logger::log(const string &message)
 	}
 }
 
+/**
+ * @brief Time to string.
+ *
+ * @param tmp_time Description.
+ *
+ * @return Description.
+ */
 string Logger::time_to_string(const std::chrono::system_clock::time_point &tmp_time)
 {
 	stringstream time_str;
@@ -105,6 +150,14 @@ string Logger::time_to_string(const std::chrono::system_clock::time_point &tmp_t
 	return time_str.str();
 }
 
+/**
+ * @brief Elapsed time to string.
+ *
+ * @param current_time Description.
+ * @param prev_time Description.
+ *
+ * @return Description.
+ */
 string Logger::elapsed_time_to_string(std::chrono::system_clock::time_point &current_time, std::chrono::system_clock::time_point &prev_time)
 {
 	ostringstream str;
@@ -133,6 +186,9 @@ string Logger::elapsed_time_to_string(std::chrono::system_clock::time_point &cur
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 Logger::~Logger()
 {
 	delete fout;

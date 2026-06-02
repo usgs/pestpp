@@ -378,17 +378,6 @@ public:
 	string get_sqp_search_method()const { return sqp_search_method; }
 	void set_sqp_solve_method(string _how) { sqp_solve_method = _how; }
 	string get_sqp_solve_method()const { return sqp_solve_method; }
-	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
-	int get_sqp_num_reals()const { return sqp_num_reals; }
-	void set_sqp_num_refined_search_pts(int _num_pts) { sqp_num_refined_search_pts = _num_pts; }
-	int get_sqp_num_refined_search_pts()const { return sqp_num_refined_search_pts; }
-	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
-	int get_sqp_subset_size()const { return sqp_subset_size; }
-	void set_sqp_subset_size(int _num_reals) { sqp_subset_size = _num_reals; }
-	bool get_sqp_update_hessian()const { return sqp_update_hessian; }
-	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
-	string get_sqp_hessian_update_method()const { return sqp_hessian_update_method; }
-	void set_sqp_hessian_update_method(string _how) { sqp_hessian_update_method = _how; }
 	vector<double> get_sqp_alpha_mults() const { return sqp_alpha_mults; } 
 	void set_sqp_alpha_mults(vector<double> _mults) { sqp_alpha_mults = _mults; }
 	double get_sqp_filter_tol() const { return sqp_filter_tol; }
@@ -649,6 +638,8 @@ public:
     string get_ies_run_realname() const {return ies_run_realname;}
 	void set_ies_reinflate_num_reals(vector<int> _vec)  { ies_reinflate_num_reals = _vec;}
 	vector<int> get_ies_reinflate_num_reals() const {return ies_reinflate_num_reals;}
+	void set_ies_use_phi_lambda_iters(bool _flag) { ies_use_phi_lambda_iters = _flag; }
+	bool get_ies_use_phi_lambda_iters() const { return ies_use_phi_lambda_iters; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -741,6 +732,9 @@ public:
     const int get_panther_timeout_milliseconds() const { return panther_timeout_milliseconds;}
     void set_panther_persistent_workers(bool _flag) {panther_persistent_workers = _flag;}
     const bool get_panther_persistent_workers() const {return panther_persistent_workers;}
+	const int get_panther_ping_interval_secs() const { return panther_ping_interval_secs;}
+	void set_panther_ping_interval_secs(int _secs) { panther_ping_interval_secs = _secs;}
+
 
 
 
@@ -882,7 +876,6 @@ private:
 	bool sqp_debug_cma;
 	bool sqp_debug_stosag_grad;
 	
-
 	int mou_population_size;
 	string mou_generator; 
 	string mou_dv_population_file;
@@ -988,8 +981,7 @@ private:
     vector<string> ies_aal_indicator_pars;
     string ies_run_realname;
 	vector<int> ies_reinflate_num_reals;
-
-
+	bool ies_use_phi_lambda_iters;
 
 	// Data Assimilation parameters
 	/*string da_mode;
@@ -1028,6 +1020,7 @@ private:
     int panther_timeout_milliseconds;
     int panther_echo_interval_milliseconds;
     bool panther_persistent_workers;
+	int panther_ping_interval_secs;
 
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);

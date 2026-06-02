@@ -16,6 +16,11 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
+/**
+ * @file SVD_PROPACK.cpp
+ * @brief Implementation of SVD_PROPACK.
+ */
+
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -36,16 +41,43 @@ extern "C" {
 		   double *dparm, int *iparm, long *jobu_len, long *jobv_len);
 }
 
+/**
+ * @brief S v d  p r o p a c k.
+ *
+ * @param _n_max_sing Description.
+ * @param _eign_thres Description.
+ *
+ * @return Description.
+ */
 SVD_PROPACK::SVD_PROPACK(int _n_max_sing, double _eign_thres) : SVDPackage("PROPACK", _n_max_sing, _eign_thres)
 
 {
 }
 
+/**
+ * @brief Solve ip.
+ *
+ * @param A Description.
+ * @param Sigma Description.
+ * @param U Description.
+ * @param Vt Description.
+ * @param Sigma_trunc Description.
+ */
 void SVD_PROPACK::solve_ip(Eigen::SparseMatrix<double>& A, VectorXd &Sigma, Eigen::SparseMatrix<double> &U, Eigen::SparseMatrix<double>& Vt, VectorXd &Sigma_trunc)
 {
 	solve_ip(A, Sigma, U, Vt, Sigma_trunc, eign_thres);
 }
 
+/**
+ * @brief Solve ip.
+ *
+ * @param A Description.
+ * @param Sigma Description.
+ * @param U Description.
+ * @param Vt Description.
+ * @param Sigma_trunc Description.
+ * @param _eigen_thres Description.
+ */
 void SVD_PROPACK::solve_ip(Eigen::SparseMatrix<double>& A, VectorXd &Sigma, Eigen::SparseMatrix<double> &U, Eigen::SparseMatrix<double>& Vt, VectorXd &Sigma_trunc, double _eigen_thres)
 {
 	class local_utils {
@@ -217,6 +249,16 @@ void SVD_PROPACK::solve_ip(Eigen::SparseMatrix<double>& A, VectorXd &Sigma, Eige
 }
 
 
+/**
+ * @brief Solve ip.
+ *
+ * @param A Description.
+ * @param Sigma Description.
+ * @param U Description.
+ * @param V Description.
+ * @param _eigen_thres Description.
+ * @param _max_sing Description.
+ */
 void SVD_PROPACK::solve_ip(Eigen::MatrixXd& A, Eigen::MatrixXd &Sigma, Eigen::MatrixXd& U, Eigen::MatrixXd& V, double _eigen_thres, int _max_sing)
 {
 	class local_utils {
@@ -379,6 +421,9 @@ void SVD_PROPACK::solve_ip(Eigen::MatrixXd& A, Eigen::MatrixXd &Sigma, Eigen::Ma
 }
 
 
+/**
+ * @brief Destructor for .
+ */
 SVD_PROPACK::~SVD_PROPACK(void)
 {
 }
