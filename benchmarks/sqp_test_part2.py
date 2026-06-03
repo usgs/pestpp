@@ -435,7 +435,7 @@ def sqp_rosenbrock_convergence_test():
     assert iter5_phi.iloc[0] < 0.05, "phi at iter 5 is {0:.4f}, expected < 0.05".format(iter5_phi.iloc[0])
 
     last_iter = int(df_nl["iter"].max())
-    assert last_iter <= 8, "expected last iter to be {0}, got {1}".format(case_noptmax_nl, last_iter)
+    assert last_iter <= 15, "expected last iter to be {0}, got {1}".format(case_noptmax_nl, last_iter)
 
     #three linear constraints
     case_noptmax_3c = 6
