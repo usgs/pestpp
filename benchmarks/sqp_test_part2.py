@@ -384,6 +384,126 @@ def sqp_cma_reinflation_test():
             "condition number at iter {0} ({1:.2f}) exceeds threshold ({2}); "
             "reinflation did not cap it".format(i, cond_num, max_cond_num))
 
+def sqp_rosenbrock_convergence_test():
+    #linear constraint
+    case_noptmax = 6
+    w_d, pst_name = _setup_rosenbrock_workdir("linear_constraint_infeas", initial_decvars=(-1.5, 0.0),
+        constraint_rhs=-1.5, noptmax=case_noptmax, num_reals=20, subset_size=10, random_seed=8)
+    base = os.path.splitext(pst_name)[0]
+
+    pst = pyemu.Pst(os.path.join(w_d, pst_name))
+    pst.pestpp_options["sqp_alpha_mults"] = "-0.05, 0.01, 0.1, 0.5, 1.0"
+    pst.write(os.path.join(w_d, pst_name))
+
+    m_d = _reset_master_dir("rosenbrock", "master_infeas_val")
+    _run_sqp_parallel(w_d, "rosenbrock", pst_name, m_d, port + 12)
+
+    phi_csv = os.path.join(m_d, base + ".phi_viol.summary.csv")
+    assert os.path.exists(phi_csv), "phi_viol.summary.csv missing: {0}".format(phi_csv)
+
+    df = pd.read_csv(phi_csv)
+    iter6 = df.loc[df["iter"] == case_noptmax, "phi"]
+    assert len(iter6) == 1, "iteration {0} not found in phi_viol.summary.csv".format(case_noptmax)
+    phi_val = iter6.iloc[0]
+    assert phi_val < 5.6, ("base phi at iter {0} is {1:.4f}, expected < 5.6".format(case_noptmax, phi_val))
+
+    # Nonlinear constraint case
+    case_noptmax_nl = 20
+    w_d_nl, pst_name_nl = _setup_rosenbrock_workdir("nonlinear_constraint", initial_decvars=(0.5, -1.6),
+        constraint_rhs=-1.5, noptmax=case_noptmax_nl, num_reals=20, subset_size=20, random_seed=12)
+    base_nl = os.path.splitext(pst_name_nl)[0]
+
+    pst_nl = pyemu.Pst(os.path.join(w_d_nl, pst_name_nl))
+    pst_nl.model_command = ["python rosenbrock_2par_one_nonlinear_constrained.py"]
+    pst_nl.pestpp_options["sqp_alpha_mults"] = "-1.0, 0.01, 0.1, 1.0, 2.0"
+    pst_nl.write(os.path.join(w_d_nl, pst_name_nl))
+
+    m_d_nl = _reset_master_dir("rosenbrock", "master_nonlinear_constraint")
+    _run_sqp_parallel(w_d_nl, "rosenbrock", pst_name_nl, m_d_nl, port + 13)
+
+    phi_csv_nl = os.path.join(m_d_nl, base_nl + ".phi_viol.summary.csv")
+    assert os.path.exists(phi_csv_nl), "phi_viol.summary.csv missing: {0}".format(phi_csv_nl)
+
+    df_nl = pd.read_csv(phi_csv_nl)
+
+    iter3_phi = df_nl.loc[df_nl["iter"] == 3, "phi"]
+    assert len(iter3_phi) == 1, "iteration 3 not found in phi_viol.summary.csv"
+    assert iter3_phi.iloc[0] < 0.5, "phi at iter 3 is {0:.4f}, expected < 0.5".format(iter3_phi.iloc[0])
+
+    iter5_phi = df_nl.loc[df_nl["iter"] == 5, "phi"]
+    assert len(iter5_phi) == 1, "iteration 5 not found in phi_viol.summary.csv"
+    assert iter5_phi.iloc[0] < 0.05, "phi at iter 5 is {0:.4f}, expected < 0.05".format(iter5_phi.iloc[0])
+
+    last_iter = int(df_nl["iter"].max())
+    assert last_iter <= 8, "expected last iter to be {0}, got {1}".format(case_noptmax_nl, last_iter)
+
+    #three linear constraints
+    case_noptmax_3c = 6
+    case_name_3c = "three_linear_constraint_infeas"
+    w_d_3c = os.path.join("rosenbrock", "part2_" + case_name_3c)
+    if os.path.exists(w_d_3c):
+        shutil.rmtree(w_d_3c)
+    shutil.copytree(os.path.join("rosenbrock", "template"), w_d_3c)
+    w_d_3c = os.path.abspath(w_d_3c)
+
+    with open(os.path.join(w_d_3c, "constraints.dat.ins"), "w") as f:
+        f.write("pif ~\nl1  w  !constraint1!\nl1  w  !constraint2!\nl1  w  !constraint3!\n")
+
+    pst_name_3c = "part2_" + case_name_3c + ".pst"
+    cwd = os.getcwd()
+    os.chdir(w_d_3c)
+    try:
+        pst_3c = pyemu.helpers.pst_from_io_files(
+            "par.dat.tpl", "par.dat",
+            ["obs.dat.ins", "constraints.dat.ins"],
+            ["obs.dat", "constraints.dat"])
+
+        par = pst_3c.parameter_data
+        par.loc[:, "partrans"] = "none"
+        par.loc[par.parnme[0], "parval1"] = -1.0
+        par.loc[par.parnme[1], "parval1"] = 1.0
+        par.loc[:, "parlbnd"] = -2.2
+        par.loc[:, "parubnd"] = 2.2
+        par.loc[:, "parchglim"] = "relative"
+
+        obs = pst_3c.observation_data
+        obs.loc["obs", "obgnme"] = "obj_fn"
+        obs.loc["obs", "obsval"] = 0.0
+        obs.loc["constraint1", "obgnme"] = "l_constraint"
+        obs.loc["constraint1", "obsval"] = -0.5
+        obs.loc["constraint2", "obgnme"] = "l_constraint"
+        obs.loc["constraint2", "obsval"] = 0.0
+        obs.loc["constraint3", "obgnme"] = "g_constraint"
+        obs.loc["constraint3", "obsval"] = -1.0
+        obs.loc[:, "weight"] = 1.0
+
+        pst_3c.pestpp_options["opt_obj_func"] = "obs"
+        pst_3c.pestpp_options["sqp_num_reals"] = 20
+        pst_3c.pestpp_options["sqp_update_hessian"] = "true"
+        pst_3c.pestpp_options["sqp_subset_size"] = 10
+        pst_3c.pestpp_options["par_sigma_range"] = 10
+        pst_3c.pestpp_options["sqp_alpha_mults"] = "-0.05, 0.01, 0.1, 0.5, 1.0"
+        pst_3c.pestpp_options["random_seed"] = 12
+
+        pst_3c.model_command = ["python rosenbrock_2par_three_linear_constrained.py"]
+        pst_3c.control_data.noptmax = case_noptmax_3c
+        pst_3c.write(pst_name_3c)
+    finally:
+        os.chdir(cwd)
+
+    base_3c = os.path.splitext(pst_name_3c)[0]
+    m_d_3c = _reset_master_dir("rosenbrock", "master_three_linear_constraint_infeas")
+    _run_sqp_parallel(w_d_3c, "rosenbrock", pst_name_3c, m_d_3c, port + 14)
+
+    phi_csv_3c = os.path.join(m_d_3c, base_3c + ".phi_viol.summary.csv")
+    assert os.path.exists(phi_csv_3c), "phi_viol.summary.csv missing: {0}".format(phi_csv_3c)
+
+    df_3c = pd.read_csv(phi_csv_3c)
+    iter6_3c = df_3c.loc[df_3c["iter"] == case_noptmax_3c, "phi"]
+    assert len(iter6_3c) == 1, "iteration {0} not found in phi_viol.summary.csv".format(case_noptmax_3c)
+    assert iter6_3c.iloc[0] < 3.1, "phi at iter {0} is {1:.4f}, expected < 3.1".format(case_noptmax_3c, iter6_3c.iloc[0])
+
+
 if __name__ == "__main__":
     # sqp_filter_test()
     # sqp_filter_tol_test()
@@ -393,5 +513,6 @@ if __name__ == "__main__":
     # sqp_cma_save_cov_test()
     # sqp_cma_evolves_test()
     # sqp_cma_custom_rates_test()
-    sqp_cma_reinflation_test()
+    # sqp_cma_reinflation_test()
+    sqp_rosenbrock_convergence_test()
 
