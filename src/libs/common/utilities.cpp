@@ -2301,12 +2301,20 @@ for (int i = 0; i < argc; ++i)
 	{
 		transform(it->begin(), it->end(), it->begin(), ::tolower);
 	}
-	
-	if (org_cmdline_vec.size() >= 2) 
+
+	// check for version flag before anything else
+	if (org_cmdline_vec.size() == 2 && (lower_cmdline_vec[1] == "-v" || lower_cmdline_vec[1] == "--version"))
+	{
+		string version = PESTPP_VERSION;
+		cout << version << endl;
+		exit(0);
+	}
+
+	if (org_cmdline_vec.size() >= 2)
 	{
 		ctl_file_name = org_cmdline_vec[1];
 	}
-	else 
+	else
 	{
 		throw_cmdline_error("too few args, no control file name found");
 	}

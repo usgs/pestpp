@@ -11,7 +11,7 @@ cd "$script_path"/..
 rm -rfd build
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" -DCMAKE_CXX_COMPILER=g++ -DFORCE_STATIC=OFF ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DFORCE_STATIC=OFF ..
 make -j
 cpack -G TGZ
 cp *.tar.gz ../

@@ -376,8 +376,12 @@ public:
 	string get_sqp_obs_restart_en()const { return sqp_obs_restart_en; }
 	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
 	string get_sqp_search_method()const { return sqp_search_method; }
+	void set_sqp_solve_method(string _how) { sqp_solve_method = _how; }
+	string get_sqp_solve_method()const { return sqp_solve_method; }
 	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
+	void set_sqp_num_refined_search_pts(int _num_pts) { sqp_num_refined_search_pts = _num_pts; }
+	int get_sqp_num_refined_search_pts()const { return sqp_num_refined_search_pts; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 	int get_sqp_subset_size()const { return sqp_subset_size; }
 	void set_sqp_subset_size(int _num_reals) { sqp_subset_size = _num_reals; }
@@ -385,8 +389,6 @@ public:
 	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
 	string get_sqp_hessian_update_method()const { return sqp_hessian_update_method; }
 	void set_sqp_hessian_update_method(string _how) { sqp_hessian_update_method = _how; }
-	bool get_sqp_solve_partial_step()const { return sqp_solve_partial_step; }
-	void set_sqp_solve_partial_step(bool _flag) { sqp_solve_partial_step = _flag; }
 	vector<double> get_sqp_alpha_mults() const { return sqp_alpha_mults; } 
 	void set_sqp_alpha_mults(vector<double> _mults) { sqp_alpha_mults = _mults; }
 	double get_sqp_filter_tol() const { return sqp_filter_tol; }
@@ -407,8 +409,6 @@ public:
 	void set_sqp_max_consec_infeas_ies(int _max) { sqp_max_consec_infeas_ies = _max; }
 	double get_sqp_max_reinflation_cond_num() const { return sqp_max_reinflation_cond_num; }
 	void set_sqp_max_reinflation_cond_num(double val) { sqp_max_reinflation_cond_num = val; }
-	double get_sqp_scale_up_factor() const { return sqp_scale_up_factor; }
-	void set_sqp_scale_up_factor(double val) { sqp_scale_up_factor = val; }
 	double get_sqp_scale_down_factor() const { return sqp_scale_down_factor; }
 	void set_sqp_scale_down_factor(double val) { sqp_scale_down_factor = val; }
 	double get_sqp_hess_max_cond_num() const { return sqp_hess_max_cond_num; }
@@ -421,8 +421,6 @@ public:
 	double get_sqp_viol_pad() const { return sqp_viol_pad; }
 	int get_sqp_reset_hessian_every()const { return sqp_reset_hessian_every; }
 	void set_sqp_reset_hessian_every(int _every) { sqp_reset_hessian_every = _every; }
-	int get_sqp_wset_level()const { return sqp_wset_level; }
-	void set_sqp_wset_level(int _level) { sqp_wset_level = _level; }
 	bool get_sqp_rescale_search_dir()const { return sqp_rescale_search_dir; }
 	void set_sqp_rescale_search_dir(bool _flag) { sqp_rescale_search_dir = _flag; }
 	int get_sqp_seek_feas_max_iter()const { return sqp_seek_feas_max_iter; }
@@ -431,6 +429,18 @@ public:
 	void set_sqp_cma_parent_num(int _num) { sqp_cma_parent_num = _num; }
 	double get_sqp_risk() const { return sqp_risk; }
 	void set_sqp_risk(double val) { sqp_risk = val; }
+	double get_sqp_powell_damping_factor() const { return sqp_powell_damping_factor; }
+	void set_sqp_powell_damping_factor(double val) { sqp_powell_damping_factor = val; }
+	bool get_sqp_use_ensemble_approx_hessian()const { return sqp_use_ensemble_approx_hessian; }
+	void set_sqp_use_ensemble_approx_hessian(bool _flag) { sqp_use_ensemble_approx_hessian = _flag; }
+	bool get_sqp_debug_enable_constraint_weighted_jco()const { return sqp_debug_enable_constraint_weighted_jco; }
+	void set_sqp_debug_enable_constraint_weighted_jco(bool _flag) { sqp_debug_enable_constraint_weighted_jco = _flag; }
+	bool get_sqp_debug_hessian()const { return sqp_debug_hessian; }
+	void set_sqp_debug_hessian(bool _flag) { sqp_debug_hessian = _flag; }
+	bool get_sqp_debug_cma()const { return sqp_debug_cma; }
+	void set_sqp_debug_cma(bool _flag) { sqp_debug_cma = _flag; }
+	bool get_sqp_debug_stosag_grad()const { return sqp_debug_stosag_grad; }
+	void set_sqp_debug_stosag_grad(bool _flag) { sqp_debug_stosag_grad = _flag; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -639,6 +649,8 @@ public:
     string get_ies_run_realname() const {return ies_run_realname;}
 	void set_ies_reinflate_num_reals(vector<int> _vec)  { ies_reinflate_num_reals = _vec;}
 	vector<int> get_ies_reinflate_num_reals() const {return ies_reinflate_num_reals;}
+	void set_ies_use_phi_lambda_iters(bool _flag) { ies_use_phi_lambda_iters = _flag; }
+	bool get_ies_use_phi_lambda_iters() const { return ies_use_phi_lambda_iters; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -733,7 +745,6 @@ public:
     const bool get_panther_persistent_workers() const {return panther_persistent_workers;}
 	const int get_panther_ping_interval_secs() const { return panther_ping_interval_secs;}
 	void set_panther_ping_interval_secs(int _secs) { panther_ping_interval_secs = _secs;}
-
 
 
 
@@ -840,11 +851,12 @@ private:
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
 	string sqp_search_method;
+	string sqp_solve_method;
 	int sqp_num_reals;
 	int sqp_subset_size;
 	bool sqp_update_hessian;
+	int sqp_num_refined_search_pts;
 	string sqp_hessian_update_method;
-	bool sqp_solve_partial_step;
 	vector<double> sqp_alpha_mults;
 	double sqp_filter_tol;
 	double sqp_working_set_tol;
@@ -852,7 +864,6 @@ private:
 	int sqp_max_consec_infeas;
 	int sqp_max_consec_infeas_ies;
 	int max_consec_phiinc;
-	double sqp_scale_up_factor;
 	double sqp_scale_down_factor;
 	double sqp_cma_c1;
 	double sqp_cma_cmu;
@@ -865,10 +876,16 @@ private:
 	bool sqp_enforce_bounds;
 	double sqp_viol_pad;
 	int sqp_reset_hessian_every;
-	int sqp_wset_level;
+	bool sqp_use_ensemble_approx_hessian;
 	bool sqp_rescale_search_dir;
 	int sqp_seek_feas_max_iter;
 	double sqp_risk;
+	double sqp_powell_damping_factor;
+	bool sqp_debug_enable_constraint_weighted_jco;
+	bool sqp_debug_hessian;
+	bool sqp_debug_cma;
+	bool sqp_debug_stosag_grad;
+	
 
 	int mou_population_size;
 	string mou_generator; 
@@ -975,6 +992,7 @@ private:
     vector<string> ies_aal_indicator_pars;
     string ies_run_realname;
 	vector<int> ies_reinflate_num_reals;
+	bool ies_use_phi_lambda_iters;
 
 
 

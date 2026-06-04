@@ -77,6 +77,7 @@ pest++/sweep/sweep
 
 /dev_tests
 /benchmarks/g07
+/benchmarks/mf6_freyberg/master_sqp1
 
 # Sphinx / Doxygen docs build artifacts
 docs/_build/

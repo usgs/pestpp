@@ -118,14 +118,6 @@ map<string, int> get_nnz_group(Pest &pest_scenario)
 }
 
 
-/**
- * @brief Normalize weights by residual.
- *
- * @param pest_scenario Description.
- * @param sim Description.
- *
- * @return Description.
- */
 pair<ObservationInfo,map<string,double>> normalize_weights_by_residual(Pest &pest_scenario, Observations &sim)
 {
 	ObservationInfo obs_info(pest_scenario.get_ctl_observation_info());
@@ -830,13 +822,6 @@ map<string, double> LinearAnalysis::prior_parameter_variance()
 	return results;
 }
 
-/**
- * @brief Prior parameter variance.
- *
- * @param par_name Description.
- *
- * @return Description.
- */
 double LinearAnalysis::prior_parameter_variance(string &par_name)
 {
 	//pfm.log_event("prior_parameter_variance");

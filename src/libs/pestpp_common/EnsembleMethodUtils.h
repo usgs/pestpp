@@ -223,7 +223,7 @@ class EnsembleSolver
 public:
 	EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
 		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer,
-		Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+		Covariance& _parcov,Eigen::MatrixXd& _am, L2PhiHandler& _ph,
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names,
 		double _reg_factor);
 

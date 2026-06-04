@@ -65,6 +65,12 @@ public:
 	void update_run(int run_id, const Observations &obs);
 	void update_run(int run_id, const std::vector<char> serial_data);
 	void update_run_failed(int run_id);
+	/** @brief Set the failure count for a run record.
+	 *
+	 *  Writes @p nfail as the negative of the run-status byte (e.g. nfail=3
+	 *  stores status=-3).  Used by the run manager to record how many times
+	 *  a run was attempted before being declared permanently failed.
+	 */
 	void set_run_nfailed(int run_id, int nfail);
 	int get_nruns();
 	int get_num_good_runs();

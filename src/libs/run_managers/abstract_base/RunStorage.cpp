@@ -614,10 +614,15 @@ void RunStorage::update_run_failed(int run_id)
 }
 
 /**
- * @brief Set run nfailed.
+ * @brief Set the failure count for a run record.
  *
- * @param run_id Description.
- * @param nfail Description.
+ * Writes the negative of @p nfail into the run-status byte of the record
+ * identified by @p run_id.  For example, if a run was attempted 3 times
+ * before being declared permanently failed, @p nfail should be 3 and the
+ * stored status will be -3.
+ *
+ * @param run_id  The zero-based index of the run record.
+ * @param nfail   The number of failed attempts for this run.
  */
 void RunStorage::set_run_nfailed(int run_id, int nfail)
 {

@@ -31,10 +31,10 @@
 
 
 EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
-	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _am, L2PhiHandler& _ph,
 	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names, double _reg_factor) :
 	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), weights(_weights), localizer(_localizer),
-	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names), reg_factor(_reg_factor) {
+	parcov(_parcov), Am(_am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names), reg_factor(_reg_factor) {
     performance_log = _performance_log;
     use_localizer = _use_localizer;
     iter = _iter;
@@ -72,7 +72,7 @@ void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map
     catch (...) {
         eptr = current_exception();
     }
-    return;
+
 }
 
 void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
@@ -305,8 +305,8 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         Eigen::setNbThreads(1);
         vector<thread> threads;
         vector<exception_ptr> exception_ptrs;
-        vector<string> preal_names = pe.get_real_names();
-        vector<string> oreal_names = oe.get_real_names();
+        preal_names = pe.get_real_names();
+        oreal_names = oe.get_real_names();
         unordered_map<string,Eigen::VectorXd> real_vec_map;
         unordered_map<string,unordered_map<string,double>> neighbor_phi_map, neighbor_pardist_map;
         mm_q_vec_map.clear();
@@ -5375,7 +5375,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         {
             message(0,"WARNING: npar and/or nobs > 1e6, you are close to going out-of-range for jcb format.  Switching to dense format but using '.jcb' file extension");
             pest_scenario.get_pestpp_options_ptr()->set_save_dense(true);
-            dense_file_ext = "jcb";
+            dense_file_ext = ".jcb";
         }
     }
 
@@ -5771,8 +5771,35 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
                     ss << endl;
             }
             message(0,ss.str());
+        	ss.str("");
+        	if (pest_scenario.get_pestpp_options().get_save_dense())
+        	{
 
+        		ss << file_manager.get_base_filename();
+        		if (cycle != NetPackage::NULL_DA_CYCLE)
+        			ss << "." << cycle;
+        		ss << ".0.par" << dense_file_ext;
+        		pe.to_dense_unordered(ss.str());
+        	}
+        	else if (pest_scenario.get_pestpp_options().get_save_binary())
+        	{
+        		ss << file_manager.get_base_filename();
+        		if (cycle != NetPackage::NULL_DA_CYCLE)
+        			ss << "." << cycle;
+        		ss << ".0.par.jcb";
+        		pe.to_binary(ss.str());
+        	}
+        	else
+        	{
+        		ss << file_manager.get_base_filename();
+        		if (cycle != NetPackage::NULL_DA_CYCLE)
+        			ss << "." << cycle;
+        		ss << ".0.par.csv";
+        		pe.to_csv(ss.str());
+        	}
+        	message(1, "saved initial truncated parameter ensemble to ", ss.str());
         }
+
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
@@ -7698,7 +7725,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	//track this here for phi-based termination check
 	best_mean_phis.push_back(best_mean);
 
-
 	if ((best_mean < last_best_mean * acc_fac))
 	{
 		message(0, "updating parameter ensemble");
@@ -7787,6 +7813,18 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
+	}
+
+	if (pest_scenario.get_pestpp_options().get_ies_use_phi_lambda_iters()) {
+
+		double new_lam = get_lambda();
+		ss.str("");
+		ss << "using phi-based lambda for each iteration, lambda changing from " << last_best_lam << " to " << new_lam;
+		message(1,ss.str());
+		last_best_lam = new_lam;
+
+
+
 	}
 
 	return true;
