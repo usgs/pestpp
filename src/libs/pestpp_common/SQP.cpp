@@ -5986,9 +5986,13 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 		idx_vsum_pairs.push_back({ static_cast<int>(i), vsum });
 	}
 
+	// Tie-break on the realization index so subset membership is identical across
+	// std::sort implementations (unstable sort) when violation sums tie.
 	sort(idx_vsum_pairs.begin(), idx_vsum_pairs.end(),
 		[](const pair<int, double>& a, const pair<int, double>& b) {
-			return a.second < b.second;
+			if (a.second != b.second)
+				return a.second < b.second;
+			return a.first < b.first;
 		});
 
 	set<int> selected_set;
