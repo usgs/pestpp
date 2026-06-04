@@ -399,6 +399,9 @@ def sqp_rosenbrock_convergence_test():
 
     pst = pyemu.Pst(os.path.join(w_d, pst_name))
     pst.pestpp_options["sqp_alpha_mults"] = "-0.05, 0.01, 0.1, 0.5, 1.0"
+    # pin to deterministic Eigen SVD so the ensemble gradient/Hessian solve is
+    # platform-reproducible (RedSVD's randomized projection diverges across OSs).
+    pst.pestpp_options["svd_pack"] = "eigen"
     pst.write(os.path.join(w_d, pst_name))
 
     m_d = _reset_master_dir("rosenbrock", "master_infeas_val")
@@ -422,6 +425,7 @@ def sqp_rosenbrock_convergence_test():
     pst_nl = pyemu.Pst(os.path.join(w_d_nl, pst_name_nl))
     pst_nl.model_command = ["python rosenbrock_2par_one_nonlinear_constrained.py"]
     pst_nl.pestpp_options["sqp_alpha_mults"] = "-1.0, 0.01, 0.1, 1.0, 2.0"
+    pst_nl.pestpp_options["svd_pack"] = "eigen"
     pst_nl.write(os.path.join(w_d_nl, pst_name_nl))
 
     m_d_nl = _reset_master_dir("rosenbrock", "master_nonlinear_constraint")
@@ -490,6 +494,7 @@ def sqp_rosenbrock_convergence_test():
         pst_3c.pestpp_options["par_sigma_range"] = 10
         pst_3c.pestpp_options["sqp_alpha_mults"] = "-0.05, 0.01, 0.1, 0.5, 1.0"
         pst_3c.pestpp_options["random_seed"] = 12
+        pst_3c.pestpp_options["svd_pack"] = "eigen"
 
         pst_3c.model_command = ["python rosenbrock_2par_three_linear_constrained.py"]
         pst_3c.control_data.noptmax = case_noptmax_3c

@@ -1986,11 +1986,23 @@ Covariance SeqQuadProgram::calc_objective_hessian()
 	// H ~ (1/σ^2_obj) * C_dv^(-1)
 	// this assumes the Hessian is proportional to the inv cov
 	Eigen::MatrixXd s, V, U;
-	SVD_REDSVD rsvd;
-	rsvd.set_performance_log(performance_log);
-	rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	// honor the ++svd_pack option so a run can pin to the deterministic EIGEN
+	// (JacobiSVD) package. RedSVD is a randomized SVD and is not bit-reproducible
+	// across platforms for ill-conditioned / aggressively-truncated problems.
+	if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::EIGEN)
+	{
+		SVD_EIGEN svd;
+		svd.set_performance_log(performance_log);
+		svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	}
+	else
+	{
+		SVD_REDSVD svd;
+		svd.set_performance_log(performance_log);
+		svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	}
 
-	
+
 	Eigen::MatrixXd dv_cov_inv = V * s.asDiagonal().inverse() * U.transpose();
 	double scale_factor = 1.0;
 	if (obj_variance > 1E-10)
@@ -2896,9 +2908,19 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 
 		performance_log->log_event("svd of dv cov matrix");
 		Eigen::MatrixXd s, V, U, st;
-		SVD_REDSVD rsvd;
-		rsvd.set_performance_log(performance_log);
-		rsvd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		// honor ++svd_pack (see note above): pin to deterministic EIGEN when requested.
+		if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::EIGEN)
+		{
+			SVD_EIGEN svd;
+			svd.set_performance_log(performance_log);
+			svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		}
+		else
+		{
+			SVD_REDSVD svd;
+			svd.set_performance_log(performance_log);
+			svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+		}
 		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
 		// Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod(dv_cov_matrix);

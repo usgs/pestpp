@@ -404,6 +404,10 @@ def freyberg_stress_test():
     pst.pestpp_options["glm_normal_form"] = "diag"
     pst.pestpp_options["parcov"] = "prior.jcb"
     pst.pestpp_options["glm_accept_mc_phi"] = True
+    # pin to deterministic Eigen JacobiSVD: this rank-10-of-2412 truncation is
+    # dominated by the randomized RedSVD projection, which is not reproducible
+    # across platforms (windows vs linux diverged badly). EIGEN is deterministic.
+    pst.pestpp_options["svd_pack"] = "eigen"
     pst.write(os.path.join(template_d, "pest_stress.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
