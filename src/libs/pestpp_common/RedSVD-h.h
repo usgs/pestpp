@@ -71,17 +71,29 @@ namespace RedSVD
 		}
 	}
 
-	//while elegant, the C++11 random stuff is not consistent across platforms
+	// std::normal_distribution is implementation-defined: libstdc++ (Linux) and
+	// MSVC (Windows) produce different sequences from the same engine state, which
+	// makes the randomized projection - and therefore every RedSVD/RedSymEigen
+	// result - diverge across platforms. Draw standard normals with a portable
+	// Box-Muller transform over the raw mt19937 integer stream instead (matching
+	// draw_standard_normal() in pest_data_structs.cpp). The engine is left default-
+	// seeded, so the same bits are produced on every platform.
 	template<typename MatrixType>
 	inline void sample_gaussian(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 		std::mt19937 generator;
-		std::normal_distribution<double> distribution(0.0, 1.0);
+		const double pi = 3.14159265358979323846264338327950288;
+		const double span = static_cast<double>(generator.max()) - static_cast<double>(generator.min());
 		for (Index i = 0; i < mat.rows(); ++i)
 		{
-			for (Index j = 0; j < mat.cols(); ++j )
-				mat(i,j) = distribution(generator);
+			for (Index j = 0; j < mat.cols(); ++j)
+			{
+				// v1 in (0,1) avoids log(0); v2 in [0,1)
+				double v1 = (static_cast<double>(generator() - generator.min()) + 1.0) / (span + 2.0);
+				double v2 = static_cast<double>(generator() - generator.min()) / (span + 1.0);
+				mat(i, j) = std::sqrt(-2.0 * std::log(v1)) * std::sin(2.0 * pi * v2);
+			}
 		}
 	}
 
