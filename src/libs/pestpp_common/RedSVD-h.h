@@ -71,29 +71,27 @@ namespace RedSVD
 		}
 	}
 
-	// std::normal_distribution is implementation-defined: libstdc++ (Linux) and
-	// MSVC (Windows) produce different sequences from the same engine state, which
-	// makes the randomized projection - and therefore every RedSVD/RedSymEigen
-	// result - diverge across platforms. Draw standard normals with a portable
-	// Box-Muller transform over the raw mt19937 integer stream instead (matching
-	// draw_standard_normal() in pest_data_structs.cpp). The engine is left default-
-	// seeded, so the same bits are produced on every platform.
+	// Cross-platform-deterministic random projection for the randomized SVD/eigen
+	// range finder. std::normal_distribution is implementation-defined (libstdc++
+	// vs MSVC diverge from the same engine state), and even a hand-rolled Box-Muller
+	// transform depends on libm sqrt/log/sin, which are not bit-identical across
+	// platforms - so the projection (and therefore every RedSVD/RedSymEigen result)
+	// still diverges, badly amplified under aggressive low-rank truncation.
+	//
+	// A Rademacher (+/-1) sign projection is a valid sub-gaussian projection for
+	// randomized range finding and depends ONLY on the raw mt19937 integer bits,
+	// which ARE portable. Combined with the default-seeded engine, this yields a
+	// bit-identical projection on every platform. gram_schmidt() orthonormalizes
+	// the result, so the unit scale of the entries is irrelevant.
 	template<typename MatrixType>
 	inline void sample_gaussian(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 		std::mt19937 generator;
-		const double pi = 3.14159265358979323846264338327950288;
-		const double span = static_cast<double>(generator.max()) - static_cast<double>(generator.min());
 		for (Index i = 0; i < mat.rows(); ++i)
 		{
 			for (Index j = 0; j < mat.cols(); ++j)
-			{
-				// v1 in (0,1) avoids log(0); v2 in [0,1)
-				double v1 = (static_cast<double>(generator() - generator.min()) + 1.0) / (span + 2.0);
-				double v2 = static_cast<double>(generator() - generator.min()) / (span + 1.0);
-				mat(i, j) = std::sqrt(-2.0 * std::log(v1)) * std::sin(2.0 * pi * v2);
-			}
+				mat(i, j) = (generator() & 1u) ? 1.0 : -1.0;
 		}
 	}
 
