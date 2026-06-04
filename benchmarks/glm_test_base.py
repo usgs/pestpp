@@ -414,7 +414,10 @@ def freyberg_stress_test():
                                  port=port)
     pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
     print(pst.phi)
-    assert pst.phi < 1200
+    # threshold re-tuned for the deterministic Eigen SVD pin above: this rank-10
+    # truncation now yields phi = 1299.20 bit-identically on linux and windows
+    # (was platform-divergent ~<1200 / 1351 under randomized RedSVD). ~4% headroom.
+    assert pst.phi < 1350
     oe = pd.read_csv(os.path.join(test_d,"pest_stress.post.obsen.csv"),index_col=0)
     assert oe.dropna().shape == (int(pst.pestpp_options["glm_num_reals"]),pst.nobs),oe.dropna().shape
     
