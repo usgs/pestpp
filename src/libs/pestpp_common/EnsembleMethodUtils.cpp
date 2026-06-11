@@ -6489,6 +6489,8 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     map<string,double> current_phi_fracs;
     map<string,double> init_group_phis;
     map<string,map<string,double>> real_init_group_phis,real_adj_group_phis;
+    map<string,double> tag_scale_sums;
+    map<string,int> tag_scale_counts;
     map<string,int> weight_real_map = weights.get_real_map();
     map<string,int> weight_var_map = weights.get_var_map();
     double total = 0;
@@ -6549,7 +6551,11 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             if (!do_adjust)
                 scale_fac = 1.0;
             else
+            {
                 scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+                tag_scale_sums[pf.first] += scale_fac;
+                tag_scale_counts[pf.first]++;
+            }
             for (auto &g : group_map.at(pf.first)) {
 
                 for (auto oname : group_to_obs_map.at(g)) {
@@ -6561,6 +6567,13 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 
         real_init_group_phis[swr_map.first] = init_group_phis;
 
+    }
+
+    for (auto& t : tag_scale_sums)
+    {
+        ss.str("");
+        ss << "file tag '" << t.first << "' average percent change in weights: " << 100.0 * ((t.second / (double)tag_scale_counts.at(t.first)) - 1.0);
+        message(1,ss.str());
     }
 
     map<string,map<string,double>> adj_swr_map = ph.get_swr_real_map(oe, weights);
@@ -6689,6 +6702,9 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         ss << "file tag '" << pf.first << "' original mean phi (factor): " << total << " (" << current_phi_fracs[pf.first] << ")";
         message(1,ss.str());
         scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+        ss.str("");
+        ss << "file tag '" << pf.first << "' average percent change in weights: " << 100.0 * (scale_fac - 1.0);
+        message(1,ss.str());
         for (auto& g : group_map.at(pf.first))
         {
             for (auto oname : group_to_obs_map.at(g))
