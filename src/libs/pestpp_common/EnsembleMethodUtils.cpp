@@ -1948,7 +1948,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		obs_resid.resize(0, 0);
 		obs_diff.resize(0, 0);
 		obs_err.resize(0, 0);
-		loc.resize(0, 0);
+		//loc.resize(0, 0);  //dead: covariance/hadamard localization is deprecated (see EnsembleSolver::solve); loc is never consumed
 		Am.resize(0, 0);
 		weights.resize(0);
 		parcov_inv.resize(0);
@@ -1956,24 +1956,30 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		
 
-		if ((use_localizer) && (loc.rows() == 0)) {
-            while (true) {
-                //get access to the localizer
-                if (loc_guard.try_lock()) {
-                    //get a matrix that is either the shape of par diff or obs diff
-                    if (loc_by_obs) {
-                        //loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-                        loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
-                    } else {
-                        //loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-                        loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
-                    }
-                    loc_guard.unlock();
-                    break;
-                }
-
-            }
-        }
+		// dead code: 'loc' (the hadamard localizing matrix) is built here but never
+		// consumed - it is not applied to the anomalies and not passed to
+		// UpgradeThread::ensemble_solution (which has no localizer arg). Covariance/
+		// hadamard localization is deprecated in EnsembleSolver::solve; live
+		// localization is done by par/obs subsetting per case. Commented out to
+		// avoid the wasted per-case n_par(or n_obs) x num_reals allocation+fill.
+		//if ((use_localizer) && (loc.rows() == 0)) {
+        //    while (true) {
+        //        //get access to the localizer
+        //        if (loc_guard.try_lock()) {
+        //            //get a matrix that is either the shape of par diff or obs diff
+        //            if (loc_by_obs) {
+        //                //loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+        //                loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
+        //            } else {
+        //                //loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+        //                loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
+        //            }
+        //            loc_guard.unlock();
+        //            break;
+        //        }
+        //
+        //    }
+        //}
 
         obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
         obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
