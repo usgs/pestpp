@@ -92,6 +92,13 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
     }
 	buf_stream.close();
 
+	// install a large stream buffer before (re)opening so that the bulk header
+	// write (serialized par/obs names) drains to disk in a handful of syscalls
+	// instead of thousands of tiny default-buffer flushes.  pubsetbuf must be
+	// called while the stream is closed to take effect on the next open.
+	io_buffer.resize(IO_BUFFER_SIZE);
+	buf_stream.rdbuf()->pubsetbuf(io_buffer.data(), io_buffer.size());
+
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::in | ios_base::binary);
 	//assert(buf_stream.good() == true);
 	if (!buf_stream)
