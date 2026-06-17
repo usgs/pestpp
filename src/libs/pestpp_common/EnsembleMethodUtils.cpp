@@ -239,6 +239,57 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
 }
 
 
+//compute neighborhood-ranking weights for one center realization when all reals are used
+//(mm_alpha >= 1).  Returns weight-by-par-realization-name in [0,1]: closer reals (lower composite
+//score in [0,2] = normalized par-space distance + normalized phi distance) get larger weights via
+//((2 - score) / 2) ^ weight_exp.  This mirrors the composite score used in MmNeighborThread::work
+//but keeps all reals (no subsetting).
+static map<string,double> mm_neighbor_weights(int center_idx, const Eigen::MatrixXd& pe_mat,
+        const vector<string>& preal_names, const vector<string>& oreal_names,
+        map<string,double> phi_map, const Eigen::SparseMatrix<double>& parcov_inv, double weight_exp)
+{
+    int num_reals = (int)preal_names.size();
+    //scale the phi values from 0 to 1 and flip to par realization names
+    double mx = -1.0e+300;
+    for (auto& p : phi_map)
+        if (p.second > mx)
+            mx = p.second;
+    for (auto& p : phi_map)
+        p.second /= mx;
+    map<string,double> par_phi_map;
+    for (int ii = 0; ii < num_reals; ii++)
+        par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
+
+    //parcov-weighted par-space distance from the center realization, scaled from 0 to 1
+    Eigen::VectorXd center = pe_mat.row(center_idx);
+    Eigen::VectorXd diff;
+    map<string,double> par_dist;
+    mx = -1.0e+300;
+    for (int ii = 0; ii < num_reals; ii++)
+    {
+        if (ii == center_idx)
+            continue;
+        diff = pe_mat.row(ii).transpose() - center;
+        double edist = diff.transpose() * parcov_inv * diff;
+        par_dist[preal_names[ii]] = edist;
+        if (edist > mx)
+            mx = edist;
+    }
+    if (mx <= 0.0)
+        throw runtime_error("multimodal weight error: maximum par diff for realization '" + preal_names[center_idx] + "' not valid");
+
+    //composite score in [0,2] -> weight in [0,1]
+    map<string,double> rweight;
+    for (int ii = 0; ii < num_reals; ii++)
+    {
+        if (ii == center_idx)
+            continue;
+        double score = (par_dist.at(preal_names[ii]) / mx) + par_phi_map.at(preal_names[ii]);
+        rweight[preal_names[ii]] = pow((2.0 - score) / 2.0, weight_exp);
+    }
+    return rweight;
+}
+
 /**
  * @brief Update multimodal components.
  *
@@ -248,7 +299,10 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     mm_real_idx_map.clear();
     mm_q_vec_map.clear();
     mm_real_name_map.clear();
+    mm_real_weight_map.clear();
     stringstream ss;
+    if ((pest_scenario.get_pestpp_options().get_ies_multimodal_weight_exponent() > 0.0) && (mm_alpha < 1.0))
+        file_manager.rec_ofstream() << "...warning: ies_multimodal_weight_exponent > 0 is ignored because ies_multimodal_alpha < 1.0" << endl;
     int num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
     Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
     Eigen::MatrixXd wmat = weights.get_eigen(vector<string>(),act_obs_names);
@@ -264,7 +318,17 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
 	preal_names = pe.get_real_names();
 
 	if (mm_alpha >= 1.0) {
-		file_manager.rec_ofstream() << "...mm_alpha >= 1.0, using all reals for gradient calculations" << endl;
+		double weight_exp = pest_scenario.get_pestpp_options().get_ies_multimodal_weight_exponent();
+		bool use_weights = weight_exp > 0.0;
+		if (use_weights)
+			file_manager.rec_ofstream() << "...mm_alpha >= 1.0 with ies_multimodal_weight_exponent " << weight_exp <<
+				", scaling realization contributions by neighborhood ranking" << endl;
+		else
+			file_manager.rec_ofstream() << "...mm_alpha >= 1.0, using all reals for gradient calculations" << endl;
+		//phi-weight ensemble is only needed for the neighborhood-ranking weights
+		map<string,map<string,double>> weight_phi_map;
+		if (use_weights)
+			weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
 		//all reals map to each other so just fill the containers
 		for (int i = 0; i < pe.shape().first; i++) {
 			real_name = real_names[i];
@@ -278,16 +342,31 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
 			pe_real_names_case.push_back(real_name);
 			oe_real_names_case.push_back(oreal_name);
 
+			//build the per-neighbor weight vector aligned to pe_real_names_case ([self, others])
+			map<string,double> rweight;
+			Eigen::VectorXd weight_vec;
+			if (use_weights) {
+				rweight = mm_neighbor_weights(i, *pe.get_eigen_ptr(), preal_names, oreal_names,
+					weight_phi_map.at(oreal_name), parcov_inv, weight_exp);
+				weight_vec.resize(pe.shape().first);
+				weight_vec[0] = 1.0;  //the center realization itself
+			}
+			int wi = 1;
+
 			for (int ii=0; ii<pe.shape().first;ii++) {
 				if (ii == i)
 					continue;
 				real_idxs.push_back(ii);
 				pe_real_names_case.push_back(preal_names[ii]);
 				oe_real_names_case.push_back(oreal_names[ii]);
+				if (use_weights)
+					weight_vec[wi++] = rweight.at(preal_names[ii]);
 			}
 			mm_real_idx_map[real_name] = real_idxs;
 			mm_q_vec_map[real_name] = q_vec;
 			mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
+			if (use_weights)
+				mm_real_weight_map[real_name] = weight_vec;
 		}
 		return;
 
@@ -845,7 +924,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         message(2, "launching threads");
 
         MmUpgradeThread* ut_ptr = new MmUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
-                                                                        mm_q_vec_map, pe_upgrade,mm_real_name_map,reg_factor);
+                                                                        mm_q_vec_map, pe_upgrade,mm_real_name_map,reg_factor,mm_real_weight_map);
 
         Eigen::VectorXd parcov_inv_vec = 1. / parcov.e_ptr()->diagonal().array();
         for (int i = 0; i < num_threads; i++)
@@ -957,7 +1036,14 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             }
             performance_log->log_event("calculating localized multimodal upgrade for " + real_name);
 
+            //hand the center realization's neighborhood-ranking weights to solve() so the
+            //localized upgrade threads can scale realization contributions (empty if not weighting)
+            if (mm_real_weight_map.find(real_name) != mm_real_weight_map.end())
+                mm_current_weights = mm_real_weight_map.at(real_name);
+            else
+                mm_current_weights.resize(0);
             solve(num_threads, cur_lam, use_glm_form, pe_real, loc_map);
+            mm_current_weights.resize(0);
         }
 
 
@@ -1062,8 +1148,23 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     obs_resid.transposeInPlace();
     par_resid.transposeInPlace();
     obs_err.transposeInPlace();
+    //optional multimodal realization weighting (single-threaded path): columns are realizations
+    //(in center_on-anomaly form, so the center realization's column is ~zero), aligned to
+    //pe_real_names = the [self, neighbors] subset order.
+    double mm_weight_sum = -1.0;
+    if ((center_on.size() > 0) && (mm_real_weight_map.find(center_on) != mm_real_weight_map.end())
+        && (mm_real_weight_map.at(center_on).size() == par_diff.cols()))
+    {
+        Eigen::VectorXd swvec = mm_real_weight_map.at(center_on).cwiseSqrt();
+        for (int j = 0; j < par_diff.cols(); j++)
+        {
+            par_diff.col(j) *= swvec[j];
+            obs_diff.col(j) *= swvec[j];
+        }
+        mm_weight_sum = mm_real_weight_map.at(center_on).sum();
+    }
     UpgradeThread::ensemble_solution(iter,verbose_level,maxsing,0,0,use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,
-                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv, act_obs_names,act_par_names,reg_factor);
+                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv, act_obs_names,act_par_names,reg_factor,mm_weight_sum);
     pe_upgrade.add_2_cols_ip(act_par_names, upgrade_1);
 
 
@@ -1094,6 +1195,8 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
                                             obs_diff_map, obs_err_map,
                                             localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
                                             _how, reg_factor);
+    //pass the (possibly empty) multimodal realization weights for the localized multimodal path
+    ut_ptr->set_real_weights(mm_current_weights);
     performance_log->log_event("using local analysis upgrade thread");
 
 	if ((num_threads < 1) || (loc_map.size() == 1))
@@ -1233,7 +1336,8 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
                               const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                               Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                               const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-                              const vector<string>& act_obs_names,const vector<string>& act_par_names,double _reg_factor)
+                              const vector<string>& act_obs_names,const vector<string>& act_par_names,double _reg_factor,
+                              double mm_weight_sum)
 {
     class local_utils
     {
@@ -1383,7 +1487,13 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
 
         int num_reals = par_resid.cols();
-        double scale = (1.0 / (sqrt(double(num_reals - 1))));
+        //conditionally use the multimodal weighted effective sample size (sum of realization
+        //weights) in place of num_reals when realization weighting is active (mm_weight_sum > 0)
+        double scale;
+        if (mm_weight_sum > 0.0)
+            scale = (1.0 / (sqrt(mm_weight_sum - 1.0)));
+        else
+            scale = (1.0 / (sqrt(double(num_reals - 1))));
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
         obs_diff = scale * (weights * obs_diff);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_diff", obs_diff);
@@ -1679,6 +1789,22 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         for (int i=0;i<obs_diff.rows();i++)
             obs_diff.row(i) -= row_vec;
 
+        //optionally scale each realization's (deviation) contribution by the neighborhood-ranking
+        //weight so that closer reals contribute more to the covariance.  the center realization is
+        //row 0 (weight 1, zero deviation).  mm_weight_sum is the effective sample size, passed to
+        //ensemble_solution so the scale factor uses sum(w) instead of num_reals.
+        double mm_weight_sum = -1.0;
+        if (real_weight_map.find(key) != real_weight_map.end())
+        {
+            Eigen::VectorXd swvec = real_weight_map.at(key).cwiseSqrt();
+            for (int i=0;i<par_diff.rows();i++)
+            {
+                par_diff.row(i) *= swvec[i];
+                obs_diff.row(i) *= swvec[i];
+            }
+            mm_weight_sum = real_weight_map.at(key).sum();
+        }
+
         par_diff.transposeInPlace();
         obs_diff.transposeInPlace();
         obs_resid.transposeInPlace();
@@ -1697,7 +1823,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         //Eigen::MatrixXd upgrade_1;
         vector<string> empty_obs_names,empty_par_names;
         UpgradeThread::ensemble_solution(iter,verbose_level,maxsing,thread_id,t_count, use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,par_diff,Am,obs_resid,
-                          obs_diff,upgrade_1,obs_err,weights,parcov_inv,empty_obs_names,empty_par_names,reg_factor);
+                          obs_diff,upgrade_1,obs_err,weights,parcov_inv,empty_obs_names,empty_par_names,reg_factor,mm_weight_sum);
 
 
         //assuming that the fist row is the realization we are after...
@@ -1723,11 +1849,13 @@ MmUpgradeThread::MmUpgradeThread(PerformanceLog* _performance_log, unordered_map
                                  unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
                                  unordered_map<string, Eigen::VectorXd>& _obs_err_map,
                                  unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
-                                 unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor):
+                                 unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor,
+                                 unordered_map<string, Eigen::VectorXd>& _real_weight_map):
         par_resid_map(_par_resid_map),par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map),
         obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map),
         pe_upgrade(_pe_upgrade), cases(_cases),
         weight_map(_weight_map),
+        real_weight_map(_real_weight_map),
         reg_factor(_reg_factor)
 {
     performance_log = _performance_log;
@@ -2009,13 +2137,27 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		par_resid.transposeInPlace();
 		obs_err.transposeInPlace();
 
+		//optional multimodal realization weighting (localized path): columns are realizations,
+		//aligned to the subset [self, neighbors] order carried in real_weights
+		double mm_weight_sum = -1.0;
+		if ((real_weights.size() > 0) && (real_weights.size() == par_diff.cols()))
+		{
+			Eigen::VectorXd swvec = real_weights.cwiseSqrt();
+			for (int j = 0; j < par_diff.cols(); j++)
+			{
+				par_diff.col(j) *= swvec[j];
+				obs_diff.col(j) *= swvec[j];
+			}
+			mm_weight_sum = real_weights.sum();
+		}
+
         UpgradeThread::ensemble_solution(iter, verbose_level,maxsing,  thread_id,
                                       t_count, use_prior_scaling,use_approx, use_glm_form,
                                       cur_lam,eigthresh, par_resid, par_diff,
                                       Am, obs_resid,obs_diff, upgrade_1,
                                       obs_err, weights,
                                       parcov_inv,
-                                      obs_names,par_names,reg_factor);
+                                      obs_names,par_names,reg_factor,mm_weight_sum);
 
 		
 		while (true)

@@ -1177,7 +1177,103 @@ def multimodal_test():
 
     phidf1 = pd.read_csv(os.path.join(m_d,"mm1.phi.actual.csv"))
     assert phidf1.iteration.max() == pst.control_data.noptmax
-    
+
+    # --- multimodal realization weighting: alpha=1.0 + neighborhood-ranking weight exponent ---
+    # exercise all three multimodal solve paths (multithreaded, single-threaded, localized).
+    # use a clean (no debug-fail) config so beta=0 vs beta>0 is a clean comparison
+    pst.pestpp_options["ies_multimodal_alpha"] = 1.0
+    pst.pestpp_options["ies_num_threads"] = 3
+    pst.pestpp_options["ies_debug_bad_phi"] = False
+    pst.pestpp_options["ies_debug_fail_remainder"] = False
+    pst.pestpp_options["ies_debug_fail_subset"] = False
+
+    # beta = 0 (default) -> equal weighting (must reproduce the plain alpha=1.0 behavior)
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 0.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_mmweight_beta0_{0}".format(func))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d, m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+    phidf_b0 = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+    assert phidf_b0.iteration.max() == pst.control_data.noptmax
+
+    # beta > 0 -> distance/rank-weighted realization contributions
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 2.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_mmweight_beta2_{0}".format(func))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d, m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+    phidf_b2 = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+    assert phidf_b2.iteration.max() == pst.control_data.noptmax
+
+    # a positive weight exponent must change the alpha=1.0 update relative to equal weighting
+    wdiff = np.abs(phidf_b0["mean"].iloc[-1] - phidf_b2["mean"].iloc[-1])
+    print("mm weight exponent mean-phi diff (threaded, beta0 vs beta2):", wdiff)
+    assert wdiff > 1e-8, "ies_multimodal_weight_exponent > 0 did not change the threaded multimodal result"
+
+    # single-threaded multimodal path (num_threads=1) must also apply weighting
+    pst.pestpp_options["ies_num_threads"] = 1
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 0.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_mmweight_st_beta0_{0}".format(func))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d, m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+    phidf_st0 = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+    assert phidf_st0.iteration.max() == pst.control_data.noptmax
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 2.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_mmweight_st_beta2_{0}".format(func))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d, m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+    phidf_st2 = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+    assert phidf_st2.iteration.max() == pst.control_data.noptmax
+    wdiff_st = np.abs(phidf_st0["mean"].iloc[-1] - phidf_st2["mean"].iloc[-1])
+    print("mm weight exponent mean-phi diff (single-thread, beta0 vs beta2):", wdiff_st)
+    assert wdiff_st > 1e-8, "weight exponent did not change the single-threaded multimodal result"
+
+    # localized multimodal path: an all-ones localizer routes through LocalAnalysisUpgradeThread
+    mat = pyemu.Matrix.from_names(pst.nnz_obs_names, pst.adj_par_names).to_dataframe()
+    mat.loc[:, :] = 1.0
+    pyemu.Matrix.from_dataframe(mat).to_ascii(os.path.join(test_d, "mm_localizer.mat"))
+    pst.pestpp_options["ies_localizer"] = "mm_localizer.mat"
+    pst.pestpp_options["ies_num_threads"] = 3
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 0.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_mmweight_loc_beta0_{0}".format(func))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d, m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+    phidf_loc0 = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+    assert phidf_loc0.iteration.max() == pst.control_data.noptmax
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 2.0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    m_d = os.path.join(model_d, "master_mmweight_loc_beta2_{0}".format(func))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(test_d, m_d)
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+    phidf_loc2 = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+    assert phidf_loc2.iteration.max() == pst.control_data.noptmax
+    wdiff_loc = np.abs(phidf_loc0["mean"].iloc[-1] - phidf_loc2["mean"].iloc[-1])
+    print("mm weight exponent mean-phi diff (localized, beta0 vs beta2):", wdiff_loc)
+    assert wdiff_loc > 1e-8, "weight exponent did not change the localized multimodal result"
+    pst.pestpp_options.pop("ies_localizer")
+
+    # restore options for the remainder of the test
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 0.0
+    pst.pestpp_options["ies_debug_bad_phi"] = True
+    pst.pestpp_options["ies_debug_fail_remainder"] = True
+    pst.pestpp_options["ies_debug_fail_subset"] = True
+    pst.pestpp_options["ies_num_threads"] = 1
+
     pst.pestpp_options["ies_multimodal_alpha"] = 0.99
     pst.write(os.path.join(test_d, "mm1.pst"))
     m_d = os.path.join(model_d, "master_almostallreals_{0}".format(func))
@@ -1248,6 +1344,110 @@ def multimodal_test():
     phidf = pd.read_csv(os.path.join(m_d,"mm1.phi.actual.csv"))
     assert phidf.iteration.max() == pst.control_data.noptmax
     assert phidf.loc[phidf.index[-1],"min"] < 0.1
+
+
+def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, noptmax=15, num_threads=1):
+    """EXPERIMENT (not a test): how the multimodal realization-weighting exponent (beta,
+    ies_multimodal_weight_exponent) influences the 'circle' problem posterior for varying
+    ensemble sizes.  The circle problem (obs = sqrt(p1^2+p2^2), obsval=1) has a degenerate
+    solution set on the unit circle, so it is a clean probe of multimodal coverage vs collapse.
+
+    Runs pestpp-ies at ies_multimodal_alpha=1.0 over a grid of (ensemble size, beta), collects
+    posterior metrics (mean phi, how tightly reals sit on the unit ring, and angular coverage of
+    the ring), writes a results csv, and produces the plots via plot_mm_weight_beta_experiment().
+    Returns the results dataframe."""
+    import itertools
+    if num_reals_list is None:
+        num_reals_list = [5, 10, 20, 50]
+    if beta_list is None:
+        beta_list = [0.0, 0.5, 1.0, 2.0, 4.0, 8.0]
+
+    model_d = "mm_beta_exp"
+    test_d = os.path.join(model_d, "template")
+    if os.path.exists(model_d):
+        shutil.rmtree(model_d)
+    os.makedirs(test_d)
+
+    # build the 'circle' forward model (same as multimodal_test)
+    tpl_file = os.path.join(test_d, "par.dat.tpl")
+    with open(tpl_file, 'w') as f:
+        f.write("ptf ~\npar1  ~   par1   ~\npar2  ~   par2   ~\n")
+    ins_file = os.path.join(test_d, "obs.dat.ins")
+    with open(ins_file, 'w') as f:
+        f.write("pif ~\nl1 !obs1!\nl1 !par1!\nl1 !par2!\n")
+    with open(os.path.join(test_d, "run.py"), 'w') as f:
+        f.write("import numpy as np\n")
+        f.write("lines = open('par.dat','r').readlines()\n")
+        f.write("p1 = float(lines[0].strip().split()[-1])\n")
+        f.write("p2 = float(lines[1].strip().split()[-1])\n")
+        f.write("result = np.sqrt(p1**2 + p2**2)\n")
+        f.write("with open('obs.dat','w') as f:\n")
+        f.write("    f.write('{0:15.6E}\\n'.format(result))\n")
+        f.write("    f.write('{0:15.6E}\\n'.format(p1))\n")
+        f.write("    f.write('{0:15.6E}\\n'.format(p2))\n")
+
+    pst = pyemu.Pst.from_io_files(tpl_file, tpl_file.replace(".tpl", ""), ins_file,
+                                  ins_file.replace(".ins", ""), pst_path=".")
+    pst.model_command = "python run.py"
+    pst.parameter_data.loc[:, "partrans"] = "none"
+    pst.parameter_data.loc[:, "parval1"] = 0
+    pst.parameter_data.loc[:, "parubnd"] = 2
+    pst.parameter_data.loc[:, "parlbnd"] = -2
+    pst.parameter_data.loc[:, "parchglim"] = "relative"
+    pst.observation_data.loc[:, "obsval"] = 1
+    pst.observation_data.loc[:, "weight"] = 0
+    pst.observation_data.loc["obs1", "weight"] = 100.0
+    pst.observation_data.loc[:, "obgnme"] = pst.observation_data.obsnme.values
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(test_d, "mm1.pst"))
+    pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=test_d)
+
+    nbins = 36  # angular bins for the ring-coverage metric
+    records = []
+    for num_reals, beta in itertools.product(num_reals_list, beta_list):
+        pst.control_data.noptmax = noptmax
+        pst.pestpp_options = {}
+        pst.pestpp_options["ies_num_reals"] = num_reals
+        pst.pestpp_options["ies_multimodal_alpha"] = 1.0
+        pst.pestpp_options["ies_multimodal_weight_exponent"] = beta
+        pst.pestpp_options["ies_num_threads"] = num_threads
+        pst.pestpp_options["ies_include_base"] = False
+        pst.pestpp_options["ies_use_approx"] = True
+        pst.pestpp_options["ies_no_noise"] = True
+        pst.pestpp_options["ies_subset_size"] = -10
+        pst.pestpp_options["ies_lambda_mults"] = 1.0
+        pst.pestpp_options["lambda_scale_fac"] = 1.0
+        pst.pestpp_options["ies_n_iter_reinflate"] = [3]
+
+        tag = "n{0}_b{1}".format(num_reals, str(beta).replace(".", "p"))
+        pst.write(os.path.join(test_d, "mm1.pst"))
+        m_d = os.path.join(model_d, "master_" + tag)
+        if os.path.exists(m_d):
+            shutil.rmtree(m_d)
+        shutil.copytree(test_d, m_d)
+        print("running", tag)
+        pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+
+        pe = pd.read_csv(os.path.join(m_d, "mm1.{0}.par.csv".format(noptmax)), index_col=0)
+        pe.columns = pe.columns.str.lower()
+        p1 = pe.loc[:, "par1"].values
+        p2 = pe.loc[:, "par2"].values
+        radius = np.sqrt(p1**2 + p2**2)
+        angle = np.arctan2(p2, p1)
+        occupied = np.unique(np.clip(np.floor((angle + np.pi) / (2*np.pi) * nbins).astype(int), 0, nbins-1))
+        phidf = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+        records.append({"num_reals": num_reals, "beta": beta,
+                        "phi_mean": phidf["mean"].iloc[-1], "phi_min": phidf["min"].iloc[-1],
+                        "radius_mean": radius.mean(), "radius_std": radius.std(),
+                        "ring_resid_mean": np.abs(radius - 1.0).mean(),
+                        "coverage": len(occupied) / float(nbins)})
+
+    df = pd.DataFrame.from_records(records)
+    csv_name = os.path.join(model_d, "mm_weight_beta_experiment.csv")
+    df.to_csv(csv_name, index=False)
+    print("saved results to", csv_name)
+    plot_mm_weight_beta_experiment(model_d=model_d, noptmax=noptmax)
+    return df
 
 
 def plot_mm1_sweep_results():
@@ -5160,10 +5360,109 @@ def tenpar_xsec_combined_autoadaloc_mm_stress_test():
 
 
 
+def plot_mm_weight_beta_experiment(csv_name=None, model_d="mm_beta_exp", noptmax=3, fps=1):
+    """visualize the mm_weight_beta_experiment results: (1) posterior metrics vs beta, one line
+    per ensemble size, and (2) an animated gif of the (par1,par2) ensembles across iterations
+    (rows = ensemble size, cols = beta) with the unit circle overlaid.  The prior (iteration 0)
+    ensemble is drawn as washed-out grey dots on every frame so collapse/coverage is visible."""
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter
+    if csv_name is None:
+        csv_name = os.path.join(model_d, "mm_weight_beta_experiment.csv")
+    df = pd.read_csv(csv_name)
+    betas = sorted(df.beta.unique())
+    nreals = sorted(df.num_reals.unique())
+
+    # (1) metric-vs-beta line plots
+    metrics = [("phi_mean", "mean phi"),
+               ("radius_std", "radius std (ring tightness)"),
+               ("coverage", "angular coverage (frac of 36 bins)"),
+               ("ring_resid_mean", "mean |radius - 1|")]
+    fig, axes = plt.subplots(2, 2, figsize=(11, 8))
+    for ax, (col, title) in zip(axes.flatten(), metrics):
+        for n in nreals:
+            sub = df.loc[df.num_reals == n].sort_values("beta")
+            ax.plot(sub.beta, sub[col], marker='o', label="N={0}".format(n))
+        ax.set_xlabel("beta (ies_multimodal_weight_exponent)")
+        ax.set_ylabel(title)
+        ax.set_title(title)
+        ax.grid(True)
+    axes.flatten()[0].legend(title="ensemble size")
+    fig.suptitle("multimodal weight exponent vs circle-problem posterior metrics")
+    fig.tight_layout()
+    metric_pdf = os.path.join(model_d, "mm_weight_beta_metrics.pdf")
+    fig.savefig(metric_pdf)
+    plt.close(fig)
+
+    # (2) animated scatter grid of the ensembles across iterations
+    def load(n, b, it):
+        tag = "n{0}_b{1}".format(n, str(b).replace(".", "p"))
+        pcsv = os.path.join(model_d, "master_" + tag, "mm1.{0}.par.csv".format(it))
+        if not os.path.exists(pcsv):
+            return None
+        pe = pd.read_csv(pcsv, index_col=0)
+        pe.columns = pe.columns.str.lower()
+        return pe["par1"].values, pe["par2"].values
+
+    # discover the iterations actually present on disk (don't rely on the noptmax arg, which
+    # may not match what was run) by scanning the master dirs for mm1.<int>.par.csv files
+    import glob, re
+    found = set()
+    for n in nreals:
+        for b in betas:
+            tag = "n{0}_b{1}".format(n, str(b).replace(".", "p"))
+            for f in glob.glob(os.path.join(model_d, "master_" + tag, "mm1.*.par.csv")):
+                m = re.search(r"mm1\.(\d+)\.par\.csv$", os.path.basename(f))
+                if m:
+                    found.add(int(m.group(1)))
+    iters = sorted(found) if len(found) > 0 else list(range(0, noptmax + 1))
+    last_iter = iters[-1] if len(iters) > 0 else noptmax
+    # preload prior (iter 0) and per-iteration ensembles to avoid repeated disk reads per frame
+    prior = {(n, b): load(n, b, 0) for n in nreals for b in betas}
+    ens = {(n, b, it): load(n, b, it) for n in nreals for b in betas for it in iters}
+
+    theta = np.linspace(0, 2 * np.pi, 200)
+    fig, axes = plt.subplots(len(nreals), len(betas),
+                             figsize=(2.4 * len(betas), 2.4 * len(nreals)), squeeze=False)
+
+    def draw_frame(it):
+        for i, n in enumerate(nreals):
+            for j, b in enumerate(betas):
+                ax = axes[i][j]
+                ax.clear()
+                ax.plot(np.cos(theta), np.sin(theta), 'r-', lw=0.8)
+                # prior ensemble as washed-out grey dots on every frame
+                pr = prior[(n, b)]
+                if pr is not None:
+                    ax.scatter(pr[0], pr[1], s=4, alpha=0.2, color='0.7')
+                cur = ens[(n, b, it)]
+                if cur is not None:
+                    ax.scatter(cur[0], cur[1], s=4, alpha=0.6, color='b')
+                ax.set_xlim(-2, 2)
+                ax.set_ylim(-2, 2)
+                ax.set_aspect("equal")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                if i == 0:
+                    ax.set_title("beta={0}".format(b), fontsize=8)
+                if j == 0:
+                    ax.set_ylabel("N={0}".format(n), fontsize=8)
+        fig.suptitle("circle-problem ensemble, iteration {0} of {1} (grey = prior)".format(it, last_iter))
+        return []
+
+    anim = FuncAnimation(fig, draw_frame, frames=iters, blit=False)
+    gif_name = os.path.join(model_d, "mm_weight_beta_scatter.gif")
+    anim.save(gif_name, writer=PillowWriter(fps=fps))
+    plt.close(fig)
+    print("saved plots:", metric_pdf, gif_name)
+
+
 if __name__ == "__main__":
 
-    chenoliver_test()
-
+    #chenoliver_test()
+    #multimodal_test()
+    mm_weight_beta_experiment()
+    plot_mm_weight_beta_experiment()
     #tenpar_fixed_transform_test()
 
     #tenpar_adjust_weights_test()

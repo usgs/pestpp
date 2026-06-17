@@ -1157,6 +1157,11 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_multimodal_alpha);
         return true;
     }
+    else if (key == "IES_MULTIMODAL_WEIGHT_EXPONENT")
+    {
+        convert_ip(value,ies_multimodal_weight_exponent);
+        return true;
+    }
     else if ((key == "IES_LOCALIZER_FORGIVE_MISSING") || (key == "IES_LOCALIZER_FORGIVE_EXTRA"))
     {
         passed_args.insert("IES_LOCALIZER_FORGIVE_MISSING");
@@ -2208,6 +2213,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_upgrades_in_memory: " << ies_upgrades_in_memory << endl;
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
+	os << "ies_multimodal_weight_exponent: " << ies_multimodal_weight_exponent << endl;
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
@@ -2455,6 +2461,7 @@ void PestppOptions::set_defaults()
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
     set_ies_multimodal_alpha(0.0);
+    set_ies_multimodal_weight_exponent(0.0);
     set_ensemble_output_precision(20);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
