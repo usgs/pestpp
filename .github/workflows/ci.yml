@@ -45,7 +45,7 @@ jobs:
           - { test_dir: "pestpp-sqp_benchmarks", test_repo: "https://github.com/pestpp/pestpp-sqp_benchmarks", test_script: "../benchmarks/sqp_test_part2.py"}
         include: 
             - os: ubuntu-latest
-              env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/rqmacasieb/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests_2.py"}
+              env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "../benchmarks/mou_tests_2.py"}
     env: ${{ matrix.env }}
 
     steps:
