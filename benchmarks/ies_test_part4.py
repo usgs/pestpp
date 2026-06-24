@@ -1267,6 +1267,32 @@ def multimodal_test():
     assert wdiff_loc > 1e-8, "weight exponent did not change the localized multimodal result"
     pst.pestpp_options.pop("ies_localizer")
 
+    # ies_multimodal_phi_weight: phi-vs-par-distance proportion in the neighborhood score.
+    # only matters when the composite score is used (here via the weight exponent).  0.5 must
+    # reproduce the default behavior; the 0.0 (pure distance) and 1.0 (pure phi) end members
+    # must each change the result and differ from one another.
+    pst.pestpp_options["ies_num_threads"] = 3
+    pst.pestpp_options["ies_multimodal_weight_exponent"] = 2.0
+    phi_w = {}
+    for pw in [0.0, 0.5, 1.0]:
+        pst.pestpp_options["ies_multimodal_phi_weight"] = pw
+        pst.write(os.path.join(test_d, "mm1.pst"))
+        m_d = os.path.join(model_d, "master_mmphiw_{0}_{1}".format(func, str(pw).replace(".", "p")))
+        if os.path.exists(m_d):
+            shutil.rmtree(m_d)
+        shutil.copytree(test_d, m_d)
+        pyemu.os_utils.run("{0} mm1.pst".format(exe_path), cwd=m_d)
+        phidf_pw = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
+        assert phidf_pw.iteration.max() == pst.control_data.noptmax
+        phi_w[pw] = phidf_pw["mean"].iloc[-1]
+    # phi_weight=0.5 reproduces the default weighting result (phidf_b2 was run at the default 0.5)
+    assert np.abs(phi_w[0.5] - phidf_b2["mean"].iloc[-1]) < 1e-8, "phi_weight=0.5 should reproduce the default result"
+    print("mm phi_weight mean-phi (0.0, 0.5, 1.0):", phi_w[0.0], phi_w[0.5], phi_w[1.0])
+    assert np.abs(phi_w[0.0] - phi_w[0.5]) > 1e-8, "phi_weight=0.0 did not change the result"
+    assert np.abs(phi_w[1.0] - phi_w[0.5]) > 1e-8, "phi_weight=1.0 did not change the result"
+    assert np.abs(phi_w[0.0] - phi_w[1.0]) > 1e-8, "phi_weight end members should differ from each other"
+    pst.pestpp_options.pop("ies_multimodal_phi_weight")
+
     # restore options for the remainder of the test
     pst.pestpp_options["ies_multimodal_weight_exponent"] = 0.0
     pst.pestpp_options["ies_debug_bad_phi"] = True
@@ -1346,21 +1372,24 @@ def multimodal_test():
     assert phidf.loc[phidf.index[-1],"min"] < 0.1
 
 
-def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, noptmax=15, num_threads=1):
+def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, phi_weight_list=None, noptmax=15, num_threads=1):
     """EXPERIMENT (not a test): how the multimodal realization-weighting exponent (beta,
     ies_multimodal_weight_exponent) influences the 'circle' problem posterior for varying
     ensemble sizes.  The circle problem (obs = sqrt(p1^2+p2^2), obsval=1) has a degenerate
     solution set on the unit circle, so it is a clean probe of multimodal coverage vs collapse.
 
-    Runs pestpp-ies at ies_multimodal_alpha=1.0 over a grid of (ensemble size, beta), collects
-    posterior metrics (mean phi, how tightly reals sit on the unit ring, and angular coverage of
-    the ring), writes a results csv, and produces the plots via plot_mm_weight_beta_experiment().
-    Returns the results dataframe."""
+    Runs pestpp-ies at ies_multimodal_alpha=1.0 over a grid of (ensemble size, beta, phi_weight),
+    collects posterior metrics (mean phi, how tightly reals sit on the unit ring, and angular
+    coverage of the ring), writes a results csv, and produces the plots via
+    plot_mm_weight_beta_experiment().  phi_weight_list defaults to both end members (0.0 = pure
+    par-space distance, 1.0 = pure phi) plus the 0.5 equal baseline.  Returns the results dataframe."""
     import itertools
     if num_reals_list is None:
-        num_reals_list = [5, 10, 20, 50]
+        num_reals_list = [10, 20, 50]
     if beta_list is None:
-        beta_list = [0.0, 0.5, 1.0, 2.0, 4.0, 8.0]
+        beta_list = [0.0, 1.0, 4.0, 8.0,16]
+    if phi_weight_list is None:
+        phi_weight_list = [0.0,0.25, 0.5, 0.75,1.0]
 
     model_d = "mm_beta_exp"
     test_d = os.path.join(model_d, "template")
@@ -1404,12 +1433,13 @@ def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, noptmax=15, n
 
     nbins = 36  # angular bins for the ring-coverage metric
     records = []
-    for num_reals, beta in itertools.product(num_reals_list, beta_list):
+    for num_reals, beta, phi_weight in itertools.product(num_reals_list, beta_list, phi_weight_list):
         pst.control_data.noptmax = noptmax
         pst.pestpp_options = {}
         pst.pestpp_options["ies_num_reals"] = num_reals
         pst.pestpp_options["ies_multimodal_alpha"] = 1.0
         pst.pestpp_options["ies_multimodal_weight_exponent"] = beta
+        pst.pestpp_options["ies_multimodal_phi_weight"] = phi_weight
         pst.pestpp_options["ies_num_threads"] = num_threads
         pst.pestpp_options["ies_include_base"] = False
         pst.pestpp_options["ies_use_approx"] = True
@@ -1417,9 +1447,11 @@ def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, noptmax=15, n
         pst.pestpp_options["ies_subset_size"] = -10
         pst.pestpp_options["ies_lambda_mults"] = 1.0
         pst.pestpp_options["lambda_scale_fac"] = 1.0
-        pst.pestpp_options["ies_n_iter_reinflate"] = [3]
+        pst.pestpp_options["ies_n_iter_reinflate"] = 999
+        pst.pestpp_options["ies_save_lambda_en"] = True
+        pst.pestpp_options["ies_verbose_level"] = 4
 
-        tag = "n{0}_b{1}".format(num_reals, str(beta).replace(".", "p"))
+        tag = "n{0}_b{1}_pw{2}".format(num_reals, str(beta).replace(".", "p"), str(phi_weight).replace(".", "p"))
         pst.write(os.path.join(test_d, "mm1.pst"))
         m_d = os.path.join(model_d, "master_" + tag)
         if os.path.exists(m_d):
@@ -1436,7 +1468,7 @@ def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, noptmax=15, n
         angle = np.arctan2(p2, p1)
         occupied = np.unique(np.clip(np.floor((angle + np.pi) / (2*np.pi) * nbins).astype(int), 0, nbins-1))
         phidf = pd.read_csv(os.path.join(m_d, "mm1.phi.actual.csv"))
-        records.append({"num_reals": num_reals, "beta": beta,
+        records.append({"num_reals": num_reals, "beta": beta, "phi_weight": phi_weight,
                         "phi_mean": phidf["mean"].iloc[-1], "phi_min": phidf["min"].iloc[-1],
                         "radius_mean": radius.mean(), "radius_std": radius.std(),
                         "ring_resid_mean": np.abs(radius - 1.0).mean(),
@@ -5361,100 +5393,117 @@ def tenpar_xsec_combined_autoadaloc_mm_stress_test():
 
 
 def plot_mm_weight_beta_experiment(csv_name=None, model_d="mm_beta_exp", noptmax=3, fps=1):
-    """visualize the mm_weight_beta_experiment results: (1) posterior metrics vs beta, one line
-    per ensemble size, and (2) an animated gif of the (par1,par2) ensembles across iterations
-    (rows = ensemble size, cols = beta) with the unit circle overlaid.  The prior (iteration 0)
-    ensemble is drawn as washed-out grey dots on every frame so collapse/coverage is visible."""
+    """visualize the mm_weight_beta_experiment results.  For each phi_weight value, produces:
+    (1) posterior metrics vs beta, one line per ensemble size, and (2) an animated gif of the
+    (par1,par2) ensembles across iterations (rows = ensemble size, cols = beta) with the unit
+    circle overlaid.  The prior (iteration 0) ensemble is drawn as washed-out grey dots on every
+    frame so collapse/coverage is visible.  Output files are suffixed with the phi_weight."""
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation, PillowWriter
+    import glob, re
     if csv_name is None:
         csv_name = os.path.join(model_d, "mm_weight_beta_experiment.csv")
     df = pd.read_csv(csv_name)
-    betas = sorted(df.beta.unique())
-    nreals = sorted(df.num_reals.unique())
+    # support older results that have no phi_weight column
+    if "phi_weight" not in df.columns:
+        df = df.copy()
+        df["phi_weight"] = np.nan
+    phi_weights = sorted(df.phi_weight.dropna().unique()) if df.phi_weight.notna().any() else [None]
 
-    # (1) metric-vs-beta line plots
     metrics = [("phi_mean", "mean phi"),
                ("radius_std", "radius std (ring tightness)"),
                ("coverage", "angular coverage (frac of 36 bins)"),
                ("ring_resid_mean", "mean |radius - 1|")]
-    fig, axes = plt.subplots(2, 2, figsize=(11, 8))
-    for ax, (col, title) in zip(axes.flatten(), metrics):
+    saved = []
+    for pw in phi_weights:
+        if pw is None:
+            sub_df = df
+            suffix, pw_label = "", "default"
+            def tag_of(n, b):
+                return "n{0}_b{1}".format(n, str(b).replace(".", "p"))
+        else:
+            sub_df = df.loc[df.phi_weight == pw]
+            pwstr = str(pw).replace(".", "p")
+            suffix, pw_label = "_pw" + pwstr, "phi_weight={0}".format(pw)
+            def tag_of(n, b, pwstr=pwstr):
+                return "n{0}_b{1}_pw{2}".format(n, str(b).replace(".", "p"), pwstr)
+        betas = sorted(sub_df.beta.unique())
+        nreals = sorted(sub_df.num_reals.unique())
+
+        # (1) metric-vs-beta line plots
+        fig, axes = plt.subplots(2, 2, figsize=(11, 8))
+        for ax, (col, title) in zip(axes.flatten(), metrics):
+            for n in nreals:
+                s = sub_df.loc[sub_df.num_reals == n].sort_values("beta")
+                ax.plot(s.beta, s[col], marker='o', label="N={0}".format(n))
+            ax.set_xlabel("beta (ies_multimodal_weight_exponent)")
+            ax.set_ylabel(title)
+            ax.set_title(title)
+            ax.grid(True)
+        axes.flatten()[0].legend(title="ensemble size")
+        fig.suptitle("multimodal weight exponent vs circle-problem metrics ({0})".format(pw_label))
+        fig.tight_layout()
+        metric_pdf = os.path.join(model_d, "mm_weight_beta_metrics{0}.pdf".format(suffix))
+        fig.savefig(metric_pdf)
+        plt.close(fig)
+
+        # (2) animated scatter grid of the ensembles across iterations
+        def load(n, b, it):
+            pcsv = os.path.join(model_d, "master_" + tag_of(n, b), "mm1.{0}.par.csv".format(it))
+            if not os.path.exists(pcsv):
+                return None
+            pe = pd.read_csv(pcsv, index_col=0)
+            pe.columns = pe.columns.str.lower()
+            return pe["par1"].values, pe["par2"].values
+
+        # discover the iterations actually present on disk (don't rely on the noptmax arg)
+        found = set()
         for n in nreals:
-            sub = df.loc[df.num_reals == n].sort_values("beta")
-            ax.plot(sub.beta, sub[col], marker='o', label="N={0}".format(n))
-        ax.set_xlabel("beta (ies_multimodal_weight_exponent)")
-        ax.set_ylabel(title)
-        ax.set_title(title)
-        ax.grid(True)
-    axes.flatten()[0].legend(title="ensemble size")
-    fig.suptitle("multimodal weight exponent vs circle-problem posterior metrics")
-    fig.tight_layout()
-    metric_pdf = os.path.join(model_d, "mm_weight_beta_metrics.pdf")
-    fig.savefig(metric_pdf)
-    plt.close(fig)
+            for b in betas:
+                for f in glob.glob(os.path.join(model_d, "master_" + tag_of(n, b), "mm1.*.par.csv")):
+                    m = re.search(r"mm1\.(\d+)\.par\.csv$", os.path.basename(f))
+                    if m:
+                        found.add(int(m.group(1)))
+        iters = sorted(found) if len(found) > 0 else list(range(0, noptmax + 1))
+        last_iter = iters[-1] if len(iters) > 0 else noptmax
+        prior = {(n, b): load(n, b, 0) for n in nreals for b in betas}
+        ens = {(n, b, it): load(n, b, it) for n in nreals for b in betas for it in iters}
 
-    # (2) animated scatter grid of the ensembles across iterations
-    def load(n, b, it):
-        tag = "n{0}_b{1}".format(n, str(b).replace(".", "p"))
-        pcsv = os.path.join(model_d, "master_" + tag, "mm1.{0}.par.csv".format(it))
-        if not os.path.exists(pcsv):
-            return None
-        pe = pd.read_csv(pcsv, index_col=0)
-        pe.columns = pe.columns.str.lower()
-        return pe["par1"].values, pe["par2"].values
+        theta = np.linspace(0, 2 * np.pi, 200)
+        fig, axes = plt.subplots(len(nreals), len(betas),
+                                 figsize=(2.4 * len(betas), 2.4 * len(nreals)), squeeze=False)
 
-    # discover the iterations actually present on disk (don't rely on the noptmax arg, which
-    # may not match what was run) by scanning the master dirs for mm1.<int>.par.csv files
-    import glob, re
-    found = set()
-    for n in nreals:
-        for b in betas:
-            tag = "n{0}_b{1}".format(n, str(b).replace(".", "p"))
-            for f in glob.glob(os.path.join(model_d, "master_" + tag, "mm1.*.par.csv")):
-                m = re.search(r"mm1\.(\d+)\.par\.csv$", os.path.basename(f))
-                if m:
-                    found.add(int(m.group(1)))
-    iters = sorted(found) if len(found) > 0 else list(range(0, noptmax + 1))
-    last_iter = iters[-1] if len(iters) > 0 else noptmax
-    # preload prior (iter 0) and per-iteration ensembles to avoid repeated disk reads per frame
-    prior = {(n, b): load(n, b, 0) for n in nreals for b in betas}
-    ens = {(n, b, it): load(n, b, it) for n in nreals for b in betas for it in iters}
+        def draw_frame(it):
+            for i, n in enumerate(nreals):
+                for j, b in enumerate(betas):
+                    ax = axes[i][j]
+                    ax.clear()
+                    ax.plot(np.cos(theta), np.sin(theta), 'r-', lw=0.8)
+                    # prior ensemble as washed-out grey dots on every frame
+                    pr = prior[(n, b)]
+                    if pr is not None:
+                        ax.scatter(pr[0], pr[1], s=4, alpha=0.2, color='0.7')
+                    cur = ens[(n, b, it)]
+                    if cur is not None:
+                        ax.scatter(cur[0], cur[1], s=4, alpha=0.6, color='b')
+                    ax.set_xlim(-2, 2)
+                    ax.set_ylim(-2, 2)
+                    ax.set_aspect("equal")
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                    if i == 0:
+                        ax.set_title("beta={0}".format(b), fontsize=8)
+                    if j == 0:
+                        ax.set_ylabel("N={0}".format(n), fontsize=8)
+            fig.suptitle("circle-problem ensemble, iteration {0} of {1} ({2}, grey = prior)".format(it, last_iter, pw_label))
+            return []
 
-    theta = np.linspace(0, 2 * np.pi, 200)
-    fig, axes = plt.subplots(len(nreals), len(betas),
-                             figsize=(2.4 * len(betas), 2.4 * len(nreals)), squeeze=False)
-
-    def draw_frame(it):
-        for i, n in enumerate(nreals):
-            for j, b in enumerate(betas):
-                ax = axes[i][j]
-                ax.clear()
-                ax.plot(np.cos(theta), np.sin(theta), 'r-', lw=0.8)
-                # prior ensemble as washed-out grey dots on every frame
-                pr = prior[(n, b)]
-                if pr is not None:
-                    ax.scatter(pr[0], pr[1], s=4, alpha=0.2, color='0.7')
-                cur = ens[(n, b, it)]
-                if cur is not None:
-                    ax.scatter(cur[0], cur[1], s=4, alpha=0.6, color='b')
-                ax.set_xlim(-2, 2)
-                ax.set_ylim(-2, 2)
-                ax.set_aspect("equal")
-                ax.set_xticks([])
-                ax.set_yticks([])
-                if i == 0:
-                    ax.set_title("beta={0}".format(b), fontsize=8)
-                if j == 0:
-                    ax.set_ylabel("N={0}".format(n), fontsize=8)
-        fig.suptitle("circle-problem ensemble, iteration {0} of {1} (grey = prior)".format(it, last_iter))
-        return []
-
-    anim = FuncAnimation(fig, draw_frame, frames=iters, blit=False)
-    gif_name = os.path.join(model_d, "mm_weight_beta_scatter.gif")
-    anim.save(gif_name, writer=PillowWriter(fps=fps))
-    plt.close(fig)
-    print("saved plots:", metric_pdf, gif_name)
+        anim = FuncAnimation(fig, draw_frame, frames=iters, blit=False)
+        gif_name = os.path.join(model_d, "mm_weight_beta_scatter{0}.gif".format(suffix))
+        anim.save(gif_name, writer=PillowWriter(fps=fps))
+        plt.close(fig)
+        saved.extend([metric_pdf, gif_name])
+    print("saved plots:", ", ".join(saved))
 
 
 if __name__ == "__main__":

@@ -62,12 +62,12 @@ neighbor_phi_map(_neighbor_phi_map),neighbor_pardist_map(_neighbor_pardist_map)
         indexes.push_back(i);
 }
 
-void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
+void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, double phi_weight, map<string,map<string,double>> weight_phi_map,
                                  vector<string> preal_names, vector<string> oreal_names,Eigen::SparseMatrix<double> parcov_inv,
                                  map<string,int> real_map,
                                  MmNeighborThread& worker, exception_ptr& eptr) {
     try {
-        worker.work(id,verbose_level,mm_alpha,weight_phi_map,preal_names,oreal_names,real_map,parcov_inv);
+        worker.work(id,verbose_level,mm_alpha,phi_weight,weight_phi_map,preal_names,oreal_names,real_map,parcov_inv);
     }
     catch (...) {
         eptr = current_exception();
@@ -75,7 +75,7 @@ void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map
 
 }
 
-void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
+void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, double phi_weight, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
                             vector<string> oreal_names,map<string,int> real_map,Eigen::SparseMatrix<double> parcov_inv)
 {
     unique_lock<mutex> next_guard(next_lock, defer_lock);
@@ -183,12 +183,13 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             }
         }
 
-        //calc composite score
+        //calc composite score - phi_weight in [0,1] sets the phi-vs-par-distance proportion;
+        //the 2x keeps the score in the same [0,2] range used downstream (phi_weight=0.5 -> par+phi)
         map<string, double> composite_score;
         for (auto &rname : preal_names) {
             if (rname == real_name)
                 continue;
-            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+            composite_score[rname] = 2.0 * (((1.0 - phi_weight) * euclid_par_dist.at(rname)) + (phi_weight * par_phi_map.at(rname)));
         }
         //sort by score
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
@@ -246,7 +247,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
 //but keeps all reals (no subsetting).
 static map<string,double> mm_neighbor_weights(int center_idx, const Eigen::MatrixXd& pe_mat,
         const vector<string>& preal_names, const vector<string>& oreal_names,
-        map<string,double> phi_map, const Eigen::SparseMatrix<double>& parcov_inv, double weight_exp)
+        map<string,double> phi_map, const Eigen::SparseMatrix<double>& parcov_inv, double weight_exp, double phi_weight)
 {
     int num_reals = (int)preal_names.size();
     //scale the phi values from 0 to 1 and flip to par realization names
@@ -284,7 +285,7 @@ static map<string,double> mm_neighbor_weights(int center_idx, const Eigen::Matri
     {
         if (ii == center_idx)
             continue;
-        double score = (par_dist.at(preal_names[ii]) / mx) + par_phi_map.at(preal_names[ii]);
+        double score = 2.0 * (((1.0 - phi_weight) * (par_dist.at(preal_names[ii]) / mx)) + (phi_weight * par_phi_map.at(preal_names[ii])));
         rweight[preal_names[ii]] = pow((2.0 - score) / 2.0, weight_exp);
     }
     return rweight;
@@ -303,6 +304,11 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     stringstream ss;
     if ((pest_scenario.get_pestpp_options().get_ies_multimodal_weight_exponent() > 0.0) && (mm_alpha < 1.0))
         file_manager.rec_ofstream() << "...warning: ies_multimodal_weight_exponent > 0 is ignored because ies_multimodal_alpha < 1.0" << endl;
+    //proportion of phi vs par-space distance in the neighborhood composite score (0.5 = equal,
+    //which recovers the original par_dist + phi behavior); must be in [0,1]
+    double phi_weight = pest_scenario.get_pestpp_options().get_ies_multimodal_phi_weight();
+    if ((phi_weight < 0.0) || (phi_weight > 1.0))
+        throw runtime_error("ies_multimodal_phi_weight must be in [0,1], not " + to_string(phi_weight));
     int num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
     Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
     Eigen::MatrixXd wmat = weights.get_eigen(vector<string>(),act_obs_names);
@@ -347,7 +353,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
 			Eigen::VectorXd weight_vec;
 			if (use_weights) {
 				rweight = mm_neighbor_weights(i, *pe.get_eigen_ptr(), preal_names, oreal_names,
-					weight_phi_map.at(oreal_name), parcov_inv, weight_exp);
+					weight_phi_map.at(oreal_name), parcov_inv, weight_exp, phi_weight);
 				weight_vec.resize(pe.shape().first);
 				weight_vec[0] = 1.0;  //the center realization itself
 			}
@@ -400,7 +406,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             exception_ptrs.push_back(exception_ptr());
         }
         for (int i = 0; i < num_threads; i++) {
-        	threads.push_back(thread(mm_neighbor_thread_function, i, verbose_level, mm_alpha, weight_phi_map,preal_names,
+        	threads.push_back(thread(mm_neighbor_thread_function, i, verbose_level, mm_alpha, phi_weight, weight_phi_map,preal_names,
                                      oreal_names, parcov_inv, real_map, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
         }
 
@@ -577,7 +583,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         for (auto &rname : real_names) {
             if (rname == real_name)
                 continue;
-            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+            composite_score[rname] = 2.0 * (((1.0 - phi_weight) * euclid_par_dist.at(rname)) + (phi_weight * par_phi_map.at(rname)));
         }
         performance_log->log_event("...sorting composite score");
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
@@ -1490,7 +1496,7 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
         //conditionally use the multimodal weighted effective sample size (sum of realization
         //weights) in place of num_reals when realization weighting is active (mm_weight_sum > 0)
         double scale;
-        if (mm_weight_sum > 0.0)
+        if ((mm_weight_sum > 0.0) & (mm_weight_sum < 1.0))
             scale = (1.0 / (sqrt(mm_weight_sum - 1.0)));
         else
             scale = (1.0 / (sqrt(double(num_reals - 1))));

@@ -30,7 +30,7 @@ public:
                      unordered_map<string,unordered_map<string,double>>& _neighbor_phi_map,
                      unordered_map<string,unordered_map<string,double>>& _neighbor_pardist_map);
 
-    void work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
+    void work(int tid, int verbose_level, double mm_alpha, double phi_weight, map<string,map<string,double>> weight_phi_map,
               vector<string> preal_names, vector<string> oreal_names,map<string,int> real_map,
               Eigen::SparseMatrix<double> parcov_inv);
 
