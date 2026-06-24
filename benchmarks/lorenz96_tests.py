@@ -294,7 +294,7 @@ if __name__ == "__main__":
     pst_file = 'es.pst'
     pst.control_data.noptmax = 0
     pst.write(os.path.join(template_ws, pst_file), version=2)
-    pyemu.os_utils.run("pestpp-ies {0}".format(pst_file),cwd=template_ws)
+    pyemu.os_utils.run("{1} {0}".format(pst_file,exe_path.replace("-da","-ies")),cwd=template_ws)
 
     pass
 
@@ -302,7 +302,7 @@ def run_ies(t_d="template96_pst_ies",num_workers=5):
     pst = pyemu.Pst(os.path.join(t_d,"es.pst"))
     pst.control_data.noptmax = 5
     pst.write(os.path.join(t_d,"es.pst"))
-    pyemu.os_utils.start_workers(t_d,"pestpp-ies","es.pst",num_workers=num_workers,master_dir="master_ies")
+    pyemu.os_utils.start_workers(t_d,exe_path.replace("-da","-ies"),"es.pst",num_workers=num_workers,master_dir="master_ies")
 
 
 def mod_to_seq():
@@ -691,9 +691,9 @@ def lorenz96_ies_dim_test(dim_use=36, num_reals=50, noptmax=3, num_workers=10):
         shutil.rmtree(m_d)
     if num_workers == 0:
         shutil.copytree(t_d, m_d)
-        pyemu.os_utils.run("pestpp-ies es.pst", cwd=m_d)
+        pyemu.os_utils.run("{0} es.pst".format(exe_path.replace("-da","-ies")), cwd=m_d)
     else:
-        pyemu.os_utils.start_workers(t_d, "pestpp-ies", "es.pst", num_workers=num_workers,
+        pyemu.os_utils.start_workers(t_d, exe_path.replace("-da","-ies"), "es.pst", num_workers=num_workers,
                                      master_dir=m_d, worker_root=".", port=port)
     phidf = pd.read_csv(os.path.join(m_d, "es.phi.actual.csv"))
     print("dim", dim_use, "npar_adj", pst.npar_adj, "nnz_obs", pst.nnz_obs,
