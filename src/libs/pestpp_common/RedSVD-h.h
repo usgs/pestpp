@@ -71,35 +71,44 @@ namespace RedSVD
 		}
 	}
 
-	// std::normal_distribution is implementation-defined: libstdc++ (Linux) and
-	// MSVC (Windows) produce different sequences from the same engine state, which
-	// makes the randomized projection - and therefore every RedSVD/RedSymEigen
-	// result - diverge across platforms. Draw standard normals with a portable
-	// Box-Muller transform over the raw mt19937 integer stream instead (matching
-	// draw_standard_normal() in pest_data_structs.cpp). The engine is left default-
-	// seeded, so the same bits are produced on every platform.
+	// std::normal_distribution is implementation-defined, and a Box-Muller transform relies on
+	// std::log/std::sin, which are not correctly-rounded and differ by ~1 ULP across libm
+	// implementations (glibc / Apple libm / MSVC CRT) - so the randomized projection, and therefore
+	// every RedSVD/RedSymEigen result, diverges across platforms even from an identical engine state.
+	// Draw standard normals instead via Acklam's rational approximation to the inverse normal CDF
+	// over the raw (fully portable) mt19937 integer stream, using only + - * / - no transcendentals -
+	// so the same bits are produced on every platform. The uniform is clamped to Acklam's central
+	// rational region (~+/-1.96 sigma), which keeps the draw entirely transcendental-free (only the
+	// tail branch would need a log). The downstream range finder orthonormalizes the sketch, so the
+	// bounded support and any overall scale are immaterial to the recovered subspace.
 	//
-	// NOTE: a Rademacher (+/-1) projection was tried for full bit-level determinism
-	// but it is too crude a sketch for this no-oversampling/no-power-iteration range
-	// finder - it degraded the covariance eigendecomposition (under-dispersed IES
-	// draws, wrong FOSM) and GLM solves. Gaussian draws are kept for accuracy; the
-	// few genuinely platform-sensitive tests are pinned to the deterministic
-	// SVD_EIGEN package instead.
+	// NOTE: a Rademacher (+/-1) projection was tried for full bit-level determinism but it is too
+	// crude a sketch for a low-rank range finder; this inverse-CDF draw is a smooth, near-Gaussian,
+	// isotropic sub-Gaussian sketch instead. The few genuinely platform-sensitive tests are still
+	// pinned to the deterministic SVD_EIGEN package.
 	template<typename MatrixType>
 	inline void sample_gaussian(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 		std::mt19937 generator;
-		const double pi = 3.14159265358979323846264338327950288;
 		const double span = static_cast<double>(generator.max()) - static_cast<double>(generator.min());
+		// Acklam (2003) inverse normal CDF, central-region rational coefficients
+		const double a1 = -3.969683028665376e+01, a2 = 2.209460984245205e+02, a3 = -2.759285104469687e+02,
+		             a4 = 1.383577518672690e+02, a5 = -3.066479806614716e+01, a6 = 2.506628277459239e+00;
+		const double b1 = -5.447609879822406e+01, b2 = 1.615858368580409e+02, b3 = -1.556989798598866e+02,
+		             b4 = 6.680131188771972e+01, b5 = -1.328068155288572e+01;
+		const double plow = 0.02425, phigh = 1.0 - plow;  // central rational validity window
 		for (Index i = 0; i < mat.rows(); ++i)
 		{
 			for (Index j = 0; j < mat.cols(); ++j)
 			{
-				// v1 in (0,1) avoids log(0); v2 in [0,1)
-				double v1 = (static_cast<double>(generator() - generator.min()) + 1.0) / (span + 2.0);
-				double v2 = static_cast<double>(generator() - generator.min()) / (span + 1.0);
-				mat(i, j) = std::sqrt(-2.0 * std::log(v1)) * std::sin(2.0 * pi * v2);
+				// uniform in (0,1) from the portable integer stream, clamped to the central region
+				double p = (static_cast<double>(generator() - generator.min()) + 1.0) / (span + 2.0);
+				if (p < plow) p = plow;
+				else if (p > phigh) p = phigh;
+				double q = p - 0.5, r = q * q;
+				mat(i, j) = (((((a1*r+a2)*r+a3)*r+a4)*r+a5)*r+a6) * q /
+				            (((((b1*r+b2)*r+b3)*r+b4)*r+b5)*r + 1.0);
 			}
 		}
 	}
@@ -165,8 +174,17 @@ namespace RedSVD
 
 			r = (r < A.rows()) ? r : A.rows();
 
+			// oversampling: build the random sketch with l = r + p columns (capped at the matrix
+			// dimension) so the dominant rank-r subspace is captured accurately, then truncate the
+			// factorization back to r at the end. this widens the two A-products (A^T*O and A*Y) by p
+			// columns but adds no extra A-passes; when the caller requests full rank (r already == the
+			// min dimension) it is a no-op.
+			const Index oversample = 10;
+			Index maxl = (A.rows() < A.cols()) ? A.rows() : A.cols();
+			Index l = ((r + oversample) < maxl) ? (r + oversample) : maxl;
+
 			// Gaussian Random Matrix for A^T
-			DenseMatrix O(A.rows(), r);
+			DenseMatrix O(A.rows(), l);
 			sample_gaussian(O);
 
 			// Compute Sample Matrix of A^T
@@ -179,7 +197,7 @@ namespace RedSVD
 			DenseMatrix B = A * Y;
 
 			// Gaussian Random Matrix
-			DenseMatrix P(B.cols(), r);
+			DenseMatrix P(B.cols(), l);
 			sample_gaussian(P);
 
 			// Compute Sample Matrix of B
@@ -193,11 +211,11 @@ namespace RedSVD
 
 			Eigen::JacobiSVD<DenseMatrix> svdOfC(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
 
-			// C = USV^T
-			// A = Z * U * S * V^T * Y^T()
-			m_matrixU = Z * svdOfC.matrixU();
-			m_vectorS = svdOfC.singularValues();
-			m_matrixV = Y * svdOfC.matrixV();
+			// C = USV^T  ->  A = Z * U * S * V^T * Y^T ; keep only the leading r triplets (truncate
+			// off the p oversampled directions)
+			m_matrixU = Z * svdOfC.matrixU().leftCols(r);
+			m_vectorS = svdOfC.singularValues().head(r);
+			m_matrixV = Y * svdOfC.matrixV().leftCols(r);
 		}
 
 		DenseMatrix matrixU() const
