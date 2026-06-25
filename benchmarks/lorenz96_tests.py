@@ -648,6 +648,11 @@ def plot_pr_pt(use_range=True):
 
 
 def lorenz96_basic_test():
+    # NOTE: this pestpp-da sequential (cyclic) test stays on the PANTHER worker run manager - it
+    # cannot use the external (/e) whole-ensemble run manager like the ies smoother tests, because
+    # pestpp-da's cyclic run management reads each realization's output back through its instruction
+    # file, whereas the /e forward run (forward_run_ensemble) writes obs straight into the
+    # run-storage file (which only pestpp-ies reads back that way).
     pst_setup_ES_new(N=50)
     t_d = mod_to_seq()
     # invest()
@@ -678,29 +683,58 @@ def lorenz96_basic_test():
     gpe_files = [f for f in os.listdir(m_d) if "global" in f and "pe" in f]
     assert len(gpe_files) == num_cycles + 1,"{0} vs {1}".format(num_cycles,len(gpe_files))
 
-def lorenz96_ies_dim_test(dim_use=36, num_reals=50, noptmax=3, num_workers=10):
+def lorenz96_ies_dim_test(dim_use=36, num_reals=50, noptmax=3):
     """dynamically-sized lorenz96 pestpp-ies smoother test - set dim_use to play with the number
-    of states (the number of observations scales with the dimension)"""
+    of states (the number of observations scales with the dimension).  uses the EXTERNAL (/e)
+    run-storage run manager: the whole ensemble is solved in one vectorized forward pass
+    (forward_ens.py), which is far faster than a model run per realization and needs no sockets."""
     pst_setup_ES_new(N=num_reals, dim=dim_use)
     t_d = "template96_pst_ies"
+    _write_forward_ens(t_d)
     pst = pyemu.Pst(os.path.join(t_d, "es.pst"))
+    _regen_twin_truth(pst, t_d)  # self-consistent twin (forward_ens uses the fixed-step model)
+    pst.model_command = ["python forward_ens.py"]
     pst.control_data.noptmax = noptmax
     pst.write(os.path.join(t_d, "es.pst"), version=2)
-    m_d = "master_ies_dim{0}".format(dim_use)
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    if num_workers == 0:
-        shutil.copytree(t_d, m_d)
-        pyemu.os_utils.run("{0} es.pst".format(exe_path.replace("-da","-ies")), cwd=m_d)
-    else:
-        pyemu.os_utils.start_workers(t_d, exe_path.replace("-da","-ies"), "es.pst", num_workers=num_workers,
-                                     master_dir=m_d, worker_root=".", port=port)
+    m_d = _run_ies_lorenz_ext(t_d, "master_ies_dim{0}".format(dim_use))
     phidf = pd.read_csv(os.path.join(m_d, "es.phi.actual.csv"))
     print("dim", dim_use, "npar_adj", pst.npar_adj, "nnz_obs", pst.nnz_obs,
           "phi mean start/end:", phidf["mean"].iloc[0], phidf["mean"].iloc[-1])
     assert phidf.iteration.max() == noptmax
     assert phidf["mean"].iloc[-1] < phidf["mean"].iloc[0]
     return m_d
+
+
+def _write_forward_ens(t_d):
+    """write forward_ens.py into template dir t_d - the single /e model command that solves the
+    WHOLE parameter ensemble (read from the run-storage file) in one vectorized pass and packs the
+    results back (lorenz96_model_setup.evolve_lorenz + forward_run_ensemble)."""
+    src = inspect.getsource(lorenz96_model_setup.evolve_lorenz) + "\n\n" + \
+          inspect.getsource(lorenz96_model_setup.forward_run_ensemble)
+    with open(os.path.join(t_d, "forward_ens.py"), "w") as f:
+        f.write("import os, sys, glob, re\nimport numpy as np\nimport pyemu\n\n")
+        f.write(src)
+        f.write("\nif __name__ == '__main__':\n    forward_run_ensemble()\n")
+
+
+def _regen_twin_truth(pst, t_d):
+    """regenerate the truth observations on pst with the SAME fixed-step vectorized model used for
+    the /e forward run (evolve_lorenz), so the twin is self-consistent (no model error).  the truth
+    initial states are read from truth_states.csv (parval1 is the prior center, not the truth)."""
+    import re
+    state_cols = sorted([p for p in pst.par_names if re.match(r"x\d+_0*0\.000$", p)],
+                        key=lambda p: int(p.split("_")[0][1:]))
+    truth_in = pd.read_csv(os.path.join(t_d, "truth_states.csv")).set_index("name")["value"]
+    X0_truth = truth_in.loc[state_cols].values.astype(float)
+    par = pst.parameter_data
+    delt = float(par.loc["delt", "parval1"]); t_start = float(par.loc["t_start", "parval1"]); t_end = float(par.loc["t_end", "parval1"])
+    times = np.arange(0.0, t_end - t_start, delt)
+    traj = lorenz96_model_setup.evolve_lorenz(X0_truth[None, :], len(times))  # (n_out, 1, N)
+    snames = [c.split("_")[0] for c in state_cols]
+    truthmap = {"{0}_{1:06.3f}".format(sn, otime): traj[k, 0, i]
+                for k, otime in enumerate(times) for i, sn in enumerate(snames)}
+    pst.observation_data["obsval"] = pst.observation_data.obsnme.map(truthmap)
+    assert pst.observation_data.obsval.notna().all(), "some obs not covered by the regenerated truth"
 
 
 def _run_ies_lorenz_ext(t_d, m_d):
@@ -732,35 +766,13 @@ def lorenz96_ies_xplat_setup(dim=40, num_reals=50, noptmax=3,
 
     run this ONCE on a reference machine and commit base_d; lorenz96_ies_xplat_test() then re-runs
     ies (also via /e) on each OS and checks the results against this base case within tolerances."""
-    import re
     # build the template + fixed prior ensemble
     pst_setup_ES_new(N=num_reals, dim=dim)
     t_d = "template96_pst_ies"
-
-    # write the single /e model command: the vectorized whole-ensemble forward run
-    src = inspect.getsource(lorenz96_model_setup.evolve_lorenz) + "\n\n" + \
-          inspect.getsource(lorenz96_model_setup.forward_run_ensemble)
-    with open(os.path.join(t_d, "forward_ens.py"), "w") as f:
-        f.write("import os, sys, glob, re\nimport numpy as np\nimport pyemu\n\n")
-        f.write(src)
-        f.write("\nif __name__ == '__main__':\n    forward_run_ensemble()\n")
+    _write_forward_ens(t_d)  # the single /e whole-ensemble model command
 
     pst = pyemu.Pst(os.path.join(t_d, "es.pst"))
-    # clean twin: regenerate the truth observations with the SAME (fixed-step) vectorized model used
-    # for the forward run, so there is no model error confounding the reproducibility check
-    state_cols = sorted([p for p in pst.par_names if re.match(r"x\d+_0*0\.000$", p)],
-                        key=lambda p: int(p.split("_")[0][1:]))
-    truth_in = pd.read_csv(os.path.join(t_d, "truth_states.csv")).set_index("name")["value"]
-    X0_truth = truth_in.loc[state_cols].values.astype(float)
-    par = pst.parameter_data
-    delt = float(par.loc["delt", "parval1"]); t_start = float(par.loc["t_start", "parval1"]); t_end = float(par.loc["t_end", "parval1"])
-    times = np.arange(0.0, t_end - t_start, delt)
-    traj = lorenz96_model_setup.evolve_lorenz(X0_truth[None, :], len(times))  # (n_out, 1, N)
-    snames = [c.split("_")[0] for c in state_cols]
-    truthmap = {"{0}_{1:06.3f}".format(sn, otime): traj[k, 0, i]
-                for k, otime in enumerate(times) for i, sn in enumerate(snames)}
-    pst.observation_data["obsval"] = pst.observation_data.obsnme.map(truthmap)
-    assert pst.observation_data.obsval.notna().all(), "some obs not covered by the regenerated truth"
+    _regen_twin_truth(pst, t_d)  # self-consistent twin so model error doesn't confound the check
 
     # make the run as deterministic as possible: the fixed prior ensemble and num_reals are already
     # set by pst_setup_ES_new (via the da_parameter_ensemble / da_num_reals aliases); here we add the
@@ -1193,34 +1205,11 @@ def lorenz96_ext_runmanager_test(dim_use=40, num_reals=50, noptmax=5,obs_time_fr
     this is a proper twin.  pestpp writes the full ensemble of parameter sets to the run-storage file
     (es.rns), the model command is called once to solve the whole ensemble in one pass and pack the
     results back (lorenz96_model_setup.forward_run_ensemble), then pestpp reads them back."""
-    import re
     pst_setup_ES_new(N=num_reals, dim=dim_use,obs_dimen_frac=obs_dimen_frac,obs_time_frac=obs_time_frac)
     t_d = "template96_pst_ies"
-    # write a self-contained ensemble forward-run script - the single /e model command
-    src = inspect.getsource(lorenz96_model_setup.evolve_lorenz) + "\n\n" + \
-          inspect.getsource(lorenz96_model_setup.forward_run_ensemble)
-    with open(os.path.join(t_d, "forward_ens.py"), "w") as f:
-        f.write("import os, sys, glob, re\nimport numpy as np\nimport pyemu\n\n")
-        f.write(src)
-        f.write("\nif __name__ == '__main__':\n    forward_run_ensemble()\n")
-
+    _write_forward_ens(t_d)  # the single /e whole-ensemble model command
     pst = pyemu.Pst(os.path.join(t_d, "es.pst"))
-    # --- clean twin: regenerate the truth observations with the SAME (fixed-step) model ---
-    par = pst.parameter_data
-    state_cols = sorted([p for p in pst.par_names if re.match(r"x\d+_0*0\.000$", p)],
-                        key=lambda p: int(p.split("_")[0][1:]))
-    # the truth ICs are persisted in truth_states.csv (parval1 is now the prior center, not the truth)
-    truth_in = pd.read_csv(os.path.join(t_d, "truth_states.csv")).set_index("name")["value"]
-    X0_truth = truth_in.loc[state_cols].values.astype(float)
-    delt = float(par.loc["delt", "parval1"]); t_start = float(par.loc["t_start", "parval1"]); t_end = float(par.loc["t_end", "parval1"])
-    times = np.arange(0.0, t_end - t_start, delt)
-    traj = lorenz96_model_setup.evolve_lorenz(X0_truth[None, :], len(times))  # (n_out, 1, N)
-    snames = [c.split("_")[0] for c in state_cols]
-    truthmap = {"{0}_{1:06.3f}".format(sn, otime): traj[k, 0, i]
-                for k, otime in enumerate(times) for i, sn in enumerate(snames)}
-    pst.observation_data["obsval"] = pst.observation_data.obsnme.map(truthmap)
-    assert pst.observation_data.obsval.notna().all(), "some obs not covered by the regenerated truth"
-    # --- end twin truth regeneration ---
+    _regen_twin_truth(pst, t_d)  # clean twin: truth from the same fixed-step model (no model error)
 
     pst.model_command = ["python forward_ens.py"]
     pst.control_data.noptmax = noptmax
@@ -1237,11 +1226,7 @@ def lorenz96_ext_runmanager_test(dim_use=40, num_reals=50, noptmax=5,obs_time_fr
     
     pst.write(os.path.join(t_d, "es.pst"), version=2)
     lorenz96_add_correlated_obs_noise(t_d)
-    m_d = "master_ies_ext_dim{0}".format(dim_use)
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    shutil.copytree(t_d, m_d)
-    pyemu.os_utils.run("{0} es.pst /e".format(exe_path.replace("-da","-ies")), cwd=m_d)
+    m_d = _run_ies_lorenz_ext(t_d, "master_ies_ext_dim{0}".format(dim_use))
     phidf = pd.read_csv(os.path.join(m_d, "es.phi.actual.csv"))
     print("ext run mgr (twin): dim", dim_use, "phi mean start/end:", phidf["mean"].iloc[0], phidf["mean"].iloc[-1])
    #assert phidf.iteration.max() == noptmax
