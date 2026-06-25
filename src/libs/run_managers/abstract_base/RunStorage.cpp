@@ -704,7 +704,34 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        cout << endl << endl << "-->get_info() bad.  run_id:" << run_id << ", info_txt:" << info_txt << endl << endl;
+        // DIAGNOSTIC (instrumentation only): the read failed - capture the raw stream state BEFORE any
+        // recovery, then clear() so we can safely query the physical file size / header count.  this
+        // distinguishes a genuinely short file (get_stream_pos(run_id) lands past EOF -> a write/append
+        // accounting problem) from a stream that was already left in a bad state by a prior operation.
+        std::ios_base::iostate rst = buf_stream.rdstate();
+        std::streamoff want_pos = get_stream_pos(run_id);
+        std::streamoff read_end = want_pos + (std::streamoff)(sizeof(std::int8_t) + info_txt_length * sizeof(char) + sizeof(double));
+        buf_stream.clear();
+        buf_stream.seekg(0, ios_base::end);
+        std::streamoff fsize = buf_stream.tellg();
+        std::int64_t hdr_nruns = -1;
+        buf_stream.seekg(0, ios_base::beg);
+        buf_stream.read(reinterpret_cast<char*>(&hdr_nruns), sizeof(hdr_nruns));
+
+        cout << endl << endl << "-->get_info() bad.  run_id:" << run_id << ", info_txt:" << info_txt << endl;
+        cout << "   stream rdstate eof|fail|bad = "
+             << ((rst & ios_base::eofbit) != 0) << "|"
+             << ((rst & ios_base::failbit) != 0) << "|"
+             << ((rst & ios_base::badbit) != 0) << endl;
+        cout << "   header n_runs=" << hdr_nruns << "  beg_run0=" << beg_run0
+             << "  run_byte_size=" << run_byte_size << endl;
+        cout << "   get_stream_pos(run_id)=" << want_pos << "  read_end=" << read_end
+             << "  physical_file_size=" << fsize << endl;
+        if (read_end > fsize)
+            cout << "   -> READ IS PAST EOF: file is shorter than n_runs implies (write/append accounting)" << endl;
+        else
+            cout << "   -> position in-bounds: the stream state was already bad before this read" << endl;
+        cout << endl;
         throw runtime_error("RunStorage::get_run_info() stream not good");
     }
 }
