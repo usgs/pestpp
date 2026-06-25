@@ -1198,7 +1198,7 @@ def lorenz96_add_correlated_obs_noise(t_d="template96_pst_ies", case="es", corr_
     print("saved", out)
     return fig
 
-def lorenz96_ext_runmanager_test(dim_use=40, num_reals=50, noptmax=5,obs_time_frac=10,obs_dimen_frac=10):
+def lorenz96_ext_runmanager_test(dim_use=40, num_reals=50, noptmax=5,obs_time_frac=10,obs_dimen_frac=10,include_corr_noise=False):
     """clean twin experiment run with the pest++ external ('/e') run manager: the truth observations
     are (re)generated with the SAME vectorized fixed-step model used for inversion, so the model is
     self-consistent (no model error).  the prior is centered on the first guess, NOT the truth, so
@@ -1225,7 +1225,8 @@ def lorenz96_ext_runmanager_test(dim_use=40, num_reals=50, noptmax=5,obs_time_fr
     pst.pestpp_options["ies_num_threads"] = 10
     
     pst.write(os.path.join(t_d, "es.pst"), version=2)
-    lorenz96_add_correlated_obs_noise(t_d)
+    if include_corr_noise:
+        lorenz96_add_correlated_obs_noise(t_d)
     m_d = _run_ies_lorenz_ext(t_d, "master_ies_ext_dim{0}".format(dim_use))
     phidf = pd.read_csv(os.path.join(m_d, "es.phi.actual.csv"))
     print("ext run mgr (twin): dim", dim_use, "phi mean start/end:", phidf["mean"].iloc[0], phidf["mean"].iloc[-1])
