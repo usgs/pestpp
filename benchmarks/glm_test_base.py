@@ -404,19 +404,23 @@ def freyberg_stress_test():
     pst.pestpp_options["glm_normal_form"] = "diag"
     pst.pestpp_options["parcov"] = "prior.jcb"
     pst.pestpp_options["glm_accept_mc_phi"] = True
-    # pin to deterministic Eigen JacobiSVD: this rank-10-of-2412 truncation is
-    # dominated by the randomized RedSVD projection, which is not reproducible
-    # across platforms (windows vs linux diverged badly). EIGEN is deterministic.
-    pst.pestpp_options["svd_pack"] = "eigen"
+    # use the randomized RedSVD package for this rank-10-of-2412 truncation: it computes only the top
+    # ~10 (oversampled) singular triplets instead of the full 2412x2412 factorization Eigen JacobiSVD
+    # does, which is a large speedup - especially on windows.  RedSVD was previously pinned away to
+    # EIGEN because its randomized projection diverged across platforms; the projection has since been
+    # made OS-consistent (transcendental-free draw + oversampling), so un-pin and let CI confirm the
+    # cross-platform agreement on this (hardest) aggressive-truncation case.
+    pst.pestpp_options["svd_pack"] = "redsvd"
     pst.write(os.path.join(template_d, "pest_stress.pst"))
     pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
                                  master_dir=test_d, verbose=True, worker_root=model_d,
                                  port=port)
     pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
     print(pst.phi)
-    # threshold re-tuned for the deterministic Eigen SVD pin above: this rank-10
-    # truncation now yields phi = 1299.20 bit-identically on linux and windows
-    # (was platform-divergent ~<1200 / 1351 under randomized RedSVD). ~4% headroom.
+    # cross-platform check: under the OS-consistent RedSVD this rank-10 truncation should land close
+    # to the deterministic EIGEN value (~1299) on every platform.  threshold keeps ~4% headroom over
+    # that; re-tune from the CI numbers if the OS-consistent RedSVD lands elsewhere (the old, non-
+    # portable RedSVD was platform-divergent at ~<1200 / 1351).
     assert pst.phi < 1350
     oe = pd.read_csv(os.path.join(test_d,"pest_stress.post.obsen.csv"),index_col=0)
     assert oe.dropna().shape == (int(pst.pestpp_options["glm_num_reals"]),pst.nobs),oe.dropna().shape
