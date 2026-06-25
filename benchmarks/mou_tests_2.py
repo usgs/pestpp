@@ -2705,9 +2705,9 @@ def pi_output_test():
 
 
 if __name__ == "__main__":
-    basic_pso_test()
+    #basic_pso_test()
     #test_restart_all()
-    #chance_consistency_test()
+    chance_consistency_test()
     #zdt1_chance_schedule_test()
     #gpr_run_riskobj_baselines()
     #gpr_compare_invest()

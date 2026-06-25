@@ -241,9 +241,9 @@ if __name__ == "__main__":
         if otime < t_obs_max:
             
             if dim < obs_dimen_frac:
-                return 2.5
+                return 1
             elif loc % obs_dimen_frac == 0:
-                return 2.5
+                return 1
             else: 
                 return 0.0
         else:
@@ -1108,7 +1108,7 @@ def lorenz96_ext_runmanager_test(dim_use=40, num_reals=50, noptmax=5,obs_time_fr
 if __name__ == "__main__":
     #lorenz96_basic_test()
     #m_d = lorenz96_ies_dim_test(dim_use=400,num_workers=10)
-    m_d = lorenz96_ext_runmanager_test(dim_use=400,num_reals=500,noptmax=10,obs_dimen_frac=5,obs_time_frac=5)
+    m_d = lorenz96_ext_runmanager_test(dim_use=1000,num_reals=1000,noptmax=10,obs_dimen_frac=40,obs_time_frac=5)
     #lorenz96_add_correlated_obs_noise()
     lorenz96_crps_heatmap(m_d)
     lorenz96_dim3_dashboard(m_d=m_d)
