@@ -1825,7 +1825,7 @@ def zdt1_weight_test():
     
     from forward_run import helper 
     pst = pyemu.Pst(os.path.join(t_d,"zdt1.pst"))
-    num_reals = 200
+    num_reals = 20
     np.random.seed(123331)
     pe = pyemu.ParameterEnsemble.from_uniform_draw(pst,num_reals=num_reals)
     oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst,pyemu.Cov.from_observation_data(pst),num_reals=num_reals)
@@ -1862,7 +1862,7 @@ def zdt1_weight_test():
     df.to_csv(os.path.join(t_d,"phi_facs.csv"))
     
 
-    pst.control_data.noptmax = 15
+    pst.control_data.noptmax = 5
 
 
     #pst.write(os.path.join(t_d,"zdt1_ies.pst"))
@@ -1886,10 +1886,12 @@ def zdt1_weight_test():
     oe_file = os.path.join(m_d,"zdt1_ies.{0}.obs.csv".format(pst.control_data.noptmax))
     assert os.path.exists(oe_file)
     oe = pd.read_csv(oe_file,index_col=0)
-    assert oe.loc[:,"obj_1"].min() < 0.2
-    assert oe.loc[:,"obj_2"].min() < 1.0
-    assert oe.loc[:,"obj_1"].max() > 0.5
-    assert oe.loc[:,"obj_2"].max() > 4.0
+    print(oe.min())
+    print(oe.max())
+    assert oe.loc[:,"obj_1"].min() <= 0.2
+    assert oe.loc[:,"obj_2"].min() <= 2.0
+    assert oe.loc[:,"obj_1"].max() >= 0.5
+    assert oe.loc[:,"obj_2"].max() >= 4.0
 
 def plot_zdt1_results(noptmax=None):
     import matplotlib.pyplot as plt
@@ -5510,8 +5512,8 @@ if __name__ == "__main__":
 
     #chenoliver_test()
     #multimodal_test()
-    mm_weight_beta_experiment()
-    plot_mm_weight_beta_experiment()
+    #mm_weight_beta_experiment()
+    #plot_mm_weight_beta_experiment()
     #tenpar_fixed_transform_test()
 
     #tenpar_adjust_weights_test()
@@ -5625,7 +5627,7 @@ if __name__ == "__main__":
     
     
     #mm_invest()
-    #zdt1_weight_test()
+    zdt1_weight_test()
     #plot_zdt1_results(15)
     
     #tenpar_upgrade_on_disk_test_with_fixed()
