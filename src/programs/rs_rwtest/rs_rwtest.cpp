@@ -1,115 +1,75 @@
-// Standalone reproducer for the libstdc++-specific RunStorage read/write-mixing failure that shows up
-// as "RunStorage::get_*() stream not good" during the mou chance/stack processing.  No PANTHER, no
-// timing: it drives RunStorage's exact read<->write interleaving sequentially, with a RANDOM dispatch/
-// completion order each iteration (mimicking nondeterministic agent ordering).  Build + run on Linux
-// (libstdc++) where it should reproduce; on mac (libc++) it passes.
-//   Usage: rs_rwtest [niter]            run iters 0..niter-1 (each seeded by its index)
-//          rs_rwtest 1 <seed>           replay a single ordering (e.g. the one that reproduced)
+// Standalone reproducer for the libstdc++-specific RunStorage read/write-mixing failure ("RunStorage::
+// get_*() stream not good") seen during mou chance/stack processing.  Sets up one storage of 110 runs,
+// then hammers a tight loop of RANDOM read/write operations on it - aggressively exercising the
+// write<->read transitions on the single shared fstream, with NO per-step setup cost.  Build + run on
+// Linux (libstdc++) where it should reproduce; on mac (libc++) it passes.
+//   Usage: rs_rwtest [nops] [seed]      (default 5,000,000 ops, seed 1)
 #include <iostream>
 #include <vector>
 #include <string>
 #include <cstdlib>
 #include <random>
-#include <algorithm>
 #include "RunStorage.h"
 using namespace std;
 
-static vector<char> make_serial(int npar, int nobs, double base)
-{
-    vector<char> v((npar + nobs) * sizeof(double), 0);
-    double *d = reinterpret_cast<double *>(v.data());
-    for (int i = 0; i < npar + nobs; i++) d[i] = base + i;
-    return v;
-}
-
-static bool run_once(unsigned seed, int total, int npop, int npar, int nobs,
-                     const vector<string> &par_names, const vector<string> &obs_names)
-{
-    std::mt19937 rng(seed);
-    RunStorage rs("rs_rwtest.rns");
-    rs.reset(par_names, obs_names, "rs_rwtest.rns");
-    vector<int> rids;
-    vector<double> mp(npar, 1.0);
-    for (int i = 0; i < total; i++)
-        rids.push_back(rs.add_run(mp, "GEN=0_MEMBER=" + to_string(i % npop), 0.0));
-
-    // RUN PHASE: randomly interleave dispatch-reads (get_serial_pars/get_info) and result-writes
-    // (update_run).  at each step randomly either dispatch the next queued run or store a random
-    // already-dispatched one - so reads and writes alternate in an unpredictable order.
-    vector<int> to_dispatch(rids);
-    std::shuffle(to_dispatch.begin(), to_dispatch.end(), rng);
-    vector<int> dispatched;
-    size_t di = 0;
-    while (di < to_dispatch.size() || !dispatched.empty())
-    {
-        bool can_dispatch = di < to_dispatch.size();
-        bool do_store = !dispatched.empty() && (!can_dispatch || (rng() & 1u));
-        if (do_store)
-        {
-            std::uniform_int_distribution<size_t> pick(0, dispatched.size() - 1);
-            size_t k = pick(rng);
-            int r = dispatched[k];
-            dispatched[k] = dispatched.back();
-            dispatched.pop_back();
-            rs.update_run(r, make_serial(npar, nobs, r * 100.0)); // write
-        }
-        else
-        {
-            int r = to_dispatch[di++];
-            vector<char> sp = rs.get_serial_pars(r);              // read
-            int st; string itx; double iv;
-            rs.get_info(r, st, itx, iv);                          // read
-            dispatched.push_back(r);
-        }
-    }
-
-    // PROCESSING / read-back in random order (mirrors get_run_info_map + get_failed_run_ids +
-    // update_from_runs over the completed runs).
-    vector<int> order(total);
-    for (int i = 0; i < total; i++) order[i] = i;
-    std::shuffle(order.begin(), order.end(), rng);
-    for (int i : order) { int st; string itx; double iv; rs.get_info(i, st, itx, iv); }
-    std::shuffle(order.begin(), order.end(), rng);
-    for (int i : order) rs.get_run_status(i);
-    std::shuffle(order.begin(), order.end(), rng);
-    for (int i : order)
-    {
-        vector<double> pv, ov; string itx; double iv;
-        rs.get_run(i, pv, ov, itx, iv);
-    }
-    rs.free_memory();
-    return true;
-}
-
 int main(int argc, char **argv)
 {
-    const int npop = 10, nstack = 100, total = npop + nstack; // mimic chance: 10 pop + 100 nested stack
+    const int npop = 10, nstack = 100, total = npop + nstack;
     const int npar = 6, nobs = 4;
-    const int niter = (argc > 1) ? atoi(argv[1]) : 500;
+    const long nops = (argc > 1) ? atol(argv[1]) : 5000000L;
+    const unsigned seed = (argc > 2) ? (unsigned)strtoul(argv[2], nullptr, 10) : 1u;
+
     vector<string> par_names, obs_names;
     for (int i = 0; i < npar; i++) par_names.push_back("par" + to_string(i));
     for (int i = 0; i < nobs; i++) obs_names.push_back("obs" + to_string(i));
 
-    // single-seed replay mode: rs_rwtest 1 <seed>
-    if (argc > 2)
-    {
-        unsigned seed = (unsigned)strtoul(argv[2], nullptr, 10);
-        try { run_once(seed, total, npop, npar, nobs, par_names, obs_names); }
-        catch (const exception &e) { cout << "REPRODUCED seed " << seed << ":  " << e.what() << endl; return 1; }
-        cout << "seed " << seed << " ok" << endl;
-        return 0;
-    }
+    RunStorage rs("rs_rwtest.rns");
+    rs.reset(par_names, obs_names, "rs_rwtest.rns");
+    vector<double> mp(npar, 1.0);
+    for (int i = 0; i < total; i++) rs.add_run(mp, "GEN=0_MEMBER=" + to_string(i % npop), 0.0);
 
-    for (int it = 0; it < niter; it++)
+    // a serialized par+obs result buffer reused for update_run writes
+    vector<char> serial((npar + nobs) * sizeof(double), 0);
+
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<int> pick_run(0, total - 1);
+    std::uniform_int_distribution<int> pick_op(0, 5);  // 1 write op, 5 read ops
+
+    long writes = 0, reads = 0;
+    for (long n = 0; n < nops; n++)
     {
-        try { run_once((unsigned)it, total, npop, npar, nobs, par_names, obs_names); }
+        if (n % 500000 == 0)
+            cerr << "\r  " << n / 1000 << "k / " << nops / 1000 << "k ops  (w=" << writes
+                 << " r=" << reads << ")   " << flush;
+        int r = pick_run(rng);
+        int op = pick_op(rng);
+        try
+        {
+            switch (op)
+            {
+            case 0: rs.update_run(r, serial); writes++; break;                                  // write
+            default:
+            {
+                reads++;
+                int st; string itx; double iv;
+                if (op == 1) rs.get_info(r, st, itx, iv);
+                else if (op == 2) { vector<double> pv, ov; rs.get_run(r, pv, ov, itx, iv); }
+                else if (op == 3) rs.get_run_status(r);
+                else if (op == 4) rs.get_serial_pars(r);
+                else (void)rs.get_nruns();
+                break;
+            }
+            }
+        }
         catch (const exception &e)
         {
-            cout << "REPRODUCED at iter/seed " << it << ":  " << e.what()
-                 << "   (replay with: rs_rwtest 1 " << it << ")" << endl;
+            cout << "REPRODUCED after " << n << " ops (writes=" << writes << " reads=" << reads
+                 << ", seed=" << seed << "):  " << e.what() << endl;
             return 1;
         }
     }
-    cout << "no failure in " << niter << " iters (this build's stdlib tolerates the read/write mixing)" << endl;
+    cout << "no failure in " << nops << " ops (writes=" << writes << " reads=" << reads
+         << "): this build's stdlib tolerates the read/write mixing" << endl;
+    rs.free_memory();
     return 0;
 }
