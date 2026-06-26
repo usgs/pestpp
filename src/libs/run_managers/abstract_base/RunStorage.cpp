@@ -241,13 +241,16 @@ void RunStorage::init_restart(const std::string &_filename)
 int RunStorage::get_nruns()
 {
 
-	buf_stream.clear();  // reset stale error state before tell/seek on the shared read/write fstream
-	streamoff init_pos = buf_stream.tellg();
+	// just read the run count from the file header.  do NOT tellg()/restore the position: tellg() is
+	// an input op, and calling it right after the stream was used for output (which is constant here)
+	// trips libstdc++'s "you must reposition when switching output<->input" rule and fails - clear()
+	// does not satisfy that boundary.  clear()+seekg(0) IS a clean reposition; every caller absolute-
+	// seeks before its own next I/O, so none rely on the position being preserved across this call.
+	buf_stream.clear();
 	buf_stream.seekg(0, ios_base::beg);
 	std::int64_t n_runs_64;
 	buf_stream.read((char*) &n_runs_64, sizeof(n_runs_64));
 	int n_runs = n_runs_64;
-	buf_stream.seekg(init_pos);
     if (!buf_stream)
     {
         throw runtime_error("RunStorage::get_nruns() stream not good");
@@ -859,27 +862,6 @@ int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &ob
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        // DIAGNOSTIC: clear() is already done above, so a failure here is a GENUINELY bad read, not a
-        // stale flag.  classify it by querying the file independently: out-of-range run_id, a short/
-        // corrupt record (a write landed at the wrong offset), or an in-bounds-but-flagged read.
-        std::streamoff want_pos = get_stream_pos(run_id);
-        std::streamoff read_end = want_pos + (std::streamoff)(sizeof(std::int8_t)
-            + info_txt_length * sizeof(char) + sizeof(double) + (n_par + n_obs) * sizeof(double));
-        std::streamoff fs_size = -1; std::int64_t fs_nruns = -1;
-        {
-            std::ifstream chk(filename.c_str(), ios_base::binary | ios_base::ate);
-            if (chk.is_open()) { fs_size = chk.tellg(); chk.seekg(0, ios_base::beg);
-                chk.read(reinterpret_cast<char*>(&fs_nruns), sizeof(fs_nruns)); }
-        }
-        cout << endl << "-->get_run() bad.  run_id=" << run_id << "  header_n_runs=" << fs_nruns
-             << "  get_stream_pos=" << want_pos << "  read_end=" << read_end << "  file_size=" << fs_size << endl;
-        if (fs_nruns >= 0 && run_id >= fs_nruns)
-            cout << "   -> run_id OUT OF RANGE (>= n_runs): corrupt header/run-count" << endl;
-        else if (fs_size >= 0 && read_end > fs_size)
-            cout << "   -> SHORT/CORRUPT RECORD: ends at " << read_end << " but file is only " << fs_size
-                 << " bytes -> a write landed at the wrong offset (write-side discipline gap)" << endl;
-        else
-            cout << "   -> record in-bounds but read still flagged after clear() (deeper stream-state issue)" << endl;
         throw runtime_error("RunStorage::get_run() stream not good");
     }
 	return status;
