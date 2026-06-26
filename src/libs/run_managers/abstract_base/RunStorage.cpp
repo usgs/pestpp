@@ -29,6 +29,8 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include "RunStorage.h"
 #include "Serialization.h"
 #include "Transformable.h"
@@ -704,33 +706,57 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        // DIAGNOSTIC (instrumentation only): the read failed - capture the raw stream state BEFORE any
-        // recovery, then clear() so we can safely query the physical file size / header count.  this
-        // distinguishes a genuinely short file (get_stream_pos(run_id) lands past EOF -> a write/append
-        // accounting problem) from a stream that was already left in a bad state by a prior operation.
+        // DIAGNOSTIC (instrumentation only).  the read failed - capture the raw stream state, then
+        // query the run-storage file INDEPENDENTLY of buf_stream (which is already broken here, so its
+        // own post-clear() answers are untrustworthy - they came back -1 last time).  a fresh ifstream
+        // on the same path gives a reliable file size + header count, which tells a genuinely short
+        // file (write/append accounting bug) apart from a dead fstream handle over a healthy file.
+        int saved_errno = errno;
         std::ios_base::iostate rst = buf_stream.rdstate();
+        bool was_open = buf_stream.is_open();
         std::streamoff want_pos = get_stream_pos(run_id);
         std::streamoff read_end = want_pos + (std::streamoff)(sizeof(std::int8_t) + info_txt_length * sizeof(char) + sizeof(double));
+
+        // buf_stream's own (unreliable) view after a clear()
         buf_stream.clear();
         buf_stream.seekg(0, ios_base::end);
-        std::streamoff fsize = buf_stream.tellg();
-        std::int64_t hdr_nruns = -1;
-        buf_stream.seekg(0, ios_base::beg);
-        buf_stream.read(reinterpret_cast<char*>(&hdr_nruns), sizeof(hdr_nruns));
+        std::streamoff bs_size = buf_stream.tellg();
+
+        // INDEPENDENT view: a fresh read-only stream on the same file path
+        std::streamoff fs_size = -1;
+        std::int64_t fs_nruns = -1;
+        bool fs_open = false;
+        {
+            std::ifstream chk(filename.c_str(), ios_base::binary | ios_base::ate);
+            fs_open = chk.is_open();
+            if (fs_open)
+            {
+                fs_size = chk.tellg();
+                chk.seekg(0, ios_base::beg);
+                chk.read(reinterpret_cast<char*>(&fs_nruns), sizeof(fs_nruns));
+                if (!chk) fs_nruns = -2; // header read failed
+            }
+        }
 
         cout << endl << endl << "-->get_info() bad.  run_id:" << run_id << ", info_txt:" << info_txt << endl;
-        cout << "   stream rdstate eof|fail|bad = "
-             << ((rst & ios_base::eofbit) != 0) << "|"
-             << ((rst & ios_base::failbit) != 0) << "|"
-             << ((rst & ios_base::badbit) != 0) << endl;
-        cout << "   header n_runs=" << hdr_nruns << "  beg_run0=" << beg_run0
-             << "  run_byte_size=" << run_byte_size << endl;
-        cout << "   get_stream_pos(run_id)=" << want_pos << "  read_end=" << read_end
-             << "  physical_file_size=" << fsize << endl;
-        if (read_end > fsize)
-            cout << "   -> READ IS PAST EOF: file is shorter than n_runs implies (write/append accounting)" << endl;
+        cout << "   filename: " << filename << endl;
+        cout << "   buf_stream: is_open=" << was_open
+             << "  rdstate eof|fail|bad=" << ((rst & ios_base::eofbit) != 0) << "|"
+             << ((rst & ios_base::failbit) != 0) << "|" << ((rst & ios_base::badbit) != 0)
+             << "  errno=" << saved_errno << " (" << std::strerror(saved_errno) << ")" << endl;
+        cout << "   layout: beg_run0=" << beg_run0 << "  run_byte_size=" << run_byte_size
+             << "  get_stream_pos(run_id)=" << want_pos << "  read_end=" << read_end << endl;
+        cout << "   buf_stream post-clear size (unreliable): " << bs_size << endl;
+        cout << "   INDEPENDENT file check: fresh_open=" << fs_open << "  size=" << fs_size
+             << "  header_n_runs=" << fs_nruns << "  runs_that_fit=" << (fs_size >= beg_run0 ? (long)((fs_size - beg_run0) / run_byte_size) : -1L) << endl;
+        if (!fs_open)
+            cout << "   -> could not open the file independently (path/permission/handle issue)" << endl;
+        else if (read_end > fs_size)
+            cout << "   -> FILE IS SHORT: run_id's record ends at " << read_end << " but file is only "
+                 << fs_size << " bytes -> write/append accounting bug (header n_runs > what was physically written)" << endl;
         else
-            cout << "   -> position in-bounds: the stream state was already bad before this read" << endl;
+            cout << "   -> FILE IS BIG ENOUGH (" << fs_size << " >= " << read_end
+                 << "): the file is fine, the buf_stream handle was left in a bad state" << endl;
         cout << endl;
         throw runtime_error("RunStorage::get_run_info() stream not good");
     }
