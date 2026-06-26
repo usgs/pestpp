@@ -697,6 +697,7 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	vector<char> info_txt_buf;
 	info_txt_buf.resize(info_txt_length, '\0');
 
+	std::ios_base::iostate rst_entry = buf_stream.rdstate();  // DIFF TEST: stream state on entry
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);
@@ -744,6 +745,9 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
              << "  rdstate eof|fail|bad=" << ((rst & ios_base::eofbit) != 0) << "|"
              << ((rst & ios_base::failbit) != 0) << "|" << ((rst & ios_base::badbit) != 0)
              << "  errno=" << saved_errno << " (" << std::strerror(saved_errno) << ")" << endl;
+        cout << "   rdstate ON ENTRY (before this read) eof|fail|bad=" << ((rst_entry & ios_base::eofbit) != 0) << "|"
+             << ((rst_entry & ios_base::failbit) != 0) << "|" << ((rst_entry & ios_base::badbit) != 0)
+             << "  <- if failbit is set here, a PRIOR op poisoned the stream (not this read)" << endl;
         cout << "   layout: beg_run0=" << beg_run0 << "  run_byte_size=" << run_byte_size
              << "  get_stream_pos(run_id)=" << want_pos << "  read_end=" << read_end << endl;
         cout << "   buf_stream post-clear size (unreliable): " << bs_size << endl;

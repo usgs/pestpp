@@ -1825,7 +1825,7 @@ def zdt1_weight_test():
     
     from forward_run import helper 
     pst = pyemu.Pst(os.path.join(t_d,"zdt1.pst"))
-    num_reals = 20
+    num_reals = 100
     np.random.seed(123331)
     pe = pyemu.ParameterEnsemble.from_uniform_draw(pst,num_reals=num_reals)
     oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst,pyemu.Cov.from_observation_data(pst),num_reals=num_reals)
@@ -1862,7 +1862,7 @@ def zdt1_weight_test():
     df.to_csv(os.path.join(t_d,"phi_facs.csv"))
     
 
-    pst.control_data.noptmax = 5
+    pst.control_data.noptmax = 3
 
 
     #pst.write(os.path.join(t_d,"zdt1_ies.pst"))
