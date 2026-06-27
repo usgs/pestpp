@@ -34,7 +34,9 @@
 #include "Transformable.h"
 #include <limits>
 #include "utilities.h"
-#include <execinfo.h>
+#ifndef _WIN32
+#include <execinfo.h>   // backtrace() - glibc/macOS only, absent on MSVC
+#endif
 
 using std::numeric_limits;
 
@@ -64,9 +66,11 @@ static void rs_read_fail_report(const char *where, int run_id, const string &fil
     else
         std::cerr << "=> in-range, file healthy (stream-state issue)";
     std::cerr << endl;
+#ifndef _WIN32
     void *bt[40];
     int nfr = backtrace(bt, 40);
     backtrace_symbols_fd(bt, nfr, 2);
+#endif
     std::cerr.flush();
 }
 
