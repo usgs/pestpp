@@ -1,75 +1,95 @@
-// Standalone reproducer for the libstdc++-specific RunStorage read/write-mixing failure ("RunStorage::
-// get_*() stream not good") seen during mou chance/stack processing.  Sets up one storage of 110 runs,
-// then hammers a tight loop of RANDOM read/write operations on it - aggressively exercising the
-// write<->read transitions on the single shared fstream, with NO per-step setup cost.  Build + run on
-// Linux (libstdc++) where it should reproduce; on mac (libc++) it passes.
-//   Usage: rs_rwtest [nops] [seed]      (default 5,000,000 ops, seed 1)
+// Targets the MOU *nested chance* queue->run->process pattern against RunStorage, to chase the
+// chance-only "RunStorage::get_*() stream not good" failure (generic random read/write access passes,
+// so the bug is specific to this pattern).  Faithfully mimics MOEA::run_population +
+// Constraints::add_runs + process_stack_runs/update_from_runs:
+//   1. reset the storage (run manager reinitialize)
+//   2. QUEUE: stack runs first, per dv member (run_ids 0..nstack-1), recording member->run_id maps;
+//      then the population runs after (nstack..).   <- the chance run-id layout
+//   3. RUN: mark every run complete via update_run, in a random "agent completion" order (write burst)
+//   4. PROCESS: for EACH member -> a full get_nruns + get_run_status scan over ALL runs (this is what
+//      get_failed_run_ids does, once per member) + get_run/get_info over that member's stack run_ids.
+// Build + run on Linux (libstdc++); on mac (libc++) it passes.
+//   Usage: rs_rwtest [niter] [seed0]
 #include <iostream>
 #include <vector>
 #include <string>
+#include <map>
 #include <cstdlib>
 #include <random>
+#include <algorithm>
 #include "RunStorage.h"
 using namespace std;
 
+static vector<char> serial_buf(int npar, int nobs) { return vector<char>((npar + nobs) * sizeof(double), 0); }
+
+// one generation's worth of nested-chance queue/run/process; throws on a RunStorage read failure
+static void run_once(unsigned seed, int nmember, int nstack_per, int npar, int nobs,
+                     const vector<string> &par_names, const vector<string> &obs_names)
+{
+    std::mt19937 rng(seed);
+    RunStorage rs("rs_rwtest.rns");
+    rs.reset(par_names, obs_names, "rs_rwtest.rns");          // (1) reinitialize
+    vector<double> mp(npar, 1.0);
+
+    // (2) QUEUE: stack runs first, per member, then the population runs
+    map<int, vector<int>> member_stack_runs;                 // member -> stack run_ids (mirrors the run-id map)
+    for (int m = 0; m < nmember; m++)
+    {
+        vector<int> rids;
+        for (int s = 0; s < nstack_per; s++)
+            rids.push_back(rs.add_run(mp, "GEN=0_MEMBER=" + to_string(m), 0.0));
+        member_stack_runs[m] = rids;
+    }
+    vector<int> pop_runs;
+    for (int m = 0; m < nmember; m++)
+        pop_runs.push_back(rs.add_run(mp, "POP_MEMBER=" + to_string(m), 0.0));
+
+    const int total = nmember * nstack_per + nmember;
+
+    // (3) RUN: store every result via update_run in a random order (stand-in for agent completion order)
+    vector<int> all_ids;
+    for (int i = 0; i < total; i++) all_ids.push_back(i);
+    std::shuffle(all_ids.begin(), all_ids.end(), rng);
+    vector<char> sd = serial_buf(npar, nobs);
+    for (int rid : all_ids) rs.update_run(rid, sd);
+
+    // (4) PROCESS: per member -> full get_run_status scan (get_failed_run_ids) + per-member reads
+    for (int m = 0; m < nmember; m++)
+    {
+        int n = rs.get_nruns();                              // get_failed_run_ids reads n_runs first
+        for (int id = 0; id < n; id++) rs.get_run_status(id);// ...then scans every run's status
+        for (int rid : member_stack_runs[m])                 // ...then reads this member's stack runs
+        {
+            vector<double> pv, ov; string itx; double iv;
+            rs.get_run(rid, pv, ov, itx, iv);
+            int st; rs.get_info(rid, st, itx, iv);
+        }
+    }
+    rs.free_memory();
+}
+
 int main(int argc, char **argv)
 {
-    const int npop = 10, nstack = 100, total = npop + nstack;
-    const int npar = 6, nobs = 4;
-    const long nops = (argc > 1) ? atol(argv[1]) : 5000000L;
-    const unsigned seed = (argc > 2) ? (unsigned)strtoul(argv[2], nullptr, 10) : 1u;
+    const int nmember = 10, nstack_per = 10, npar = 6, nobs = 4;
+    const long niter = (argc > 1) ? atol(argv[1]) : 100000L;
+    const unsigned seed0 = (argc > 2) ? (unsigned)strtoul(argv[2], nullptr, 10) : 0u;
 
     vector<string> par_names, obs_names;
     for (int i = 0; i < npar; i++) par_names.push_back("par" + to_string(i));
     for (int i = 0; i < nobs; i++) obs_names.push_back("obs" + to_string(i));
 
-    RunStorage rs("rs_rwtest.rns");
-    rs.reset(par_names, obs_names, "rs_rwtest.rns");
-    vector<double> mp(npar, 1.0);
-    for (int i = 0; i < total; i++) rs.add_run(mp, "GEN=0_MEMBER=" + to_string(i % npop), 0.0);
-
-    // a serialized par+obs result buffer reused for update_run writes
-    vector<char> serial((npar + nobs) * sizeof(double), 0);
-
-    std::mt19937 rng(seed);
-    std::uniform_int_distribution<int> pick_run(0, total - 1);
-    std::uniform_int_distribution<int> pick_op(0, 5);  // 1 write op, 5 read ops
-
-    long writes = 0, reads = 0;
-    for (long n = 0; n < nops; n++)
+    for (long it = 0; it < niter; it++)
     {
-        if (n % 500000 == 0)
-            cerr << "\r  " << n / 1000 << "k / " << nops / 1000 << "k ops  (w=" << writes
-                 << " r=" << reads << ")   " << flush;
-        int r = pick_run(rng);
-        int op = pick_op(rng);
-        try
-        {
-            switch (op)
-            {
-            case 0: rs.update_run(r, serial); writes++; break;                                  // write
-            default:
-            {
-                reads++;
-                int st; string itx; double iv;
-                if (op == 1) rs.get_info(r, st, itx, iv);
-                else if (op == 2) { vector<double> pv, ov; rs.get_run(r, pv, ov, itx, iv); }
-                else if (op == 3) rs.get_run_status(r);
-                else if (op == 4) rs.get_serial_pars(r);
-                else (void)rs.get_nruns();
-                break;
-            }
-            }
-        }
+        if (it % 5000 == 0)
+            cerr << "\r  " << it << " / " << niter << " gens   " << flush;
+        try { run_once((unsigned)(seed0 + it), nmember, nstack_per, npar, nobs, par_names, obs_names); }
         catch (const exception &e)
         {
-            cout << "REPRODUCED after " << n << " ops (writes=" << writes << " reads=" << reads
-                 << ", seed=" << seed << "):  " << e.what() << endl;
+            cout << "\nREPRODUCED at gen/seed " << (seed0 + it) << ":  " << e.what()
+                 << "   (replay: rs_rwtest 1 " << (seed0 + it) << ")" << endl;
             return 1;
         }
     }
-    cout << "no failure in " << nops << " ops (writes=" << writes << " reads=" << reads
-         << "): this build's stdlib tolerates the read/write mixing" << endl;
-    rs.free_memory();
+    cout << "\nno failure in " << niter << " gens (this build's stdlib tolerates the pattern)" << endl;
     return 0;
 }
