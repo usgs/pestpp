@@ -265,7 +265,7 @@ def chance_consistency_test():
     pst.control_data.noptmax = -1
     pst.write(os.path.join(t_d, "constr.pst"))
     m1 = os.path.join("mou_tests", "constr_test_master_fail_3")
-    pyemu.os_utils.start_workers(t_d, exe_path, "constr.pst", 35, worker_root="mou_tests",
+    pyemu.os_utils.start_workers(t_d, exe_path, "constr.pst", 10, worker_root="mou_tests",
                                  master_dir=m1, verbose=True,port=port)
 
 

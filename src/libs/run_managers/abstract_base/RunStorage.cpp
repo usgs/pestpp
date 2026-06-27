@@ -34,12 +34,41 @@
 #include "Transformable.h"
 #include <limits>
 #include "utilities.h"
+#include <execinfo.h>
 
 using std::numeric_limits;
 
 using namespace std;
 
 const double RunStorage::no_data = -9999.0;
+
+// DIAGNOSTIC: when a RunStorage read fails, query the file INDEPENDENTLY of buf_stream to classify the
+// failure - an out-of-range run_id (a chance run-id/logic bug), a record past EOF (short/corrupt file),
+// or an in-range/healthy record (a stream-state issue) - and dump a backtrace so the calling code path
+// (which handed over the run_id) is visible.  build with -g -rdynamic for readable frame names.
+static void rs_read_fail_report(const char *where, int run_id, const string &filename,
+                                std::streamoff want_pos, std::streamoff rec_end)
+{
+    std::streamoff fs_size = -1; std::int64_t fs_nruns = -1;
+    {
+        std::ifstream chk(filename.c_str(), std::ios_base::binary | std::ios_base::ate);
+        if (chk.is_open()) { fs_size = chk.tellg(); chk.seekg(0, std::ios_base::beg);
+            chk.read(reinterpret_cast<char *>(&fs_nruns), sizeof(fs_nruns)); }
+    }
+    std::cerr << "\n-->" << where << " FAILED  run_id=" << run_id << "  header_n_runs=" << fs_nruns
+              << "  pos=" << want_pos << "  rec_end=" << rec_end << "  file_size=" << fs_size << "  ";
+    if (fs_nruns >= 0 && run_id >= (int)fs_nruns)
+        std::cerr << "=> run_id OUT OF RANGE (chance run-id/logic bug)";
+    else if (fs_size >= 0 && rec_end > fs_size)
+        std::cerr << "=> record PAST EOF (short/corrupt file)";
+    else
+        std::cerr << "=> in-range, file healthy (stream-state issue)";
+    std::cerr << endl;
+    void *bt[40];
+    int nfr = backtrace(bt, 40);
+    backtrace_symbols_fd(bt, nfr, 2);
+    std::cerr.flush();
+}
 
 /**
  * @brief Run storage.
@@ -253,6 +282,7 @@ int RunStorage::get_nruns()
 	int n_runs = n_runs_64;
     if (!buf_stream)
     {
+        rs_read_fail_report("get_nruns", -1, filename, 0, (std::streamoff)sizeof(std::int64_t));
         throw runtime_error("RunStorage::get_nruns() stream not good");
     }
     if (n_runs < 0)
@@ -670,6 +700,8 @@ std::int8_t RunStorage::get_run_status_native(int run_id)
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
     if (!buf_stream)
     {
+        rs_read_fail_report("get_run_status_native", run_id, filename, get_stream_pos(run_id),
+            get_stream_pos(run_id) + (std::streamoff)sizeof(std::int8_t));
         throw runtime_error("RunStorage::get_run_status_native() stream not good");
     }
 	return r_status;
@@ -713,6 +745,8 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
+        rs_read_fail_report("get_info", run_id, filename, get_stream_pos(run_id),
+            get_stream_pos(run_id) + (std::streamoff)(sizeof(std::int8_t) + info_txt_length * sizeof(char) + sizeof(double)));
         throw runtime_error("RunStorage::get_run_info() stream not good");
     }
 }
@@ -862,6 +896,9 @@ int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &ob
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
+        rs_read_fail_report("get_run", run_id, filename, get_stream_pos(run_id),
+            get_stream_pos(run_id) + (std::streamoff)(sizeof(std::int8_t) + info_txt_length * sizeof(char)
+            + sizeof(double) + (n_par + n_obs) * sizeof(double)));
         throw runtime_error("RunStorage::get_run() stream not good");
     }
 	return status;
