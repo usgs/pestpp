@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.24
+# <a id='s1' />Version 5.2.27
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-October 2025
+July 2026
 
 # <a id='s2' />Acknowledgements
 
@@ -2538,15 +2538,9 @@ After running a program of the PEST++ suite, you may notice a number of (possibl
 
 ### <a id='s9-4-1' />5.4.1 Failed Run Storage File
 
-In addition to the run storage files described above, the PEST++ run manager also writes a *case.rnf* file. This file records the parameter values associated with model runs that have been declared as permanently failed – that is, runs which have been attempted *max_run_fail()* times without success. The *case.rnf* file uses the same binary format as the *case.rns* run storage file, and can therefore be read and processed using pyEMU.
+Unlike the *case.rns*, *case.rnu* and *case.rnj* run storage files described above, which are removed when PESTPP-XXX exits gracefully, the run manager also writes a *case.rnf* file that is left behind on purpose. This file records the parameter values for any model runs that were declared permanently failed – that is, runs that were attempted *max_run_fail()* times without success – so that you can go back after a run and see which parameter combinations the model couldn’t handle. Each entry holds the parameter values that were sent to the model, along with the relevant metadata (for example, the realization name in PESTPP-IES or PESTPP-DA) and the number of times that run was attempted before being given up on. The *case.rnf* file uses the same binary format as the *case.rns* file, so it can be read and processed with pyEMU. It is written incrementally as runs fail, so its contents are available even if PESTPP-XXX is interrupted, and if no runs fail the file is simply left empty.
 
-Unlike the *case.rns*, *case.rnu* and *case.rnj* files, the *case.rnf* file is not removed when PESTPP-XXX exits gracefully. It is intended to persist after a run so that users can inspect which parameter combinations caused model failure.
-
-Each entry in the *case.rnf* file contains the parameter values that were supplied to the model for the failed run, together with any associated metadata (such as the realization name in the case of PESTPP-IES or PESTPP-DA). The number of times each run was attempted before being declared as failed is also stored with each entry.
-
-This file can be useful in several contexts. When undertaking highly parameterized inversion or ensemble-based analyses, some parameter combinations may drive the model into a state from which it cannot recover, producing either numerical instability or execution failure. By examining the parameter values stored in *case.rnf*, a user can identify regions of parameter space that are problematic for a given model. This information can then be used to refine parameter bounds, adjust prior parameter distributions, or modify model input files to improve model stability. It can also serve as a diagnostic tool when deploying PEST++ for the first time on a new model, helping to identify parameter ranges or combinations that require attention.
-
-The *case.rnf* file is produced by all members of the PEST++ suite whenever one or more model runs exceed the *max_run_fail()* threshold. If no runs are declared as permanently failed, the file will exist but will be empty. The file is written incrementally as runs fail, so its contents are available even if PESTPP-XXX is interrupted or terminated prematurely.
+This file can be a handy diagnostic, especially in highly parameterized or ensemble-based analyses where some parameter combinations can push the model into a state it can’t recover from. By looking at the parameter values in *case.rnf*, you can start to identify the regions of parameter space that are problematic for a given model and use that to tighten parameter bounds, adjust the prior, or revisit the model input files. It can also be useful when standing up PEST++ on a new model for the first time, where it can help flag parameter ranges or combinations that need attention.
 
 # <a id='s10' />6. PESTPP-GLM
 
@@ -3611,6 +3605,8 @@ Figure 9.1 – A demonstration of the multi-modal upgrade process (B) using the 
 
 It is important to note that more realizations will be required in the PESTPP-IES solution process when using multi-modal upgrades. This is so an effectively local group of realizations can be found for each realizations upgrade that a) capture the local objective function behavior and b) the local group has enough realizations to resolve the important relations between pars and obs. The size of the local group of realizations is controlled by the *ies_multimodal_alpha* argument, which ranges between 0 and 1 and is the fraction of the total ensemble to use for the local group of realizations. Smaller values of *ies_multimodal_alpha* will result in more local groups of realizations but at the expense of these groups being smaller in number. A value between 0.1 and0.25 seems to work well for a limited number of test cases. Note that as of version 5.2.0, the multi-modal solution process is multithreaded and uses the *ies_num_threads* option; some early testing indicates that 10-15 threads on a high performance laptop is reasonable.
 
+The composite score that PESTPP-IES uses to identify the local group of realizations is made up of two pieces – the distance in parameter space and the objective function value of other realizations. The relative importance of these two pieces is controlled by the *ies_multimodal_phi_weight* argument, which ranges between 0 and 1; a value of 0.5 (the default) weights them equally, which is the original behavior, while values nearer 1.0 use more phi information and values nearer 0.0 use more parameter-space distance. A related argument, *ies_multimodal_weight_exponent*, offers a continuous alternative to forming a hard local group: rather than selecting a subset of realizations and using them equally (and using only these realizations), users can leave *ies_multimodal_alpha* at its default of 1.0 (so that all realizations are retained) and instead set *ies_multimodal_weight_exponent* greater than zero. This scales the contribution of each realization to a given realization's upgrade by how near it is in the composite score sense, so that higher composite score realizations contribute more and lower score realizations contribute less. Larger values of the exponent sharpen this down-weighting and, in the limit, approach the behavior of the hard local group, while a value of zero (the default) weights all realizations equally and recovers the standard solution. Note that *ies_multimodal_weight_exponent* is only active when *ies_multimodal_alpha* is 1.0 – if a local group is already being formed (that is, *ies_multimodal_alpha* less than 1.0), the exponent is ignored. These two arguments are new and have only seen limited testing.
+
 Closely related to the multimodal solution process is the use of a “weights” ensemble with PESTPP-IES. Through the *ies_weight_ensemble* argument, users can specify unique weight vectors for each realization. This argument can only be used with the multimodal solution process and allows the upgrade of each realization use a unique weighting scheme. In this way, PESTP-IES can be used to explore how different weighting scheme impact the posterior results. This functionality is demonstrated on the ZDT1 bi-objective optimization benchmark in Figure 9.2
 
 <img src="./media/image5.png" style="width:5in;height:5in" alt="Chart, scatter chart Description automatically generated" />
@@ -4164,6 +4160,16 @@ Note also that the number of control variables may change with time. Refer to th
 <td><em>ies_multimodal_alpha(1.0)</em></td>
 <td>double</td>
 <td>The fraction of the total ensemble size to use as the local neighborhood realizations in the multimodal solution process. Must be greater than zero and less than 1. Values of 0.1 to 0.25 seem to work well. Default is 1.0 (disable multi-modal solution process)</td>
+</tr>
+<tr class="even">
+<td><em>ies_multimodal_weight_exponent(0.0)</em></td>
+<td>double</td>
+<td>Exponent controlling soft, distance-based weighting of realization contributions when <em>ies_multimodal_alpha</em> is 1.0 (that is, when a local neighborhood subset is not being used). Larger values more strongly down-weight realizations that have a lower composite score – in combined parameter-space and objective-function distance – from the realization being upgraded, approaching the behavior of the local neighborhood subset; a value of 0.0 (the default) weights all realizations equally and recovers the standard solution. Ignored when <em>ies_multimodal_alpha</em> is less than 1.0.</td>
+</tr>
+<tr class="odd">
+<td><em>ies_multimodal_phi_weight(0.5)</em></td>
+<td>double</td>
+<td>The relative importance of objective function (phi) value versus parameter-space distance in the composite score used to rank realizations in the multimodal solution process. Must be between 0 and 1. A value of 0.5 (the default) weights the two equally, which recovers the original behavior; values nearer 1.0 favor phi distance and values nearer 0.0 favor parameter-space distance. Used by both <em>ies_multimodal_alpha</em> and <em>ies_multimodal_weight_exponent</em>.</td>
 </tr>
 <tr class="even">
 <td><em>ies_weight_ensemble()</em></td>
