@@ -1,0 +1,28 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 3
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+da_parameter_ensemble          initial_x_ens.csv
+da_num_reals                   50
+da_use_mda                     false
+ies_include_base               False
+da_use_simulated_states        false
+ies_no_noise                   True
+ies_num_threads                1
+random_seed                    11111
+* parameter groups external
+es.pargp_data.csv
+* parameter data external
+es.par_data.csv
+* observation data external
+es.obs_data.csv
+* model command line
+python forward_ens.py
+* model input external
+es.tplfile_data.csv
+* model output external
+es.insfile_data.csv

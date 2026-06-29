@@ -3112,6 +3112,28 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 	if (population_stack_pe_run_map.size() > 0)
 	{
 		cout << "...processing nested stack runs" << endl;
+		{   // TEMP DEBUG: nested-chance run-id integrity (cross-check maps vs run manager n_runs)
+			int nr = run_mgr_ptr->get_nruns();
+			std::set<int> all_ids; int oor = 0, dups = 0;
+			cout << "...NESTED-CHANCE-DBG[process]: run_mgr n_runs=" << nr
+			     << "  members=" << population_stack_pe_run_map.size() << endl;
+			for (auto &mi : population_stack_pe_run_map)
+			{
+				int mn = -1, mx = -1; bool first = true;
+				for (auto &kv : mi.second)
+				{
+					int rid = kv.second;
+					if (first) { mn = mx = rid; first = false; }
+					else { if (rid < mn) mn = rid; if (rid > mx) mx = rid; }
+					if (rid < 0 || rid >= nr) oor++;
+					if (!all_ids.insert(rid).second) dups++;
+				}
+				cout << "   member '" << mi.first << "' nrun=" << mi.second.size()
+				     << " run_ids[" << mn << ".." << mx << "]" << ((mx >= nr || mn < 0) ? "  <<< OUT-OF-RANGE" : "") << endl;
+			}
+			cout << "...NESTED-CHANCE-DBG[process]: unique_ids=" << all_ids.size() << " out_of_range="
+			     << oor << " duplicates=" << dups << ((oor || dups) ? "  <<<<< CORRUPT RUN-ID TRACKING" : "  (ok)") << endl;
+		}
 		ObservationEnsemble nested_oe;
 		vector<string> keep_nested_names;
 		stack_oe_map.clear();
@@ -3140,6 +3162,12 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			{
 				should_fail = true;
 				test_failed = true;
+			}
+			{   // TEMP DEBUG: which member + run-ids are about to be read (last line before a crash = culprit)
+				int mn = -1, mx = -1; bool f = true;
+				for (auto &kv : real_info.second) { int r = kv.second; if (f) { mn = mx = r; f = false; } else { if (r < mn) mn = r; if (r > mx) mx = r; } }
+				cout << "   ...reading nested stack for member '" << real_info.first << "' run_ids["
+				     << mn << ".." << mx << "] (" << real_info.second.size() << " runs)" << endl << flush;
 			}
 			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, true, should_fail);
 
@@ -3512,6 +3540,28 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
     }
 
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
+	{   // TEMP DEBUG: nested-chance run-id integrity at QUEUE time (compare to [process] later)
+		int nr = run_mgr_ptr->get_nruns();
+		std::set<int> all_ids; int oor = 0, dups = 0;
+		cout << "...NESTED-CHANCE-DBG[queue]: run_mgr n_runs=" << nr
+		     << "  members=" << population_stack_pe_run_map.size() << endl;
+		for (auto &mi : population_stack_pe_run_map)
+		{
+			int mn = -1, mx = -1; bool first = true;
+			for (auto &kv : mi.second)
+			{
+				int rid = kv.second;
+				if (first) { mn = mx = rid; first = false; }
+				else { if (rid < mn) mn = rid; if (rid > mx) mx = rid; }
+				if (rid < 0 || rid >= nr) oor++;
+				if (!all_ids.insert(rid).second) dups++;
+			}
+			cout << "   member '" << mi.first << "' nrun=" << mi.second.size()
+			     << " run_ids[" << mn << ".." << mx << "]" << ((mx >= nr || mn < 0) ? "  <<< OUT-OF-RANGE" : "") << endl;
+		}
+		cout << "...NESTED-CHANCE-DBG[queue]: unique_ids=" << all_ids.size() << " out_of_range="
+		     << oor << " duplicates=" << dups << ((oor || dups) ? "  <<<<< CORRUPT RUN-ID TRACKING" : "  (ok)") << endl << flush;
+	}
 	stack_runs_processed = false;
 	//reset stack_oe to use the same real names as stack_pe
 	stack_oe.reserve(names1, stack_oe.get_var_names());
