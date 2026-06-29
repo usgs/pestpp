@@ -1,0 +1,2 @@
+run_list.push_front(base_run);
+std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag); 

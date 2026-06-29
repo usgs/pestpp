@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.24
+# <a id='s1' />Version 5.2.27
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-October 2025
+July 2026
 
 # <a id='s2' />Acknowledgements
 
@@ -174,6 +174,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [5.3.4 Run Management Record File](#s9-3-4)
         - [5.3.5 Run Management Control Variables ](#s9-3-5)
     - [5.4 Run Book-Keeping Files](#s9-4)
+        - [5.4.1 Failed Run Storage File](#s9-4-1)
 - [6. PESTPP-GLM](#s10)
     - [6.1 Introduction](#s10-1)
         - [6.2.1 Basic Equations](#s10-1-1)
@@ -2535,6 +2536,12 @@ In situations where the forward model runtime is very short, allowing the master
 
 After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run – if PESTPP-XXX exits gracefully, these files are removed. These run storage files can be read and processed using pyEMU.
 
+### <a id='s9-4-1' />5.4.1 Failed Run Storage File
+
+Unlike the *case.rns*, *case.rnu* and *case.rnj* run storage files described above, which are removed when PESTPP-XXX exits gracefully, the run manager also writes a *case.rnf* file that is left behind on purpose. This file records the parameter values for any model runs that were declared permanently failed – that is, runs that were attempted *max_run_fail()* times without success – so that you can go back after a run and see which parameter combinations the model couldn’t handle. Each entry holds the parameter values that were sent to the model, along with the relevant metadata (for example, the realization name in PESTPP-IES or PESTPP-DA) and the number of times that run was attempted before being given up on. The *case.rnf* file uses the same binary format as the *case.rns* file, so it can be read and processed with pyEMU. It is written incrementally as runs fail, so its contents are available even if PESTPP-XXX is interrupted, and if no runs fail the file is simply left empty.
+
+This file can be a handy diagnostic, especially in highly parameterized or ensemble-based analyses where some parameter combinations can push the model into a state it can’t recover from. By looking at the parameter values in *case.rnf*, you can start to identify the regions of parameter space that are problematic for a given model and use that to tighten parameter bounds, adjust the prior, or revisit the model input files. It can also be useful when standing up PEST++ on a new model for the first time, where it can help flag parameter ranges or combinations that need attention.
+
 # <a id='s10' />6. PESTPP-GLM
 
 ## <a id='s10-1' />6.1 Introduction
@@ -2831,6 +2838,7 @@ The following table summarizes the contents of files that are recorded by PESTPP
 | *caseN.fosm_reweight.rei*      | Scaled final weights used in FOSM calculations.                                                                                                                                                                                                                                                                         |
 | *case.rst*                     | A binary file containing restart information.                                                                                                                                                                                                                                                                           |
 | *case.rns, case.rnj, case.rnu* | Binary files used by the run manager.                                                                                                                                                                                                                                                                                   |
+| *case.rnf*                     | Binary file containing parameter values of permanently failed model runs. See section 5.4.1.                                                                                                                                                                                                                           |
 
 Table 6.1. Files recorded by PESTPP-GLM.
 
@@ -3063,6 +3071,7 @@ PESTPP-SEN writes the following output files. It is assumed that the filename ba
 | *case.rmr*           | Parallel run management record. This file is written if model runs are conducted in parallel.                                                                                                                                                                                    |
 | *Case.sen.par.csv*   | Morris only. Lists the parameter sets used to run the model.                                                                                                                                                                                                                     |
 | *case.rns*           | Binary file used for model run management.                                                                                                                                                                                                                                       |
+| *case.rnf*           | Binary file containing parameter values of permanently failed model runs. See section 5.4.1.                                                                                                                                                                                     |
 
 Table 7.3 Files written by PESTPP-SEN. It is assumed that the name of the PEST control file is *case.pst*. Data elements in all of the above files are comma delimited.
 
@@ -3341,6 +3350,7 @@ Files recorded by PESTPP-OPT are listed in the following table. The contents of 
 | *case.rnj*             | A binary file used for run management.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | *case.N.par_stack.csv* | Optional parameter stack saved each iteration                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | *case.N.obs_stack.csv* | Optional observation stack saved each iteration                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| *case.rnf*             | Binary file containing parameter values of permanently failed model runs. See section 5.4.1.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Table 8.1 PESTPP-OPT output files. It is assumed that the name of the PEST control file is *case.pst*.
 
@@ -3594,6 +3604,8 @@ To that end, and following the work of Zhang and others (2018), PESTPP-IES imple
 Figure 9.1 – A demonstration of the multi-modal upgrade process (B) using the example problem from Zhang and others (2018) compared to the standard solution (A). During the first iteration upgrade process, the upgrade for red-dot realization uses only realizations in the local parameter space/low objective function neighborhood (cyan dots) out of the entire ensemble (grey dots). This upgrade yields the magenta location, very near the target circle, compared to the nearly no movement from the standard solution (A).
 
 It is important to note that more realizations will be required in the PESTPP-IES solution process when using multi-modal upgrades. This is so an effectively local group of realizations can be found for each realizations upgrade that a) capture the local objective function behavior and b) the local group has enough realizations to resolve the important relations between pars and obs. The size of the local group of realizations is controlled by the *ies_multimodal_alpha* argument, which ranges between 0 and 1 and is the fraction of the total ensemble to use for the local group of realizations. Smaller values of *ies_multimodal_alpha* will result in more local groups of realizations but at the expense of these groups being smaller in number. A value between 0.1 and0.25 seems to work well for a limited number of test cases. Note that as of version 5.2.0, the multi-modal solution process is multithreaded and uses the *ies_num_threads* option; some early testing indicates that 10-15 threads on a high performance laptop is reasonable.
+
+The composite score that PESTPP-IES uses to identify the local group of realizations is made up of two pieces – the distance in parameter space and the objective function value of other realizations. The relative importance of these two pieces is controlled by the *ies_multimodal_phi_weight* argument, which ranges between 0 and 1; a value of 0.5 (the default) weights them equally, which is the original behavior, while values nearer 1.0 use more phi information and values nearer 0.0 use more parameter-space distance. A related argument, *ies_multimodal_weight_exponent*, offers a continuous alternative to forming a hard local group: rather than selecting a subset of realizations and using them equally (and using only these realizations), users can leave *ies_multimodal_alpha* at its default of 1.0 (so that all realizations are retained) and instead set *ies_multimodal_weight_exponent* greater than zero. This scales the contribution of each realization to a given realization's upgrade by how near it is in the composite score sense, so that higher composite score realizations contribute more and lower score realizations contribute less. Larger values of the exponent sharpen this down-weighting and, in the limit, approach the behavior of the hard local group, while a value of zero (the default) weights all realizations equally and recovers the standard solution. Note that *ies_multimodal_weight_exponent* is only active when *ies_multimodal_alpha* is 1.0 – if a local group is already being formed (that is, *ies_multimodal_alpha* less than 1.0), the exponent is ignored. These two arguments are new and have only seen limited testing.
 
 Closely related to the multimodal solution process is the use of a “weights” ensemble with PESTPP-IES. Through the *ies_weight_ensemble* argument, users can specify unique weight vectors for each realization. This argument can only be used with the multimodal solution process and allows the upgrade of each realization use a unique weighting scheme. In this way, PESTP-IES can be used to explore how different weighting scheme impact the posterior results. This functionality is demonstrated on the ZDT1 bi-objective optimization benchmark in Figure 9.2
 
@@ -3874,6 +3886,7 @@ Non-CSV output files written by PESTPP-IES are listed in the following table.
 | *case.rmr*              | Parallel run management record. This file is written if model runs are conducted in parallel.                                                                                             |
 | *case.log*              | Performance log. This file records the times at which various processing steps begin and end.                                                                                             |
 | *case.rns*              | Binary file used for model run management. This file is typically removed after a successful PESTPP-IES run.                                                                              |
+| *case.rnf*              | Binary file containing parameter values of permanently failed model runs. See section 5.4.1. This file persists after a successful PESTPP-IES run.                                        |
 | *case.N.res.cov/.jcb*   | (optional) residual covariance matrix saved each iteration.                                                                                                                               |
 | *case.N.autoadaloc.mat* | The (optional) localization matrix yielded by the automatic adaptive localization process                                                                                                 |
 | *case.N.base.par*       | The “base” realization parameter values for the Nth iteration in a PEST-style par file. Only written if the “base” realization is available.                                              |
@@ -4149,6 +4162,16 @@ Note also that the number of control variables may change with time. Refer to th
 <td>The fraction of the total ensemble size to use as the local neighborhood realizations in the multimodal solution process. Must be greater than zero and less than 1. Values of 0.1 to 0.25 seem to work well. Default is 1.0 (disable multi-modal solution process)</td>
 </tr>
 <tr class="even">
+<td><em>ies_multimodal_weight_exponent(0.0)</em></td>
+<td>double</td>
+<td>Exponent controlling soft, distance-based weighting of realization contributions when <em>ies_multimodal_alpha</em> is 1.0 (that is, when a local neighborhood subset is not being used). Larger values more strongly down-weight realizations that have a lower composite score – in combined parameter-space and objective-function distance – from the realization being upgraded, approaching the behavior of the local neighborhood subset; a value of 0.0 (the default) weights all realizations equally and recovers the standard solution. Ignored when <em>ies_multimodal_alpha</em> is less than 1.0.</td>
+</tr>
+<tr class="odd">
+<td><em>ies_multimodal_phi_weight(0.5)</em></td>
+<td>double</td>
+<td>The relative importance of objective function (phi) value versus parameter-space distance in the composite score used to rank realizations in the multimodal solution process. Must be between 0 and 1. A value of 0.5 (the default) weights the two equally, which recovers the original behavior; values nearer 1.0 favor phi distance and values nearer 0.0 favor parameter-space distance. Used by both <em>ies_multimodal_alpha</em> and <em>ies_multimodal_weight_exponent</em>.</td>
+</tr>
+<tr class="even">
 <td><em>ies_weight_ensemble()</em></td>
 <td>text</td>
 <td>The name of a CSV or JCO/JCB file (recognized by its extension) containing user-supplied weight vectors for each realization. If this keyword is omitted, PESTPP-IES uses the weight vector in the control file for all realizations. Only used with <em>ies_multimodal_alpha</em></td>
@@ -4197,6 +4220,11 @@ Note also that the number of control variables may change with time. Refer to th
 <td><em>ies_reinflate_num_reals</em></td>
 <td>list of ints</td>
 <td>The number of realizations to use between reinflation cycles.  If negative, new realizations are drawn from the current ensemble.</td>
+</tr>
+<tr class="even">
+<td><em>ies_use_phi_lambda_iters</em></td>
+<td>bool</td>
+<td>Flag to use phi-based lambda each iteration (instead just for the initial phi).</td>
 </tr>
 
 </tbody>
@@ -4852,6 +4880,10 @@ Since the parameters and observations being used can change across cycles, the P
 <td><em>Case.global.&lt;cycle&gt;.&lt; iter&gt;.pcs.csv</em></td>
 <td>The global parameter change summary for cycle &lt;cycle&gt; after iteration &lt;iter&gt;</td>
 </tr>
+<tr class="odd">
+<td><em>case.rnf</em></td>
+<td>Binary file containing parameter values of permanently failed model runs. See section 5.4.1.</td>
+</tr>
 </tbody>
 </table>
 
@@ -5051,8 +5083,8 @@ The following table summarizes the contents of files that are recorded by PESTPP
 <td>The listing of parents used to generate each offspring for each generation</td>
 </tr>
 <tr class="even">
-<td></td>
-<td></td>
+<td><em>case.rnf</em></td>
+<td>Binary file containing parameter values of permanently failed model runs. See section 5.4.1.</td>
 </tr>
 </tbody>
 </table>
@@ -5122,15 +5154,17 @@ Table 13.2. PESTPP-MOU specific control arguments. PESTPP-MOU shares many other 
 # <a id='s17' />14. PESTPP-SQP
 
 ## <a id='s17-1' />14.1 Introduction
-PESTPP-SQP is a sophisticated tool for constrained nonlinear optimization that implements Sequential Quadratic Programming (SQP) methods with advanced ensemble-based gradient estimation capabilities. Designed for decision-support workflows in computationally expensive modeling applications, PESTPP-SQP addresses the challenge of optimizing model decision variables subject to complex model-based constraints, including chance constraints that account for uncertainty in constraint satisfaction.
+PESTPP-SQP is a tool for constrained nonlinear optimization that implements Sequential Quadratic Programming (SQP) methods with ensemble-based gradient estimation capabilities. Designed for decision-support workflows in computationally expensive modeling applications, PESTPP-SQP addresses the challenge of optimizing model decision variables subject to complex model-based constraints, including chance constraints that account for uncertainty in constraint satisfaction.
 
-The tool represents a significant advancement in optimization methodology by combining classical SQP theory with modern ensemble-based approaches. At its core, PESTPP-SQP formulates local quadratic models of the Lagrangian function around the current decision variable vector, approximating the original nonlinear optimization problem with tractable quadratic programming subproblems. The mathematical foundation rests on the Karush-Kuhn-Tucker (KKT) optimality conditions, which serve as a "traffic control system" ensuring that any solution found is truly optimal and feasible.
+PESTPP-SQP formulates local quadratic models of the Lagrangian function around the current decision variable vector, approximating the original nonlinear optimization problem with tractable quadratic programming subproblems. The mathematical foundation rests on the Karush-Kuhn-Tucker (KKT) optimality conditions, solved via either direct or null-space decomposition methods.
 
-One of PESTPP-SQP's most innovative features is its implementation of the Stochastic Simplex Approximate Gradient (StoSAG) method developed by Fonseca et al. (2015). This ensemble-based gradient estimation approach fundamentally transforms how gradients are computed by leveraging statistical correlation analysis between parameter perturbations and objective function responses, eliminating the need for multiple expensive model runs typically required by finite difference methods. The StoSAG implementation includes sophisticated numerical techniques such as singular value decomposition with truncation thresholds to ensure robust gradient estimation even when parameter ensembles exhibit high correlation or near-singularity.
+Gradients are estimated using the ensemble-based cross-covariance approach described by Chen et al. (2009), and later modified by Fonseca et al. (2015) as stochastic gradients. This approach computes the gradient from the statistical cross-covariance between decision variable perturbations and objective function responses across the ensemble population, reusing model runs already needed for the population-based search. Singular value decomposition with user-controlled truncation thresholds is used to form the pseudoinverse of the decision variable covariance matrix, providing robustness when ensemble members exhibit high correlation.
 
-The optimization process employs a sophisticated filter-based globalization strategy that provides more flexible alternatives to traditional penalty function approaches. This filter method maintains a partial ordering in the two-dimensional space of objective function values and constraint violations, allowing the algorithm to balance competing goals of optimality and feasibility more naturally than rigid penalty weights. When ensemble gradients are active, PESTPP-SQP can leverage CMA-ES (Covariance Matrix Adaptation Evolution Strategy) style population proposals with adaptive covariance mechanisms to avoid convergence to local minima and maintain population diversity.
+The Hessian of the Lagrangian can be updated using BFGS or SR1, with automatic fallback to diagonal rescaling or steepest descent when Hessian approximations become ill-conditioned.
 
-Advanced functionality includes automatic scaling mechanisms for steps and gradients, with intelligent fallback to diagonal rescaling or steepest descent when Hessian approximations become problematic. The tool supports both finite-difference and ensemble-based gradient computation, with optional restarts from prior Jacobian matrices and residuals to accelerate optimization. Working set tolerance mechanisms provide fine-grained control over constraint activation and deactivation, while adaptive localization weights help focus gradient information on the most relevant parameters in high-dimensional settings.
+The optimization process employs a filter-based globalization strategy that maintains a partial ordering in the two-dimensional space of objective function values and constraint violations, allowing the algorithm to balance optimality and feasibility without rigid penalty weights. Once a KKT search direction is computed, a line search evaluates candidate steps at user-controlled scale factors along that direction, with optional adaptive refinement around promising candidates, and selects the best step via the filter. PESTPP-SQP also uses a covariance adaptation mechanism to generate population proposals and avoid convergence to local minima.
+
+Working set tolerance mechanisms provide control over constraint activation and deactivation. Hot-starting from prior observation and decision-variable ensembles is supported to reduce the cost of restarting optimization runs. Chance constraints are evaluated at either a single representative point or all ensemble members, depending on the *opt_chance_points* setting.
 
 
 ## <a id='s17-2' />14.2 Theory
@@ -5164,11 +5198,11 @@ subject to: g_i(xₖ) + ∇g_i(xₖ)ᵀd ≤ 0, i = 1, ..., m
             h_j(xₖ) + ∇h_j(xₖ)ᵀd = 0, j = 1, ..., p
 ```
 
-This quadratic programming subproblem can be solved efficiently using specialized QP solvers, yielding a search direction dₖ that moves toward optimality while maintaining feasibility.
+This quadratic programming subproblem is solved using internal KKT solvers (direct and null-space methods), yielding a search direction dₖ that moves toward optimality while maintaining feasibility.
 
 The quadratic objective model employs an approximation to the Hessian matrix of the Lagrangian, which captures the curvature information of both the objective function and the constraints. By default, PESTPP-SQP uses the BFGS (Broyden-Fletcher-Goldfarb-Shanno) method with Powell damping to update this Hessian approximation, ensuring that the approximation maintains positive definiteness and provides good curvature information. For cases where the problem structure benefits from potentially indefinite approximations, the SR1 (Symmetric Rank-1) update method is also available.
 
-The equality-constrained quadratic programming subproblem is formed by identifying the working set of active inequality constraints at the current point. This working set represents the constraints that are currently "tight" or binding at the solution. PESTPP-SQP computes the search direction using two complementary approaches: the null-space method and direct KKT solving. The null-space method uses singular value decomposition (SVD) to project the problem into the null space of active constraints, computing a reduced-space Newton step that respects the constraint manifold. A range-space correction is then applied to ensure feasibility. When the null-space approach encounters numerical difficulties or becomes unsuitable, PESTPP-SQP falls back to a direct solution of the Karush-Kuhn-Tucker (KKT) system, providing a robust alternative that maintains convergence guarantees.
+The equality-constrained quadratic programming subproblem is formed by identifying the working set of active inequality constraints at the current point. This working set represents the constraints that are currently "tight" or binding at the solution. PESTPP-SQP computes the search direction using two complementary approaches: the null-space method and direct KKT solving. The null-space method uses Householder QR decomposition of the active constraint Jacobian to compute the range-space (Y) and null-space (Z) basis matrices, computing a reduced-space Newton step that respects the constraint manifold. A range-space correction is then applied to ensure feasibility. SVD is used as a numerical fallback for specific sub-system solves when LDLT decomposition fails.
 
 The Karush-Kuhn-Tucker (KKT) conditions form the mathematical foundation that drives both step computation and active-set updates in PESTPP-SQP. In simple terms, KKT conditions are like a "traffic control system" for optimization that ensures any solution found is truly optimal and feasible. These conditions state that at an optimal solution, the gradient of the objective function must be expressible as a weighted combination of the gradients of the active constraints, where the weights (called Lagrange multipliers) are non-negative for inequality constraints. Think of it this way: if you're trying to minimize cost while staying within budget, the KKT conditions ensure that you can't improve the cost further without violating the budget constraint. 
 
@@ -5206,55 +5240,57 @@ Here, x* is the optimal solution, λᵢ are the Lagrange multipliers for inequal
 
 PESTPP-SQP uses these conditions to determine when constraints should enter or leave the active set and to compute search directions that move toward optimality while maintaining feasibility. All variable bounds are enforced at all times, ensuring that the optimization process never violates the fundamental parameter limits.
 
-To ensure that the algorithm converges to a good solution from any starting point, PESTPP-SQP employs a sophisticated filter method combined with line-search techniques. The filter method provides a more flexible alternative to traditional penalty function approaches by maintaining a "filter" of acceptable points in the two-dimensional space of objective function values and constraint violations. A trial point is accepted if it improves either the objective function or the total constraint violation without causing unacceptable degradation in the other metric. This creates a partial ordering that allows the algorithm to balance the competing goals of optimality and feasibility (similar to Pareto analysis) more naturally than rigid penalty weights. The line search component scales the computed search direction using user-provided multipliers, with internal Wolfe-like conditions guiding the acceptance of trial points. These conditions ensure that each step provides sufficient improvement in the objective function and maintains sufficient curvature information for future iterations.
+To ensure that the algorithm converges to a good solution from any starting point, PESTPP-SQP employs a sophisticated filter method combined with line-search techniques. The filter method provides a more flexible alternative to traditional penalty function approaches by maintaining a "filter" of acceptable points in the two-dimensional space of objective function values and constraint violations. A trial point is accepted if it improves either the objective function or the total constraint violation without causing unacceptable degradation in the other metric. This creates a partial ordering that allows the algorithm to balance the competing goals of optimality and feasibility (similar to Pareto analysis) more naturally than rigid penalty weights. The line search component scales the computed search direction using user-provided multipliers (*sqp_alpha_mults*), with optional adaptive refinement around promising candidates. Trial point acceptance is determined entirely by the filter, which accepts any candidate that improves either the objective value or total constraint violation relative to existing filter members.
 
 Hessian approximation management is crucial for the success of SQP methods, and PESTPP-SQP implements a robust system for maintaining reliable curvature information. The BFGS method with Powell damping serves as the default approach, carefully designed to maintain positive curvature even when the true Hessian might be indefinite. This is particularly important because positive definite Hessian approximations lead to well-conditioned subproblems and reliable search directions. When the problem structure suggests that indefinite curvature information might be more informative, such as in problems with saddle points or regions of negative curvature, users can choose to use the SR1 method as an alternative that can capture these information. However, PESTPP-SQP includes sophisticated automatic fallback mechanisms for situations where the Hessian approximation becomes problematic. When the computed search direction fails to be a descent direction (i.e., it would increase rather than decrease the objective), the algorithm automatically resorts to diagonal rescaling or steepest descent methods. This ensures that optimization progress continues even when curvature information becomes unreliable, maintaining the robustness of the overall approach.
 
 ### <a id='s17-2-2' />14.2.2 Gradient approximation
-PESTPP-SQP employs similar ensemble-based gradient approximation technique that is used in PESTPP-IES. However, to enhance its robustness, scalability, and efficiency in solving constrained optimization problems, it implements Stochastic Simplex Approximate Gradient (StoSAG) method developed by Fonseca et al. (2015). T
+PESTPP-SQP employs an ensemble-based stochastic gradient approximation approach similar in spirit to the gradient estimation used in PESTPP-IES. Gradients are estimated from the statistical relationships between decision-variable perturbations and objective function responses across an ensemble of realizations.
 
-The StoSAG method fundamentally transforms how gradients are computed in optimization by leveraging ensemble-based statistical approaches similar to the approach by Chen and Oliver (2013) in IES. StoSAG uses an ensemble of parameter/decision-variable realizations and their corresponding objective function evaluations to estimate gradients instead of requiring multiple model runs to compute finite difference approximations.
+The mathematical foundation of this approach follows the cross-covariance formulation described by Chen et al. (2009), Dehdari and Oliver (2012), and Fonseca et al. (2015). For each ensemble member, decision-variable anomalies are computed as deviations from a designated "base" realization — the current best decision-variable estimate around which the gradient is being approximated — rather than from the ensemble mean as in PESTPP-IES. The gradient is then estimated as:
 
-The mathematical foundation of StoSAG relies on the relationship between parameter perturbations and objective function responses, which is largely similar to the ensemble-based approach by Chen and Oliver (2013). However, the key distinction of StoSAG lies in how parameter anomalies are computed for gradient estimation. In the traditional IES approach, parameter anomalies are calculated as deviations from the ensemble mean, treating all ensemble members as equally weighted samples from the parameter distribution. StoSAG, however, computes parameter anomalies relative to a designated "base" realization, which represents the current best parameter estimate around which the gradient is being approximated. This base-centered anomaly computation ensures that the gradient estimation is properly localized around the point of interest in the optimization process, providing more accurate and relevant gradient information for computing search directions at the current iteration.
+```
+∇f ≈ C_dd⁺ · C_dJ
+```
 
-PESTPP-SQP adds some features with the implementation of StoSAG to enhance its practical applicability. Similar to PESTPP-IES, the method uses selective subsets of ensemble members for gradient computation, which improves computational efficiency while maintaining robustness. The subset selection process ensures that the base realization is always included and uses intelligent sampling strategies to maintain gradient quality. This selective approach is particularly valuable for large-scale problems where full ensemble gradient computation would be computationally prohibitive.
+where C_dd is the sample covariance matrix of the decision-variable ensemble, C_dd⁺ is its pseudoinverse, and C_dJ is the sample cross-covariance between decision-variable anomalies and objective function anomalies. Base-centered anomaly computation ensures that gradient estimation is properly localized around the current point of interest in the optimization process.
 
-The StoSAG implementation also incorporates advanced numerical techniques to handle potential numerical instabilities. The method uses singular value decomposition (SVD) with truncation thresholds to compute the pseudo-inverse of the parameter covariance matrix, ensuring robust gradient estimation even when the parameter ensemble exhibits high correlation or near-singularity. This approach is based on the work of Dehdari and Oliver (2012) and provides a numerically stable alternative to direct matrix inversion.
+To handle potential ill-conditioning when ensemble members exhibit high correlation or near-singularity, the pseudoinverse of C_dd is computed using singular value decomposition (SVD) with user-controlled truncation thresholds (via *svd_eigthresh* and *max_sing*), following the approach described by Dehdari and Oliver (2012).
 
-One of the key advantages of StoSAG over traditional finite difference methods is its ability to provide gradient information from ensemble members that may not be perfectly centered around the current parameter values. This flexibility allows PESTPP-SQP to leverage existing ensemble information from previous iterations or from other sources (such as ensemble Kalman filter applications), making the method particularly efficient for iterative optimization processes.
+For computational efficiency, PESTPP-SQP supports subset selection: at each iteration, a subset of ensemble members is selected for the line search by ranking members according to their total constraint violation and retaining those with the lowest violation, with the base realization always included. The full ensemble is used for gradient and Hessian estimation. This is particularly valuable for large-scale problems where evaluating all ensemble members at every candidate step would be cost-prohibitive.
 
-The method also naturally incorporates uncertainty quantification, as the ensemble-based approach inherently provides information about the reliability of gradient estimates. This uncertainty information can be used to adaptively adjust optimization strategies, such as modifying step sizes or switching between different gradient approximation methods based on the estimated gradient quality.
+The ensemble also naturally supports optimization under uncertainty through chance constraints. Because each ensemble member includes both decision variables and uncertain (adjustable) parameters, the ensemble collectively represents a distribution of possible model outcomes. PESTPP-SQP uses this distribution to evaluate constraint satisfaction at a user-specified reliability level (controlled by *sqp_risk*), allowing the optimization to explicitly account for the probability that constraints will be met under parameter uncertainty. Chance constraints can be evaluated at either a single representative ensemble member or across all members, depending on the *opt_chance_points* setting.
 
-### <a id='s17-2-3' />14.2.3 Improving iterative realization sampling using Covariance Matrix Adaptation (CMA)
+### <a id='s17-2-3' />14.2.3 Improving iterative realization sampling using adaptive covariance
 
-PESTPP-SQP incorporates CMA to generate and adapt parameter and decision variable ensembles used for gradient estimation via StoSAG. The CMA-ES strategy continually updates the covariance matrix during the optimization workflow to ensure that the parameter/decision variable realizations generated in each iteration are well-positioned for accurate gradient approximation around the base realization. The adaptive covariance mechanism automatically adjusts the parameter sampling distribution based on successful search directions and maintains archives of feasible/infeasible solutions, leading to more efficient exploration and reliable gradient computation.
+PESTPP-SQP incorporates a CMA-inspired adaptive covariance mechanism to generate and update the decision-variable ensemble used for stochastic gradient estimation. While it draws on CMA principles — including rank-one and rank-mu covariance updates, evolution paths, and CMA-derived learning rates — it differs from the standard CMA-ES algorithm in several respects: parent selection is archive-based (ensemble members are ranked by constraint violation and feasibility rather than by the standard generational fitness sorting), the rank-mu update does not use negative weights, and step-size adaptation via a sigma evolution path is available as an experimental option but disabled by default.
 
-Under the hood, PESTPP-SQP manages adaptive covariance updates, reinflation procedures to prevent degeneracy, and maintains archives of feasible and infeasible solutions. This approach helps avoid convergence to local minima and maintains population diversity throughout the optimization process. The adaptive covariance mechanism automatically adjusts the search distribution based on successful and unsuccessful search directions, leading to more efficient exploration of the parameter space.
+The covariance matrix is updated each iteration using the best-ranked members from the archive, ensuring that newly generated realizations are progressively better positioned around the current base realization. Reinflation procedures prevent degeneracy when the covariance matrix becomes ill-conditioned, and archives of feasible and infeasible solutions are maintained to guide the adaptation.
 
 PESTPP-SQP features automatic scaling mechanisms for both steps and gradients. The update_scaling function monitors the relative step sizes compared to gradients and adjusts diagonal scaling factors accordingly. When the Hessian matrix becomes unreliable or produces non-descent directions, the algorithm automatically falls back to a scaled identity matrix with diagonal elements based on the computed scaling factors. This ensures continued progress even when curvature information becomes problematic.
 
-The restart functionality allows PESTPP-SQP to utilize previously computed Jacobian matrices and residuals to accelerate the first optimization step. This is particularly valuable for problems where initial model runs are expensive, as it can skip redundant computations and begin optimization from a more informed starting point. The working set tolerance mechanism provides fine-grained control over constraint activation and deactivation. The working_set_tol parameter determines when constraints enter or leave the active set, with automatic adjustment based on optimization progress. Successful iterations lead to tighter tolerance values, while failures result in relaxation of the tolerance to maintain feasibility.
+The restart functionality allows PESTPP-SQP to hotstart from previously saved observation and decision-variable ensembles, avoiding redundant model runs and beginning optimization from a more informed starting point. The working set tolerance mechanism provides fine-grained control over constraint activation and deactivation. The working_set_tol parameter determines when constraints enter or leave the active set, with automatic adjustment based on optimization progress. Successful iterations lead to tighter tolerance values, while failures result in relaxation of the tolerance to maintain feasibility.
 
 ### <a id='s17-2-4' />14.2.4 PESTPP-SQP workflow
 
 PESTPP-SQP follows an iterative workflow that combines sequential quadratic programming theory with advanced ensemble-based gradient estimation and robust globalization strategies
 
 **1. Initialization and Setup**
-The optimization process begins with comprehensive initialization procedures that establish the foundation for subsequent iterations. PESTPP-SQP loads and parses the PEST control file, identifying decision variable groups specified through the `opt_dec_var_groups` option, and constructs the objective function definition from observation and prior information equation groups. The tool supports restart capabilities, allowing users to provide previously computed Jacobian matrices and residual files to accelerate the first optimization step, particularly valuable for expensive forward models. When using ensemble-based gradients, the initialization phase can optionally seed the parameter ensemble with user-provided realizations or generate an initial ensemble based on parameter covariance information.
+The optimization process begins with comprehensive initialization procedures that establish the foundation for subsequent iterations. PESTPP-SQP loads and parses the PEST control file, identifying decision variable groups specified through the *opt_dec_var_groups* option, and constructs the objective function definition from observation and prior information equation groups. The tool supports hotstart capabilities, allowing users to provide previously saved observation and decision-variable ensembles to avoid redundant model runs, particularly valuable for expensive forward models. The initialization phase can optionally seed the ensemble with user-provided realizations or generate an initial ensemble based on parameter covariance information.
 
 **2. Gradient Estimation and Hessian Approximation**
-Gradient estimation forms the core of each SQP iteration, with PESTPP-SQP offering two complementary approaches. For ensemble-based gradients using StoSAG, the tool leverages the current parameter ensemble to compute gradient estimates through statistical correlation analysis. This process involves calculating parameter covariances and cross-covariances with the objective function (and constraints, for constraint Jacobian approximation). When using finite-difference gradients, PESTPP-SQP performs a systematic Jacobian sequence, perturbing each parameter individually while optionally reusing base Jacobian information from previous runs to reduce computational overhead.
+Gradient estimation forms the core of each SQP iteration. PESTPP-SQP leverages the current decision-variable ensemble to compute gradient estimates through the ensemble cross-covariance approach described in section 14.2.2. This process involves calculating decision-variable covariances and cross-covariances with the objective function (and constraints, for constraint Jacobian approximation).
 
 Following gradient estimation, PESTPP-SQP updates the Hessian approximation using either BFGS with Powell damping (default) or SR1 methods. The BFGS approach maintains positive definiteness to ensure well-conditioned quadratic subproblems, while SR1 can capture indefinite curvature information useful for certain problem structures. Automatic scaling mechanisms monitor the relative step sizes compared to gradients and adjust diagonal scaling factors accordingly, with intelligent fallback to scaled identity matrices when curvature information becomes unreliable.
 
 **3. Quadratic Programming Subproblem Solution**
-The heart of each SQP iteration involves solving a quadratic programming subproblem that approximates the original constrained optimization problem. PESTPP-SQP identifies the working set of active inequality constraints based on the current working set tolerance, then constructs the constraint Jacobian matrix for these active constraints. The search direction is computed using either the null-space method (default) with SVD-based projection or direct KKT solving, depending on numerical conditions and problem structure. The null-space approach projects the problem into the constraint manifold's null space for reduced-space Newton steps, while direct KKT solving provides a robust alternative when numerical difficulties arise.
+The core of each SQP iteration involves solving a quadratic programming subproblem that approximates the original constrained optimization problem. PESTPP-SQP identifies the working set of active inequality constraints based on the current working set tolerance, then constructs the constraint Jacobian matrix for these active constraints. The search direction is computed using either the null-space method (default) or direct KKT solving, depending on numerical conditions and problem structure. The null-space approach uses Householder QR decomposition of the active constraint Jacobian to compute range-space and null-space basis matrices, yielding a reduced-space Newton step, while direct KKT solving provides a robust alternative when numerical difficulties arise.
 
 **4. Globalization and Step Acceptance**
 Globalization ensures that each iteration makes meaningful progress toward optimality while maintaining feasibility. PESTPP-SQP employs a filter-based line search that maintains a partial ordering in the two-dimensional space of objective function values and constraint violations. The line search evaluates candidate steps using user-specified scale multipliers, testing each candidate against parameter bounds and constraint satisfaction. The filter method accepts trial points that improve either the objective function or constraint violations without causing unacceptable degradation in the other metric, providing more flexible alternatives to traditional penalty function approaches. The working set tolerance mechanism automatically adjusts based on optimization progress, tightening when iterations are successful and relaxing when failures occur to maintain feasibility.
 
-**5. CMA-ES Ensemble Adaptation (Ensemble Mode)**
-When using ensemble-based gradients, PESTPP-SQP incorporates CMA-ES strategies to adapt the parameter sampling distribution for improved gradient estimation quality. PESTPP-SQP updates the covariance matrix based on successful parameter combinations from previous iterations, maintains archives of feasible and infeasible solutions, and generates new parameter ensembles positioned for accurate gradient approximation around the current base realization. When the base solution becomes infeasible, automatic reinflation procedures prevent degeneracy by expanding the sampling distribution to restore exploration capability.
+**5. Adaptive Covariance Ensemble Update**
+PESTPP-SQP updates the decision-variable ensemble covariance using the CMA-inspired mechanism described in section 14.2.3. The covariance matrix is updated based on archive members ranked by constraint violation, and new ensemble realizations are generated around the current base realization. When the base solution becomes infeasible, automatic reinflation procedures prevent degeneracy by expanding the sampling distribution to restore exploration capability.
 
 **Step 6: Feasibility Recovery (When Needed)**
 If the optimization process encounters persistent infeasibility or stagnation, PESTPP-SQP activates an IES-based feasibility recovery routine. This specialized procedure focuses exclusively on achieving feasibility before returning to the main SQP optimization process, ensuring that the algorithm can recover from challenging initial conditions or constraint violations that might otherwise cause premature termination.
@@ -5271,8 +5307,7 @@ PESTPP-SQP runs like other PEST++ tools:
 
 Inputs:
 - Standard PEST control file (parameters, bounds, observations/prior information, command lines, template/instruction files).
-- Optional Jacobian/residuals for hot starts.
-- Optional parameter/observation ensembles (CSV/JCO/JCB) for ensemble gradient mode.
+- Optional observation and decision-variable ensembles (CSV/JCO/JCB) for hotstarts or ensemble gradient mode.
 
 ### <a id='s17-2-6' />14.2.6 PESTPP-SQP Output Files
 
@@ -5349,8 +5384,8 @@ The following table summarizes the contents of files that are recorded by PESTPP
 <td>Chance-related outputs if chance constraints are active (e.g., chance-shifted summaries analogous to MOU).</td>
 </tr>
 <tr class="odd">
-<td></td>
-<td></td>
+<td><em>case.rnf</em></td>
+<td>Binary file containing parameter values of permanently failed model runs. See section 5.4.1.</td>
 </tr>
 </tbody>
 </table>
@@ -5375,20 +5410,36 @@ Variables discussed in section 5.3.6 that control parallel run management are no
 
 | Variable                        | Type | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 |-------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| *sqp_num_reals(0)*                    | integer                | >0 enables ensemble-gradient SQP; 0 uses finite-difference gradients. |
-| *sqp_dv_en()*                         | text                   | Initial DV ensemble file (CSV/JCO/JCB). If omitted, draws from prior covariance. |
-| *sqp_obs_restart_en()*                | text                   | Observation ensemble restart (CSV/JCO/JCB) matched to DV ensemble if available. |
-| *base_jacobian()*                     | text                   | JCO/JCB file for hot-start Jacobian in FD mode. |
-| *sqp_alpha_mults(0.25,0.5,1.0,2.0)*   | list of reals          | Line-search scale multipliers. |
-| *sqp_filter_tol(1.0e-6)*              | real                   | Filter tolerance for objective/violation dominance. |
-| *sqp_working_set_tol(1.0e-4)*         | real                   | Tolerance to classify an inequality as active. |
-| *sqp_update_hessian(true)*            | boolean                | Enable/disable BFGS/SR1 Hessian updates (BFGS default internally). |
-| *sqp_subset_size(-10)*                | integer                | Ensemble subset size for gradient estimation; negative means percent of current ensemble size. |
-| *sqp_cma_stepsize_control(false)*     | boolean | Enable CMA-ES step-size control via evolution path. |
-| *sqp_cma_c1()*                         | real    | Rank-one learning rate. |
-| *sqp_cma_cmu()*                        | real    | Rank-μ learning rate. |
-| *sqp_cma_cc()*                         | real    | Cumulation (time scale) for the evolution path. |
-| *sqp_cma_reinflation_factor(1.1)*      | real    | Reinflation factor to maintain exploration when base realization is infeasible. |
+| *sqp_num_reals(-1)*                   | integer  | Number of ensemble realizations. Values >0 enable ensemble-gradient mode. -1 (default) enables ensemble mode only if *sqp_dv_en* is also provided. |
+| *sqp_dv_en()*                         | text     | Initial decision-variable ensemble file (CSV/JCO/JCB). If omitted, draws from prior parameter covariance. |
+| *sqp_restart_obs_en()*                | text     | Observation ensemble for warm-starting (CSV/JCO/JCB); must be matched to the DV ensemble. |
+| *sqp_alpha_mults(0.001,0.005,0.01,0.1,0.5,1.0)* | list of reals | Line-search scale multipliers applied to the KKT search direction. |
+| *sqp_num_refined_search_pts(1)*       | integer  | Number of intermediate (adaptively refined) candidate points added around the best line-search scale factor. |
+| *sqp_filter_tol(0.001)*               | real     | Tolerance for objective/violation dominance in the filter acceptance criterion. |
+| *sqp_working_set_tol(0.10)*           | real     | Relative tolerance used to classify an inequality constraint as active (in the working set). |
+| *sqp_viol_pad(1e-4)*                  | real     | Small padding added to constraint violations when evaluating working-set membership. |
+| *sqp_update_hessian(true)*            | boolean  | Enable Hessian updates each iteration. If false, the identity matrix is used throughout. |
+| *sqp_hessian_update_method(BFGS)*     | text     | Hessian update formula: BFGS (default, with Powell damping), SR1, or STOSAG (ensemble-approximated curvature). |
+| *sqp_powell_damping_factor(0.2)*      | real     | Damping factor used in Powell's modification to the BFGS update to maintain positive definiteness. |
+| *sqp_hess_max_cond_num(1e8)*          | real     | Maximum condition number allowed for the Hessian before regularization is applied. |
+| *sqp_reset_hessian_every(-1)*         | integer  | Reset the Hessian to the identity every N iterations. -1 disables periodic resets. |
+| *sqp_use_ensemble_approx_hessian(true)* | boolean | Use the ensemble-approximated (STOSAG-based) curvature to initialize the Hessian at the first iteration. |
+| *sqp_solve_method(NULL)*              | text     | KKT subproblem solver: NULL (null-space method, default) or DIRECT (direct KKT solve). |
+| *sqp_rescale_search_dir(true)*        | boolean  | Rescale the KKT search direction by parameter ranges prior to the line search. |
+| *sqp_subset_size(-10)*                | integer  | Number of ensemble members used in the line search. Negative values are interpreted as a percentage of the current ensemble size. |
+| *sqp_enforce_bounds(false)*           | boolean  | Enforce parameter bounds on ensemble members during initialization. |
+| *sqp_risk(0.5)*                       | real     | Reliability level for chance constraint evaluation in PESTPP-SQP (0–1). 0.5 = risk neutral; >0.5 = risk averse. Overrides *opt_risk* for SQP runs. |
+| *sqp_max_consec_infeas_ies(3)*        | integer  | Number of consecutive infeasible iterations before switching to IES-based feasibility recovery. |
+| *sqp_seek_feas_max_iter(3)*           | integer  | Maximum number of IES iterations allowed during feasibility recovery. |
+| *sqp_scale_down_factor(1.0)*          | real     | Factor by which the base search-direction scale is reduced when the previous step was rejected. |
+| *sqp_cma_parent_num(-1)*              | integer  | Number of parent members used in the adaptive covariance update. -1 defaults to lambda/4. |
+| *sqp_cma_c1(-1)*                      | real     | Rank-one learning rate for the covariance update. -1 uses the auto-computed CMA default. |
+| *sqp_cma_cmu(-1)*                     | real     | Rank-mu learning rate for the covariance update. -1 uses the auto-computed CMA default. |
+| *sqp_cma_cc(-1)*                      | real     | Cumulation time scale for the rank-one evolution path. -1 uses the auto-computed CMA default. |
+| *sqp_cma_reinflation_factor(-1)*      | real     | Multiplicative reinflation applied to the covariance matrix when the base realization is infeasible. -1 disables explicit reinflation. |
+| *sqp_max_reinflation_cond_num(500.0)* | real     | Maximum covariance matrix condition number permitted before reinflation is triggered. |
+| *sqp_save_cov_every(-1)*              | integer  | Save the adaptive covariance matrix every N iterations. -1 disables saving. |
+| *sqp_cma_stepsize_control(false)*     | boolean  | Enable experimental step-size adaptation via a sigma evolution path. Disabled by default. |
 
 
 
