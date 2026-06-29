@@ -637,6 +637,10 @@ public:
 	void set_ies_ordered_binary(bool _flag) { ies_ordered_binary = _flag; }
     double get_ies_multimodal_alpha() const { return ies_multimodal_alpha; }
     void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
+    double get_ies_multimodal_weight_exponent() const { return ies_multimodal_weight_exponent; }
+    void set_ies_multimodal_weight_exponent(double _flag) { ies_multimodal_weight_exponent = _flag; }
+    double get_ies_multimodal_phi_weight() const { return ies_multimodal_phi_weight; }
+    void set_ies_multimodal_phi_weight(double _flag) { ies_multimodal_phi_weight = _flag; }
     void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
     int get_ensemble_output_precision() const {return ensemble_output_precision;}
     void set_ies_n_iter_reinflate(vector<int> _n_iter_reinflate)  { ies_n_iter_reinflate = _n_iter_reinflate;}
@@ -983,6 +987,8 @@ private:
 	bool ies_upgrades_in_memory;
 	bool ies_ordered_binary;
 	double ies_multimodal_alpha;
+	double ies_multimodal_weight_exponent;
+	double ies_multimodal_phi_weight;
 	bool ies_localizer_forgive_missing;
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;

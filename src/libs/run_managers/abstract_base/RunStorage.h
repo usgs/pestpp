@@ -98,7 +98,11 @@ public:
 	~RunStorage();
 private:
 	static const int info_txt_length = NetPackage::DESC_LEN;
+	// large stream buffer (8 MB) installed on buf_stream so bulk header writes
+	// drain in a few syscalls rather than thousands of default-buffer flushes
+	static const std::size_t IO_BUFFER_SIZE = 8 * 1024 * 1024;
 	std::string filename;
+	std::vector<char> io_buffer;
 	mutable std::fstream buf_stream;
 	std::streamoff beg_run0;
 	std::streamoff run_byte_size;

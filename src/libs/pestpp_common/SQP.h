@@ -30,10 +30,18 @@ struct FilterRec
 	Observations oe_val;
 	string real_name;
 	double viol_padded;
+    // Strict weak ordering with a deterministic total tie-break. The previous
+    // comparator (logical AND of two '<') encoded Pareto dominance, which is NOT
+    // a strict weak ordering: incomparable records produced a non-transitive
+    // "equivalence", which is undefined behavior for the std::multiset key and
+    // ordered them differently on libstdc++ vs MSVC. Dominance/pruning is handled
+    // separately (first_strictly_dominates_second); this only defines storage order.
     friend bool operator<(const FilterRec &k1, const FilterRec &k2) {
-        if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
-            return true;
-        return false;
+        if (k1.obj_val != k2.obj_val)
+            return k1.obj_val < k2.obj_val;
+        if (k1.viol_val != k2.viol_val)
+            return k1.viol_val < k2.viol_val;
+        return k1.real_name < k2.real_name;
     }
 };
 
