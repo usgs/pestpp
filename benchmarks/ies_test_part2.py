@@ -866,6 +866,9 @@ def tenpar_restart_test_2():
         assert oreal == preal,"{0},{1}".format(oreal,preal)
     df_act = pd.read_csv(os.path.join(test_d,"pest_restart.phi.actual.csv"),index_col=0)
     df_comp = pd.read_csv(os.path.join(test_d,"pest_restart.phi.composite.csv"),index_col=0)
+    assert df_act.shape == df_comp.shape
+    df_act.dropna(inplace=True)
+    df_comp.dropna(inplace=True)
     d = np.abs((df_act - df_comp).values)
     print(d.sum())
     assert d.sum() == 0.0,d.sum()

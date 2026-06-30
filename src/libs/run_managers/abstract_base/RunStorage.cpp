@@ -92,6 +92,13 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
     }
 	buf_stream.close();
 
+	// install a large stream buffer before (re)opening so that the bulk header
+	// write (serialized par/obs names) drains to disk in a handful of syscalls
+	// instead of thousands of tiny default-buffer flushes.  pubsetbuf must be
+	// called while the stream is closed to take effect on the next open.
+	io_buffer.resize(IO_BUFFER_SIZE);
+	buf_stream.rdbuf()->pubsetbuf(io_buffer.data(), io_buffer.size());
+
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::in | ios_base::binary);
 	//assert(buf_stream.good() == true);
 	if (!buf_stream)
@@ -234,12 +241,16 @@ void RunStorage::init_restart(const std::string &_filename)
 int RunStorage::get_nruns()
 {
 
-	streamoff init_pos = buf_stream.tellg();
+	// just read the run count from the file header.  do NOT tellg()/restore the position: tellg() is
+	// an input op, and calling it right after the stream was used for output (which is constant here)
+	// trips libstdc++'s "you must reposition when switching output<->input" rule and fails - clear()
+	// does not satisfy that boundary.  clear()+seekg(0) IS a clean reposition; every caller absolute-
+	// seeks before its own next I/O, so none rely on the position being preserved across this call.
+	buf_stream.clear();
 	buf_stream.seekg(0, ios_base::beg);
 	std::int64_t n_runs_64;
 	buf_stream.read((char*) &n_runs_64, sizeof(n_runs_64));
 	int n_runs = n_runs_64;
-	buf_stream.seekg(init_pos);
     if (!buf_stream)
     {
         throw runtime_error("RunStorage::get_nruns() stream not good");
@@ -278,6 +289,9 @@ int RunStorage::get_num_good_runs()
  */
 int RunStorage::increment_nruns()
 {
+	// reset stale error state before the read-then-write of the header on the shared fstream; the
+	// seekp(0) below provides the required boundary when switching from reading to writing.
+	buf_stream.clear();
 	buf_stream.seekg(0, ios_base::beg);
 	std::int64_t n_runs_64;
 	buf_stream.read((char*) &n_runs_64, sizeof(n_runs_64));
@@ -614,10 +628,15 @@ void RunStorage::update_run_failed(int run_id)
 }
 
 /**
- * @brief Set run nfailed.
+ * @brief Set the failure count for a run record.
  *
- * @param run_id Description.
- * @param nfail Description.
+ * Writes the negative of @p nfail into the run-status byte of the record
+ * identified by @p run_id.  For example, if a run was attempted 3 times
+ * before being declared permanently failed, @p nfail should be 3 and the
+ * stored status will be -3.
+ *
+ * @param run_id  The zero-based index of the run record.
+ * @param nfail   The number of failed attempts for this run.
  */
 void RunStorage::set_run_nfailed(int run_id, int nfail)
 {
@@ -646,6 +665,7 @@ std::int8_t RunStorage::get_run_status_native(int run_id)
 
 	std::int8_t  r_status;
 	check_rec_id(run_id);
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
     if (!buf_stream)
@@ -683,6 +703,7 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	vector<char> info_txt_buf;
 	info_txt_buf.resize(info_txt_length, '\0');
 
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);
@@ -692,7 +713,6 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        cout << endl << endl << "-->get_info() bad.  run_id:" << run_id << ", info_txt:" << info_txt << endl << endl;
         throw runtime_error("RunStorage::get_run_info() stream not good");
     }
 }
@@ -790,6 +810,7 @@ int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, siz
 
 	p_size = min(p_size, npars);
 	o_size = min(o_size, nobs);
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);
@@ -830,6 +851,7 @@ int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &ob
 
 	check_rec_id(run_id);
 
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);
@@ -894,6 +916,7 @@ vector<char> RunStorage::get_serial_pars(int run_id)
 
 	vector<char> serial_data;
 	serial_data.resize(run_par_byte_size);
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.seekg(sizeof(r_status)+sizeof(char)*info_txt_length+sizeof(double), ios_base::cur);
 	buf_stream.read(serial_data.data(), serial_data.size());
@@ -924,6 +947,7 @@ int  RunStorage::get_parameters(int run_id, Parameters &pars)
 	size_t n_par = par_names.size();
 	vector<double> par_data;
 	par_data.resize(n_par);
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);
@@ -962,6 +986,7 @@ int  RunStorage::get_observations(int run_id, Observations &obs)
 	size_t n_obs = obs_names.size();
 	vector<double> obs_data;
 	obs_data.resize(n_obs);
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);
@@ -999,6 +1024,7 @@ int  RunStorage::get_observations_vec(int run_id, vector<double> &obs_data)
 	size_t n_par = par_names.size();
 	size_t n_obs = obs_names.size();
 	obs_data.resize(n_obs);
+	buf_stream.clear();  // reset stale error state before seeking the shared read/write fstream: libstdc++ can leave failbit after a write, making this seekg a silent no-op on good data (Linux-only). a genuinely bad read still throws below.
 	buf_stream.seekg(get_stream_pos(run_id), ios_base::beg);
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
 	buf_stream.read(reinterpret_cast<char*>(&info_txt_buf[0]), sizeof(char)*info_txt_length);

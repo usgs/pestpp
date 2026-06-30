@@ -464,7 +464,12 @@ void process_sweep_runs(ofstream &out, Pest &pest_scenario, RunManagerAbstract* 
                 out << ',' << phi_data.meas;
                 out << ',' << phi_data.regul;
                 for (auto &obs_grp: obs_group_names) {
-                    out << ',' << phi_data.group_phi.at(obs_grp);
+                    // a control-file obs group can be absent from group_phi - e.g. a prior-information
+                    // group like 'greater_than' (an opt objective/constraint group): it is listed in
+                    // ctl_ordered_obs_group_names but sweep clears the prior info up front, so it never
+                    // gets a phi entry.  output 0.0 for such groups instead of .at()-crashing.
+                    map<string,double>::const_iterator git = phi_data.group_phi.find(obs_grp);
+                    out << ',' << (git == phi_data.group_phi.end() ? 0.0 : git->second);
                 }
                 for (auto &oname: obs_names) {
                     out << ',' << obs[oname];

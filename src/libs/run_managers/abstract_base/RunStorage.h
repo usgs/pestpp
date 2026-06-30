@@ -65,6 +65,12 @@ public:
 	void update_run(int run_id, const Observations &obs);
 	void update_run(int run_id, const std::vector<char> serial_data);
 	void update_run_failed(int run_id);
+	/** @brief Set the failure count for a run record.
+	 *
+	 *  Writes @p nfail as the negative of the run-status byte (e.g. nfail=3
+	 *  stores status=-3).  Used by the run manager to record how many times
+	 *  a run was attempted before being declared permanently failed.
+	 */
 	void set_run_nfailed(int run_id, int nfail);
 	int get_nruns();
 	int get_num_good_runs();
@@ -92,7 +98,11 @@ public:
 	~RunStorage();
 private:
 	static const int info_txt_length = NetPackage::DESC_LEN;
+	// large stream buffer (8 MB) installed on buf_stream so bulk header writes
+	// drain in a few syscalls rather than thousands of default-buffer flushes
+	static const std::size_t IO_BUFFER_SIZE = 8 * 1024 * 1024;
 	std::string filename;
+	std::vector<char> io_buffer;
 	mutable std::fstream buf_stream;
 	std::streamoff beg_run0;
 	std::streamoff run_byte_size;
