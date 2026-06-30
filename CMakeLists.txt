@@ -17,10 +17,20 @@ endif()
 message(STATUS
   "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION}")
 
+# This logic needs to be considered before project()
+if(MSVC)
+    add_compile_options(/bigobj)
+endif()
+set(_change_MSVC_flags FALSE)
 if(WIN32)
-  # Set MSVC runtime to MultiThreaded (/MT)
-  cmake_policy(SET CMP0091 NEW)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  add_compile_definitions(NOMINMAX)
+  if(CMAKE_VERSION VERSION_LESS 3.15.0)
+    set(_change_MSVC_flags TRUE)
+  else()
+    # Set MSVC runtime to MultiThreaded (/MT)
+    cmake_policy(SET CMP0091 NEW)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
 endif()
 
 project(PESTPP

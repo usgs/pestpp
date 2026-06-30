@@ -214,7 +214,7 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
-	enum GLMNormalForm { IDENT,DIAG, PRIOR };
+	enum GLMNormalForm { IDENT,DIAG, PRIOR, HP };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	PestppOptions() { use_da_args=false; }
 
@@ -300,7 +300,11 @@ public:
     void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
     bool get_glm_debug_high_2nd_iter_phi() const {return glm_debug_high_2nd_iter_phi;}
     void set_glm_debug_high_2nd_iter_phi(bool _flag) {glm_debug_high_2nd_iter_phi = _flag;}
-
+	bool get_glm_hp_lambdas() const {return glm_hp_lambdas;}
+	void set_glm_hp_lambdas(bool _flag) {glm_hp_lambdas = _flag;}
+	bool get_glm_panther_lambdas() const {return glm_panther_lambdas;}
+	void set_glm_panther_lambdas(bool _flag) {glm_panther_lambdas = _flag;}
+	
 
 
 
@@ -785,9 +789,12 @@ private:
 	bool glm_rebase_super;
 	bool glm_iter_mc;
 	bool glm_debug_high_2nd_iter_phi;
+	bool glm_hp_lambdas;
+	bool glm_panther_lambdas;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
+	
 	bool iter_summary_flag;
 	bool der_forgive;
 	bool uncert;

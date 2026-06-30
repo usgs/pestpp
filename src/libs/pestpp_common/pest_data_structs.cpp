@@ -598,6 +598,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 			glm_normal_form = GLMNormalForm::IDENT;
 		else if (value == "PRIOR")
 			glm_normal_form = GLMNormalForm::PRIOR;
+		else if (value == "HP")
+			glm_normal_form = GLMNormalForm::HP;
 	}
 
 	else if (key == "GLM_DEBUG_DER_FAIL")
@@ -615,6 +617,14 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
     else if (key == "GLM_DEBUG_HIGH_2ND_ITER_PHI")
     {
         glm_debug_high_2nd_iter_phi = pest_utils::parse_string_arg_to_bool(value);
+    }
+	else if (key == "GLM_HP_LAMBDAS")
+    {
+        glm_hp_lambdas = pest_utils::parse_string_arg_to_bool(value);
+    }
+	else if (key == "GLM_PANTHER_LAMBDAS")
+    {
+        glm_panther_lambdas = pest_utils::parse_string_arg_to_bool(value);
     }
 	else if (key == "UPGRADE_AUGMENT")
 	{
@@ -2004,7 +2014,11 @@ void PestppOptions::summary(ostream& os) const
 		norm_str = "IDENT";
 	else if (glm_normal_form == GLMNormalForm::PRIOR)
 		norm_str = "PRIOR";
+	else if (glm_normal_form == GLMNormalForm::HP)
+		norm_str = "HP";
 	os << "glm_normal_form: " << norm_str << endl;
+	os << "glm_hp_lambdas:" << glm_hp_lambdas << endl;
+	os << "glm_panther_lambdas" << glm_panther_lambdas << endl;
 	os << "glm_debug_der_fail: " << glm_debug_der_fail << endl;
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
@@ -2302,6 +2316,8 @@ void PestppOptions::set_defaults()
 	set_glm_rebase_super(false);
 	set_glm_iter_mc(false);
     set_glm_debug_high_2nd_iter_phi(false);
+	set_glm_hp_lambdas(false);
+	set_glm_panther_lambdas(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
