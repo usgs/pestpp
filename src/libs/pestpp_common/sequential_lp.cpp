@@ -582,7 +582,14 @@ void sequentialLP::iter_solve()
     bool use_stack_anamolies = true;
     if ((constraints.get_use_chance()) && (!constraints.get_use_fosm()))
     {
-        if (constraints.should_update_chance(slp_iter))
+        //the stack is (re)evaluated at the current dec-var point in iter_presolve()
+        //using should_update_chance(slp_iter-1) (see iter_presolve()), so the raw/direct
+        //stack values are only valid this iteration when that same gate is true.  using
+        //should_update_chance(slp_iter) here is an off-by-one: on iterations where the
+        //stack was NOT refreshed it would apply stale-point raw stack values to the
+        //current constraint bounds instead of re-centering the anomalies on the current
+        //simulated constraint values.
+        if (constraints.should_update_chance(slp_iter-1))
         {
             ss.str("");
             ss << "...using direct stack simulated results in chance calculations";

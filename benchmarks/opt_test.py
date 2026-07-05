@@ -611,6 +611,95 @@ def startworker():
     pyemu.os_utils.start_workers(t_d,exe_path,"test.pst",num_workers=10,worker_root=worker_d)
 
 
+def stack_chance_recalc_handoff_test():
+    """regression test for the constraints->sequential-LP stack-chance handoff.
+
+    With opt_recalc_chance_every > 1, the stack is only (re)evaluated at the
+    current decision-variable point on a subset of SLP iterations.  On those
+    "fresh stack" iterations pestpp-opt should hand the raw/direct stack sim
+    results to the LP ("...using direct stack simulated results...").  On the
+    other "stale stack" iterations it must instead re-center the stack anomalies
+    on the current simulated constraint values ("...using stack anomalies...").
+
+    A prior off-by-one keyed the raw-vs-anomaly decision on
+    should_update_chance(slp_iter) while the stack refresh is gated on
+    should_update_chance(slp_iter-1), inverting the two modes: raw values were
+    applied to a stale stack and anomalies to a fresh one.  This test asserts the
+    handoff mode reported each iteration matches whether the stack was actually
+    refreshed that iteration (detected via the per-iteration obs_stack csv files).
+    """
+    d = os.path.join("opt_dewater_chance", "stack_recalc_handoff_test")
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
+    pst = pyemu.Pst(os.path.join(d, "dewater_pest.base.pst"))
+    par = pst.parameter_data
+    par.loc[par.partrans == "fixed", "partrans"] = "log"
+
+    pst.pestpp_options.pop("opt_constraint_groups", None)
+    pst.pestpp_options.pop("base_jacobian", None)
+    pst.pestpp_options.pop("opt_par_stack", None)
+    pst.pestpp_options.pop("opt_obs_stack", None)
+    pst.pestpp_options["opt_risk"] = 0.9
+    pst.pestpp_options["opt_stack_size"] = 10
+    # recalc the stack only every-other iteration so fresh/stale iterations differ
+    recalc_every = 2
+    pst.pestpp_options["opt_recalc_chance_every"] = recalc_every
+    noptmax = 5
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(d, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)
+
+    rec_file = os.path.join(d, "test.rec")
+    assert os.path.exists(rec_file)
+
+    # parse the rec file: map each LP iteration to the chance handoff mode used
+    iter_mode = {}
+    cur_iter = None
+    with open(rec_file, 'r') as f:
+        for line in f:
+            if "starting LP iteration" in line:
+                cur_iter = int(line.strip().split("iteration")[1].split("---")[0])
+            elif "using direct stack simulated results" in line:
+                assert cur_iter is not None
+                iter_mode[cur_iter] = "direct"
+            elif "using stack anomalies and current simulated" in line:
+                assert cur_iter is not None
+                iter_mode[cur_iter] = "anomalies"
+    print("iter_mode:", iter_mode)
+
+    # a handoff mode must be reported for every LP iteration
+    assert len(iter_mode) == noptmax, \
+        "expected a chance handoff mode for all {0} iterations, got {1}".format(noptmax, iter_mode)
+
+    # ground truth: the stack is (re)evaluated at iteration N iff an iteration-tagged
+    # obs_stack csv was written for N (constraints.add_runs() writes these on refresh)
+    refreshed = set()
+    for i in range(1, noptmax + 1):
+        if os.path.exists(os.path.join(d, "test.{0}.obs_stack.csv".format(i))):
+            refreshed.add(i)
+    print("stack refreshed on iterations:", sorted(refreshed))
+    # sanity: with recalc_every=2 the stack should refresh on iters 1,3,5
+    assert refreshed == {1, 3, 5}, \
+        "unexpected stack refresh schedule: {0}".format(sorted(refreshed))
+
+    direct_iters = set(i for i, m in iter_mode.items() if m == "direct")
+    print("direct/raw handoff on iterations:", sorted(direct_iters))
+
+    # THE regression check: raw/direct stack values may only be used on iterations
+    # where the stack was actually refreshed at the current point.  the off-by-one
+    # bug inverts this (direct on stale iters 2,4; anomalies on fresh iters 1,3,5).
+    assert direct_iters == refreshed, \
+        "stack-chance handoff mismatch: raw/direct used on {0} but stack refreshed on {1}".format(
+            sorted(direct_iters), sorted(refreshed))
+
+    # explicit guards on the two sharpest cases
+    assert iter_mode[1] == "direct", \
+        "iter 1 stack is fresh at the current point -> must use direct stack results, got '{0}'".format(iter_mode[1])
+    assert iter_mode[2] == "anomalies", \
+        "iter 2 stack is stale (not refreshed) -> must use stack anomalies, got '{0}'".format(iter_mode[2])
+
+
 def fosm_invest():
     t_d = os.path.join("opt_dewater_chance","master5")
     pst = pyemu.Pst(os.path.join(t_d,"test.pst"))
@@ -638,5 +727,6 @@ if __name__ == "__main__":
     #est_res_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     stack_test()
+    stack_chance_recalc_handoff_test()
     #dewater_restart_test()
     #std_weights_test()
