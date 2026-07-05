@@ -16,11 +16,12 @@
 	You should have received a copy of the GNU General Public License
 	along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 	*/
+
 /**
  * @file SVDSolver.cpp
  * @brief Implementation of SVDSolver.
  */
-
+#include "RunManagerPanther.h"
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -45,6 +46,7 @@
 #include "linear_analysis.h"
 #include "Ensemble.h"
 #include "EnsembleSmoother.h"
+
 
 using namespace std;
 using namespace pest_utils;
@@ -333,7 +335,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 		tmp_str.str("");
 		tmp_str << "completed iteration " << global_iter_num;
 		performance_log->log_event(tmp_str.str());
-		// write files that get written at the end of each iteration
+		// write files that get wrtten at the end of each iteration
 		stringstream filename;
 		string complete_filename;
 
@@ -377,7 +379,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 				output_file_writer.write_jco(false, "jco", jacobian);
 			//jacobian.save();
 			// jacobian calculated next iteration will be at the current parameters and
-			// will be more accurate than the one calculated at the beginning of this iteration
+			// will be more accurate than the one caluculated at the begining of this iteration
 			save_nextjac = true;
             // par file for this iteration
             output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
@@ -449,7 +451,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	VectorXd Sigma_trunc;
 	Eigen::SparseMatrix<double> U;
 	Eigen::SparseMatrix<double> Vt;
-	// the last boolean argument is an instruction to compute the square weights
+	// the last boolean arguement is an instruction to compute the square weights
 	Eigen::SparseMatrix<double> q_mat = Q_sqrt.get_sparse_matrix(obs_name_vec, regul, true);
 	// removed this line when true added to end of the previous call to get_sparce_matrix
 	//q_mat = (q_mat * q_mat).eval();
@@ -488,7 +490,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
 		performance_log->log_event(info_str.str());
 
-		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimmed off
+		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
 		performance_log->log_event("commencing SVD factorization of lambda-scaled JtQJ");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
@@ -496,7 +498,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 
 		VectorXd Sigma_inv = Sigma.array().inverse();
-		performance_log->log_event("commencing linear algebra multiplication to compute upgrade");
+		performance_log->log_event("commencing linear algebra multiplication to compute ugrade");
 
 		info_str << "Vt info: " << "rows = " << Vt.rows() << ": cols = " << Vt.cols() << ": size = " << Vt.size() << ": nonzeros = " << Vt.nonZeros();
 		performance_log->log_event(info_str.str());
@@ -554,12 +556,12 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event("commencing SVD factorization - using identity lambda scaling");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
-		//Only add lambda to singular values above the threshold
+		//Only add lambda to singular values above the threshhold
 		Sigma = Sigma.array() + (Sigma.cwiseProduct(Sigma).array() * lambda).sqrt();
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 		VectorXd Sigma_inv = Sigma.array().inverse();
 
-		performance_log->log_event("commencing linear algebra multiplication to compute upgrade");
+		performance_log->log_event("commencing linear algebra multiplication to compute ugrade");
 		stringstream info_str;
 		info_str << "Vt info: " << "rows = " << Vt.rows() << ": cols = " << Vt.cols() << ": size = " << Vt.size() << ": nonzeros = " << Vt.nonZeros();
 		performance_log->log_event(info_str.str());
@@ -573,7 +575,73 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation));
 
 	}
+	else if (glm_normal_form == PestppOptions::GLMNormalForm::HP)
+	{
+		performance_log->log_event("commencing HP-style scaling (PEST_HP logic) with robust guards");
 
+		// Form the raw normal matrix and innovation (RHS)
+		JtQJ = jac.transpose() * q_mat * jac;
+		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
+
+		// Robust Calculation of Scaling Factors (SC)
+		Eigen::VectorXd d = JtQJ.diagonal();
+		Eigen::VectorXd SC = Eigen::VectorXd::Zero(d.size());
+		int no_effect_count = 0;
+		double sensitivity_threshold = 1.0e-30; 
+		double sc_upper_bound = 1.0e8; 
+
+		for (int i = 0; i < d.size(); ++i) {
+			if (d(i) > sensitivity_threshold) {
+				SC(i) = 1.0 / sqrt(d(i));
+				if (SC(i) > sc_upper_bound) SC(i) = sc_upper_bound;
+			} else {
+				SC(i) = 0.0; // Freeze parameter
+				no_effect_count++;
+			}
+		}
+
+		if (no_effect_count > 0) {
+			stringstream ss;
+			ss << "Warning: " << no_effect_count << " parameters have zero sensitivity and are frozen this iteration.";
+			performance_log->log_event(ss.str());
+		}
+
+		// Apply Scaling
+		Eigen::DiagonalMatrix<double, Eigen::Dynamic> SC_mat(SC);
+		JtQJ = SC_mat * JtQJ * SC_mat;
+		innovation = SC.cwiseProduct(innovation);
+
+		// Calculate Damping (rrtemp) and Apply to Diagonal
+		double max_sc = SC.maxCoeff();
+		double rrtemp = (max_sc > 0) ? (lambda / (max_sc * max_sc)) : 0.0;
+
+		Eigen::VectorXd damping = SC.array().square() * rrtemp;
+		for (int i = 0; i < JtQJ.rows(); ++i)
+		{
+			// Adding 1.0 (Standard HP) + damping + a tiny epsilon for Cholesky stability
+			JtQJ.coeffRef(i, i) += damping(i) + 1e-12; 
+		}
+
+		// Factorization
+		performance_log->log_event("commencing SVD factorization of HP-scaled JtQJ");
+		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
+		
+		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
+
+		// Robust Sigma Inversion (Prevents NaNs/Infs in the upgrade vector)
+		VectorXd Sigma_inv = Sigma;
+		for (int i = 0; i < Sigma.size(); ++i)
+		{
+			// Guard against dividing by zero if the matrix is rank-deficient
+			Sigma_inv(i) = (Sigma(i) > 1e-15) ? (1.0 / Sigma(i)) : 0.0;
+		}
+
+		// Compute final upgrade vector and unscale by SC
+		// Note: If SC(i) was 0, upgrade_vec(i) will be 0, effectively freezing the parameter.
+		upgrade_vec = SC_mat * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation)));
+		
+		performance_log->log_event("upgrade calculation complete");
+	}
 	else
 		throw runtime_error("unrecognized marquardt scaling type");
 
@@ -598,9 +666,9 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 
 	Eigen::VectorXd grad_vec;
 	grad_vec = -2.0 * (jac.transpose() * (q_mat * Residuals));
-	performance_log->log_event("linear algebra multiplication to compute upgrade complete");
+	performance_log->log_event("linear algebra multiplication to compute ugrade complete");
 
-	//transfer newly computed components of the upgrade vector to upgrade.svd_uvec
+	//tranfer newly computed components of the upgrade vector to upgrade.svd_uvec
 	upgrade_active_ctl_del_pars.clear();
 	grad_active_ctl_del_pars.clear();
 
@@ -624,7 +692,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	tmp_pars = base_numeric_pars;
 	par_transform.del_numeric_2_del_active_ctl_ip(grad_active_ctl_del_pars, tmp_pars);
 
-	//tranfere previously frozen components of the upgrade vector to upgrade.svd_uvec
+	//tranfere previously frozen componets of the ugrade vector to upgrade.svd_uvec
 	for (auto &ipar : prev_frozen_active_ctl_pars)
 	{
 		active_ctl_upgrade_pars[ipar.first] = ipar.second;
@@ -670,7 +738,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	}
 	performance_log->log_event("commencing check of parameter bounds");
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,false);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,true,true);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 
 
@@ -678,8 +746,6 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	Parameters notfrozen_upgrade_active_ctl_pars = upgrade_active_ctl_pars;
 	notfrozen_upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars.get_keys());
 	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
-	
-	ss.str("");
 	ss << "change limit/bound enforcement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
 	performance_log->log_event(ss.str());
 	if (ctl_info.second < 0.01)
@@ -730,7 +796,7 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
 	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, 
-		grad_ctl_del_pars,false);
+		grad_ctl_del_pars,false,false);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 	if (new_frozen_active_ctl_pars.size() == upgrade_active_ctl_pars.size())
 		throw runtime_error("SVDSolver::test_upgrade_to_find_freeze_pars() error: all parameters at/near bounds and heading out - cannot continue");
@@ -1150,18 +1216,234 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		num_lamb_runs++; 
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 		//Marquardt Lambda Update Vector
-		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
-		
-		std::sort(lambda_vec.begin(), lambda_vec.end());
-		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
-		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+		vector<double> lambda_vec;
 
+		ofstream &fout_rec = file_manager.rec_ofstream();
+		// if glm_hp_lambdas is activated, we sidestep the entire old GLM lambda process
+		// all this code comes from interpreting a portion of the PEST_HP Fortran code
+		// that deals with lambda
+		if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas())
+		{
+			int lmrun = 3; // a default for cases where we're working in serial
+
+			RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
+			stringstream panther_message;
+			
+			// if we're using panther, then we can ask it for the curret number of agents.
+			if (panther_manager) 
+			{
+				std::map<std::string, int> stats = panther_manager->get_agent_stats();
+				lmrun = stats["total"];
+				panther_message.str("");
+				panther_message << "Number of connected agents to be used for lambda upgrades: " << lmrun;
+				performance_log->log_event(panther_message.str());
+				std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
+				fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
+			} 
+			else 
+			{ // otherwise stick with our default
+				panther_message.str("");
+				panther_message << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs";
+				performance_log->log_event(panther_message.str());
+				std::cout << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << std::endl;
+				fout_rec << "The current run manager is not a Panther manager. Defaulting to 3 upgrade runs" << endl;
+			}
+			// determine how many lambdas to use based on how many agents are available
+			int maxitn;
+            if (lmrun <= 3) {
+                maxitn = 3;
+            } else if (lmrun <= 5) {
+                maxitn = lmrun;
+            } else if (lmrun <= 12) {
+                maxitn = 6;
+            } else if (lmrun <= 21) {
+                maxitn = 7;
+            } else if (lmrun <= 32) {
+                maxitn = 8;
+            } else if (lmrun <= 45) {
+                maxitn = 9;
+            } else {
+                maxitn = lmrun / 5;
+            }
+			
+
+			// Using HP's lambda scale vec
+			std::vector<double> hp_lambda_scale_vec = {1, 1.5, 0.75, 1.25, 0.5, 1.75, 2.0};
+			
+			// replacing the normal lambda_scale_vec
+			lambda_scale_vec.assign(hp_lambda_scale_vec.begin(), hp_lambda_scale_vec.end());
+            
+			// Determine the number of scales to use
+            int num_lrun_level = (lmrun - maxitn) / maxitn + 1;
+            if (num_lrun_level > static_cast<int>(lambda_scale_vec.size())) {
+                num_lrun_level = static_cast<int>(lambda_scale_vec.size());
+            }
+
+            // Slice the line search factor vector in place
+            if (num_lrun_level < static_cast<int>(lambda_scale_vec.size())) {
+                lambda_scale_vec.resize(num_lrun_level);
+            }
+			
+			// Generate lambdas according to how PEST_HP does it
+			const double def_rlambda1 = 10.0;
+			const double def_lowest_lambda_fac = 1.0e-14;
+			const double def_highest_lambda_fac = 1.0e14;
+			double phi_initial = base_run.get_phi(*regul_scheme_ptr);
+			int num_nonzero_obs = static_cast<int>(obs_names_vec.size());
+			// this is the critical difference between GLM lambdas and HP lambdas
+			// HP lambdas are a factor of the current phi
+			double lambda_mid = phi_initial / static_cast<double>(num_nonzero_obs);
+			double def_lowest_lambda = lambda_mid * def_lowest_lambda_fac;
+			double def_highest_lambda = lambda_mid * def_highest_lambda_fac;
+			double lambda = def_rlambda1 * lambda_mid;
+			double rlamfac_exp;
+			double rlamfac_down = 1.0;
+			double rlamfac_up = 1.0;
+
+			if (lambda > 0.1 * lambda_mid && lambda < 10.0 * lambda_mid)
+			{
+				rlamfac_exp = 2.0;
+				if (lambda > lambda_mid)
+					rlamfac_down = 2.0;
+			}
+			else if (lambda > 0.01 * lambda_mid && lambda < 100.0 * lambda_mid)
+			{
+				rlamfac_exp = 3.0;
+				if (lambda > lambda_mid)
+					rlamfac_down = 2.0;
+			}
+			else if (lambda < lambda_mid)
+			{
+				rlamfac_exp = 3.0;
+			}
+			else
+			{
+				rlamfac_exp = 4.0;
+			}
+
+			double rlamfac;
+			if (lambda > lambda_mid)
+				rlamfac = std::pow(lambda / lambda_mid, 1.0 / rlamfac_exp);
+			else if (lambda < lambda_mid)
+				rlamfac = std::pow(lambda_mid / lambda, 1.0 / rlamfac_exp);
+			else
+				rlamfac = 2.0;
+
+			if (rlamfac < 2.0)
+				rlamfac = 2.0;
+
+			int half = maxitn / 2;
+			
+			double lamkpl = lambda; 
+			double lamkph = lambda; 
+			lambda_vec.push_back(lambda);
+		
+			for (int i = 0; i < half; ++i)
+			{
+				if (i == 0)
+				{
+					lamkpl /= rlamfac * rlamfac_down * 0.5; // HP does the first lambda down differently for whatever reason
+				}
+				else
+				{
+					lamkpl /= rlamfac * rlamfac_down;
+				}
+				lambda_vec.push_back(std::max(lamkpl, def_lowest_lambda));
+			}
+			
+			for (int i = 0; i < (maxitn - 1 - half); ++i)
+			{
+				lamkph *= rlamfac * rlamfac_up;
+				lambda_vec.push_back(std::min(lamkph, def_highest_lambda));
+			}
+			
+			std::sort(lambda_vec.begin(), lambda_vec.end());
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+		}
+		
+		else // non-HP option, do lambdas as normal
+		{
+			lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+			std::sort(lambda_vec.begin(), lambda_vec.end());
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+			// if glm_panther_lambdas is turned on, we'll slightly modify the use lambda 
+			// protocol to make sure we're utilizing just the right amount of lambda.
+			if (pest_scenario.get_pestpp_options().get_glm_panther_lambdas())
+			{
+				int lmrun;
+				RunManagerPanther* panther_manager = dynamic_cast<RunManagerPanther*>(&run_manager);
+				stringstream panther_message;
+				
+				// if we're using panther, then we can ask it for the curret number of agents.
+				if (panther_manager) 
+				{
+					std::map<std::string, int> stats = panther_manager->get_agent_stats();
+					lmrun = stats["total"];
+					panther_message.str("");
+					panther_message << "Number of connected agents to be used for lambda upgrades: " << lmrun;
+					performance_log->log_event(panther_message.str());
+					std::cout << "Number of connected agents to be used for lambda upgrades: " << lmrun << std::endl;
+					fout_rec << "Number of connected agents to be used for lambda upgrade: " << lmrun << endl;
+
+					int current_product = lambda_vec.size() * lambda_scale_vec.size();
+
+					// Loop until the product is less than or equal to lmrun
+					while (current_product > lmrun) {
+						// Decide whether to remove from lambda_vec or lambda_scale_vec
+						// A simple heuristic is to remove from the larger vector to balance them
+						if (lambda_vec.size() > lambda_scale_vec.size()) 
+						{
+							lambda_vec.pop_back(); // Remove the largest lambda
+						} 
+						else 
+						{
+							lambda_scale_vec.pop_back(); // Remove the largest scale
+						}
+						current_product = lambda_vec.size() * lambda_scale_vec.size();
+					}
+
+					// Now, add lambdas if the product is still too small
+					while (current_product < lmrun) {
+						// Add a new lambda value.
+						double lowest_lambda = lambda_vec.front();
+						double highest_lambda = lambda_vec.back();
+
+						// Add a new value, alternating between low and high
+						if (lambda_vec.size() % 2 == 0) 
+						{ // Add a low value
+							lambda_vec.insert(lambda_vec.begin(), lowest_lambda / 10.0);
+						} else 
+						{ // Add a high value
+							lambda_vec.push_back(highest_lambda * 10.0);
+						}
+
+						// Keep lambda_vec sorted after adding
+						std::sort(lambda_vec.begin(), lambda_vec.end());
+
+						current_product = lambda_vec.size() * lambda_scale_vec.size();
+						}
+					} 
+					else 
+					{ // otherwise stick with our default
+						panther_message.str("");
+						panther_message << "The current run manager is not a Panther manager. Not altering GLM lambda runs.";
+						performance_log->log_event(panther_message.str());
+						std::cout << "The current run manager is not a Panther manager. Not altering GLM lambda runs." << std::endl;
+						fout_rec << "The current run manager is not a Panther manager. Not altering GLM lambda runs." << endl;
+					}
+
+			
+			}
+		}
+		
 		int i_update_vec = 0;
 		stringstream message;
 		stringstream prf_message;
 
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
-		ofstream &fout_rec = file_manager.rec_ofstream();
 		frozen_active_ctl_pars.insert(failed_jac_pars.begin(), failed_jac_pars.end());
 		
 		for (double i_lambda : lambda_vec)
@@ -1181,10 +1463,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters lam_frozen_active_ctl_pars = frozen_active_ctl_pars;	
 			try
 			{
-				//test for pars to freeze
+				// test for pars to freeze
 				test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
-					obs_names_vec, base_run_active_ctl_par,
-					tmp_new_par);
+				obs_names_vec, base_run_active_ctl_par,
+				tmp_new_par);
 
 				calc_upgrade_vec(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 					obs_names_vec, base_run_active_ctl_par, new_pars, limit_type);
@@ -1208,31 +1490,56 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 
 			//Add Scaled Upgrade Vectors
-			Parameters new_numeric_pars = par_transform.model2numeric_cp(new_par_model);
-			Parameters base_numeric_pars = par_transform.model2numeric_cp(base_model_pars);
-			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
-			for (double i_scale : lambda_scale_vec)
-			{
-				if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
-					continue;
-				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
+            Parameters new_numeric_pars = par_transform.model2numeric_cp(new_par_model);
+            Parameters base_numeric_pars = par_transform.model2numeric_cp(base_model_pars);
+            Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
+            
+            for (double i_scale : lambda_scale_vec)
+            {
+                if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
+                    continue;
+                Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
+                
+                Parameters scaled_active_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
 
-				Parameters scaled_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
-                pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_par,false,true);
-				scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+                // Take frozen parameters OUT of the active control parameters
+                vector<string> erased_frozen_pars;
+                for (const auto& frozen_par_name : lam_frozen_active_ctl_pars.get_keys())
+                {
+                    if (scaled_active_ctl_pars.find(frozen_par_name) != scaled_active_ctl_pars.end())
+                    {
+                        scaled_active_ctl_pars.erase(frozen_par_name);
+                        erased_frozen_pars.push_back(frozen_par_name);
+                    }
+                }
+
+                // Enforce limits strictly on the parameters that are still in the collection
+                pest_scenario.enforce_par_limits(performance_log, scaled_active_ctl_pars, base_run_active_ctl_par, true, true);
+
+                // Put the frozen parameters back IN with their exact base values using insert()
+                for (const auto& frozen_par_name : erased_frozen_pars)
+                {
+                    double base_val = base_run_active_ctl_par.get_rec(frozen_par_name);
+                    scaled_active_ctl_pars.insert(frozen_par_name, base_val);
+                }
+                // --------------------------------------------------
+
+                scaled_pars = par_transform.active_ctl2model_cp(scaled_active_ctl_pars);
+                
                 //now flip back to all ctl pars not just active...
-                scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+                // scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
                 output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
-					0, i_lambda, i_scale, scaled_ctl_pars);
+                    0, i_lambda, i_scale, scaled_active_ctl_pars);
 
-				stringstream ss;
-				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
-				par_transform.numeric2model_ip(scaled_pars);
-				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
-				num_lamb_runs++;
-				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
-				save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
-			}
+                stringstream ss;
+                ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+                // par_transform.numeric2model_ip(scaled_pars);
+                int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
+                num_lamb_runs++;
+                fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
+                
+                save_frozen_pars(fout_frz, lam_frozen_active_ctl_pars, run_id);
+            }
 
 			////Try to extend the previous upgrade vector
 			/*if ((upgrade_augment) &&  (limit_type == Pest::LimitType::LBND || limit_type == Pest::LimitType::UBND))
@@ -1316,7 +1623,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		Observations tmp_obs;
 		string lambda_type; 
 		double i_lambda;
-		//This must be outside the loop to insure all parameter sets are read in order
+		//This must be outside the loop to insure all parrameter sets are read in order
 		bool success = run_manager.get_run(i, tmp_pars, tmp_obs, lambda_type, i_lambda);
 		if ((pest_scenario.get_pestpp_options().get_glm_debug_lamb_fail()) && (i == 1))
 		{
@@ -1421,44 +1728,50 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	{
 		throw runtime_error("all upgrade runs failed.");
 	}
+	if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false)
+	{
+		// Check if best_lambda is at the edge of lambda_vec
 
-	// Check if best_lambda is at the edge of lambda_vec
+		// regrab lambda_vec
+		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
+		std::sort(lambda_vec.begin(), lambda_vec.end());
+		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
 
-	// regrab lambda_vec
-	vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
-	std::sort(lambda_vec.begin(), lambda_vec.end());
-	auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
-	lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+		auto last_lambda = lambda_vec.back();
+		auto first_lambda = lambda_vec.front();
+		file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
+		double lambda_spacing_factor = 10.0; // doing powers of 10 for now
+		bool extended = false;
 
-	auto last_lambda = lambda_vec.back();
-	auto first_lambda = lambda_vec.front();
-	file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
-	double lambda_spacing_factor = 10.0; // doing powers of 10 for now
-	bool extended = false;
-	if (pest_scenario.get_pestpp_options().get_lambda_scale_vec().size() > 1) {
-		if (best_lambda == last_lambda) {
+		if (best_lambda == last_lambda) // our best lambda is our highest lambda
+		{
 			// Add a new larger lambda
 			double new_lambda = last_lambda * lambda_spacing_factor;
-			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end()) {
+			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+			{
 				lambda_vec.push_back(new_lambda);
 				extended = true;
-				file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda
-											<< std::endl;
+				file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
+				lambda_vec.erase(lambda_vec.begin()); // remove the highest lambda
 			}
-		} else if (best_lambda == first_lambda) {
+		}
+		else if (best_lambda == first_lambda)
+		{
 			// Add a new smaller lambda
 			double new_lambda = first_lambda / lambda_spacing_factor;
-			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end()) {
+			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+			{
+				lambda_vec.pop_back();
 				lambda_vec.push_back(new_lambda);
 				extended = true;
-				file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda
-											<< std::endl;
+				file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
+				
 			}
 		}
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 	}
-
 	return best_upgrade_run;
 }
 
@@ -1492,7 +1805,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 //				b_facorg_lim = p_init;
 //			}
 //
-//			// Check Relative Change Limit
+//			// Check Relative Chanage Limit
 //			if (p_info->chglim == "RELATIVE" && abs((p_upgrade - p_init) / b_facorg_lim) > ctl_info->relparmax)
 //			{
 //				par_limit.first = true;
@@ -1608,7 +1921,7 @@ Parameters SVDSolver::limit_parameters_freeze_all_ip(const Parameters &init_acti
 	//	}
 	//}
 
-	////Transform parameters back their active control state and freeze any that violate their bounds
+	////Transform parameters back their ative control state and freeze any that violate their bounds
 	//upgrade_active_ctl_pars = par_transform.numeric2active_ctl_cp(upgrade_numeric_pars);
 
 	//check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
@@ -1718,7 +2031,7 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 	const Parameters new_numeric_pars = par_transform.ctl2numeric_cp(upgrade.get_ctl_pars());
 	output_file_writer.par_report(os, termination_ctl.get_iteration_number()+1, new_numeric_pars, old_numeric_pars, "Transformed Numeric");
 
-	//Need to pass default regularization weights so this comparison is consistent across iterations
+	//Need to pass defualt regularization weights so this comparision is consistent across iterations
 	termination_ctl.process_iteration(upgrade.get_phi_comp(DynamicRegularization::get_unit_reg_instance()), max_rel_change);
 }
 
@@ -1742,89 +2055,127 @@ bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd
 		out_of_bnd = true;
 	return out_of_bnd;*/
 
-	bool out_of_bnd = false;
+	int out_of_bnd = 0;
 	double tolerance = 1.0e-7;
 	if (((1.0 + tolerance) * p_org >= upper_bnd) && (p_new >= p_org))
-		out_of_bnd = true;
-	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org))
-		out_of_bnd = true;
+	{
+		out_of_bnd = 1;
+	}
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org)){
+		out_of_bnd = 2;
+	}
 	return out_of_bnd;
 }
 
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
-	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
-	bool include_bound)
+    const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
+    bool include_bound, bool clamp)
 {
-	double tolerance = 1.0e-7;
-	int num_upgrade_out_grad_in = 0;
-	double p_org;
-	double p_new;
-	double upper_bnd;
-	double lower_bnd;
-	const string *name_ptr;
-	const auto it_end = upgrade_active_ctl_pars.end();
-	for (const auto &ipar : current_active_ctl_pars)
-	{
-		name_ptr = &(ipar.first);
-		const auto it = upgrade_active_ctl_pars.find(*name_ptr);
+    double tolerance = 1.0e-3;
+    int num_upgrade_out_grad_in = 0;
+    double p_org;
+    double p_new;
+    double upper_bnd;
+    double lower_bnd;
+    const string *name_ptr;
+    const auto it_end = upgrade_active_ctl_pars.end();
 
-		if (it != it_end)
-		{
-			//first check upgrade parameters
-			p_new = it->second;
-			p_org = current_active_ctl_pars.get_rec(*name_ptr);
-			upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->ubnd;
-			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->lbnd;
-			//these are active parameters so this is not really necessary - just being extra safe
-			bool par_active = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->is_active();
-			if (!par_active)
-				continue;
-			
-			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
-				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
-			else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
-				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
-			else
-			{
+	// helper function to freeze at bounds unless enforce_par_limits decreases that shift
+    auto enforce_and_freeze = [&](const string* n_ptr, double val) {
+        Parameters single_par;
+        single_par.insert(*n_ptr, val);
+        
+        pest_scenario.enforce_par_limits(performance_log, single_par, current_active_ctl_pars, true, true);
+        
+        new_freeze_active_ctl_pars.insert(*n_ptr, single_par.get_rec(*n_ptr));
+    };
 
-				bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-				if (par_going_out)
-					new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
-			}
-		}
-	}
-	if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
-	{
-		ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+	// if already at bounds, just freeze
+    auto just_freeze = [&](const string* n_ptr, double val) {
+        Parameters single_par;
+        single_par.insert(*n_ptr, val);
+        
+        new_freeze_active_ctl_pars.insert(*n_ptr, single_par.get_rec(*n_ptr));
+    };
 
-		TranTied* tt = par_transform.get_tied_ptr();
-		Parameters current_ctl_pars = current_active_ctl_pars;
-		tt->reverse(current_ctl_pars);
-		Parameters upgrade_ctl_pars = upgrade_active_ctl_pars;
-		tt->reverse(upgrade_ctl_pars);
-		auto items = tt->get_items();
-		pair<string, double> tt_item;
-		for (auto ipar : upgrade_ctl_pars)
-		{
-			if (items.find(ipar.first) == items.end())
-				continue;
+    for (const auto &ipar : current_active_ctl_pars)
+    {
+        name_ptr = &(ipar.first);
+        const auto it = upgrade_active_ctl_pars.find(*name_ptr);
 
-			tt_item = items.at(ipar.first);
+        if (it != it_end)
+        {
+            //first check upgrade parameters
+            p_new = it->second;
+            p_org = current_active_ctl_pars.get_rec(*name_ptr);
+            upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->ubnd;
+            lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->lbnd;
+            //these are active parameters so this is not really necessary - just being extra safe
+            bool par_active = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->is_active();
+            if (!par_active)
+                continue;
+            
+            //if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (abs(p_new - upper_bnd) <= tolerance) && (clamp))
+			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (p_new != upper_bnd) && (clamp))
+                enforce_and_freeze(name_ptr, upper_bnd);
+			else if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
+				just_freeze(name_ptr, upper_bnd);
+			//else if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd) && (abs(p_new - lower_bnd) <= tolerance) && (clamp))
+            else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd) && (p_new != lower_bnd) && (clamp))
+                enforce_and_freeze(name_ptr, lower_bnd);
+			else if ((include_bound) && ((1.0 + tolerance) * p_new <= lower_bnd))
+				just_freeze(name_ptr, lower_bnd);
+            else
+            {
+                int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+                if ((par_going_out == 1) && (clamp))
+                    enforce_and_freeze(name_ptr, upper_bnd);
+				else if (par_going_out == 1)
+					just_freeze(name_ptr, p_org);
+                else if ((par_going_out == 2) && (clamp))
+                    enforce_and_freeze(name_ptr, lower_bnd);
+				else if (par_going_out == 2)
+					just_freeze(name_ptr, p_org);
+            }
+        }
+    }
+    
+    if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
+    {
+        ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
 
-			p_new = ipar.second;
-			p_org = current_ctl_pars.get_rec(ipar.first);
-			upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->ubnd;
-			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->lbnd;
-			bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-			if (par_going_out)
-			{
-				new_freeze_active_ctl_pars.insert(tt_item.first, current_ctl_pars.get_rec(tt_item.first));
-			}
-		}
-	}
-	return num_upgrade_out_grad_in;
+        TranTied* tt = par_transform.get_tied_ptr();
+        Parameters current_ctl_pars = current_active_ctl_pars;
+        tt->reverse(current_ctl_pars);
+        Parameters upgrade_ctl_pars = upgrade_active_ctl_pars;
+        tt->reverse(upgrade_ctl_pars);
+        auto items = tt->get_items();
+        pair<string, double> tt_item;
+        for (auto ipar : upgrade_ctl_pars)
+        {
+            if (items.find(ipar.first) == items.end())
+                continue;
+
+            tt_item = items.at(ipar.first);
+
+            p_new = ipar.second;
+            p_org = current_ctl_pars.get_rec(ipar.first);
+            upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->ubnd;
+            lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->lbnd;
+            int par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+            if (par_going_out > 0)
+            {
+                // Apply the same individual isolation for tied bounds
+                Parameters single_tied_par;
+                single_tied_par.insert(tt_item.first, current_ctl_pars.get_rec(tt_item.first));
+                pest_scenario.enforce_par_limits(performance_log, single_tied_par, current_active_ctl_pars, true, true);
+                new_freeze_active_ctl_pars.insert(tt_item.first, single_tied_par.get_rec(tt_item.first));
+            }
+        }
+    }
+    
+    return num_upgrade_out_grad_in;
 }
-
 //void SVDSolver::limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
 //	Pest::LimitType &limit_type, const Parameters &frozen_active_ctl_pars)
 //{
@@ -1841,7 +2192,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 //
 //	check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_active_ctl_parameters);
 //
-//	////delete any limits corresponding to ignored types
+//	////delete any limits cooresponding to ignored types
 //	//for (auto it = limited_active_ctl_parameters.begin(); it != limited_active_ctl_parameters.end();)
 //	//{
 //	//	const string &name = (*it).first;
@@ -1921,15 +2272,9 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
-    double meas = base_run.get_obj_func_ptr()->get_phi_comp(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr).meas;
-    double lam_val = pow(10.0, (floor(log10(meas))));
-    if (lam_val < 1.0e-10) {
-        lam_val = 10000;
-    }
-    //double lam_val = 0.0;
 
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
-		base_run_active_ctl_par, freeze_active_ctl_pars, lam_val, new_pars, upgrade_ctl_del_pars,
+		base_run_active_ctl_par, freeze_active_ctl_pars, 0, new_pars, upgrade_ctl_del_pars,
 		grad_ctl_del_pars);
 
 	//Don't limit parameters as this is just an estimate
@@ -2069,8 +2414,7 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 			//mu_vec[0].print(cout);
 			//cout << endl;
 		}
-		if (mu_vec[0].mu <= wfmin)
-            break;
+		if (mu_vec[0].mu <= wfmin) break;
 	}
 
 	for (; i < max_iter; ++i)
@@ -2092,8 +2436,7 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 			//cout << endl;
 			cout << "    ...solving for optimal weight factor : " << setw(6) << mu_vec[3].mu << endl << flush;
 		}
-		if (mu_vec[3].mu >= wfmax)
-            break;
+		if (mu_vec[3].mu >= wfmax) break;
 	}
 
 	double tau = (sqrt(5.0) - 1.0) / 2.0;

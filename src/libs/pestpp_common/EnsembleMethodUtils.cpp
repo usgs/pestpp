@@ -31,10 +31,10 @@
 
 
 EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
-	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _am, L2PhiHandler& _ph,
 	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names, double _reg_factor) :
 	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), weights(_weights), localizer(_localizer),
-	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names), reg_factor(_reg_factor) {
+	parcov(_parcov), Am(_am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names), reg_factor(_reg_factor) {
     performance_log = _performance_log;
     use_localizer = _use_localizer;
     iter = _iter;
@@ -62,20 +62,20 @@ neighbor_phi_map(_neighbor_phi_map),neighbor_pardist_map(_neighbor_pardist_map)
         indexes.push_back(i);
 }
 
-void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
+void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, double phi_weight, map<string,map<string,double>> weight_phi_map,
                                  vector<string> preal_names, vector<string> oreal_names,Eigen::SparseMatrix<double> parcov_inv,
                                  map<string,int> real_map,
                                  MmNeighborThread& worker, exception_ptr& eptr) {
     try {
-        worker.work(id,verbose_level,mm_alpha,weight_phi_map,preal_names,oreal_names,real_map,parcov_inv);
+        worker.work(id,verbose_level,mm_alpha,phi_weight,weight_phi_map,preal_names,oreal_names,real_map,parcov_inv);
     }
     catch (...) {
         eptr = current_exception();
     }
-    return;
+
 }
 
-void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
+void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, double phi_weight, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
                             vector<string> oreal_names,map<string,int> real_map,Eigen::SparseMatrix<double> parcov_inv)
 {
     unique_lock<mutex> next_guard(next_lock, defer_lock);
@@ -183,12 +183,13 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             }
         }
 
-        //calc composite score
+        //calc composite score - phi_weight in [0,1] sets the phi-vs-par-distance proportion;
+        //the 2x keeps the score in the same [0,2] range used downstream (phi_weight=0.5 -> par+phi)
         map<string, double> composite_score;
         for (auto &rname : preal_names) {
             if (rname == real_name)
                 continue;
-            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+            composite_score[rname] = 2.0 * (((1.0 - phi_weight) * euclid_par_dist.at(rname)) + (phi_weight * par_phi_map.at(rname)));
         }
         //sort by score
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
@@ -239,6 +240,57 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
 }
 
 
+//compute neighborhood-ranking weights for one center realization when all reals are used
+//(mm_alpha >= 1).  Returns weight-by-par-realization-name in [0,1]: closer reals (lower composite
+//score in [0,2] = normalized par-space distance + normalized phi distance) get larger weights via
+//((2 - score) / 2) ^ weight_exp.  This mirrors the composite score used in MmNeighborThread::work
+//but keeps all reals (no subsetting).
+static map<string,double> mm_neighbor_weights(int center_idx, const Eigen::MatrixXd& pe_mat,
+        const vector<string>& preal_names, const vector<string>& oreal_names,
+        map<string,double> phi_map, const Eigen::SparseMatrix<double>& parcov_inv, double weight_exp, double phi_weight)
+{
+    int num_reals = (int)preal_names.size();
+    //scale the phi values from 0 to 1 and flip to par realization names
+    double mx = -1.0e+300;
+    for (auto& p : phi_map)
+        if (p.second > mx)
+            mx = p.second;
+    for (auto& p : phi_map)
+        p.second /= mx;
+    map<string,double> par_phi_map;
+    for (int ii = 0; ii < num_reals; ii++)
+        par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
+
+    //parcov-weighted par-space distance from the center realization, scaled from 0 to 1
+    Eigen::VectorXd center = pe_mat.row(center_idx);
+    Eigen::VectorXd diff;
+    map<string,double> par_dist;
+    mx = -1.0e+300;
+    for (int ii = 0; ii < num_reals; ii++)
+    {
+        if (ii == center_idx)
+            continue;
+        diff = pe_mat.row(ii).transpose() - center;
+        double edist = diff.transpose() * parcov_inv * diff;
+        par_dist[preal_names[ii]] = edist;
+        if (edist > mx)
+            mx = edist;
+    }
+    if (mx <= 0.0)
+        throw runtime_error("multimodal weight error: maximum par diff for realization '" + preal_names[center_idx] + "' not valid");
+
+    //composite score in [0,2] -> weight in [0,1]
+    map<string,double> rweight;
+    for (int ii = 0; ii < num_reals; ii++)
+    {
+        if (ii == center_idx)
+            continue;
+        double score = 2.0 * (((1.0 - phi_weight) * (par_dist.at(preal_names[ii]) / mx)) + (phi_weight * par_phi_map.at(preal_names[ii])));
+        rweight[preal_names[ii]] = pow((2.0 - score) / 2.0, weight_exp);
+    }
+    return rweight;
+}
+
 /**
  * @brief Update multimodal components.
  *
@@ -248,7 +300,15 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     mm_real_idx_map.clear();
     mm_q_vec_map.clear();
     mm_real_name_map.clear();
+    mm_real_weight_map.clear();
     stringstream ss;
+    if ((pest_scenario.get_pestpp_options().get_ies_multimodal_weight_exponent() > 0.0) && (mm_alpha < 1.0))
+        file_manager.rec_ofstream() << "...warning: ies_multimodal_weight_exponent > 0 is ignored because ies_multimodal_alpha < 1.0" << endl;
+    //proportion of phi vs par-space distance in the neighborhood composite score (0.5 = equal,
+    //which recovers the original par_dist + phi behavior); must be in [0,1]
+    double phi_weight = pest_scenario.get_pestpp_options().get_ies_multimodal_phi_weight();
+    if ((phi_weight < 0.0) || (phi_weight > 1.0))
+        throw runtime_error("ies_multimodal_phi_weight must be in [0,1], not " + to_string(phi_weight));
     int num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
     Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
     Eigen::MatrixXd wmat = weights.get_eigen(vector<string>(),act_obs_names);
@@ -264,7 +324,17 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
 	preal_names = pe.get_real_names();
 
 	if (mm_alpha >= 1.0) {
-		file_manager.rec_ofstream() << "...mm_alpha >= 1.0, using all reals for gradient calculations" << endl;
+		double weight_exp = pest_scenario.get_pestpp_options().get_ies_multimodal_weight_exponent();
+		bool use_weights = weight_exp > 0.0;
+		if (use_weights)
+			file_manager.rec_ofstream() << "...mm_alpha >= 1.0 with ies_multimodal_weight_exponent " << weight_exp <<
+				", scaling realization contributions by neighborhood ranking" << endl;
+		else
+			file_manager.rec_ofstream() << "...mm_alpha >= 1.0, using all reals for gradient calculations" << endl;
+		//phi-weight ensemble is only needed for the neighborhood-ranking weights
+		map<string,map<string,double>> weight_phi_map;
+		if (use_weights)
+			weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
 		//all reals map to each other so just fill the containers
 		for (int i = 0; i < pe.shape().first; i++) {
 			real_name = real_names[i];
@@ -278,16 +348,31 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
 			pe_real_names_case.push_back(real_name);
 			oe_real_names_case.push_back(oreal_name);
 
+			//build the per-neighbor weight vector aligned to pe_real_names_case ([self, others])
+			map<string,double> rweight;
+			Eigen::VectorXd weight_vec;
+			if (use_weights) {
+				rweight = mm_neighbor_weights(i, *pe.get_eigen_ptr(), preal_names, oreal_names,
+					weight_phi_map.at(oreal_name), parcov_inv, weight_exp, phi_weight);
+				weight_vec.resize(pe.shape().first);
+				weight_vec[0] = 1.0;  //the center realization itself
+			}
+			int wi = 1;
+
 			for (int ii=0; ii<pe.shape().first;ii++) {
 				if (ii == i)
 					continue;
 				real_idxs.push_back(ii);
 				pe_real_names_case.push_back(preal_names[ii]);
 				oe_real_names_case.push_back(oreal_names[ii]);
+				if (use_weights)
+					weight_vec[wi++] = rweight.at(preal_names[ii]);
 			}
 			mm_real_idx_map[real_name] = real_idxs;
 			mm_q_vec_map[real_name] = q_vec;
 			mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
+			if (use_weights)
+				mm_real_weight_map[real_name] = weight_vec;
 		}
 		return;
 
@@ -305,8 +390,8 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         Eigen::setNbThreads(1);
         vector<thread> threads;
         vector<exception_ptr> exception_ptrs;
-        vector<string> preal_names = pe.get_real_names();
-        vector<string> oreal_names = oe.get_real_names();
+        preal_names = pe.get_real_names();
+        oreal_names = oe.get_real_names();
         unordered_map<string,Eigen::VectorXd> real_vec_map;
         unordered_map<string,unordered_map<string,double>> neighbor_phi_map, neighbor_pardist_map;
         mm_q_vec_map.clear();
@@ -321,7 +406,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             exception_ptrs.push_back(exception_ptr());
         }
         for (int i = 0; i < num_threads; i++) {
-        	threads.push_back(thread(mm_neighbor_thread_function, i, verbose_level, mm_alpha, weight_phi_map,preal_names,
+        	threads.push_back(thread(mm_neighbor_thread_function, i, verbose_level, mm_alpha, phi_weight, weight_phi_map,preal_names,
                                      oreal_names, parcov_inv, real_map, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
         }
 
@@ -498,7 +583,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         for (auto &rname : real_names) {
             if (rname == real_name)
                 continue;
-            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+            composite_score[rname] = 2.0 * (((1.0 - phi_weight) * euclid_par_dist.at(rname)) + (phi_weight * par_phi_map.at(rname)));
         }
         performance_log->log_event("...sorting composite score");
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
@@ -845,7 +930,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         message(2, "launching threads");
 
         MmUpgradeThread* ut_ptr = new MmUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
-                                                                        mm_q_vec_map, pe_upgrade,mm_real_name_map,reg_factor);
+                                                                        mm_q_vec_map, pe_upgrade,mm_real_name_map,reg_factor,mm_real_weight_map);
 
         Eigen::VectorXd parcov_inv_vec = 1. / parcov.e_ptr()->diagonal().array();
         for (int i = 0; i < num_threads; i++)
@@ -957,7 +1042,14 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             }
             performance_log->log_event("calculating localized multimodal upgrade for " + real_name);
 
+            //hand the center realization's neighborhood-ranking weights to solve() so the
+            //localized upgrade threads can scale realization contributions (empty if not weighting)
+            if (mm_real_weight_map.find(real_name) != mm_real_weight_map.end())
+                mm_current_weights = mm_real_weight_map.at(real_name);
+            else
+                mm_current_weights.resize(0);
             solve(num_threads, cur_lam, use_glm_form, pe_real, loc_map);
+            mm_current_weights.resize(0);
         }
 
 
@@ -1062,8 +1154,23 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     obs_resid.transposeInPlace();
     par_resid.transposeInPlace();
     obs_err.transposeInPlace();
+    //optional multimodal realization weighting (single-threaded path): columns are realizations
+    //(in center_on-anomaly form, so the center realization's column is ~zero), aligned to
+    //pe_real_names = the [self, neighbors] subset order.
+    double mm_weight_sum = -1.0;
+    if ((center_on.size() > 0) && (mm_real_weight_map.find(center_on) != mm_real_weight_map.end())
+        && (mm_real_weight_map.at(center_on).size() == par_diff.cols()))
+    {
+        Eigen::VectorXd swvec = mm_real_weight_map.at(center_on).cwiseSqrt();
+        for (int j = 0; j < par_diff.cols(); j++)
+        {
+            par_diff.col(j) *= swvec[j];
+            obs_diff.col(j) *= swvec[j];
+        }
+        mm_weight_sum = mm_real_weight_map.at(center_on).sum();
+    }
     UpgradeThread::ensemble_solution(iter,verbose_level,maxsing,0,0,use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,
-                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv, act_obs_names,act_par_names,reg_factor);
+                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv, act_obs_names,act_par_names,reg_factor,mm_weight_sum);
     pe_upgrade.add_2_cols_ip(act_par_names, upgrade_1);
 
 
@@ -1094,6 +1201,8 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
                                             obs_diff_map, obs_err_map,
                                             localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
                                             _how, reg_factor);
+    //pass the (possibly empty) multimodal realization weights for the localized multimodal path
+    ut_ptr->set_real_weights(mm_current_weights);
     performance_log->log_event("using local analysis upgrade thread");
 
 	if ((num_threads < 1) || (loc_map.size() == 1))
@@ -1233,7 +1342,8 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
                               const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                               Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                               const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-                              const vector<string>& act_obs_names,const vector<string>& act_par_names,double _reg_factor)
+                              const vector<string>& act_obs_names,const vector<string>& act_par_names,double _reg_factor,
+                              double mm_weight_sum)
 {
     class local_utils
     {
@@ -1383,7 +1493,13 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
 
         int num_reals = par_resid.cols();
-        double scale = (1.0 / (sqrt(double(num_reals - 1))));
+        //conditionally use the multimodal weighted effective sample size (sum of realization
+        //weights) in place of num_reals when realization weighting is active (mm_weight_sum > 0)
+        double scale;
+        if ((mm_weight_sum > 0.0) & (mm_weight_sum < 1.0))
+            scale = (1.0 / (sqrt(mm_weight_sum - 1.0)));
+        else
+            scale = (1.0 / (sqrt(double(num_reals - 1))));
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
         obs_diff = scale * (weights * obs_diff);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_diff", obs_diff);
@@ -1679,6 +1795,22 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         for (int i=0;i<obs_diff.rows();i++)
             obs_diff.row(i) -= row_vec;
 
+        //optionally scale each realization's (deviation) contribution by the neighborhood-ranking
+        //weight so that closer reals contribute more to the covariance.  the center realization is
+        //row 0 (weight 1, zero deviation).  mm_weight_sum is the effective sample size, passed to
+        //ensemble_solution so the scale factor uses sum(w) instead of num_reals.
+        double mm_weight_sum = -1.0;
+        if (real_weight_map.find(key) != real_weight_map.end())
+        {
+            Eigen::VectorXd swvec = real_weight_map.at(key).cwiseSqrt();
+            for (int i=0;i<par_diff.rows();i++)
+            {
+                par_diff.row(i) *= swvec[i];
+                obs_diff.row(i) *= swvec[i];
+            }
+            mm_weight_sum = real_weight_map.at(key).sum();
+        }
+
         par_diff.transposeInPlace();
         obs_diff.transposeInPlace();
         obs_resid.transposeInPlace();
@@ -1697,7 +1829,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         //Eigen::MatrixXd upgrade_1;
         vector<string> empty_obs_names,empty_par_names;
         UpgradeThread::ensemble_solution(iter,verbose_level,maxsing,thread_id,t_count, use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,par_diff,Am,obs_resid,
-                          obs_diff,upgrade_1,obs_err,weights,parcov_inv,empty_obs_names,empty_par_names,reg_factor);
+                          obs_diff,upgrade_1,obs_err,weights,parcov_inv,empty_obs_names,empty_par_names,reg_factor,mm_weight_sum);
 
 
         //assuming that the fist row is the realization we are after...
@@ -1723,11 +1855,13 @@ MmUpgradeThread::MmUpgradeThread(PerformanceLog* _performance_log, unordered_map
                                  unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
                                  unordered_map<string, Eigen::VectorXd>& _obs_err_map,
                                  unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
-                                 unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor):
+                                 unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor,
+                                 unordered_map<string, Eigen::VectorXd>& _real_weight_map):
         par_resid_map(_par_resid_map),par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map),
         obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map),
         pe_upgrade(_pe_upgrade), cases(_cases),
         weight_map(_weight_map),
+        real_weight_map(_real_weight_map),
         reg_factor(_reg_factor)
 {
     performance_log = _performance_log;
@@ -1948,7 +2082,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		obs_resid.resize(0, 0);
 		obs_diff.resize(0, 0);
 		obs_err.resize(0, 0);
-		loc.resize(0, 0);
+		//loc.resize(0, 0);  //dead: covariance/hadamard localization is deprecated (see EnsembleSolver::solve); loc is never consumed
 		Am.resize(0, 0);
 		weights.resize(0);
 		parcov_inv.resize(0);
@@ -1956,24 +2090,30 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		
 
-		if ((use_localizer) && (loc.rows() == 0)) {
-            while (true) {
-                //get access to the localizer
-                if (loc_guard.try_lock()) {
-                    //get a matrix that is either the shape of par diff or obs diff
-                    if (loc_by_obs) {
-                        //loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-                        loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
-                    } else {
-                        //loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-                        loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
-                    }
-                    loc_guard.unlock();
-                    break;
-                }
-
-            }
-        }
+		// dead code: 'loc' (the hadamard localizing matrix) is built here but never
+		// consumed - it is not applied to the anomalies and not passed to
+		// UpgradeThread::ensemble_solution (which has no localizer arg). Covariance/
+		// hadamard localization is deprecated in EnsembleSolver::solve; live
+		// localization is done by par/obs subsetting per case. Commented out to
+		// avoid the wasted per-case n_par(or n_obs) x num_reals allocation+fill.
+		//if ((use_localizer) && (loc.rows() == 0)) {
+        //    while (true) {
+        //        //get access to the localizer
+        //        if (loc_guard.try_lock()) {
+        //            //get a matrix that is either the shape of par diff or obs diff
+        //            if (loc_by_obs) {
+        //                //loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+        //                loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
+        //            } else {
+        //                //loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+        //                loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
+        //            }
+        //            loc_guard.unlock();
+        //            break;
+        //        }
+        //
+        //    }
+        //}
 
         obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
         obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
@@ -2003,13 +2143,27 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		par_resid.transposeInPlace();
 		obs_err.transposeInPlace();
 
+		//optional multimodal realization weighting (localized path): columns are realizations,
+		//aligned to the subset [self, neighbors] order carried in real_weights
+		double mm_weight_sum = -1.0;
+		if ((real_weights.size() > 0) && (real_weights.size() == par_diff.cols()))
+		{
+			Eigen::VectorXd swvec = real_weights.cwiseSqrt();
+			for (int j = 0; j < par_diff.cols(); j++)
+			{
+				par_diff.col(j) *= swvec[j];
+				obs_diff.col(j) *= swvec[j];
+			}
+			mm_weight_sum = real_weights.sum();
+		}
+
         UpgradeThread::ensemble_solution(iter, verbose_level,maxsing,  thread_id,
                                       t_count, use_prior_scaling,use_approx, use_glm_form,
                                       cur_lam,eigthresh, par_resid, par_diff,
                                       Am, obs_resid,obs_diff, upgrade_1,
                                       obs_err, weights,
                                       parcov_inv,
-                                      obs_names,par_names,reg_factor);
+                                      obs_names,par_names,reg_factor,mm_weight_sum);
 
 		
 		while (true)
@@ -5375,7 +5529,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         {
             message(0,"WARNING: npar and/or nobs > 1e6, you are close to going out-of-range for jcb format.  Switching to dense format but using '.jcb' file extension");
             pest_scenario.get_pestpp_options_ptr()->set_save_dense(true);
-            dense_file_ext = "jcb";
+            dense_file_ext = ".jcb";
         }
     }
 
@@ -5771,8 +5925,35 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
                     ss << endl;
             }
             message(0,ss.str());
+        	ss.str("");
+        	if (pest_scenario.get_pestpp_options().get_save_dense())
+        	{
 
+        		ss << file_manager.get_base_filename();
+        		if (cycle != NetPackage::NULL_DA_CYCLE)
+        			ss << "." << cycle;
+        		ss << ".0.par" << dense_file_ext;
+        		pe.to_dense_unordered(ss.str());
+        	}
+        	else if (pest_scenario.get_pestpp_options().get_save_binary())
+        	{
+        		ss << file_manager.get_base_filename();
+        		if (cycle != NetPackage::NULL_DA_CYCLE)
+        			ss << "." << cycle;
+        		ss << ".0.par.jcb";
+        		pe.to_binary(ss.str());
+        	}
+        	else
+        	{
+        		ss << file_manager.get_base_filename();
+        		if (cycle != NetPackage::NULL_DA_CYCLE)
+        			ss << "." << cycle;
+        		ss << ".0.par.csv";
+        		pe.to_csv(ss.str());
+        	}
+        	message(1, "saved initial truncated parameter ensemble to ", ss.str());
         }
+
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
@@ -6462,6 +6643,8 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     map<string,double> current_phi_fracs;
     map<string,double> init_group_phis;
     map<string,map<string,double>> real_init_group_phis,real_adj_group_phis;
+    map<string,double> tag_scale_sums;
+    map<string,int> tag_scale_counts;
     map<string,int> weight_real_map = weights.get_real_map();
     map<string,int> weight_var_map = weights.get_var_map();
     double total = 0;
@@ -6522,7 +6705,11 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             if (!do_adjust)
                 scale_fac = 1.0;
             else
+            {
                 scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+                tag_scale_sums[pf.first] += scale_fac;
+                tag_scale_counts[pf.first]++;
+            }
             for (auto &g : group_map.at(pf.first)) {
 
                 for (auto oname : group_to_obs_map.at(g)) {
@@ -6534,6 +6721,13 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 
         real_init_group_phis[swr_map.first] = init_group_phis;
 
+    }
+
+    for (auto& t : tag_scale_sums)
+    {
+        ss.str("");
+        ss << "file tag '" << t.first << "' average percent change in weights: " << 100.0 * ((t.second / (double)tag_scale_counts.at(t.first)) - 1.0);
+        message(1,ss.str());
     }
 
     map<string,map<string,double>> adj_swr_map = ph.get_swr_real_map(oe, weights);
@@ -6662,6 +6856,9 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         ss << "file tag '" << pf.first << "' original mean phi (factor): " << total << " (" << current_phi_fracs[pf.first] << ")";
         message(1,ss.str());
         scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+        ss.str("");
+        ss << "file tag '" << pf.first << "' average percent change in weights: " << 100.0 * (scale_fac - 1.0);
+        message(1,ss.str());
         for (auto& g : group_map.at(pf.first))
         {
             for (auto oname : group_to_obs_map.at(g))
@@ -7698,7 +7895,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	//track this here for phi-based termination check
 	best_mean_phis.push_back(best_mean);
 
-
 	if ((best_mean < last_best_mean * acc_fac))
 	{
 		message(0, "updating parameter ensemble");
@@ -7787,6 +7983,18 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
+	}
+
+	if (pest_scenario.get_pestpp_options().get_ies_use_phi_lambda_iters()) {
+
+		double new_lam = get_lambda();
+		ss.str("");
+		ss << "using phi-based lambda for each iteration, lambda changing from " << last_best_lam << " to " << new_lam;
+		message(1,ss.str());
+		last_best_lam = new_lam;
+
+
+
 	}
 
 	return true;

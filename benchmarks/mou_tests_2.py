@@ -265,7 +265,7 @@ def chance_consistency_test():
     pst.control_data.noptmax = -1
     pst.write(os.path.join(t_d, "constr.pst"))
     m1 = os.path.join("mou_tests", "constr_test_master_fail_3")
-    pyemu.os_utils.start_workers(t_d, exe_path, "constr.pst", 35, worker_root="mou_tests",
+    pyemu.os_utils.start_workers(t_d, exe_path, "constr.pst", 10, worker_root="mou_tests",
                                  master_dir=m1, verbose=True,port=port)
 
 
@@ -2705,9 +2705,9 @@ def pi_output_test():
 
 
 if __name__ == "__main__":
-    basic_pso_test()
+    #basic_pso_test()
     #test_restart_all()
-    #chance_consistency_test()
+    chance_consistency_test()
     #zdt1_chance_schedule_test()
     #gpr_run_riskobj_baselines()
     #gpr_compare_invest()

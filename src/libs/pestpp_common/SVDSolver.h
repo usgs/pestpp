@@ -18,7 +18,6 @@
 */
 #ifndef SVDSOLVER_H_
 #define SVDSOLVER_H_
-
 #include <map>
 #include <set>
 #include <iomanip>
@@ -166,7 +165,7 @@ protected:
 	int check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars, 
 		const Parameters &new_upgrade_active_ctl_pars, 
 		const Parameters &new_grad_active_ctl_pars = Parameters(),
-		bool include_bound=false);
+		bool include_bound=false, bool clamp=false);
 };
 
 #endif /* SVDSOLVER_H_ */

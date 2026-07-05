@@ -217,11 +217,14 @@ vector<int8_t> Serialization::serialize(const Parameters &pars, const vector<str
  */
 vector<int8_t> Serialization::serialize(const vector<string> &string_vec)
 {
+	size_t total = 0;
+	for (auto &i : string_vec)
+		total += i.size() + 1;
 	vector<int8_t> serial_data;
+	serial_data.reserve(total);
 	for (auto &i : string_vec)
 	{
-		vector<int8_t> tmp_str = NetPackage::pack_string(i.begin(),i.end());
-		serial_data.insert(serial_data.end(), tmp_str.begin(), tmp_str.end());
+		serial_data.insert(serial_data.end(), i.begin(), i.end());
 		serial_data.push_back('\0');
 	}
 	return serial_data;

@@ -111,9 +111,9 @@ public:
 	map<string, double> get_unsatified_obs_constraints_vs_shifted(Observations& constraints_sim, Observations& shifted_constraints, double tol, bool include_weight);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true, bool include_weight = false);
 	map<string, double> get_constraint_map(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift);
+	pair<Mat, bool> get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, const Eigen::VectorXd* lagrange_mults = nullptr, double working_set_tol = 0.15);
+	pair<Mat, bool> get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>(), double working_set_tol = 0.15);
 
-	pair<Mat, bool> get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, const Eigen::VectorXd* lagrange_mults = nullptr, double working_set_tol = 0.15, int wset_lvl = 1);
-	pair<Mat, bool> get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>(), double working_set_tol = 0.15, int wset_lvl = 1);
 	pair<vector<string>, bool> reduce_working_set(vector<string>& working_set, const Eigen::VectorXd& lagrange_mults);
 
 	map<string, map<string, double>> get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol = 0.0, bool include_weight = true, ObservationEnsemble* shift_ensemble_oe = nullptr, double risk_val = 0.5);
@@ -258,11 +258,14 @@ private:
 
 	ObservationEnsemble get_stack_mean(map<string, ObservationEnsemble>& _stack_oe_map);
 
-	pair<vector<string>,vector<string>> get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol=0.1, int wset_lvl = 1);
+	pair<vector<string>,vector<string>> get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol);
+
     void augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names);
 
     void initialize_chance_schedule(ofstream& frec);
 
+	pair<Eigen::MatrixXd, Eigen::VectorXd> compute_constraint_aware_covariance(ParameterEnsemble& dv, ObservationEnsemble& oe,	const vector<string>& working_set_constraints, const Eigen::MatrixXd& objective_cov);
+	Eigen::VectorXd compute_constraint_weights(ObservationEnsemble& oe, const vector<string>& working_set_constraints, int n_reals);
 
 };
 #endif
