@@ -131,10 +131,6 @@ public:
 	bool get_std_weights() { return std_weights; }
 	bool get_use_chance() { return use_chance; }
 	bool get_use_fosm() { return use_fosm; }
-	//true if there is a parameter stack that can be (re)simulated at the current dec-var
-	//point (internal stack or opt_par_stack); false for an external obs-only stack, which
-	//is fixed at the point it was generated and can only be re-centered via anomalies.
-	bool get_stack_is_rerunnable() { return stack_pe.shape().first > 0; }
 
 	//get the dimensions
 	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
@@ -186,11 +182,6 @@ private:
 	bool use_stosag;
 	bool std_weights;
 	bool stack_runs_processed;
-	//the stack anomaly-vs-raw convention chosen for the current decision-variable point
-	//(set by get_constraint_bound_vectors when the LP bounds are built).  the postsolve
-	//satisfaction check and reports must reuse this same convention so they don't flag as
-	//violated a solution the LP made feasible under the other convention.
-	bool use_stack_anomalies_dv = true;
 	double risk;
 	double probit_val;
 	double dbl_max;

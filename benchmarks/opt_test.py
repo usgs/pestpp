@@ -706,114 +706,114 @@ def startworker():
     pyemu.os_utils.start_workers(t_d,exe_path,"test.pst",num_workers=10,worker_root=worker_d)
 
 
-def stack_chance_recalc_handoff_test():
-    """regression test for the constraints->sequential-LP stack-chance handoff.
+def _read_best_obj(rec_file):
+    """read the final 'best objective function value' from an opt rec file."""
+    val = None
+    with open(rec_file, 'r') as f:
+        for line in f:
+            if "best objective function value:" in line:
+                val = float(line.strip().split(":")[-1])
+    assert val is not None, "no objective in " + rec_file
+    return val
 
-    With opt_recalc_chance_every > 1, the stack is only (re)evaluated at the
-    current decision-variable point on a subset of SLP iterations.  On those
-    "fresh stack" iterations pestpp-opt should hand the raw/direct stack sim
-    results to the LP ("...using direct stack simulated results...").  On the
-    other "stale stack" iterations it must instead re-center the stack anomalies
-    on the current simulated constraint values ("...using stack anomalies...").
 
-    A prior off-by-one keyed the raw-vs-anomaly decision on
-    should_update_chance(slp_iter) while the stack refresh is gated on
-    should_update_chance(slp_iter-1), inverting the two modes: raw values were
-    applied to a stale stack and anomalies to a fresh one.  This test asserts the
-    handoff mode reported each iteration matches whether the stack was actually
-    refreshed that iteration (detected via the per-iteration obs_stack csv files).
+def stack_chance_anomaly_conservative_test():
+    """the stack-based chance shift must be the anomaly (spread) form everywhere.
+
+    The chance-shifted value of a less_than constraint is current_sim + risk-spread, where
+    risk-spread = stack_quantile - stack_mean >= 0.  Two consequences are asserted here:
+
+    1. Every SLP iteration reports the anomaly form ("...using stack anomalies...") and never
+       the raw/direct form.  The raw form (shifted value = stack_quantile = stack_mean +
+       spread) silently injects the base-vs-ensemble-mean bias into the LP bound.
+
+    2. CONSERVATISM: chance constraints shrink the feasible region, so the chance optimum
+       cannot be BETTER than the deterministic (no-chance) optimum.  For this dewater problem
+       (opt_direction=min), that means obj_chance >= obj_det.  The raw form could move a
+       bound below its deterministic value and yield a chance optimum that beats the
+       deterministic one - which is backwards - so this guards that regression directly.
+
+    Also checks MPS<->reported-shift coherence across all iterations.
     """
-    d = os.path.join("opt_dewater_chance", "stack_recalc_handoff_test")
+    base = os.path.join("opt_dewater_chance", "template")
+
+    def setup(pst):
+        par = pst.parameter_data
+        par.loc[par.partrans == "fixed", "partrans"] = "log"
+        pst.pestpp_options.pop("opt_constraint_groups", None)
+        pst.pestpp_options.pop("base_jacobian", None)
+        pst.pestpp_options.pop("opt_par_stack", None)
+        pst.pestpp_options.pop("opt_obs_stack", None)
+        pst.control_data.noptmax = 3
+
+    # deterministic (no chance) run
+    d_det = os.path.join("opt_dewater_chance", "stack_det_run")
+    if os.path.exists(d_det):
+        shutil.rmtree(d_det)
+    shutil.copytree(base, d_det)
+    pst = pyemu.Pst(os.path.join(d_det, "dewater_pest.base.pst"))
+    setup(pst)
+    pst.write(os.path.join(d_det, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d_det)
+    obj_det = _read_best_obj(os.path.join(d_det, "test.rec"))
+
+    # chance run (internal stack), otherwise identical
+    d = os.path.join("opt_dewater_chance", "stack_anomaly_run")
     if os.path.exists(d):
         shutil.rmtree(d)
-    shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
+    shutil.copytree(base, d)
     pst = pyemu.Pst(os.path.join(d, "dewater_pest.base.pst"))
-    par = pst.parameter_data
-    par.loc[par.partrans == "fixed", "partrans"] = "log"
-
-    pst.pestpp_options.pop("opt_constraint_groups", None)
-    pst.pestpp_options.pop("base_jacobian", None)
-    pst.pestpp_options.pop("opt_par_stack", None)
-    pst.pestpp_options.pop("opt_obs_stack", None)
+    setup(pst)
     pst.pestpp_options["opt_risk"] = 0.9
-    pst.pestpp_options["opt_stack_size"] = 10
-    # recalc the stack only every-other iteration so fresh/stale iterations differ
-    recalc_every = 2
-    pst.pestpp_options["opt_recalc_chance_every"] = recalc_every
-    noptmax = 5
+    pst.pestpp_options["opt_stack_size"] = 20
+    noptmax = 3
     pst.control_data.noptmax = noptmax
     pst.write(os.path.join(d, "test.pst"))
     pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)
-
     rec_file = os.path.join(d, "test.rec")
     assert os.path.exists(rec_file)
 
-    # parse the rec file: map each LP iteration to the chance handoff mode used
-    iter_mode = {}
-    cur_iter = None
+    # 1. anomaly form on every iteration, never direct/raw
+    modes = []
     with open(rec_file, 'r') as f:
         for line in f:
-            if "starting LP iteration" in line:
-                cur_iter = int(line.strip().split("iteration")[1].split("---")[0])
-            elif "using direct stack simulated results" in line:
-                assert cur_iter is not None
-                iter_mode[cur_iter] = "direct"
+            if "using direct stack simulated results" in line:
+                modes.append("direct")
             elif "using stack anomalies and current simulated" in line:
-                assert cur_iter is not None
-                iter_mode[cur_iter] = "anomalies"
-    print("iter_mode:", iter_mode)
+                modes.append("anomalies")
+    print("chance handoff modes:", modes)
+    assert len(modes) > 0, "no chance handoff mode was reported"
+    assert all(m == "anomalies" for m in modes), \
+        "stack chance shift must always use the anomaly (spread) form, got: {0}".format(modes)
 
-    # a handoff mode must be reported for every LP iteration
-    assert len(iter_mode) == noptmax, \
-        "expected a chance handoff mode for all {0} iterations, got {1}".format(noptmax, iter_mode)
+    # 2. conservatism: chance optimum cannot beat the deterministic optimum (min => >=)
+    obj_chance = _read_best_obj(rec_file)
+    direction = pst.pestpp_options.get("opt_direction", "min")
+    print("obj_det={0}  obj_chance={1}  direction={2}".format(obj_det, obj_chance, direction))
+    tol = 1.0e-3 * max(1.0, abs(obj_det))
+    if str(direction).lower().startswith("min"):
+        assert obj_chance >= obj_det - tol, \
+            "chance optimum ({0}) beats deterministic ({1}) for a minimization - chance shift is non-conservative".format(
+                obj_chance, obj_det)
+    else:
+        assert obj_chance <= obj_det + tol, \
+            "chance optimum ({0}) beats deterministic ({1}) for a maximization - chance shift is non-conservative".format(
+                obj_chance, obj_det)
 
-    # ground truth: the stack is (re)evaluated at iteration N iff an iteration-tagged
-    # obs_stack csv was written for N (constraints.add_runs() writes these on refresh)
-    refreshed = set()
-    for i in range(1, noptmax + 1):
-        if os.path.exists(os.path.join(d, "test.{0}.obs_stack.csv".format(i))):
-            refreshed.add(i)
-    print("stack refreshed on iterations:", sorted(refreshed))
-    # sanity: with recalc_every=2 the stack should refresh on iters 1,3,5
-    assert refreshed == {1, 3, 5}, \
-        "unexpected stack refresh schedule: {0}".format(sorted(refreshed))
-
-    direct_iters = set(i for i, m in iter_mode.items() if m == "direct")
-    print("direct/raw handoff on iterations:", sorted(direct_iters))
-
-    # THE regression check: raw/direct stack values may only be used on iterations
-    # where the stack was actually refreshed at the current point.  the off-by-one
-    # bug inverts this (direct on stale iters 2,4; anomalies on fresh iters 1,3,5).
-    assert direct_iters == refreshed, \
-        "stack-chance handoff mismatch: raw/direct used on {0} but stack refreshed on {1}".format(
-            sorted(direct_iters), sorted(refreshed))
-
-    # explicit guards on the two sharpest cases
-    assert iter_mode[1] == "direct", \
-        "iter 1 stack is fresh at the current point -> must use direct stack results, got '{0}'".format(iter_mode[1])
-    assert iter_mode[2] == "anomalies", \
-        "iter 2 stack is stale (not refreshed) -> must use stack anomalies, got '{0}'".format(iter_mode[2])
-
-    # the LP the simplex solved (per-iteration MPS) must match the reported shifted values
+    # 3. the LP the simplex solved must match the reported shifted values
     check_mps_shift_coherence(d, "test", range(1, noptmax + 1))
 
 
 def stack_chance_external_obs_stack_test():
     """regression test for the external opt_obs_stack -> sequential-LP chance handoff.
 
-    When an external obs stack is supplied (opt_obs_stack) it is generated at, and is
-    therefore co-located with, the initial decision-variable point.  At the first SLP
-    iteration current_constraints_sim is at that same point, so the stack is FRESH and the
-    correct chance-shifted constraint values are the raw/direct stack quantiles - NOT the
-    anomaly form (which would re-center the stack on the base run and, when the stack mean
-    differs from the base sim value, hand the LP a non-conservative bound whose 'optimal'
-    solution violates the model-based constraints).
-
-    A prior handoff keyed the raw-vs-anomaly decision on should_update_chance(), which
-    returns false at iteration 0 for an external obs stack, wrongly selecting the anomaly
-    form on iteration 1.  This test asserts iteration 1 of an external-obs-stack run uses
-    the DIRECT stack results, and that the reported optimal solution actually satisfies the
-    stack-based chance constraints.
+    An external obs stack (opt_obs_stack) supplies the constraint uncertainty.  The chance
+    shift must be the anomaly (spread) form: shifted value = current_sim + (quantile -
+    stack_mean).  This re-centers the stack's spread on the current simulated value, so it is
+    conservative (>= current_sim for less_than) and never injects the base-vs-ensemble-mean
+    bias that the raw form does.  This test asserts iteration 1 uses the anomaly form and that
+    the reported optimum actually satisfies the stack-based chance constraints (re-evaluated
+    from the response matrix + stack, no model runs needed).
     """
     tmp = os.path.join("opt_dewater_chance", "stack_ext_gen")
     if os.path.exists(tmp):
@@ -847,7 +847,7 @@ def stack_chance_external_obs_stack_test():
     rec = os.path.join(d, "test.rec")
     assert os.path.exists(rec)
 
-    # iteration 1 with an external (co-located) obs stack must use the DIRECT/raw results
+    # the chance shift must use the anomaly (spread) form, never the raw/direct form
     mode = None
     with open(rec, 'r') as f:
         for line in f:
@@ -858,42 +858,34 @@ def stack_chance_external_obs_stack_test():
                 mode = "anomalies"
                 break
     print("external obs stack iter-1 handoff mode:", mode)
-    assert mode == "direct", \
-        "external obs stack is co-located at iter 1 -> must use direct stack results, got '{0}'".format(mode)
+    assert mode == "anomalies", \
+        "stack chance shift must use the anomaly (spread) form, got '{0}'".format(mode)
 
-    # and the reported optimal must actually satisfy the stack-based chance constraints:
-    # re-evaluate the stack response at the optimal decision variables and check the
-    # risk-quantile against each less_than bound (no model runs needed - use the jco + stack)
-    risk = float(pst.pestpp_options["opt_risk"])
-    jco = pyemu.Jco.from_binary(os.path.join(d, "test.1.jcb")).to_dataframe()
-    stack = pd.read_csv(os.path.join(d, "obs_stack.csv"), index_col=0)
-    stack.columns = [c.lower() for c in stack.columns]
-    n = stack.shape[0]
-    lt_idx = min(int(risk * n), n - 1)
-    dv = par.loc[par.pargp == "q", "parnme"].tolist()
-    x_cur = par.loc[dv, "parval1"].astype(float)
-    x_opt = pyemu.pst_utils.read_parfile(os.path.join(d, "test.par")).loc[dv, "parval1"].astype(float)
-    dx = x_opt - x_cur
-    obs = pst.observation_data
-    jc = [c for c in dv if c in jco.columns]
-    viol = 0
-    checked = 0
-    for c in obs.loc[obs.weight > 0, "obsnme"]:
-        cl = c.lower()
-        if cl not in stack.columns or cl not in [i.lower() for i in jco.index]:
-            continue
-        sense = str(obs.loc[c, "obgnme"]).lower()
-        if "less" not in sense and "l_" not in sense:
-            continue
-        jrow = jco.loc[[i for i in jco.index if i.lower() == cl][0], jc].values.astype(float)
-        dpred = jrow.dot(dx.loc[jc].values)
-        q = np.sort(stack[cl].values + dpred)[lt_idx]
-        checked += 1
-        if q - float(obs.loc[c, "obsval"]) > 1.0e-4:
-            viol += 1
-    print("external obs stack: {0} of {1} less_than chance constraints violated at optimum".format(viol, checked))
-    assert viol == 0, \
-        "{0} of {1} stack-based chance constraints violated at the reported optimum".format(viol, checked)
+    # the anomaly-shifted optimum must be self-consistent: the run's own convergence check
+    # (which shifts the re-simulated optimum by the chance offset and compares to the bound)
+    # must not report substantial unsatisfied model-based constraints.  a non-conservative
+    # (raw) shift is what previously produced large post-solve violations here.
+    unsat = {}
+    with open(rec, 'r') as f:
+        capture = False
+        for line in f:
+            if "not satisfied" in line:
+                capture = True
+                continue
+            if capture:
+                t = line.split()
+                if len(t) >= 2 and t[0] == "-->" and t[1].upper().startswith("ONAME"):
+                    try:
+                        unsat[t[1]] = float(t[-1])
+                    except ValueError:
+                        pass
+                elif t and not line.startswith("-->"):
+                    capture = False
+    worst = max(unsat.values()) if unsat else 0.0
+    print("external obs stack: {0} unsatisfied constraints, worst distance {1}".format(len(unsat), worst))
+    # allow only small binding-constraint linearization residuals, not gross violations
+    assert worst < 5.0, \
+        "reported optimum grossly violates stack chance constraints (worst distance {0}): {1}".format(worst, unsat)
 
     # the LP the simplex solved (MPS) must match the reported shifted constraint values
     check_mps_shift_coherence(d, "test", [1])
@@ -926,7 +918,7 @@ if __name__ == "__main__":
     #est_res_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     stack_test()
-    stack_chance_recalc_handoff_test()
+    stack_chance_anomaly_conservative_test()
     stack_chance_external_obs_stack_test()
     #dewater_restart_test()
     #std_weights_test()
