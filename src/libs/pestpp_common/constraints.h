@@ -186,6 +186,11 @@ private:
 	bool use_stosag;
 	bool std_weights;
 	bool stack_runs_processed;
+	//the stack anomaly-vs-raw convention chosen for the current decision-variable point
+	//(set by get_constraint_bound_vectors when the LP bounds are built).  the postsolve
+	//satisfaction check and reports must reuse this same convention so they don't flag as
+	//violated a solution the LP made feasible under the other convention.
+	bool use_stack_anomalies_dv = true;
 	double risk;
 	double probit_val;
 	double dbl_max;

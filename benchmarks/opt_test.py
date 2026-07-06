@@ -14,6 +14,92 @@ def _get_free_port():
         return s.getsockname()[1]
 
 
+def _parse_mps_row_rhs(mps_file):
+    """parse a COIN/CLP standard MPS file -> ({row_name: rhs_value}, {row_name: sense}).
+
+    section keywords (ROWS/COLUMNS/RHS/...) start at column 0; data rows are indented.
+    note the RHS-vector name in RHS data rows is itself 'RHS', so a naive token check
+    would mistake data rows for the section header - key off the leading indent instead.
+    """
+    rhs, sense, sec = {}, {}, None
+    with open(mps_file) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            t = line.split()
+            if (not line[0].isspace()) and t[0] in ("NAME", "OBJSENSE", "ROWS", "COLUMNS",
+                                                    "RHS", "RANGES", "BOUNDS", "ENDATA"):
+                sec = t[0]
+                continue
+            if sec == "ROWS" and len(t) == 2 and t[0] in ("L", "G", "E", "N"):
+                sense[t[1]] = t[0]
+            elif sec == "RHS" and len(t) >= 3:
+                for i in range(1, len(t) - 1, 2):
+                    rhs[t[i]] = float(t[i + 1])
+    return rhs, sense
+
+
+def _parse_rec_obs_constraints(rec_file, iteration):
+    """parse the 'observation constraint/objective information at start of iteration N'
+    table -> {name: (required, shifted_sim_value)}.  the fixed-width columns can run
+    together where the +/- double-max bound abuts the residual, so read by position:
+    name=t[0], sense=t[1], required=t[2], (chance-)shifted sim value=t[3]."""
+    hdr = "observation constraint/objective information at start of iteration {0}".format(iteration)
+    lines = open(rec_file).read().splitlines()
+    hs = [i for i, l in enumerate(lines) if hdr in l]
+    out = {}
+    if not hs:
+        return out
+    for l in lines[hs[-1] + 2:]:
+        t = l.split()
+        if len(t) >= 5 and t[1] in ("less_than", "greater_than", "equal_to"):
+            try:
+                out[t[0]] = (float(t[2]), float(t[3]))
+            except ValueError:
+                pass
+        elif out:
+            break  # reached the end of the table
+    return out
+
+
+def check_mps_shift_coherence(d, run_name, iters, tol=1.0e-3):
+    """assert the LP problem the simplex actually solved is coherent with the chance-shifted
+    constraint values pestpp-opt reports.
+
+    pestpp-opt writes a standard MPS file each SLP iteration ('<run>.<iter>.mps', on by
+    default via ++opt_coin_log).  Its right-hand side for each observation-constraint row
+    is (required - shifted sim value).  The rec file's 'observation constraint ... start of
+    iteration' table reports the same 'required' and (chance-)'shifted sim value'.  If the
+    LP is built with one chance convention (e.g. raw stack quantiles) while the reported /
+    convergence-checked shifted values use another (e.g. anomaly form), the two disagree and
+    the 'optimal' solution silently violates the constraints it is reported to satisfy.
+    This check ties the two together: MPS RHS == required - reported shifted sim value.
+    """
+    rec_file = os.path.join(d, run_name + ".rec")
+    assert os.path.exists(rec_file), "missing rec file: " + rec_file
+    total = 0
+    for it in iters:
+        mps = os.path.join(d, "{0}.{1}.mps".format(run_name, it))
+        if not os.path.exists(mps):
+            continue
+        rhs, sense = _parse_mps_row_rhs(mps)
+        rec = _parse_rec_obs_constraints(rec_file, it)
+        common = [n for n in rec if n in rhs and sense.get(n) in ("L", "G")]
+        assert len(common) > 0, \
+            "no obs constraints common to {0} and rec iteration {1}".format(mps, it)
+        for name in common:
+            required, shifted = rec[name]
+            expected_rhs = required - shifted
+            assert abs(rhs[name] - expected_rhs) < tol, (
+                "MPS vs reported-shift incoherence at iter {0} constraint '{1}': "
+                "MPS RHS={2} but required-shifted={3} (required={4}, shifted sim={5})".format(
+                    it, name, rhs[name], expected_rhs, required, shifted))
+            total += 1
+    assert total > 0, "no MPS constraint rows were checked - was ++opt_coin_log disabled?"
+    print("MPS coherence: {0} constraint-rows across iterations {1} match reported shifted values".format(
+        total, list(iters)))
+
+
 bin_path = os.path.join("test_bin")
 print(platform.platform().lower())
 
@@ -708,6 +794,9 @@ def stack_chance_recalc_handoff_test():
     assert iter_mode[2] == "anomalies", \
         "iter 2 stack is stale (not refreshed) -> must use stack anomalies, got '{0}'".format(iter_mode[2])
 
+    # the LP the simplex solved (per-iteration MPS) must match the reported shifted values
+    check_mps_shift_coherence(d, "test", range(1, noptmax + 1))
+
 
 def stack_chance_external_obs_stack_test():
     """regression test for the external opt_obs_stack -> sequential-LP chance handoff.
@@ -805,6 +894,9 @@ def stack_chance_external_obs_stack_test():
     print("external obs stack: {0} of {1} less_than chance constraints violated at optimum".format(viol, checked))
     assert viol == 0, \
         "{0} of {1} stack-based chance constraints violated at the reported optimum".format(viol, checked)
+
+    # the LP the simplex solved (MPS) must match the reported shifted constraint values
+    check_mps_shift_coherence(d, "test", [1])
 
 
 def fosm_invest():

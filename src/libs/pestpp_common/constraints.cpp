@@ -1507,7 +1507,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
  */
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
 {
-	return get_chance_shifted_constraints(current_obs, risk);
+	//use the same raw-vs-anomaly convention the LP bounds were built with (set in
+	//get_constraint_bound_vectors) so the postsolve satisfaction check/reports are
+	//consistent with the constraints the simplex actually solved.
+	return get_chance_shifted_constraints(current_obs, risk, use_stack_anomalies_dv);
 
 }
 
@@ -1843,6 +1846,10 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Pa
 	/* get the upper and lower bound constraint vectors. For less than constraints, the lower bound is 
 	set to double max, for greater than constraints, the upper bound is set to double max.
 	These are needed for the simplex solve*/
+	//remember which chance convention the LP is being built with so the postsolve
+	//satisfaction check and reports (which call the single-arg get_chance_shifted_constraints)
+	//apply the same shift and stay consistent with the bounds the LP actually solved.
+	use_stack_anomalies_dv = use_stack_anomalies;
 	vector<double> residuals;
 	if (use_chance)
 	{
