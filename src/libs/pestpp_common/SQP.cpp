@@ -3796,8 +3796,26 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 
 	ParameterEnsemble dv_all = dv;
 	ObservationEnsemble oe_all = oe;
-	dv_all.append_other_rows(dv_candidates);
-	oe_all.append_other_rows(oe_candidates);
+	//guard against an empty or mismatched candidate set (no trial radii generated, or all
+	//candidate runs failed) - appending dv candidates that oe lacks would make
+	//pick_from_filter throw on a missing obs vector.  fall back to the current reals + the
+	//base solution in the filter (the incumbent) so the trust region is reduced next pass.
+	if (dv_candidates.shape().first != oe_candidates.shape().first)
+	{
+		message(0, "WARNING: candidate dv (" + to_string(dv_candidates.shape().first) +
+			") and obs (" + to_string(oe_candidates.shape().first) +
+			") ensembles are inconsistent; keeping current solution for this iteration");
+	}
+	else if (oe_candidates.shape().first == 0)
+	{
+		message(0, "WARNING: trust-region candidate ensemble is empty (no trial radii or all "
+			"candidate runs failed); keeping current solution for this iteration");
+	}
+	else
+	{
+		dv_all.append_other_rows(dv_candidates);
+		oe_all.append_other_rows(oe_candidates);
+	}
 
 	bool success;
 	FilterRec result = pick_upgrade_and_update_current(dv_all, oe_all, cma_reset_archive, true);
@@ -4293,9 +4311,30 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 
 	ParameterEnsemble dv_all = dv;
 	ObservationEnsemble oe_all = oe;
-	dv_all.append_other_rows(dv_candidates);
-	oe_all.append_other_rows(oe_candidates);
-	
+	//only fold candidates into the selection ensembles when we actually have obs for them
+	//and the dv/obs row counts line up.  an empty candidate set (no step lengths were
+	//generated) or a mismatched one (all/partial candidate runs failed) must not be
+	//appended - doing so would leave dv_all with candidate rows that oe_all lacks, and
+	//pick_from_filter would then look up a candidate with no obs vector and throw.  in
+	//that case we select from the current reals plus the base solution held in the filter,
+	//which yields the incumbent and lets the outer loop reduce the step / seek feasibility.
+	if (dv_candidates.shape().first != oe_candidates.shape().first)
+	{
+		message(0, "WARNING: candidate dv (" + to_string(dv_candidates.shape().first) +
+			") and obs (" + to_string(oe_candidates.shape().first) +
+			") ensembles are inconsistent; keeping current solution for this iteration");
+	}
+	else if (oe_candidates.shape().first == 0)
+	{
+		message(0, "WARNING: candidate ensemble is empty (no step lengths generated or all "
+			"candidate runs failed); keeping current solution for this iteration");
+	}
+	else
+	{
+		dv_all.append_other_rows(dv_candidates);
+		oe_all.append_other_rows(oe_candidates);
+	}
+
 	return pick_upgrade_and_update_current(dv_all , oe_all, cma_reset_archive, true, dvs_subset, recalc);
 }
 
@@ -5764,6 +5803,13 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 			{
 				message(0, "WARNING: all dv candidate runs failed");
 				_oe = ObservationEnsemble(&pest_scenario);
+				//drop the corresponding dv candidate rows too so dv_candidates stays
+				//row-consistent with the (now empty) obs ensemble.  otherwise downstream
+				//selection (pick_from_filter) would look up a candidate that has no obs
+				//vector and the ensemble would throw "real name not found".
+				vector<string> all_dv_names = dv_candidates.get_real_names();
+				if (all_dv_names.size() > 0)
+					dv_candidates.drop_rows(all_dv_names);
 			}
 			else
 			{
