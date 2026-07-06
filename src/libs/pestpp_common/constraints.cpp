@@ -1742,13 +1742,20 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
 		old_constraint_val = current_obs.get_rec(name);
 		//the value that must be statified (from the control file)
 		required_val = constraints_obs[name];
+		//locate this constraint's column in the stack.  guard the lookup: map::operator[]
+		//would silently insert and return 0 for a missing name, so a constraint absent from
+		//(or misnamed in) the stack would be shifted by an unrelated stack column (index 0)
+		//with no error.  require an explicit match instead.
+		if (var_map.find(name) == var_map.end())
+			throw_constraints_error("constraint '" + name + "' not found in the stack ensemble columns - cannot compute stack-based chance shift");
+		int cidx = var_map.at(name);
 		// the realized values of this stack are the anomalies added to the
-		//current constraint value - this assumes the current value 
+		//current constraint value - this assumes the current value
 		//is the mean of the stack distribution
         if (use_stack_anomalies)
-            cvec = anom.col(var_map[name]).array() + old_constraint_val;
+            cvec = anom.col(cidx).array() + old_constraint_val;
         else
-		    cvec = anom.col(var_map[name]).array();// + old_constraint_val;
+		    cvec = anom.col(cidx).array();// + old_constraint_val;
 		//now sort the anomalies + current (mean) value vector
 		sort(cvec.data(), cvec.data() + cvec.size());
 		/*cout << cvec << endl << endl;

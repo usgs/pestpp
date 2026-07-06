@@ -582,14 +582,29 @@ void sequentialLP::iter_solve()
     bool use_stack_anamolies = true;
     if ((constraints.get_use_chance()) && (!constraints.get_use_fosm()))
     {
-        //the stack is (re)evaluated at the current dec-var point in iter_presolve()
-        //using should_update_chance(slp_iter-1) (see iter_presolve()), so the raw/direct
-        //stack values are only valid this iteration when that same gate is true.  using
-        //should_update_chance(slp_iter) here is an off-by-one: on iterations where the
-        //stack was NOT refreshed it would apply stale-point raw stack values to the
-        //current constraint bounds instead of re-centering the anomalies on the current
-        //simulated constraint values.
-        if (constraints.should_update_chance(slp_iter-1))
+        //decide whether the stack in hand corresponds to the *current* decision-variable
+        //point.  if it does ("fresh"), the raw/direct stack simulated results are the
+        //correct chance-shifted constraint values and must be used as-is.  if it does not
+        //("stale"), we can only trust the stack's spread, so we re-center its anomalies on
+        //the current simulated constraint values (the anomaly form).
+        //
+        //the stack is fresh when:
+        //  - this is the first SLP iteration: the initial stack (external obs stack loaded
+        //    from file, or an internal/par stack drawn+run) is always co-located with the
+        //    initial dec vars, and current_constraints_sim is at that same point; OR
+        //  - the stack is re-runnable (there is a parameter stack, so add_runs actually
+        //    queues model runs) AND it was re-evaluated at the current point this iteration
+        //    (the same should_update_chance(slp_iter-1) gate that iter_presolve uses to
+        //    queue those runs).
+        //note: should_update_chance() alone is NOT a freshness signal - for an external
+        //obs-only stack (empty stack_pe) it can report "update" on iterations where nothing
+        //is actually re-run, and it returns false on iter 0 for external stacks even though
+        //the loaded stack IS co-located at iteration 1.  using it directly (either slp_iter
+        //or slp_iter-1) mis-selects raw-vs-anomaly and produces non-conservative constraint
+        //bounds (the "optimal" solution then violates the model-based constraints).
+        bool stack_is_fresh = (slp_iter == 1) ||
+            (constraints.get_stack_is_rerunnable() && constraints.should_update_chance(slp_iter-1));
+        if (stack_is_fresh)
         {
             ss.str("");
             ss << "...using direct stack simulated results in chance calculations";

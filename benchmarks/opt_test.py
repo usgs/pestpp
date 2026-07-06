@@ -3,6 +3,7 @@ import shutil
 import platform
 import socket
 import numpy as np
+import pandas as pd
 import pyemu
 
 
@@ -708,6 +709,104 @@ def stack_chance_recalc_handoff_test():
         "iter 2 stack is stale (not refreshed) -> must use stack anomalies, got '{0}'".format(iter_mode[2])
 
 
+def stack_chance_external_obs_stack_test():
+    """regression test for the external opt_obs_stack -> sequential-LP chance handoff.
+
+    When an external obs stack is supplied (opt_obs_stack) it is generated at, and is
+    therefore co-located with, the initial decision-variable point.  At the first SLP
+    iteration current_constraints_sim is at that same point, so the stack is FRESH and the
+    correct chance-shifted constraint values are the raw/direct stack quantiles - NOT the
+    anomaly form (which would re-center the stack on the base run and, when the stack mean
+    differs from the base sim value, hand the LP a non-conservative bound whose 'optimal'
+    solution violates the model-based constraints).
+
+    A prior handoff keyed the raw-vs-anomaly decision on should_update_chance(), which
+    returns false at iteration 0 for an external obs stack, wrongly selecting the anomaly
+    form on iteration 1.  This test asserts iteration 1 of an external-obs-stack run uses
+    the DIRECT stack results, and that the reported optimal solution actually satisfies the
+    stack-based chance constraints.
+    """
+    tmp = os.path.join("opt_dewater_chance", "stack_ext_gen")
+    if os.path.exists(tmp):
+        shutil.rmtree(tmp)
+    shutil.copytree(os.path.join("opt_dewater_chance", "template"), tmp)
+    pst = pyemu.Pst(os.path.join(tmp, "dewater_pest.base.pst"))
+    par = pst.parameter_data
+    par.loc[par.partrans == "fixed", "partrans"] = "log"
+    pst.pestpp_options.pop("opt_constraint_groups", None)
+    pst.pestpp_options.pop("base_jacobian", None)
+    pst.pestpp_options["opt_risk"] = 0.9
+    pst.pestpp_options["opt_stack_size"] = 20
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(tmp, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=tmp)
+    # the obs stack simulated at the initial dec-var point
+    obs_stack = os.path.join(tmp, "test.1.obs_stack.csv")
+    assert os.path.exists(obs_stack), "expected obs stack was not written: " + obs_stack
+
+    # now run with that stack supplied EXTERNALLY (opt_obs_stack) at the same initial point
+    d = os.path.join("opt_dewater_chance", "stack_ext_obs_stack_test")
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
+    shutil.copy2(obs_stack, os.path.join(d, "obs_stack.csv"))
+    pst.pestpp_options.pop("opt_stack_size", None)
+    pst.pestpp_options["opt_obs_stack"] = "obs_stack.csv"
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(d, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)
+    rec = os.path.join(d, "test.rec")
+    assert os.path.exists(rec)
+
+    # iteration 1 with an external (co-located) obs stack must use the DIRECT/raw results
+    mode = None
+    with open(rec, 'r') as f:
+        for line in f:
+            if "using direct stack simulated results" in line:
+                mode = "direct"
+                break
+            if "using stack anomalies and current simulated" in line:
+                mode = "anomalies"
+                break
+    print("external obs stack iter-1 handoff mode:", mode)
+    assert mode == "direct", \
+        "external obs stack is co-located at iter 1 -> must use direct stack results, got '{0}'".format(mode)
+
+    # and the reported optimal must actually satisfy the stack-based chance constraints:
+    # re-evaluate the stack response at the optimal decision variables and check the
+    # risk-quantile against each less_than bound (no model runs needed - use the jco + stack)
+    risk = float(pst.pestpp_options["opt_risk"])
+    jco = pyemu.Jco.from_binary(os.path.join(d, "test.1.jcb")).to_dataframe()
+    stack = pd.read_csv(os.path.join(d, "obs_stack.csv"), index_col=0)
+    stack.columns = [c.lower() for c in stack.columns]
+    n = stack.shape[0]
+    lt_idx = min(int(risk * n), n - 1)
+    dv = par.loc[par.pargp == "q", "parnme"].tolist()
+    x_cur = par.loc[dv, "parval1"].astype(float)
+    x_opt = pyemu.pst_utils.read_parfile(os.path.join(d, "test.par")).loc[dv, "parval1"].astype(float)
+    dx = x_opt - x_cur
+    obs = pst.observation_data
+    jc = [c for c in dv if c in jco.columns]
+    viol = 0
+    checked = 0
+    for c in obs.loc[obs.weight > 0, "obsnme"]:
+        cl = c.lower()
+        if cl not in stack.columns or cl not in [i.lower() for i in jco.index]:
+            continue
+        sense = str(obs.loc[c, "obgnme"]).lower()
+        if "less" not in sense and "l_" not in sense:
+            continue
+        jrow = jco.loc[[i for i in jco.index if i.lower() == cl][0], jc].values.astype(float)
+        dpred = jrow.dot(dx.loc[jc].values)
+        q = np.sort(stack[cl].values + dpred)[lt_idx]
+        checked += 1
+        if q - float(obs.loc[c, "obsval"]) > 1.0e-4:
+            viol += 1
+    print("external obs stack: {0} of {1} less_than chance constraints violated at optimum".format(viol, checked))
+    assert viol == 0, \
+        "{0} of {1} stack-based chance constraints violated at the reported optimum".format(viol, checked)
+
+
 def fosm_invest():
     t_d = os.path.join("opt_dewater_chance","master5")
     pst = pyemu.Pst(os.path.join(t_d,"test.pst"))
@@ -736,5 +835,6 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     stack_test()
     stack_chance_recalc_handoff_test()
+    stack_chance_external_obs_stack_test()
     #dewater_restart_test()
     #std_weights_test()
