@@ -459,6 +459,11 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		}
 
 	}
+	//var_map is only populated by update_var_map() - draw()/reserve()/from_csv() and the
+	//`dv = dv_ensemble` assignment set var_names but NOT var_map, so without this call
+	//get_var_map() returns an empty map and every decision variable is wrongly reported as
+	//"missing in the dv en".
+	dv.update_var_map();
 	map<string,int> dvmap = dv.get_var_map();
 	map<string,int>::iterator dvend = dvmap.end();
 	vector<string> missing;
