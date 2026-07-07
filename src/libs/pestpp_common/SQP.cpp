@@ -390,7 +390,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			message(1, "loading dv ensemble from csv file", dv_file);
 			try
 			{
-				dv.from_csv(dv_file);
+				dv.from_csv(dv_file, true);
 			}
 			catch (const exception &e)
 			{
@@ -402,12 +402,12 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 				throw_sqp_error(string("error processing dv csv file"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || ((par_ext.compare("bin") == 0)))
 		{
 			message(1, "loading dv ensemble from binary file", dv_file);
 			try
 			{
-				dv.from_binary(dv_file);
+				dv.from_binary(dv_file, true);
 			}
 			catch (const exception &e)
 			{
@@ -458,6 +458,22 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			    //throw_sqp_error("not implemented");
 		}
 
+	}
+	map<string,int> dvmap = dv.get_var_map();
+	map<string,int>::iterator dvend = dvmap.end();
+	vector<string> missing;
+	for (auto& n : dv_names)
+	{
+		if (dvmap.find(n) == dvend)
+			missing.push_back(n);
+	}
+	if (missing.size() > 0)
+	{
+		ss.str("");
+		ss << "the following decision variables are missing in the dv en:" << endl;
+		for (auto& m: missing)
+			ss << m << endl;
+		throw_sqp_error(ss.str());
 	}
 
 	if (dv_names.size() < pest_scenario.get_ctl_ordered_adj_par_names().size())
