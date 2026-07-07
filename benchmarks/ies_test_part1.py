@@ -1740,7 +1740,7 @@ def tenpar_localizer_pdc_test():
         #pst.pestpp_options["ies_verbose_level"] = 3
         pst_name = os.path.join(template_d,"pest_local_pdc.pst")
         pst.write(pst_name)
-        pyemu.os_utils.start_workers(template_d, exe_path, "pest_local_pdc.pst", num_workers=10,
+        pyemu.os_utils.start_workers(template_d, '../../pestpp-ies', "pest_local_pdc.pst", num_workers=10,
                                        master_dir=test_d, verbose=True, worker_root=model_d,
                                        port=port)
         phi_df1 = pd.read_csv(os.path.join(test_d,"pest_local_pdc.phi.meas.csv"))
@@ -1771,7 +1771,7 @@ def tenpar_localizer_pdc_test():
             mat = pyemu.Matrix.from_dataframe(mat)
             mat.to_binary(os.path.join(template_d,loc_name))
         pst.write(pst_name)
-        pyemu.os_utils.start_workers(template_d, exe_path, "pest_local_pdc.pst", num_workers=10,
+        pyemu.os_utils.start_workers(template_d, '../../pestpp-ies', "pest_local_pdc.pst", num_workers=10,
                                        master_dir=test_d, verbose=True, worker_root=model_d,
                                        port=port)
         phi_df1 = pd.read_csv(os.path.join(test_d,"pest_local_pdc.phi.meas.csv"))
@@ -1793,7 +1793,7 @@ def tenpar_localizer_pdc_test():
         pst.pestpp_options["ies_obs_en"] = "restart_local_noise.csv"
         pst.pestpp_options["ies_restart_obs_en"] = "restart_local_obs.csv"
         pst.write(pst_name)
-        pyemu.os_utils.start_workers(template_d, exe_path, "pest_local_pdc.pst", num_workers=10,
+        pyemu.os_utils.start_workers(template_d, '../../pestpp-ies', "pest_local_pdc.pst", num_workers=10,
                                        master_dir=test_d, verbose=True, worker_root=model_d,
                                        port=port)
         phi_df2 = pd.read_csv(os.path.join(test_d,"pest_local_pdc.phi.meas.csv"))
@@ -2504,7 +2504,7 @@ if __name__ == "__main__":
     #invest()
     #tenpar_ineq_test()
     #tenpar_restart_similar_test()
-    tenpar_fixed_test3()
+    #tenpar_fixed_test3()
     # tenpar_full_cov_test()
     # eval_freyberg_full_cov_reorder()
     #test_freyberg_full_cov_reorder()
@@ -2517,7 +2517,7 @@ if __name__ == "__main__":
     #tenpar_full_cov_test()
     #tenpar_fixed_test2()
     # tenpar_subset_how_test()
-    # tenpar_localizer_test1()
+    tenpar_localizer_pdc_test()
     # tenpar_localizer_test2()
     # tenpar_localizer_test3()
     # freyberg_localizer_eval1()
