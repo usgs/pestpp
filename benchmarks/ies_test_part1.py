@@ -2243,6 +2243,7 @@ def tenpar_localizer_incomplete_test():
         pst.pestpp_options["ies_localizer_forgive_missing"] = True
         pst.pestpp_options["ies_save_lambda_en"] = True
         pst.pestpp_options["ies_autoadaloc"] = True
+        pst.pestpp_options["overdue_giveup_fac"] = 1e10
         pst.control_data.noptmax = 2
 
         # pst.pestpp_options["ies_verbose_level"] = 3
@@ -2263,7 +2264,12 @@ def tenpar_localizer_incomplete_test():
         assert len(lam_pe_file) == 1
         lam_pe = pd.read_csv(os.path.join(test_d,lam_pe_file[0]),index_col=0)
         other_pnames = [n for n in pst.par_names if n not in pnames]
-        d = pr_pe.loc[:,other_pnames].values - lam_pe.loc[:,other_pnames].values
+        common = list(set(pr_pe.index.tolist()).intersection(set(lam_pe.index.tolist())))
+        common.sort()
+        assert len(common) > 0
+
+
+        d = pr_pe.loc[common,other_pnames].values - lam_pe.loc[common,other_pnames].values
         print(np.abs(d).max())
         assert np.abs(d).max() < 1.0e-5
 
@@ -2347,6 +2353,7 @@ def tenpar_localizer_incomplete_group_test():
         pst.pestpp_options["ies_localizer_forgive_missing"] = True
         pst.pestpp_options["ies_save_lambda_en"] = True
         pst.pestpp_options["ies_autoadaloc"] = True
+        pst.pestpp_options["overdue_giveup_fac"] = 100000
         pst.control_data.noptmax = 2
 
         # pst.pestpp_options["ies_verbose_level"] = 3
@@ -2493,7 +2500,7 @@ if __name__ == "__main__":
     #tenpar_localizer_pdc_test()
     #tenpar_localizer_pdc_obsgroup_test()
     #tenpar_localizer_pdc_pargroup_forgive_test()
-    #tenpar_localizer_incomplete_test()
+    tenpar_localizer_incomplete_test()
     #tenpar_localizer_incomplete_group_test()
     #tenpar_fixed_test3()
     

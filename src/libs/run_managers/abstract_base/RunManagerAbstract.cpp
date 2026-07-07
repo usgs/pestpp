@@ -32,11 +32,29 @@
 #include "Transformable.h"
 #include "utilities.h"
 
+/**
+ * @brief Derive the failed-run storage filename from the primary storage filename.
+ *
+ * Replaces the *.rns* extension with *.rnf*, or appends *.rnf* if no
+ * *.rns* extension is found.
+ *
+ * @param stor_filename  The primary run storage filename (*case.rns*).
+ * @return The corresponding failed-run storage filename (*case.rnf*).
+ */
+static string make_failed_filename(const string& stor_filename) {
+	string fn = stor_filename;
+	size_t pos = fn.rfind(".rns");
+	if (pos != string::npos) fn.replace(pos, 4, ".rnf");
+	else fn += ".rnf";
+	return fn;
+}
+
 RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
 	const vector<string> _tplfile_vec, const vector<string> _inpfile_vec,
 	const vector<string> _insfile_vec, const vector<string> _outfile_vec,
 	const string &stor_filename, int _max_n_failure)
   : total_runs(0), max_n_failure(_max_n_failure), file_stor(stor_filename),
+    failed_file_stor(make_failed_filename(stor_filename)),
     comline_vec(_comline_vec), tplfile_vec(_tplfile_vec),
     inpfile_vec(_inpfile_vec), insfile_vec(_insfile_vec), outfile_vec(_outfile_vec)
 {
@@ -60,6 +78,7 @@ RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
 void RunManagerAbstract::initialize(const Parameters &model_pars, const Observations &obs, const string &_filename)
 {
 	file_stor.reset(model_pars.get_keys(), obs.get_keys(), _filename);
+	failed_file_stor.reset(model_pars.get_keys(), obs.get_keys());
 }
 
 /**
@@ -72,6 +91,7 @@ void RunManagerAbstract::initialize(const Parameters &model_pars, const Observat
 void RunManagerAbstract::initialize(const std::vector<std::string> &par_names, std::vector<std::string> &obs_names, const string &_filename)
 {
 	file_stor.reset(par_names, obs_names, _filename);
+	failed_file_stor.reset(par_names, obs_names);
 }
 
 /**
@@ -84,6 +104,8 @@ void RunManagerAbstract::reinitialize(const string &_filename)
 	vector<string> par_names = get_par_name_vec();
 	vector<string> obs_names = get_obs_name_vec();
 	file_stor.reset(par_names, obs_names, _filename);
+	// Note: failed_file_stor is intentionally NOT reset here so that
+	// failed runs accumulate across all iterations/batches.
 }
 
 /**
@@ -93,8 +115,12 @@ void RunManagerAbstract::reinitialize(const string &_filename)
  */
 void RunManagerAbstract::initialize_restart(const std::string &_filename)
 {
-
 	file_stor.init_restart(_filename);
+	string failed_filename = make_failed_filename(_filename);
+	if (pest_utils::check_exist_in(failed_filename))
+		failed_file_stor.init_restart(failed_filename);
+	else
+		failed_file_stor.reset(file_stor.get_par_name_vec(), file_stor.get_obs_name_vec());
 }
 
 /**
@@ -505,18 +531,51 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
  }
 
 /**
- * @brief Update run failed.
+ * @brief Mark a run as failed in the primary storage and, if the failure
+ *        count has reached max_run_fail, copy its parameter values into
+ *        the failed-run storage file (*case.rnf*).
  *
- * @param run_id Description.
+ * The failure count is stored in the run-status byte of the *.rnf* record
+ * as the negative of the attempt count (e.g. -3 means the run was attempted
+ * three times).  The parameter values and metadata (info_txt, info_value) are
+ * copied from the primary storage so that users can later inspect which
+ * parameter combinations caused persistent model failure.
+ *
+ * @param run_id  The run manager ID of the failed run.
  */
  void  RunManagerAbstract::update_run_failed(int run_id)
  {
 	 file_stor.update_run_failed(run_id);
+
+	 // If this run just crossed the failure threshold, record it in the failed runs file
+	 if (n_run_failures_exceeded(run_id))
+	 {
+		 vector<double> pars_vec, obs_vec;
+		 string info_txt;
+		 double info_value;
+		 file_stor.get_run(run_id, pars_vec, obs_vec, info_txt, info_value);
+		 int failed_id = failed_file_stor.add_run(pars_vec, info_txt, info_value);
+		 int nfail = -file_stor.get_run_status(run_id);
+		 failed_file_stor.set_run_nfailed(failed_id, nfail);
+	 }
  }
 
  const RunStorage& RunManagerAbstract::get_runstorage_ref() const
  {
 	 return file_stor;
+ }
+
+/**
+ * @brief Return a const reference to the failed-run storage (*case.rnf*).
+ *
+ * The returned RunStorage contains one entry for each run that exceeded
+ * the max_run_fail threshold.  Each entry holds the parameter values that
+ * were supplied to the model, associated metadata, and the number of
+ * failed attempts encoded in the run-status byte.
+ */
+ const RunStorage& RunManagerAbstract::get_failed_runstorage_ref() const
+ {
+	 return failed_file_stor;
  }
 
 /**

@@ -30,7 +30,7 @@ public:
                      unordered_map<string,unordered_map<string,double>>& _neighbor_phi_map,
                      unordered_map<string,unordered_map<string,double>>& _neighbor_pardist_map);
 
-    void work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
+    void work(int tid, int verbose_level, double mm_alpha, double phi_weight, map<string,map<string,double>> weight_phi_map,
               vector<string> preal_names, vector<string> oreal_names,map<string,int> real_map,
               Eigen::SparseMatrix<double> parcov_inv);
 
@@ -223,7 +223,7 @@ class EnsembleSolver
 public:
 	EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
 		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer,
-		Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+		Covariance& _parcov,Eigen::MatrixXd& _am, L2PhiHandler& _ph,
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names,
 		double _reg_factor);
 
@@ -252,6 +252,12 @@ private:
 	unordered_map<string,vector<int>> mm_real_idx_map;
 	unordered_map<string,pair<vector<string>,vector<string>>> mm_real_name_map;
     unordered_map<string,Eigen::VectorXd> mm_q_vec_map;
+    //per-center-realization weights (aligned to mm_real_name_map[key].first) used to scale
+    //realization contributions when mm_alpha >= 1 and ies_multimodal_weight_exponent > 0; empty otherwise
+    unordered_map<string,Eigen::VectorXd> mm_real_weight_map;
+    //the weight vector for the center realization currently being solved in the localized
+    //multimodal path; passed to LocalAnalysisUpgradeThread via solve(); empty when not weighting
+    Eigen::VectorXd mm_current_weights;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	vector<string>& act_par_names, act_obs_names;
 	template<typename T, typename A>
@@ -276,7 +282,8 @@ public:
                   unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
                   unordered_map<string, Eigen::VectorXd>& _obs_err_map,
                   unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
-                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor);
+                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases, double _reg_factor,
+                  unordered_map<string, Eigen::VectorXd>& _real_weight_map);
 
     void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
 
@@ -289,6 +296,7 @@ protected:
 
     ParameterEnsemble& pe_upgrade;
     unordered_map<string, Eigen::VectorXd>& weight_map;
+    unordered_map<string, Eigen::VectorXd>& real_weight_map;
 
     unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map;
     unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, & obs_err_map;
@@ -312,6 +320,10 @@ public:
 
 	virtual void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names) { ; }
 
+	//optional per-realization weights (aligned to the realization columns) for the localized
+	//multimodal solve; empty means no realization weighting
+	void set_real_weights(const Eigen::VectorXd& w) { real_weights = w; }
+
 
     static void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
                            const int t_count, const bool use_prior_scaling,const bool use_approx, const bool use_glm,
@@ -319,7 +331,8 @@ public:
                            const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                            Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                            const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-                           const vector<string>& act_obs_names,const vector<string>& act_par_names, double _reg_factor);
+                           const vector<string>& act_obs_names,const vector<string>& act_par_names, double _reg_factor,
+                           double mm_weight_sum = -1.0);
 protected:
 	PerformanceLog* performance_log;
 	Localizer::How how;
@@ -330,6 +343,7 @@ protected:
 
 	ParameterEnsemble& pe_upgrade;
 	Localizer& localizer;
+	Eigen::VectorXd real_weights;
 	unordered_map<string, double>& parcov_inv_map;
 	unordered_map<string, double>& weight_map;
 

@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import platform
+import subprocess
 import numpy as np
 import pandas as pd
 import platform
@@ -1448,6 +1449,17 @@ def fr_timeout_test():
                 print(line.strip())
                 assert num == 7 # hard coded above
 
+    rnf_par,rnf_obs,rnf_info = pyemu.helpers.read_pestpp_runstorage(os.path.join(m_d,"pest.rnf"),irun="all",with_metadata=True)
+    print(rnf_par)
+    print(rnf_obs)
+    print(rnf_info)
+    assert rnf_par.shape[0] == rnf_obs.shape[0]
+    assert rnf_par.shape[0] == rnf_info.shape[0]
+    assert rnf_par.shape[0] == 3
+    assert rnf_par.shape[1] == pst.npar
+    assert rnf_obs.shape[1] == pst.nobs
+    
+
 
 
 def ins_missing_e_test():
@@ -2129,9 +2141,55 @@ def parse_pst_test():
 
 
 
+def save_failed_runs_test():
+    """test that a .rnf file is created when runs fail"""
+    model_d = "ies_10par_xsec"
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "test_save_fails")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    # intentionally break the model command so all runs fail
+    pst.model_command = "python -c \"raise Exception('intentional fail')\""
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["ies_num_reals"] = 5
+    pst.pestpp_options["max_run_fail"] = 1
+    pst.write(os.path.join(new_d, "pest.pst"))
+    try:
+        pyemu.os_utils.run("{0} pest.pst".format(exe_path), cwd=new_d)
+    except:
+        pass
+    # check that the .rnf file was created and is non-empty
+    rnf_file = os.path.join(new_d, "pest.rnf")
+    assert os.path.exists(rnf_file), "failed run storage file 'pest.rnf' not found"
+    assert os.path.getsize(rnf_file) > 0, "failed run storage file 'pest.rnf' is empty"
+    print("save_failed_runs_test passed: {0} exists with size {1}".format(
+        rnf_file, os.path.getsize(rnf_file)))
+
+
+def version_flag_test():
+    """test that all pestpp executables support -v and --version flags"""
+    exe_names = ["pestpp-ies", "pestpp-glm", "pestpp-sen", "pestpp-swp",
+                 "pestpp-opt", "pestpp-da", "pestpp-mou", "pestpp-sqp"]
+    for flag in ["-v", "--version"]:
+        for exe_name in exe_names:
+            ep = exe_path.replace("pestpp-ies", exe_name)
+            if not os.path.exists(ep):
+                print("skipping {0}, not found".format(ep))
+                continue
+            result = subprocess.run([ep, flag], capture_output=True, text=True)
+            assert result.returncode == 0, \
+                "{0} {1} returned non-zero exit code: {2}".format(exe_name, flag, result.returncode)
+            version_str = result.stdout.strip().split('\n')[-1].strip()
+            assert len(version_str) > 0, \
+                "{0} {1} produced no version output".format(exe_name, flag)
+            print("{0} {1} -> '{2}'".format(exe_name, flag, version_str))
+
+
 if __name__ == "__main__":
     #parse_pst_test()
-    #basic_test()
+    basic_test()
     #mf6_v5_glm_test()
     #nonascii_path_test()
 

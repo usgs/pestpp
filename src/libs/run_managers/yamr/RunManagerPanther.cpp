@@ -2449,7 +2449,7 @@ void RunManagerPanther::kill_all_active_runs()
         kill_all_active_runs();
         for (auto run_id : waiting_runs)
         {
-            file_stor.update_run_failed(run_id);
+            RunManagerAbstract::update_run_failed(run_id);
         }
         waiting_runs.clear();
         cout << endl << "'pest.stp' found, all remaining runs marked as fails. " << endl << endl;
@@ -2645,7 +2645,7 @@ void RunManagerPanther::kill_all_active_runs()
  */
  void RunManagerPanther::update_run_failed(int run_id, int socket_fd)
  {
-	 file_stor.update_run_failed(run_id);
+	 RunManagerAbstract::update_run_failed(run_id);
 	 failure_map.insert(make_pair(run_id, socket_fd));
 	 list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(socket_fd);
 	 agent_info_iter->add_failed_run();
