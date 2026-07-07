@@ -1923,6 +1923,12 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_debug_stosag_grad = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SQP_USE_IES_INFEAS")
+	{
+		sqp_use_ies_infeas = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	
 	return false;
 }
 
@@ -2122,6 +2128,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_debug_hessian: " << sqp_debug_hessian << endl;
 	os << "sqp_debug_cmaes: " << sqp_debug_cma << endl;
 	os << "sqp_debug_stosag_grad: " << sqp_debug_stosag_grad << endl;
+	os << "sqp_use_ies_infeas: " << sqp_use_ies_infeas << endl;
+
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2390,6 +2398,8 @@ void PestppOptions::set_defaults()
 	set_sqp_debug_hessian(false);
 	set_sqp_debug_cma(false);
 	set_sqp_debug_stosag_grad(false);
+	set_sqp_use_ies_infeas(false);
+
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);

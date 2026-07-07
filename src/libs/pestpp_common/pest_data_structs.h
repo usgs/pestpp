@@ -445,6 +445,8 @@ public:
 	void set_sqp_debug_cma(bool _flag) { sqp_debug_cma = _flag; }
 	bool get_sqp_debug_stosag_grad()const { return sqp_debug_stosag_grad; }
 	void set_sqp_debug_stosag_grad(bool _flag) { sqp_debug_stosag_grad = _flag; }
+	bool get_sqp_use_ies_infeas()const { return sqp_use_ies_infeas; }
+	void set_sqp_use_ies_infeas(bool _flag) { sqp_use_ies_infeas = _flag; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -896,6 +898,7 @@ private:
 	bool sqp_debug_hessian;
 	bool sqp_debug_cma;
 	bool sqp_debug_stosag_grad;
+	bool sqp_use_ies_infeas;
 	
 
 	int mou_population_size;

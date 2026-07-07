@@ -72,6 +72,170 @@ def basic_sqp_test():
     assert df.shape == (pst.pestpp_options["sqp_num_reals"] + 1,pst.nobs + pst.nprior),str(df.shape)
 
 
+def _resolve_sqp_exe():
+    """find the pestpp-sqp binary: prefer the benchmark-relative exe_path,
+    then the local cmake build tree, then whatever is on PATH."""
+    candidates = [os.path.abspath(exe_path),
+                  os.path.join("..", "build", "src", "programs", "pestpp-sqp", "pestpp-sqp" + exe),
+                  os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "build",
+                               "src", "programs", "pestpp-sqp", "pestpp-sqp" + exe)]
+    for c in candidates:
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    found = shutil.which("pestpp-sqp" + exe)
+    if found is not None:
+        return found
+    return os.path.abspath(exe_path)
+
+
+def _build_min_rosen_sqp(t_d):
+    """build the minimal analytic Rosenbrock SQP case (2 dec vars + 1 linear
+    constraint, no MODFLOW) in directory ``t_d`` and return the pyemu.Pst."""
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+
+    forward = (
+        'vals={}\n'
+        'for line in open("par.dat"):\n'
+        '    k,v=line.split(); vals[k.strip()]=float(v)\n'
+        'x,y=vals["x"],vals["y"]\n'
+        'f=(1.0-x)**2 + 100.0*(y-x*x)**2\n'
+        'c=x+y\n'
+        'with open("obs.dat","w") as fp: fp.write("obs {0:20.10E}\\n".format(f))\n'
+        'with open("constraints.dat","w") as fp: fp.write("constraint {0:20.10E}\\n".format(c))\n'
+    )
+    with open(os.path.join(t_d, "forward.py"), "w") as f:
+        f.write(forward)
+    with open(os.path.join(t_d, "par.dat.tpl"), "w") as f:
+        f.write("ptf ~\nx ~   x        ~\ny ~   y        ~\n")
+    with open(os.path.join(t_d, "obs.dat.ins"), "w") as f:
+        f.write("pif ~\nl1 w !obs!\n")
+    with open(os.path.join(t_d, "constraints.dat.ins"), "w") as f:
+        f.write("pif ~\nl1 w !constraint!\n")
+
+    cwd = os.getcwd()
+    os.chdir(t_d)
+    try:
+        pst = pyemu.Pst.from_io_files("par.dat.tpl", "par.dat",
+                                      ["obs.dat.ins", "constraints.dat.ins"],
+                                      ["obs.dat", "constraints.dat"])
+    finally:
+        os.chdir(cwd)
+
+    par = pst.parameter_data
+    par.loc[:, "partrans"] = "none"
+    par.loc[:, "parlbnd"] = -2.2
+    par.loc[:, "parubnd"] = 2.2
+    par.loc[:, "pargp"] = "decvars"
+    par.loc["x", "parval1"] = 1.6
+    par.loc["y", "parval1"] = 1.6
+
+    obs = pst.observation_data
+    obs.loc["obs", "obgnme"] = "obj_fn"
+    obs.loc["obs", "obsval"] = 0.0
+    obs.loc["obs", "weight"] = 1.0
+    obs.loc["constraint", "obgnme"] = "l_constraint"
+    obs.loc["constraint", "obsval"] = 2.0
+    obs.loc["constraint", "weight"] = 1.0
+
+    pst.pestpp_options["opt_dec_var_groups"] = "decvars"
+    pst.pestpp_options["opt_objective_function"] = "obs"
+    pst.pestpp_options["opt_direction"] = "min"
+    pst.model_command = ["python forward.py"]
+    return pst
+
+
+def _expected_subset_size(num_reals, subset_size):
+    """replicate the pestpp-sqp subset-size logic: negative == percentage of
+    the ensemble size (min 4), positive == absolute (capped at ensemble size)."""
+    if subset_size < 0:
+        k = int(int(num_reals) * ((-1.0 * float(subset_size)) / 100.0))
+        return max(k, 4)
+    return min(int(subset_size), int(num_reals))
+
+
+def _parse_used_subset_size(rec_file):
+    """parse a pestpp-sqp rec file and return (line_search_subset_size,
+    search_dir_subset_size) actually used - both exclude the BASE realization."""
+    with open(rec_file) as f:
+        lines = f.readlines()
+
+    # (i) the "performing line search on ensemble subset: a, b, ..., BASE" list
+    ls_size = None
+    for line in lines:
+        if "performing line search on ensemble subset:" in line:
+            tail = line.split("ensemble subset:", 1)[1]
+            names = [t.strip() for t in tail.replace("\n", "").split(",") if t.strip() != ""]
+            names = [n for n in names if n.upper() != "BASE"]
+            ls_size = len(names)
+            break
+
+    # (ii) the "...calculating search direction for realization <i>" lines for the
+    # first iteration - these run <subset> reals then BASE (not on adjacent lines)
+    sd_names = []
+    for line in lines:
+        if "calculating search direction for realization" in line:
+            tok = line.split("realization", 1)[1].strip()
+            sd_names.append(tok)
+            if tok.upper() == "BASE":
+                break
+    sd_size = (len(sd_names) - 1) if len(sd_names) > 0 else None
+
+    return ls_size, sd_size
+
+
+def sqp_subset_size_test():
+    """regression test: pestpp-sqp must honor the requested (or default) subset
+    size for the search-direction / line-search step, rather than using the
+    entire ensemble.  Covers negative (percentage) mode, positive (absolute)
+    mode, and reliance on the default (-10 == 10 percent)."""
+    this_exe = _resolve_sqp_exe()
+    model_d = "sqp_subset"
+    if os.path.exists(model_d):
+        shutil.rmtree(model_d)
+    os.makedirs(model_d)
+
+    num_reals = 20
+    # (name, sqp_subset_size).  None -> rely on the default (-10 -> 10 percent).
+    # sqp_alpha_mults is left at its multi-value default so the "only one scale
+    # factor, not using subset" branch is not triggered.
+    cases = [("neg_pct", -25),   # 25 percent of 20 -> 5
+             ("abs_val", 6),     # absolute 6
+             ("default", None)]  # default -10 -> 10 percent of 20 -> 2 -> min 4
+
+    failures = []
+    for name, subset_size in cases:
+        t_d = os.path.join(model_d, name)
+        pst = _build_min_rosen_sqp(t_d)
+        pst.pestpp_options["sqp_num_reals"] = num_reals
+        if subset_size is None:
+            expected = _expected_subset_size(num_reals, -10)
+        else:
+            pst.pestpp_options["sqp_subset_size"] = subset_size
+            expected = _expected_subset_size(num_reals, subset_size)
+        pst.control_data.noptmax = 2
+        pst.write(os.path.join(t_d, name + ".pst"), version=2)
+        pyemu.os_utils.run("{0} {1}.pst".format(this_exe, name), cwd=t_d)
+
+        ls_size, sd_size = _parse_used_subset_size(os.path.join(t_d, name + ".rec"))
+        assert ls_size is not None, \
+            "could not find 'performing line search on ensemble subset:' in " + name + ".rec"
+
+        msg = ("case '{0}' (sqp_num_reals={1}, sqp_subset_size={2}): expected subset "
+               "size {3}, but line-search subset used {4} and search-direction block "
+               "used {5} (sqp_num_reals={1})").format(
+                   name, num_reals, subset_size, expected, ls_size, sd_size)
+        print(msg)
+        if ls_size != expected:
+            failures.append(msg)
+        elif sd_size is not None and sd_size != expected:
+            failures.append(msg)
+
+    assert len(failures) == 0, \
+        "pestpp-sqp did not honor the requested/default subset size:\n" + "\n".join(failures)
+
+
 def rosenbrock_setup(version,initial_decvars=1.6,constraints=False,constraint_exp="one_linear"):
     model_d = "rosenbrock"
     t_d = os.path.join(model_d, "template")

@@ -1024,10 +1024,14 @@ void SeqQuadProgram::initialize()
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
 	int subset_size = pest_scenario.get_pestpp_options().get_sqp_subset_size();
-	if (subset_size >= 0)
-		use_subset = true;
-	else 
-		use_subset = false;
+	//sqp_subset_size follows the ies convention: a NEGATIVE value is a percentage of the
+	//ensemble size and a POSITIVE value is an absolute count - both request a subset.  only
+	//0 means "no subset, use the full ensemble".  (a subset larger than the ensemble is
+	//handled downstream: reduced to the ensemble size, and get_subset_idxs returns all when
+	//nreal_subset >= size.)  the previous `subset_size >= 0` test wrongly disabled subsetting
+	//for negative values - including the default of -10 - so the requested/default subset
+	//size was computed and reported but never actually applied.
+	use_subset = (subset_size != 0);
 	
 	if (pp_args.find("PAR_SIGMA_RANGE") == pp_args.end())
 	{
@@ -1268,7 +1272,7 @@ void SeqQuadProgram::initialize()
 	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
 	filter.update(last_best, v, vpad, current_ctl_dv_values, current_obs, BASE_REAL_NAME, 0);
 
-	if ((v > 0.0) && !use_ensemble_grad)
+	if ((v > 0.0) && (pest_scenario.get_pestpp_options().get_sqp_use_ies_infeas()))
 	{
 	    message(0,"initial solution infeasible, seeking feasible solution");
 		seek_feasible();
