@@ -249,7 +249,25 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 					return best_upgrade_run;
 				if (restart_runs) restart_controller.get_restart_option() = RestartController::RestartOption::NONE;
 			}
-
+			if (global_iter_num == 1) 
+			{
+				stringstream filename;
+				string complete_filename;
+				
+				// Write rei0
+				filename << "rei" << 0;
+				output_file_writer.write_rei(file_manager.open_ofile_ext(filename.str()), global_iter_num-1,
+					*(best_upgrade_run.get_obj_func_ptr()->get_obs_ptr()),
+					best_upgrade_run.get_obs(), *(best_upgrade_run.get_obj_func_ptr()),
+					best_upgrade_run.get_ctl_pars());
+				file_manager.close_file(filename.str());
+				filename.str(""); // reset the stringstream
+				// Write 0.par
+				filename << 0 << ".par";
+				output_file_writer.write_par(file_manager.open_ofile_ext(filename.str()), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
+					*(par_transform.get_scale_ptr()));
+				file_manager.close_file(filename.str());
+			}
 			// Update Regularization weights if REG_FRAC is used
 			ModelRun prev_run(best_upgrade_run);
 			os << endl;
