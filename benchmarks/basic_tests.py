@@ -509,7 +509,7 @@ def parchglim_test():
     pst.pestpp_options["lambdas"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df.loc["stage","parval1"],fpm)
     assert p_df.loc["stage","parval1"] == fpm
@@ -518,22 +518,21 @@ def parchglim_test():
     par.loc[pst.par_names[0],"parchglim"] = "relative"
     pst.control_data.relparmax = rpm
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(par)
     print(p_df)
     assert p_df.loc["stage","parval1"] == par.loc["stage","parval1"] + (rpm * par.loc["stage","parval1"])
 
-    
+
     par.loc[pst.par_names[0],"partrans"] = "none"
     par.loc[pst.par_names[0],"parlbnd"] = -10.0
-    par.loc[pst.par_names[0],"parubnd"] = 0   
+    par.loc[pst.par_names[0],"parubnd"] = 0.0   
     par.loc[pst.par_names[0],"parchglim"] = "factor"
     par.loc[pst.par_names[0],"parval1"] = -1.0
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
-    print(par)
     print(p_df)
     print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1)))
     assert p_df.loc["stage","parval1"] <= par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1))
@@ -546,7 +545,7 @@ def parchglim_test():
     par.loc[pst.par_names[0],"parval1"] = -1.0
     pst.control_data.relparmax = rpm
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
     print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + rpm)
@@ -558,7 +557,7 @@ def parchglim_test():
     pst.control_data.facparmax = 5.0
     
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
     print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + rpm)
@@ -577,7 +576,7 @@ def parchglim_test():
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
     try:
 
-        pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+        pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     except:
         pass
     else:
@@ -597,7 +596,7 @@ def parchglim_test():
     pst.control_data.facparmax = fpm
     
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("./pestpp-glm pest_parchglim.pst",cwd=m_d)
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
     assert p_df.loc["stage","parval1"] <= par.loc["stage","parubnd"]
@@ -2219,7 +2218,7 @@ if __name__ == "__main__":
     #agnostic_path_test()
     #glm_long_name_test()
     #sen_plusplus_test()
-    parchglim_test()
+    #parchglim_test()
     #unc_file_test()
     #cmdline_test()
     #secondary_marker_test()
@@ -2248,7 +2247,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     
-    #fr_timeout_test()
+    fr_timeout_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
