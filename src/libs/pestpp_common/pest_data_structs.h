@@ -570,6 +570,8 @@ public:
 	void set_par_sigma_range(double _par_sigma_range) { par_sigma_range = _par_sigma_range; }
 	bool get_save_binary() const { return save_binary; }
 	void set_save_binary(bool _ies_save_binary) { save_binary = _ies_save_binary; }
+	bool get_save_all_runs() const { return save_all_runs; }
+	void set_save_all_runs(bool _save_all_runs) { save_all_runs = _save_all_runs; }
 	string get_ies_localizer() const { return ies_localizer; }
 	void set_ies_localizer(string _ies_localizer) { ies_localizer = _ies_localizer; }
 	double get_ies_accept_phi_fac() const { return ies_accept_phi_fac; }
@@ -964,6 +966,7 @@ private:
 	double par_sigma_range;
 	bool save_binary;
     bool save_dense;
+	bool save_all_runs;
 	string ies_localizer;
 	double ies_accept_phi_fac;
 	double ies_lambda_inc_fac;

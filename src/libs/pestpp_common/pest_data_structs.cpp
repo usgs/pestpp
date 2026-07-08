@@ -1398,6 +1398,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		panther_debug_fail_freeze = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SAVE_ALL_RUNS")
+	{
+		save_all_runs = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	else if (key == "CHECK_TPLINS")
 	{
 		check_tplins = pest_utils::parse_string_arg_to_bool(value);
@@ -1970,6 +1975,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
+	os << "save_all_runs: " << save_all_runs << endl;
     os << "save_dense: " << save_dense << endl;
     os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
@@ -2462,6 +2468,7 @@ void PestppOptions::set_defaults()
 	set_ies_enforce_bounds(true);
 	set_par_sigma_range(4.0);
 	set_save_binary(false);
+	set_save_all_runs(false);
 	set_ies_localizer("");
 	set_ies_accept_phi_fac(1.05);
 	set_ies_lambda_inc_fac(10.0);
