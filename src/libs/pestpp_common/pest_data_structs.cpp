@@ -1764,6 +1764,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_solve_method = org_value;
 		return true;
 	}
+	else if (key == "SQP_CMA_BOUND_HANDLING")
+	{
+		sqp_cma_bound_handling = org_value;
+		return true;
+	}
 	else if (key == "SQP_NUM_REALS")
 	{
 		convert_ip(value, sqp_num_reals);
@@ -2103,6 +2108,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
 	os << "sqp_search_method: " << sqp_search_method << endl;
 	os << "sqp_solve_method: " << sqp_solve_method << endl;
+	os << "sqp_cma_bound_handling: " << sqp_cma_bound_handling << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 	os << "sqp_num_refined_search_pts: " << sqp_num_refined_search_pts << endl;
 	os << "sqp_subset_size: " << sqp_subset_size << endl;
@@ -2373,6 +2379,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_search_method("LINE");
 	set_sqp_solve_method("NULL");
+	set_sqp_cma_bound_handling("reject");
 	set_sqp_num_reals(-1);
 	set_sqp_num_refined_search_pts(1.0);
 	set_sqp_subset_size(-10);
