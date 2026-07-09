@@ -282,6 +282,7 @@ private:
 	// cached gradient is compared so the cache is skipped if a realization's gradient differs.
 	Eigen::VectorXd cached_unconstrained_search_d;
 	Eigen::VectorXd cached_unconstrained_grad;
+	Covariance cached_unconstrained_used_hessian;  // preserve regularize_hessian's used_hessian side effect on cache hit
 	bool cached_unconstrained_valid = false;
 	// cache of the dv-covariance pseudoinverse SVD (s,U,V).  It depends only on the dv
 	// ensemble anomalies (which change only at make_gradient_runs), yet is needed identically

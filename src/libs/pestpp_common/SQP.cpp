@@ -4611,6 +4611,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 			&& grad_vector == cached_unconstrained_grad)
 		{
 			search_d = cached_unconstrained_search_d;
+			// regularize_hessian (skipped on this cache hit) sets used_hessian as a side effect,
+			// which the caller uses to update hessian_en[d]; restore it so the cached path leaves
+			// identical state to the recomputed path.
+			used_hessian = cached_unconstrained_used_hessian;
 		}
 		else
 		{
@@ -4632,6 +4636,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 			cached_unconstrained_search_d = search_d;
 			cached_unconstrained_grad = grad_vector;
+			cached_unconstrained_used_hessian = used_hessian;  // capture regularize's side effect
 			cached_unconstrained_valid = true;
 		}
 	}
