@@ -1398,6 +1398,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		panther_debug_fail_freeze = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SAVE_ALL_RUNS")
+	{
+		save_all_runs = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	else if (key == "CHECK_TPLINS")
 	{
 		check_tplins = pest_utils::parse_string_arg_to_bool(value);
@@ -1759,6 +1764,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_solve_method = org_value;
 		return true;
 	}
+	else if (key == "SQP_CMA_BOUND_HANDLING")
+	{
+		sqp_cma_bound_handling = org_value;
+		return true;
+	}
 	else if (key == "SQP_NUM_REALS")
 	{
 		convert_ip(value, sqp_num_reals);
@@ -1923,6 +1933,12 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_debug_stosag_grad = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SQP_USE_IES_INFEAS")
+	{
+		sqp_use_ies_infeas = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	
 	return false;
 }
 
@@ -1964,6 +1980,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
+	os << "save_all_runs: " << save_all_runs << endl;
     os << "save_dense: " << save_dense << endl;
     os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
@@ -2091,6 +2108,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
 	os << "sqp_search_method: " << sqp_search_method << endl;
 	os << "sqp_solve_method: " << sqp_solve_method << endl;
+	os << "sqp_cma_bound_handling: " << sqp_cma_bound_handling << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 	os << "sqp_num_refined_search_pts: " << sqp_num_refined_search_pts << endl;
 	os << "sqp_subset_size: " << sqp_subset_size << endl;
@@ -2122,6 +2140,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_debug_hessian: " << sqp_debug_hessian << endl;
 	os << "sqp_debug_cmaes: " << sqp_debug_cma << endl;
 	os << "sqp_debug_stosag_grad: " << sqp_debug_stosag_grad << endl;
+	os << "sqp_use_ies_infeas: " << sqp_use_ies_infeas << endl;
+
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -2359,6 +2379,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_search_method("LINE");
 	set_sqp_solve_method("NULL");
+	set_sqp_cma_bound_handling("reject");
 	set_sqp_num_reals(-1);
 	set_sqp_num_refined_search_pts(1.0);
 	set_sqp_subset_size(-10);
@@ -2390,6 +2411,8 @@ void PestppOptions::set_defaults()
 	set_sqp_debug_hessian(false);
 	set_sqp_debug_cma(false);
 	set_sqp_debug_stosag_grad(false);
+	set_sqp_use_ies_infeas(false);
+
 
 	set_mou_generator("PSO");
 	set_mou_population_size(100);
@@ -2452,6 +2475,7 @@ void PestppOptions::set_defaults()
 	set_ies_enforce_bounds(true);
 	set_par_sigma_range(4.0);
 	set_save_binary(false);
+	set_save_all_runs(false);
 	set_ies_localizer("");
 	set_ies_accept_phi_fac(1.05);
 	set_ies_lambda_inc_fac(10.0);

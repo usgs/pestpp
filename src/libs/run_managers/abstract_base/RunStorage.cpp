@@ -1106,6 +1106,47 @@ void RunStorage::print_run_summary(std::ostream &fout)
 }
 
 /**
+ * @brief Open a run-storage file by name and print a concise run-count summary.
+ *
+ * Reads the header and per-run status bytes of @p filename and writes the total
+ * number of recorded runs along with the successful and failed counts to
+ * @p fout.  If the file does not exist this is a no-op (so callers can invoke it
+ * unconditionally); if the file exists but cannot be parsed a warning is printed.
+ *
+ * @param filename  The run-storage file to summarize (e.g. *case.allruns.rns*).
+ * @param fout      The output stream to write the summary to.
+ */
+void RunStorage::print_persistent_summary(const std::string &filename, std::ostream &fout)
+{
+	{
+		ifstream f(filename, ios::binary);
+		if (!f.good())
+			return;
+	}
+	try
+	{
+		RunStorage rs("");
+		rs.init_restart(filename);
+		int nruns = rs.get_nruns();
+		int ngood = rs.get_num_good_runs();
+		int nfailed = 0;
+		for (int irun = 0; irun < nruns; ++irun)
+		{
+			if (rs.get_run_status(irun) < 0)
+				++nfailed;
+		}
+		fout << endl << "  all-runs storage file '" << filename << "':" << endl;
+		fout << "    total completed runs recorded: " << nruns << endl;
+		fout << "    successful runs: " << ngood << endl;
+		fout << "    failed runs: " << nfailed << endl;
+	}
+	catch (const exception &e)
+	{
+		fout << endl << "  warning: unable to read all-runs storage file '" << filename << "': " << e.what() << endl;
+	}
+}
+
+/**
  * @brief Export diff to text file.
  *
  * @param in1_filename Description.

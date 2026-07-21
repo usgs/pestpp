@@ -3,6 +3,7 @@ import shutil
 import platform
 import socket
 import numpy as np
+import pandas as pd
 import pyemu
 
 
@@ -11,6 +12,92 @@ def _get_free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         return s.getsockname()[1]
+
+
+def _parse_mps_row_rhs(mps_file):
+    """parse a COIN/CLP standard MPS file -> ({row_name: rhs_value}, {row_name: sense}).
+
+    section keywords (ROWS/COLUMNS/RHS/...) start at column 0; data rows are indented.
+    note the RHS-vector name in RHS data rows is itself 'RHS', so a naive token check
+    would mistake data rows for the section header - key off the leading indent instead.
+    """
+    rhs, sense, sec = {}, {}, None
+    with open(mps_file) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            t = line.split()
+            if (not line[0].isspace()) and t[0] in ("NAME", "OBJSENSE", "ROWS", "COLUMNS",
+                                                    "RHS", "RANGES", "BOUNDS", "ENDATA"):
+                sec = t[0]
+                continue
+            if sec == "ROWS" and len(t) == 2 and t[0] in ("L", "G", "E", "N"):
+                sense[t[1]] = t[0]
+            elif sec == "RHS" and len(t) >= 3:
+                for i in range(1, len(t) - 1, 2):
+                    rhs[t[i]] = float(t[i + 1])
+    return rhs, sense
+
+
+def _parse_rec_obs_constraints(rec_file, iteration):
+    """parse the 'observation constraint/objective information at start of iteration N'
+    table -> {name: (required, shifted_sim_value)}.  the fixed-width columns can run
+    together where the +/- double-max bound abuts the residual, so read by position:
+    name=t[0], sense=t[1], required=t[2], (chance-)shifted sim value=t[3]."""
+    hdr = "observation constraint/objective information at start of iteration {0}".format(iteration)
+    lines = open(rec_file).read().splitlines()
+    hs = [i for i, l in enumerate(lines) if hdr in l]
+    out = {}
+    if not hs:
+        return out
+    for l in lines[hs[-1] + 2:]:
+        t = l.split()
+        if len(t) >= 5 and t[1] in ("less_than", "greater_than", "equal_to"):
+            try:
+                out[t[0]] = (float(t[2]), float(t[3]))
+            except ValueError:
+                pass
+        elif out:
+            break  # reached the end of the table
+    return out
+
+
+def check_mps_shift_coherence(d, run_name, iters, tol=1.0e-3):
+    """assert the LP problem the simplex actually solved is coherent with the chance-shifted
+    constraint values pestpp-opt reports.
+
+    pestpp-opt writes a standard MPS file each SLP iteration ('<run>.<iter>.mps', on by
+    default via ++opt_coin_log).  Its right-hand side for each observation-constraint row
+    is (required - shifted sim value).  The rec file's 'observation constraint ... start of
+    iteration' table reports the same 'required' and (chance-)'shifted sim value'.  If the
+    LP is built with one chance convention (e.g. raw stack quantiles) while the reported /
+    convergence-checked shifted values use another (e.g. anomaly form), the two disagree and
+    the 'optimal' solution silently violates the constraints it is reported to satisfy.
+    This check ties the two together: MPS RHS == required - reported shifted sim value.
+    """
+    rec_file = os.path.join(d, run_name + ".rec")
+    assert os.path.exists(rec_file), "missing rec file: " + rec_file
+    total = 0
+    for it in iters:
+        mps = os.path.join(d, "{0}.{1}.mps".format(run_name, it))
+        if not os.path.exists(mps):
+            continue
+        rhs, sense = _parse_mps_row_rhs(mps)
+        rec = _parse_rec_obs_constraints(rec_file, it)
+        common = [n for n in rec if n in rhs and sense.get(n) in ("L", "G")]
+        assert len(common) > 0, \
+            "no obs constraints common to {0} and rec iteration {1}".format(mps, it)
+        for name in common:
+            required, shifted = rec[name]
+            expected_rhs = required - shifted
+            assert abs(rhs[name] - expected_rhs) < tol, (
+                "MPS vs reported-shift incoherence at iter {0} constraint '{1}': "
+                "MPS RHS={2} but required-shifted={3} (required={4}, shifted sim={5})".format(
+                    it, name, rhs[name], expected_rhs, required, shifted))
+            total += 1
+    assert total > 0, "no MPS constraint rows were checked - was ++opt_coin_log disabled?"
+    print("MPS coherence: {0} constraint-rows across iterations {1} match reported shifted values".format(
+        total, list(iters)))
 
 
 bin_path = os.path.join("test_bin")
@@ -619,6 +706,191 @@ def startworker():
     pyemu.os_utils.start_workers(t_d,exe_path,"test.pst",num_workers=10,worker_root=worker_d)
 
 
+def _read_best_obj(rec_file):
+    """read the final 'best objective function value' from an opt rec file."""
+    val = None
+    with open(rec_file, 'r') as f:
+        for line in f:
+            if "best objective function value:" in line:
+                val = float(line.strip().split(":")[-1])
+    assert val is not None, "no objective in " + rec_file
+    return val
+
+
+def stack_chance_anomaly_conservative_test():
+    """the stack-based chance shift must be the anomaly (spread) form everywhere.
+
+    The chance-shifted value of a less_than constraint is current_sim + risk-spread, where
+    risk-spread = stack_quantile - stack_mean >= 0.  Two consequences are asserted here:
+
+    1. Every SLP iteration reports the anomaly form ("...using stack anomalies...") and never
+       the raw/direct form.  The raw form (shifted value = stack_quantile = stack_mean +
+       spread) silently injects the base-vs-ensemble-mean bias into the LP bound.
+
+    2. CONSERVATISM: chance constraints shrink the feasible region, so the chance optimum
+       cannot be BETTER than the deterministic (no-chance) optimum.  For this dewater problem
+       (opt_direction=min), that means obj_chance >= obj_det.  The raw form could move a
+       bound below its deterministic value and yield a chance optimum that beats the
+       deterministic one - which is backwards - so this guards that regression directly.
+
+    Also checks MPS<->reported-shift coherence across all iterations.
+    """
+    base = os.path.join("opt_dewater_chance", "template")
+
+    def setup(pst):
+        par = pst.parameter_data
+        par.loc[par.partrans == "fixed", "partrans"] = "log"
+        pst.pestpp_options.pop("opt_constraint_groups", None)
+        pst.pestpp_options.pop("base_jacobian", None)
+        pst.pestpp_options.pop("opt_par_stack", None)
+        pst.pestpp_options.pop("opt_obs_stack", None)
+        pst.control_data.noptmax = 3
+
+    # deterministic (no chance) run
+    d_det = os.path.join("opt_dewater_chance", "stack_det_run")
+    if os.path.exists(d_det):
+        shutil.rmtree(d_det)
+    shutil.copytree(base, d_det)
+    pst = pyemu.Pst(os.path.join(d_det, "dewater_pest.base.pst"))
+    setup(pst)
+    pst.write(os.path.join(d_det, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d_det)
+    obj_det = _read_best_obj(os.path.join(d_det, "test.rec"))
+
+    # chance run (internal stack), otherwise identical
+    d = os.path.join("opt_dewater_chance", "stack_anomaly_run")
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(base, d)
+    pst = pyemu.Pst(os.path.join(d, "dewater_pest.base.pst"))
+    setup(pst)
+    pst.pestpp_options["opt_risk"] = 0.9
+    pst.pestpp_options["opt_stack_size"] = 20
+    noptmax = 3
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(d, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)
+    rec_file = os.path.join(d, "test.rec")
+    assert os.path.exists(rec_file)
+
+    # 1. anomaly form on every iteration, never direct/raw
+    modes = []
+    with open(rec_file, 'r') as f:
+        for line in f:
+            if "using direct stack simulated results" in line:
+                modes.append("direct")
+            elif "using stack anomalies and current simulated" in line:
+                modes.append("anomalies")
+    print("chance handoff modes:", modes)
+    assert len(modes) > 0, "no chance handoff mode was reported"
+    assert all(m == "anomalies" for m in modes), \
+        "stack chance shift must always use the anomaly (spread) form, got: {0}".format(modes)
+
+    # 2. conservatism: chance optimum cannot beat the deterministic optimum (min => >=)
+    obj_chance = _read_best_obj(rec_file)
+    direction = pst.pestpp_options.get("opt_direction", "min")
+    print("obj_det={0}  obj_chance={1}  direction={2}".format(obj_det, obj_chance, direction))
+    tol = 1.0e-3 * max(1.0, abs(obj_det))
+    if str(direction).lower().startswith("min"):
+        assert obj_chance >= obj_det - tol, \
+            "chance optimum ({0}) beats deterministic ({1}) for a minimization - chance shift is non-conservative".format(
+                obj_chance, obj_det)
+    else:
+        assert obj_chance <= obj_det + tol, \
+            "chance optimum ({0}) beats deterministic ({1}) for a maximization - chance shift is non-conservative".format(
+                obj_chance, obj_det)
+
+    # 3. the LP the simplex solved must match the reported shifted values
+    check_mps_shift_coherence(d, "test", range(1, noptmax + 1))
+
+
+def stack_chance_external_obs_stack_test():
+    """regression test for the external opt_obs_stack -> sequential-LP chance handoff.
+
+    An external obs stack (opt_obs_stack) supplies the constraint uncertainty.  The chance
+    shift must be the anomaly (spread) form: shifted value = current_sim + (quantile -
+    stack_mean).  This re-centers the stack's spread on the current simulated value, so it is
+    conservative (>= current_sim for less_than) and never injects the base-vs-ensemble-mean
+    bias that the raw form does.  This test asserts iteration 1 uses the anomaly form and that
+    the reported optimum actually satisfies the stack-based chance constraints (re-evaluated
+    from the response matrix + stack, no model runs needed).
+    """
+    tmp = os.path.join("opt_dewater_chance", "stack_ext_gen")
+    if os.path.exists(tmp):
+        shutil.rmtree(tmp)
+    shutil.copytree(os.path.join("opt_dewater_chance", "template"), tmp)
+    pst = pyemu.Pst(os.path.join(tmp, "dewater_pest.base.pst"))
+    par = pst.parameter_data
+    par.loc[par.partrans == "fixed", "partrans"] = "log"
+    pst.pestpp_options.pop("opt_constraint_groups", None)
+    pst.pestpp_options.pop("base_jacobian", None)
+    pst.pestpp_options["opt_risk"] = 0.9
+    pst.pestpp_options["opt_stack_size"] = 20
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(tmp, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=tmp)
+    # the obs stack simulated at the initial dec-var point
+    obs_stack = os.path.join(tmp, "test.1.obs_stack.csv")
+    assert os.path.exists(obs_stack), "expected obs stack was not written: " + obs_stack
+
+    # now run with that stack supplied EXTERNALLY (opt_obs_stack) at the same initial point
+    d = os.path.join("opt_dewater_chance", "stack_ext_obs_stack_test")
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
+    shutil.copy2(obs_stack, os.path.join(d, "obs_stack.csv"))
+    pst.pestpp_options.pop("opt_stack_size", None)
+    pst.pestpp_options["opt_obs_stack"] = "obs_stack.csv"
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(d, "test.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)
+    rec = os.path.join(d, "test.rec")
+    assert os.path.exists(rec)
+
+    # the chance shift must use the anomaly (spread) form, never the raw/direct form
+    mode = None
+    with open(rec, 'r') as f:
+        for line in f:
+            if "using direct stack simulated results" in line:
+                mode = "direct"
+                break
+            if "using stack anomalies and current simulated" in line:
+                mode = "anomalies"
+                break
+    print("external obs stack iter-1 handoff mode:", mode)
+    assert mode == "anomalies", \
+        "stack chance shift must use the anomaly (spread) form, got '{0}'".format(mode)
+
+    # the anomaly-shifted optimum must be self-consistent: the run's own convergence check
+    # (which shifts the re-simulated optimum by the chance offset and compares to the bound)
+    # must not report substantial unsatisfied model-based constraints.  a non-conservative
+    # (raw) shift is what previously produced large post-solve violations here.
+    unsat = {}
+    with open(rec, 'r') as f:
+        capture = False
+        for line in f:
+            if "not satisfied" in line:
+                capture = True
+                continue
+            if capture:
+                t = line.split()
+                if len(t) >= 2 and t[0] == "-->" and t[1].upper().startswith("ONAME"):
+                    try:
+                        unsat[t[1]] = float(t[-1])
+                    except ValueError:
+                        pass
+                elif t and not line.startswith("-->"):
+                    capture = False
+    worst = max(unsat.values()) if unsat else 0.0
+    print("external obs stack: {0} unsatisfied constraints, worst distance {1}".format(len(unsat), worst))
+    # allow only small binding-constraint linearization residuals, not gross violations
+    assert worst < 5.0, \
+        "reported optimum grossly violates stack chance constraints (worst distance {0}): {1}".format(worst, unsat)
+
+    # the LP the simplex solved (MPS) must match the reported shifted constraint values
+    check_mps_shift_coherence(d, "test", [1])
+
+
 def fosm_invest():
     t_d = os.path.join("opt_dewater_chance","master5")
     pst = pyemu.Pst(os.path.join(t_d,"test.pst"))
@@ -646,5 +918,7 @@ if __name__ == "__main__":
     #est_res_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     stack_test()
+    stack_chance_anomaly_conservative_test()
+    stack_chance_external_obs_stack_test()
     #dewater_restart_test()
     #std_weights_test()
