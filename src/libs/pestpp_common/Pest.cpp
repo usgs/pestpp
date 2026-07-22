@@ -56,7 +56,8 @@ using namespace::pest_utils;
  *
  * @return Description.
  */
-Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(nullptr)
+Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(nullptr),
+	pestpp_options(std::make_shared<PestppOptions>())
 {
 	set_defaults();
 }
@@ -66,7 +67,7 @@ Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(n
  */
 void Pest::set_defaults()
 {
-	pestpp_options.set_defaults();
+	pestpp_options->set_defaults();
 	svd_info.set_defaults();
 	regul_scheme_ptr = nullptr;//new DynamicRegularization;
 	//regul_scheme_ptr->set_defaults();
@@ -117,11 +118,11 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 		}
 	}
 
-	if ((control_info.noptmax == 0) && (pestpp_options.get_max_run_fail() > 1))
+	if ((control_info.noptmax == 0) && (pestpp_options->get_max_run_fail() > 1))
 	{
 		cout << "noptmax = 0, resetting max_run_fail = 1" << endl;
 		f_rec << "noptmax = 0, resetting max_run_fail = 1" << endl;
-		pestpp_options.set_max_run_fail(1);
+		pestpp_options->set_max_run_fail(1);
 
 	}
 
@@ -387,10 +388,10 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 	}
 
 	//check that prediction names are list in obs
-	if ((pestpp_options.get_uncert_flag()) && (pestpp_options.get_prediction_names().size() > 0))
+	if ((pestpp_options->get_uncert_flag()) && (pestpp_options->get_prediction_names().size() > 0))
 	{
 		vector<string> missing;
-		for (auto &pred_name : pestpp_options.get_prediction_names())
+		for (auto &pred_name : pestpp_options->get_prediction_names())
 		{
 			auto it_obs = find(ctl_ordered_obs_names.begin(), ctl_ordered_obs_names.end(), pred_name);
 			if (it_obs == ctl_ordered_obs_names.end())
@@ -411,8 +412,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 		}
 	}
 
-	if (pestpp_options.get_hotstart_resfile().size() > 0)
-		if (pestpp_options.get_basejac_filename().size() == 0)
+	if (pestpp_options->get_hotstart_resfile().size() > 0)
+		if (pestpp_options->get_basejac_filename().size() == 0)
 		{
 			cout << "'base_jacobian' is none, so 'hotstart_resfile' being ignored..." << endl;
 			f_rec << "'base_jacobian' is none, so 'hotstart_resfile' being ignored..." << endl;
@@ -444,7 +445,7 @@ void Pest::check_io(ofstream& f_rec, bool echo_errors)
 	{
 		throw_control_file_error(f_rec, "unspecified error in model interface file access checking", true, echo_errors);
 	}
-	if (pestpp_options.get_check_tplins())
+	if (pestpp_options->get_check_tplins())
 	{
 		try
 		{
@@ -595,7 +596,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	base_par_transform.push_back_ctl2active_ctl(t_fixed);
 	base_par_transform.push_back_active_ctl2numeric(t_log);
 
-	pestpp_options.set_defaults();
+	pestpp_options->set_defaults();
 	vector<string> notfound_args;
 	set<string> tied_names;
 	pst_filename = _pst_filename;
@@ -717,8 +718,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				pair<string, string> kv = parse_keyword_line(f_rec, line);
 				//cout << kv.first << ", " << kv.second << endl;
 				//cout << endl;
-				//PestppOptions::ARG_STATUS stat = pestpp_options.assign_value_by_key(kv.first, kv.second);
-				stat = pestpp_options.assign_value_by_key(kv.first,kv.second);
+				//PestppOptions::ARG_STATUS stat = pestpp_options->assign_value_by_key(kv.first, kv.second);
+				stat = pestpp_options->assign_value_by_key(kv.first,kv.second);
 				check_report_assignment(f_rec, stat, kv.first, kv.second);
 
 				//try to use this as a control data arg
@@ -1410,7 +1411,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 		try
 		{
-			line_arg_map = pestpp_options.parse_plusplus_line(*b);
+			line_arg_map = pestpp_options->parse_plusplus_line(*b);
 		}
 		catch (exception &e)
 		{
@@ -1428,7 +1429,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
 	}
-	pestpp_options.rectify_ies_da_args();
+	pestpp_options->rectify_ies_da_args();
 
 	if (dup.size() > 0)
 	{
@@ -1471,7 +1472,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		ss << " the following '++' args were not accepted:" << endl;
 		for (auto n : not_accepted)
 			ss << n << ",";
-		if (pestpp_options.get_forgive_unknown_args())
+		if (pestpp_options->get_forgive_unknown_args())
 		{
 			ss << endl << "forgive_unknown_args is 'true', continuing" << endl;
 			throw_control_file_error(f_rec, ss.str(), false);
@@ -1488,7 +1489,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		ss << " the following control data keyword lines were not accepted:" << endl;
 		for (auto n : notfound_args)
 			ss << n << ",";
-		if (pestpp_options.get_forgive_unknown_args())
+		if (pestpp_options->get_forgive_unknown_args())
 		{
 			ss << endl << "forgive_unknown_args is 'true', continuing" << endl;
 			throw_control_file_error(f_rec, ss.str(), false);
@@ -1527,8 +1528,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 
 	//check if the predictions ++ arg might be a file name?
-	vector<string> pred_arg = pestpp_options.get_prediction_names();
-	if ((pestpp_options.get_uncert_flag()) && (pred_arg.size() == 1))
+	vector<string> pred_arg = pestpp_options->get_prediction_names();
+	if ((pestpp_options->get_uncert_flag()) && (pred_arg.size() == 1))
 	{
 		string fname = pred_arg[0];
 		if (pest_utils::check_exist_in(fname))
@@ -1536,7 +1537,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			f_rec << "filename '" << fname << "' detected for prediction names, reading...";
 			vector<string> pred_names = pest_utils::read_onecol_ascii_to_vector(fname);
 			f_rec << pred_names.size() << " predictions found" << endl;
-			pestpp_options.set_prediction_names(pred_names);
+			pestpp_options->set_prediction_names(pred_names);
 		}
 	}
 
@@ -1544,9 +1545,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	rectify_par_groups();
 
 	if (regul_scheme_ptr)
-		regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
+		regul_scheme_ptr->set_max_reg_iter(pestpp_options->get_max_reg_iter());
 
-	if (pestpp_options.get_tie_by_group())
+	if (pestpp_options->get_tie_by_group())
 	{
 		cout << "Note: ++tie_by_group(true) - tying adjustable parameters by groups" << endl;
 		f_rec << "Note: ++tie_by_group(true) - tying adjustable parameters by groups" << endl;
@@ -1667,7 +1668,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	Parameters upgrade_ctl_pars;
 	Parameters last_ctl_pars;
 
-	if (pestpp_options.get_enforce_tied_bounds())
+	if (pestpp_options->get_enforce_tied_bounds())
 	{
 		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);

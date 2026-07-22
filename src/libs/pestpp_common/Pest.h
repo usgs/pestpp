@@ -93,8 +93,12 @@ public:
 	const  vector<string> &get_inpfile_vec();
 	const  vector<string> &get_insfile_vec();
 	const  vector<string> &get_outfile_vec();
-	const PestppOptions &get_pestpp_options() const {return pestpp_options;}
-    PestppOptions *get_pestpp_options_ptr() { return &pestpp_options; }
+	const PestppOptions &get_pestpp_options() const {return *pestpp_options;}
+    PestppOptions *get_pestpp_options_ptr() { return pestpp_options.get(); }
+	// give this Pest its own private copy of the options (break the shared_ptr link a
+	// copy/get_child_pest established). Use when a throwaway scenario must mutate options
+	// without those mutations leaking back to the scenario it was copied from.
+	void isolate_options() { pestpp_options = std::make_shared<PestppOptions>(*pestpp_options); }
 	ObservationInfo *get_observation_info_ptr() { return &observation_info; }
 	DynamicRegularization* get_regul_scheme_ptr() { return regul_scheme_ptr.get(); }
 	const ParetoInfo &get_pareto_info() const { return pareto_info; }
@@ -136,7 +140,10 @@ protected:
 	ObservationInfo observation_info;
 	PriorInformation prior_info;
 	ModelExecInfo model_exec_info;
-	PestppOptions pestpp_options;
+	// shared ownership so get_child_pest() lets a child scenario borrow (not copy) the
+	// parent's options: a mid-run option change on the parent is visible to the child.
+	// Copies share by default; call isolate_options() where a private copy is required.
+	std::shared_ptr<PestppOptions> pestpp_options;
 	ParamTransformSeq base_par_transform;
 	vector<string> ctl_ordered_par_names;
 	vector<string> ctl_ordered_obs_names;
