@@ -24,6 +24,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <memory>
 #include "ParamTransformSeq.h"
 #include "pest_data_structs.h"
 #include "PriorInformation.h"
@@ -95,7 +96,7 @@ public:
 	const PestppOptions &get_pestpp_options() const {return pestpp_options;}
     PestppOptions *get_pestpp_options_ptr() { return &pestpp_options; }
 	ObservationInfo *get_observation_info_ptr() { return &observation_info; }
-	DynamicRegularization* get_regul_scheme_ptr() { return regul_scheme_ptr; }
+	DynamicRegularization* get_regul_scheme_ptr() { return regul_scheme_ptr.get(); }
 	const ParetoInfo &get_pareto_info() const { return pareto_info; }
 	vector<string> get_nonregul_obs() const;
 	string get_pst_filename() { return pst_filename; }
@@ -143,7 +144,11 @@ protected:
 	vector<string> ctl_ordered_obs_group_names;
 	vector<string> ctl_ordered_pi_names;
 	vector<int> assimilation_cycles;
-	DynamicRegularization *regul_scheme_ptr;
+	// shared ownership: get_child_pest() copies Pest by value, so parent and child
+	// share one DynamicRegularization. A raw owning pointer double-freed here (see the
+	// old try/catch dtor); shared_ptr makes the copy safe without changing the raw-pointer
+	// accessor used by ~50 call sites.
+	std::shared_ptr<DynamicRegularization> regul_scheme_ptr;
 	map<int,string> other_lines;
 	string pst_filename;
 

@@ -53,7 +53,6 @@
     <ClInclude Include="Regularization.h" />
     <ClInclude Include="RestartController.h" />
     <ClInclude Include="sequential_lp.h" />
-    <ClInclude Include="SVDASolver.h" />
     <ClInclude Include="SVDPackage.h" />
     <ClInclude Include="SVDSolver.h" />
     <ClInclude Include="targetver.h" />
@@ -86,7 +85,6 @@
     <ClCompile Include="Regularization.cpp" />
     <ClCompile Include="RestartController.cpp" />
     <ClCompile Include="sequential_lp.cpp" />
-    <ClCompile Include="SVDASolver.cpp" />
     <ClCompile Include="SVDPackage.cpp" />
     <ClCompile Include="SVDSolver.cpp" />
     <ClCompile Include="TerminationController.cpp" />

@@ -24,7 +24,6 @@ OBJECTS := \
     RestartController \
     OutputFileWriter \
     PerformanceLog \
-    SVDASolver \
     DifferentialEvolution \
     Ensemble \
     EnsembleSmoother \

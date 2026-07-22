@@ -188,7 +188,6 @@ private:
     double BASE_SCALE_FACTOR = 1.0;
     bool SOLVE_EACH_REAL = false;
 	bool reset_corr = false;
-	double eigthresh;
 
 	//trust region parameters
 	double trust_radius = 5.0;

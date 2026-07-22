@@ -26,7 +26,6 @@ add_library(pestpp_com STATIC
   QSqrtMatrix.cpp
   Regularization.cpp
   RestartController.cpp
-  SVDASolver.cpp
   SVDPackage.cpp
   SVD_PROPACK.cpp
   SVDSolver.cpp

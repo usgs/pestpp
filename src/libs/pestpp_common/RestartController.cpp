@@ -9,7 +9,6 @@
 #include "RestartController.h"
 #include "TerminationController.h"
 #include "utilities.h"
-#include "SVDASolver.h"
 
 using namespace std;
 using namespace::pest_utils;

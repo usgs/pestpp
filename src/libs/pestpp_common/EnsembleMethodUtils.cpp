@@ -3843,7 +3843,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 	map<string, double> mean_map, std_map;
 	base_pe_ptr->fill_moment_maps(mean_map, std_map);
 	init_moments = pair<map<string, double>, map<string, double>>(mean_map, std_map);
-	ParameterGroupInfo gi = base_pe_ptr->get_pest_scenario().get_base_group_info();
+	ParameterGroupInfo gi = base_pe_ptr->get_pest_scenario_ptr()->get_base_group_info();
 	string group;
 	for (auto &n : base_pe_ptr->get_var_names())
 	{

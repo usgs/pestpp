@@ -222,7 +222,6 @@ public:
 
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
-	vector<string> notfound_args;
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	void rectify_ies_da_args();
 

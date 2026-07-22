@@ -640,18 +640,15 @@ int main(int argc, char* argv[])
 
 		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
 		ofw.scenario_report(fout_rec, false);
-		PestppOptions ppopt = pest_scenario.get_pestpp_options();
-        set<string> passed = ppopt.get_passed_args();
+        set<string> passed = pest_scenario.get_pestpp_options().get_passed_args();
         if (passed.find("SWEEP_OUTPUT_FILE")==passed.end())
         {
-            if (ppopt.get_save_dense())
+            if (pest_scenario.get_pestpp_options().get_save_dense())
             {
                 fout_rec << "'save_dense' is true, resetting 'sweep_output_file' to 'sweep_output.bin'" << endl;
                 pest_scenario.get_pestpp_options_ptr()->set_sweep_output_csv_file("sweep_output.bin");
             }
         }
-        //get a fresh copy
-        ppopt = pest_scenario.get_pestpp_options();
         // process the parameter csv file
         string par_csv_file;
         if (pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file().empty())
@@ -665,10 +662,10 @@ int main(int argc, char* argv[])
 
 
 		fout_rec << "    sweep parameter file = " << left << setw(50) << par_csv_file << endl;
-		fout_rec << "    sweep output file = " << left << setw(50) << ppopt.get_sweep_output_csv_file() << endl;
-		fout_rec << "    sweep chunk size = " << left << setw(10) << ppopt.get_sweep_chunk() << endl;
-		//fout_rec << "    sweep base run = " << left << setw(10) << ppopt.get_sweep_base_run() << endl;
-		fout_rec << "    sweep forgive failed runs = " << left << setw(10) << ppopt.get_sweep_forgive() << endl;
+		fout_rec << "    sweep output file = " << left << setw(50) << pest_scenario.get_pestpp_options().get_sweep_output_csv_file() << endl;
+		fout_rec << "    sweep chunk size = " << left << setw(10) << pest_scenario.get_pestpp_options().get_sweep_chunk() << endl;
+		//fout_rec << "    sweep base run = " << left << setw(10) << pest_scenario.get_pestpp_options().get_sweep_base_run() << endl;
+		fout_rec << "    sweep forgive failed runs = " << left << setw(10) << pest_scenario.get_pestpp_options().get_sweep_forgive() << endl;
 
 
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())

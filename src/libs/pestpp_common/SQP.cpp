@@ -5048,10 +5048,10 @@ bool SeqQuadProgram::seek_feasible()
 {
 	stringstream ss;
 	message(1, "seeking feasibility with iterative ensemble smoother solution");
-	Pest ies_pest_scenario;
-	string pst_filename = pest_scenario.get_pst_filename();
-	ifstream fin(pest_scenario.get_pst_filename());
-	ies_pest_scenario.process_ctl_file(fin, pst_filename);
+	// clone the in-memory scenario instead of re-parsing the .pst from disk, so that any
+	// option the caller changed at runtime propagates into the feasibility IES solve. The
+	// clone is mutated freely below without touching the primary pest_scenario.
+	Pest ies_pest_scenario = pest_scenario;
 	set<string>snames(dv_names.begin(), dv_names.end());
 	set<string>::iterator send = snames.end();
 	ParameterInfo* pi = ies_pest_scenario.get_ctl_parameter_info_ptr_4_mod();

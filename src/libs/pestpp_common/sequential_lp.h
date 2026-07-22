@@ -73,7 +73,10 @@ private:
 	
 	Observations obj_func_obs;
 	ObservationInfo obj_func_info;
-	Pest pest_scenario;
+	// reference, not a copy: the Constraints and OptObjFunc members below are built from
+	// the caller's Pest, so holding a copy here gave sequentialLP a second, divergent
+	// PestppOptions. Binding the reference keeps one source of truth.
+	Pest& pest_scenario;
 	RunManagerAbstract* run_mgr_ptr;
 	Covariance parcov;
 	Covariance obscov;

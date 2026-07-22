@@ -56,7 +56,7 @@ using namespace::pest_utils;
  *
  * @return Description.
  */
-Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0)
+Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(nullptr)
 {
 	set_defaults();
 }
@@ -68,7 +68,7 @@ void Pest::set_defaults()
 {
 	pestpp_options.set_defaults();
 	svd_info.set_defaults();
-	regul_scheme_ptr = 0;//new DynamicRegularization;
+	regul_scheme_ptr = nullptr;//new DynamicRegularization;
 	//regul_scheme_ptr->set_defaults();
 	control_info.set_defaults();
 
@@ -79,7 +79,7 @@ void Pest::set_defaults()
  */
 void Pest::set_default_dynreg()
 {
-    regul_scheme_ptr = new DynamicRegularization;
+    regul_scheme_ptr.reset(new DynamicRegularization);
     regul_scheme_ptr->set_defaults();
 }
 
@@ -2841,16 +2841,8 @@ map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, doubl
  * @brief Destructor for .
  */
 Pest::~Pest() {
-	if (regul_scheme_ptr != 0)
-	{
-		try
-		{
-			delete regul_scheme_ptr;
-		}
-		catch (...)
-		{
-		}
-	}
+	// regul_scheme_ptr is a shared_ptr now: no manual delete, and copies made by
+	// get_child_pest() no longer double-free the shared DynamicRegularization.
     base_group_info.free_mem();
 }
 
@@ -3342,7 +3334,9 @@ void Pest::release_unused_for_agent()
     //base_group_info.clear();
     prior_info.clear();
     base_group_info.free_mem();
-    regul_scheme_ptr = NULL;
+    // drop this Pest's share of the regul scheme; if a parent still holds it (agent
+    // child Pest), the object survives via the parent's shared_ptr.
+    regul_scheme_ptr.reset();
 
 }
 
