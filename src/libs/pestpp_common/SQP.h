@@ -159,7 +159,7 @@ public:
 	bool should_terminate();
 
 private:
-	int  verbose_level;
+	int  verbose_level = 1;   // default until initialize() syncs it from ies_verbose_level
 	Pest &pest_scenario;
 	FileManager &file_manager;
 	std::mt19937 rand_gen;

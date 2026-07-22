@@ -142,7 +142,9 @@ bool TerminationController::check_last_iteration()
 		return terminate_code;
 	}
 
-	double min_phi_diff = lowest_phi.back() - lowest_phi.front();
+	// guard against .back()/.front() UB when called before any iteration has recorded a phi;
+	// min_phi_diff is only consumed in the (lowest_phi.size() >= nphistp) branch below.
+	double min_phi_diff = lowest_phi.empty() ? 0.0 : lowest_phi.back() - lowest_phi.front();
 	if (current_phi <= std::numeric_limits<double>::denorm_min())
 	{
 		terminate_code = true;
@@ -215,6 +217,14 @@ const TerminationController& TerminationController::operator=(const TerminationC
 	phiredstp = rhs.phiredstp;
 	relparstp = rhs.relparstp;
 	lowest_phi = rhs.lowest_phi;
+	// previously omitted, leaving a copy with stale/default termination criteria:
+	phim_accept = rhs.phim_accept;
+	current_phi = rhs.current_phi;
+	nopt_count = rhs.nopt_count;
+	terminate_code = rhs.terminate_code;
+	use_dynaimc_regul = rhs.use_dynaimc_regul;
+	phi_accept_achieved = rhs.phi_accept_achieved;
+	termimate_reason = rhs.termimate_reason;
 	return *this;
 }
 

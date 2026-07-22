@@ -47,7 +47,9 @@
 DynamicRegularization::DynamicRegularization(const DynamicRegularization &rhs)
 	: use_dynamic_reg(rhs.use_dynamic_reg), adj_grp_weights(rhs.adj_grp_weights), phi_m_lim(rhs.phi_m_lim), phi_m_accept(rhs.phi_m_accept), frac_phi_m(rhs.frac_phi_m),
 	wf_min(rhs.wf_min), wf_max(rhs.wf_max), wffac(rhs.wffac), wftol(rhs.wftol), wf_init(rhs.wf_init),
-	tikhonov_weight(rhs.wf_init), max_reg_iter(rhs.max_reg_iter), regul_grp_weights(rhs.regul_grp_weights)
+	// preserve the current Tikhonov weight on copy; was mistakenly re-seeded from wf_init,
+	// silently resetting the weight whenever a DynamicRegularization was copied.
+	tikhonov_weight(rhs.tikhonov_weight), max_reg_iter(rhs.max_reg_iter), regul_grp_weights(rhs.regul_grp_weights)
 {
 }
 /**

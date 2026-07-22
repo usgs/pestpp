@@ -1013,6 +1013,7 @@ void SeqQuadProgram::initialize()
 {	
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+	verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
 
 	iter = 1;
 

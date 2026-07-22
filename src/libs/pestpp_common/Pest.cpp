@@ -339,7 +339,10 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 
 	if (get_ctl_ordered_nz_obs_names().size() == 0)
 	{
-		if ((forgive) || (NetPackage::NULL_DA_CYCLE))
+		// NULL_DA_CYCLE is -9999 (truthy), so the old test was unconditionally forgiving and
+		// never raised the error. Match the adjustable-parameter check above: forgive only
+		// when explicitly forgiving or inside a specific DA cycle.
+		if ((forgive) || (cycle != NetPackage::NULL_DA_CYCLE))
 		{
 			cout << "observation warning: no non-zero weighted observations" << endl;
 			f_rec << "observation warning: no non-zero weighted observations" << endl;
