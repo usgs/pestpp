@@ -1127,13 +1127,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_registry(string key
     return ARG_STATUS::ARG_NOTFOUND;
 }
 
-// ---- public entry points: now delegate to the registry (the flip) ----
+// ---- public entry points: parsing + defaults delegate to the registry (the flip) ----
 void PestppOptions::set_defaults() { set_defaults_registry(); }
-void PestppOptions::summary(ostream& os) const { summary_registry(os); }
 PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
 {
     return assign_value_by_key_registry(key, org_value);
 }
+void PestppOptions::summary(ostream& os) const { summary_registry(os); }
 
 // ---- local self-verification: registry-driven vs legacy, byte-for-byte via to_str dumps ----
 static string registry_dump(const PestppOptions& o)

@@ -216,7 +216,8 @@ def new_fmt_load_test():
                 elif "number of prior estimates" in line.lower():
                     raw = line.split('=')
                     npi = int(raw[1])
-                elif "forecasts:" in line.lower():
+                # the registry summary emits the canonical "predictions:" tag (was "forecasts:")
+                elif "predictions:" in line.lower():
                     raw = line.split(":")
                     forecasts = [r.strip().lower() for r in raw[1].split(',') if len(r.strip())]
                     #print(forecasts)

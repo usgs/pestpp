@@ -222,7 +222,9 @@ def basic_sqp_direction_test():
         _run_sqp_parallel(w_d, "rosenbrock", pst_name, m_d, port + 2)
 
         _, rec_text = _read_rec(m_d, pst_name)
-        expected_token = "opt_direction: {0}".format(1 if direction == "min" else -1)
+        # registry summary emits the canonical uppercase tag and a std::to_string double
+        # (6 decimals), e.g. "OPT_DIRECTION: 1.000000" (was "opt_direction: 1")
+        expected_token = "OPT_DIRECTION: {0}.000000".format(1 if direction == "min" else -1)
         assert expected_token in rec_text, "rec did not record '{0}' for direction='{1}'".format(expected_token, direction)
 
         noptmax_val = pst.control_data.noptmax
