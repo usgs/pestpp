@@ -97,7 +97,6 @@ void RunManagerSerial::run(Parameters* pars, Observations* obs)
                 cout << ss.str();
             }
             f_terminate.set(true);
-            run_thread.join();
             break;
         }
         //check if the runner thread has finished
@@ -109,11 +108,13 @@ void RunManagerSerial::run(Parameters* pars, Observations* obs)
         if ((q == 1) || (q == 2) || (q == 4))
         {
             f_terminate.set(true);
-            run_thread.join();
             break;
         }
 
     }
+    // single join for every exit path: the exception/quit branches above set
+    // f_terminate and break here rather than joining themselves, so run_thread
+    // is joined exactly once (a second join throws std::system_error/EINVAL on libc++).
     run_thread.join();
     if (run_exception)
         rethrow_exception(run_exception);

@@ -154,8 +154,6 @@ jobs:
       - name: aux bin path hackery
         shell: bash -l {0}
         run: |
-          cp -r benchmarks/test_bin/win $HOME/bin
-          echo "../../test_bin/win" >> $GITHUB_PATH
           if [[ "$RUNNER_OS" == "Windows" ]]; then
               cp -r benchmarks/test_bin/win $HOME/bin
               echo "../../test_bin/win" >> $GITHUB_PATH
@@ -163,8 +161,8 @@ jobs:
               cp -r benchmarks/test_bin/mac $HOME/bin
               echo "../../test_bin/mac" >> $GITHUB_PATH
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
+              cp -r benchmarks/test_bin/linux $HOME/bin
               echo "../../test_bin/linux" >> $GITHUB_PATH
-              cp -r benchmarks/test_bin/win $HOME/bin
           else
               echo "::error::Unrecognized RUNNER_OS '$RUNNER_OS' - no test_bin available for this runner"
               exit 1
