@@ -162,9 +162,12 @@ jobs:
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
               cp -r benchmarks/test_bin/mac $HOME/bin
               echo "../../test_bin/mac" >> $GITHUB_PATH
-          else
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
               echo "../../test_bin/linux" >> $GITHUB_PATH
               cp -r benchmarks/test_bin/win $HOME/bin
+          else
+              echo "::error::Unrecognized RUNNER_OS '$RUNNER_OS' - no test_bin available for this runner"
+              exit 1
           fi
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
