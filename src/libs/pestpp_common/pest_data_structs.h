@@ -209,6 +209,8 @@ public:
 };
 
 
+struct OptionSpec;  // Stage 3 registry entry, defined in pest_options_registry.cpp
+
 class PestppOptions {
 public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
@@ -222,8 +224,23 @@ public:
 
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
+	// public entry points now delegate to the registry (defined in pest_options_registry.cpp)
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	void rectify_ies_da_args();
+
+	// Stage 3 option registry (single source of truth). Implemented in
+	// pest_options_registry.cpp. The legacy *_legacy implementations are retained only so
+	// self_verify() can prove equivalence; remove them once CI confirms.
+	static const std::vector<OptionSpec>& get_option_registry();
+	void set_defaults_registry();
+	void summary_registry(std::ostream& os) const;
+	ARG_STATUS assign_value_by_key_registry(std::string key, const std::string org_value);
+	ARG_STATUS assign_value_by_key_legacy(string key, const string org_value);
+	void set_defaults_legacy();
+	void summary_legacy(std::ostream& os) const;
+	bool is_valid_arg(const std::string& key) const;
+	std::set<std::string> get_registered_args() const;
+	static bool self_verify(std::ostream& os);
 
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);

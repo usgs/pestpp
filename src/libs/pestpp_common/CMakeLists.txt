@@ -22,6 +22,7 @@ add_library(pestpp_com STATIC
   PerformanceLog.cpp
   Pest.cpp
   pest_data_structs.cpp
+  pest_options_registry.cpp
   PriorInformation.cpp
   QSqrtMatrix.cpp
   Regularization.cpp

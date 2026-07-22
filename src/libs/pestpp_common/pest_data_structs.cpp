@@ -367,7 +367,7 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 	return arg_map;
 }
 
-PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
+PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, const string org_value)
 {
 	upper_ip(key);
 
@@ -1943,7 +1943,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 }
 
 
-void PestppOptions::summary(ostream& os) const
+void PestppOptions::summary_legacy(ostream& os) const
 {
 
 	os << endl << "    PEST++ OPTIONS: " << endl << endl;
@@ -2301,7 +2301,7 @@ void PestppOptions::summary(ostream& os) const
 }
 
 
-void PestppOptions::set_defaults()
+void PestppOptions::set_defaults_legacy()
 {
 
 	set_svd_pack(PestppOptions::SVD_PACK::REDSVD);
