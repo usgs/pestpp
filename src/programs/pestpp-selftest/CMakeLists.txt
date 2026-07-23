@@ -10,4 +10,6 @@ target_link_libraries(pestpp-selftest
   rm_external
 )
 
-install(TARGETS pestpp-selftest RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# intentionally NOT installed: this is a CI-only test binary, run from the build tree.
+# Installing it would also add it to local_install's cmake_install.cmake without being in
+# that target's DEPENDS list, racing ahead of its own build under ninja.
