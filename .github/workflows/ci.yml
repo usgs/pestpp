@@ -158,6 +158,13 @@ jobs:
           fi
           cd ..
 
+      - name: option-system self-test
+        shell: bash -l {0}
+        run: |
+          bin=$(find build -type f \( -name 'pestpp-selftest' -o -name 'pestpp-selftest.exe' \) | head -1)
+          echo "running $bin"
+          "$bin"
+
       - name: aux bin path hackery
         shell: bash -l {0}
         run: |
