@@ -278,9 +278,6 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 	jco(*_file_mgr_ptr, _of_wr)
 {
 
-	use_fosm = false;
-	std_weights = false;
-	probit_val = 0.0;
 	stack_runs_processed = false;
 	stack_pe.set_pest_scenario_ptr(&_pest_scenario);
 	nested_pe.set_pest_scenario_ptr(&_pest_scenario);
@@ -304,26 +301,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	//same for dec var values
 	//current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
-	//check for a stack size arg - if positive, then use stacks for chances
+	//check for a stack size arg - if positive, then use stacks for chances. stack_size is
+	//seeded from the option but is later re-set to the loaded stack's actual row count, so it
+	//stays a member; get_use_fosm()/get_use_stosag()/get_std_weights() are now live-derived (see the getters).
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
-	//an existing parameter stack for chances
-	string par_stack_name = pest_scenario.get_pestpp_options().get_opt_par_stack();
-	//maybe even an existing observations (e.g. constraints) stack!
-	string obs_stack_name = pest_scenario.get_pestpp_options().get_opt_obs_stack();
-	//check for sqp risk
-	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
-	//by default, we want to use fosm for chances, but it any
-	//of those stack options were passed, then use stacks instead
-	use_fosm = true;
-	use_stosag = false;
-	if (sqp_risk != 0.50)
-	{
-		use_stosag = true;
-		use_fosm = false;
-	}
-	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
-	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
-		use_fosm = false;
 	//initialize the stack containers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
 	stack_pe.set_rand_gen(&rand_gen);
@@ -568,36 +549,27 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//------------------------------------------
 	//  ---  chance constraints  ---
 	//------------------------------------------
-	if (use_stosag)
-		risk = pest_scenario.get_pestpp_options().get_sqp_risk();
-	else
-		risk = pest_scenario.get_pestpp_options().get_opt_risk();
-	if (risk != 0.5)
+	// raw (unclamped) risk, for one-time validation and the reset-note logging; the live
+	// value used everywhere else comes from get_risk() (which clamps).
+	double raw_risk = get_use_stosag() ? pest_scenario.get_pestpp_options().get_sqp_risk()
+									   : pest_scenario.get_pestpp_options().get_opt_risk();
+	if (get_use_chance())
 	{
 		pfm.log_event("initializing chance constraints/objectives");
-		use_chance = true;
-		
 
 		//make sure risk value is valid
-		if ((risk > 1.0) || (risk < 0.0))
+		if ((raw_risk > 1.0) || (raw_risk < 0.0))
 			throw_constraints_error("++opt_risk parameter must between 0.0 and 1.0");
 
-		//reset risk extreme risk values
-		if (risk > 0.999)
-		{
-			f_rec << endl << "  ---  note: resetting risk value of " << risk << " to a practical value of " << 0.999 << endl << endl;
-			risk = 0.999;
-		}
-		if (risk < 0.001)
-		{
-			f_rec << endl << "  ---  note: resetting risk value of " << risk << " to a practical value of " << 0.001 << endl << endl;
-			risk = 0.001;
-		}
+		//note extreme risk values that get_risk() clamps to a practical range
+		if (raw_risk > 0.999)
+			f_rec << endl << "  ---  note: resetting risk value of " << raw_risk << " to a practical value of " << 0.999 << endl << endl;
+		if (raw_risk < 0.001)
+			f_rec << endl << "  ---  note: resetting risk value of " << raw_risk << " to a practical value of " << 0.001 << endl << endl;
 
-		probit_val = get_probit();
         initialize_chance_schedule(f_rec);
 		//if the std weight options was selected, use it - it overrides all other options
-		if (std_weights)
+		if (get_std_weights())
 		{
 			double std, var;
 			cout << "++opt_std_weights = True, using weights as chance constraint/objective uncertainty" << endl;
@@ -613,7 +585,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			}
 		}
 		//otherwise, if no stack options, use fosm
-		else if (use_fosm)
+		else if (get_use_fosm())
 		{
 			//make sure there is at least one non-decision var adjustable parameter
 			if (adj_par_names.size() == 0)
@@ -631,7 +603,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				}
 			}
 
-			f_rec << "  using FOSM-based chance constraints/objectives with risk = " << risk << endl;
+			f_rec << "  using FOSM-based chance constraints/objectives with risk = " << get_risk() << endl;
 
 			parcov.try_from(pest_scenario, *file_mgr_ptr);
 			vector<string> drop;
@@ -651,10 +623,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}
 		}
-		else if (use_stosag && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
+		else if (get_use_stosag() && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
 		{
 			// StoSAG mode: no stack setup needed, will use existing ensemble for risk shifting
-			f_rec << "  using chance constraints/objectives with risk = " << risk << endl;
+			f_rec << "  using chance constraints/objectives with risk = " << get_risk() << endl;
 			f_rec << "  using existing ensemble for constraint shifting, no separate stack needed" << endl;
 			// No stack operations needed - the ensemble will be provided by SQP when needed
 		}
@@ -673,7 +645,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			//if a par stack wasn't passed, draw one
 			if (par_csv.size() == 0)
 			{
-				if ((stack_size == 0) && (obs_stack_name.size() == 0))
+				if ((stack_size == 0) && (pest_scenario.get_pestpp_options().get_opt_obs_stack().size() == 0))
 					throw_constraints_error("++opt_stack_size is zero");
 				else if (stack_size > 0)
 				{
@@ -978,8 +950,6 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			}
 		}
 	}
-	//otherwise, dont use chance constraints
-	else use_chance = false;
 }
 
 /**
@@ -1020,13 +990,13 @@ void Constraints::initial_report()
 		cout << "..." << ctl_ord_pi_constraint_names.size() << " pi-based constraints, see rec file for listing" << endl;
 	}
 
-	if (use_chance)
+	if (get_use_chance())
 	{
 		f_rec << endl << endl << "  ---  chance constraint/objective FOSM information  ---  " << endl;
-		if (use_fosm)
+		if (get_use_fosm())
 		{
 			f_rec << "...using FOSM-based chance constraints/objectives" << endl;
-			f_rec << "...++opt_risk and corresponding probit function value: " << setw(10) << risk << setw(20) << probit_val << endl;
+			f_rec << "...++opt_risk and corresponding probit function value: " << setw(10) << get_risk() << setw(20) << get_probit() << endl;
 			f_rec << "...number of non-zero weight observations for FOSM calcs: " << num_nz_obs() << endl;
 		}
 		else
@@ -1036,7 +1006,7 @@ void Constraints::initial_report()
 		f_rec << "...number of adjustable parameters for chance constraint/objective calcs: " << num_adj_pars() << endl;
 		
 		f_rec << "...repeat chance constraint/objective calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
-		if (use_fosm)
+		if (get_use_fosm())
 		{
 			f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
 			int i = 1;
@@ -1048,7 +1018,7 @@ void Constraints::initial_report()
 				i++;
 			}
 			f_rec << endl;
-			if ((num_nz_obs() == 0) && (use_fosm))
+			if ((num_nz_obs() == 0) && (get_use_fosm()))
 			{
 				f_rec << endl << endl << "...Note: No nonzero weight observations found." << endl;
 				f_rec << "...Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
@@ -1067,10 +1037,10 @@ void Constraints::initial_report()
 				f_rec << endl;
 			}
 		}
-		cout << "...opt_risk = " << risk;
-		if (std_weights)
+		cout << "...opt_risk = " << get_risk();
+		if (get_std_weights())
 			cout << ", using FOSM-based chance constraints with the weights of non-zero-weighted constraints as standard deviation" << endl;
-		else if (use_fosm)
+		else if (get_use_fosm())
 			cout << ", using FOSM-based chance constraints with " << adj_par_names.size() << " adjustable parameters" << endl;
 		else
 			cout << ", using stack-based chance constraints with " << stack_pe.shape().first << " realizations" << endl;
@@ -1088,12 +1058,12 @@ void Constraints::initial_report()
 void Constraints::update_chance_offsets()
 {
 	/* recalculate the chance bits*/
-	if ((!use_chance) || (std_weights))
+	if ((!get_use_chance()) || (get_std_weights()))
 		return;
 	prior_const_var.clear();
 	post_const_var.clear();
 	//if we are using FOSM basd chance constraints, we need to do some new fosm calcs
-	if (use_fosm)
+	if (get_use_fosm())
 	{
 		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 		cout << "  ---  calculating FOSM-based chance constraint/objective components  ---  " << endl;
@@ -1251,7 +1221,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
     ss.str("");
     ss << file_mgr_ptr->get_base_filename() << "." << gen << ".population_stack_summary.csv";
     ofstream csv;
-    if (!use_fosm) {
+    if (!get_use_fosm()) {
         csv.open(ss.str());
 
         if (csv.bad()) {
@@ -1262,7 +1232,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 	map<string, double> risk_map;
 	for (auto& rname : pe.get_real_names())
 	{
-		risk_map[rname] = risk;
+		risk_map[rname] = get_risk();
 	}
 	pe.update_var_map();
 	map<string, int> vm = pe.get_var_map();
@@ -1300,7 +1270,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			shifted_oe.replace(i, sim_shifted);
 			//cout << *shifted_oe.get_eigen_ptr() << endl;
 			//cout << endl;
-			if (!use_fosm) {
+			if (!get_use_fosm()) {
                 for (auto &constraint : ctl_ord_obs_constraint_names) {
                     csv << rnames[i] << "," << opt_member << "," << constraint << ",";
                     csv << risk_map[rnames[i]] << "," << stack_mean.at(constraint) << "," << stack_std.at(constraint)
@@ -1382,7 +1352,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				min_dist = numeric_limits<double>::max();
 				min_real_name = "";
 				distances.clear();
-                double _risk = risk;
+                double _risk = get_risk();
 
                 if (risk_obj.size() > 0)
                 {
@@ -1491,7 +1461,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			}
 		}
 	}
-    if (!use_fosm)
+    if (!get_use_fosm())
     {
         csv.close();
     }
@@ -1511,7 +1481,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	//pure parameter-uncertainty margin on the current value, so it is zero for zero-variance
 	//constraints and never injects the base-vs-ensemble-mean bias.  see the note in
 	//sequentialLP::iter_solve.  the LP presolve and this postsolve/check path all use it.
-	return get_chance_shifted_constraints(current_obs, risk);
+	return get_chance_shifted_constraints(current_obs, get_risk());
 
 }
 
@@ -1538,7 +1508,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	double pr_offset, pt_offset;
 	Observations shifted_obs;
 	double _probit_val = get_probit(_risk);
-	if (use_fosm)
+	if (get_use_fosm())
 	{
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
@@ -1573,7 +1543,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			shifted_obs.insert(name, new_constraint_val);
 		}
 	}
-	else if (use_stosag && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
+	else if (get_use_stosag() && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
 	{
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
@@ -1617,7 +1587,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vec
 {
 	Eigen::VectorXd rhs(cnames.size()), resid(cnames.size());
 	Observations sim = _constraints_sim;
-	if (use_chance)
+	if (get_use_chance())
 		sim = get_chance_shifted_constraints(_constraints_sim);
 	string cname;
 	Observations obs = pest_scenario.get_ctl_observations();
@@ -1848,9 +1818,9 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Pa
 	set to double max, for greater than constraints, the upper bound is set to double max.
 	These are needed for the simplex solve*/
 	vector<double> residuals;
-	if (use_chance)
+	if (get_use_chance())
 	{
-		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs, risk, use_stack_anomalies);
+		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs, get_risk(), use_stack_anomalies);
 		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
@@ -2012,7 +1982,7 @@ double  Constraints::ErfInv2(double x)
  */
 double Constraints::get_probit()
 {
-	return get_probit(risk);
+	return get_probit(get_risk());
 }
 
 /**
@@ -2381,7 +2351,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 	stringstream ss;
 	ss.str("");
 	string tag = "";
-	if (use_chance)
+	if (get_use_chance())
 	    tag = "chance-shifted";
 	string op_sum = mou_population_observation_constraint_summary(iter,oe,tag,obs_obj_names);
 	ss << op_sum;
@@ -2475,7 +2445,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 	
 	//if we are using chances, then we need to account for that here
 	Observations current;
-	if (use_chance)
+	if (get_use_chance())
 	{
 		current = get_chance_shifted_constraints(current_obs);	
 	}
@@ -2521,7 +2491,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 		}
 	}
 
-	if (use_chance)
+	if (get_use_chance())
 		presolve_chance_report(iter,current_obs);	 
 	
 	return;
@@ -2540,7 +2510,7 @@ void Constraints::write_res_files(Observations& constraints, Parameters& pars_an
 	/* one form of this method that doesn't require advanced knowledge of whether or not chances are being used.
 	write a pest-style residuals file, and, if using chances, write a sep file that includes the chance offset info*/
 	write_res_file(constraints, pars_and_dec_vars, tag, iter, false);
-	if (use_chance)
+	if (get_use_chance())
 		write_res_file(constraints, pars_and_dec_vars, tag, iter, true);
 }
 
@@ -2587,7 +2557,7 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
-	if (!use_chance)
+	if (!get_use_chance())
 		return;
 
 	//Observations current_constraints_chance = get_stack_shifted_chance_constraints(current_obs);
@@ -2644,10 +2614,10 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 void Constraints::presolve_chance_report(int iter, Observations& current_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
-	if (!use_chance)
+	if (!get_use_chance())
 		return;
 	
-	if (!use_fosm)
+	if (!get_use_fosm())
 	{
 		stack_summary(iter, current_obs, echo, header);
 		return;
@@ -2689,7 +2659,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	ss << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;
 	ss << "        adjustable parameters identified in the control file." << endl;
     ss <<"         The 'required' value only applies to constraint quantities." << endl << endl;
-	if (!use_fosm)
+	if (!get_use_fosm())
 	{
 		ss << "  note: the above standard deviations are empirical estimates from the stack" << endl;
 	}
@@ -2704,10 +2674,10 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, Ob
 {
 	/* write chance info to the rec file before undertaking the current iteration process
 	 * This overload uses ensemble-based risk shifting for SQP */
-	if (!use_chance)
+	if (!get_use_chance())
 		return;
 
-	if (ensemble_oe != nullptr && ensemble_oe->shape().first > 0 && !use_fosm)
+	if (ensemble_oe != nullptr && ensemble_oe->shape().first > 0 && !get_use_fosm())
 	{
 		Observations base_obs = current_obs;
 		
@@ -2764,13 +2734,13 @@ bool Constraints::should_update_chance(int iter)
 	/* this is a total hack - it tries to determine if it is time to update the chance
 	information, like should we queue up some JCO perturbation runs for FOSM chances or 
 	should we queue up some stack runs for stack-based chances*/
-	if (!use_chance)
+	if (!get_use_chance())
 		return false;
-	if (std_weights)
+	if (get_std_weights())
 		return false;
 	if (iter == 0)
 	{
-		if (use_fosm)
+		if (get_use_fosm())
 			return true;
 		if (pest_scenario.get_pestpp_options().get_opt_obs_stack().size() > 0)
 			return false;
@@ -2888,14 +2858,14 @@ void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observ
 		f_rec << "simplex status";
 	if (price_map.size() > 0)
 		f_rec << setw(15) << "price";
-	if (use_chance)
+	if (get_use_chance())
 		f_rec << setw(15) << "fosm offset";
 	f_rec << setw(15) << "current" << setw(15) << "residual";
 	f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
 
 	vector<double> cur_residuals = get_constraint_residual_vec(old_obs);
 	vector<double> new_residuals;
-	if (use_chance)
+	if (get_use_chance())
 	{
 		Observations constraints_shift = get_chance_shifted_constraints(new_obs);
 		new_residuals = get_constraint_residual_vec(constraints_shift);
@@ -2914,7 +2884,7 @@ void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observ
 			f_rec << setw(25) << status_map[name];
 		if (price_map.size() > 0)
 			f_rec << setw(15) << price_map[name];
-		if (use_chance)
+		if (get_use_chance())
 		{
 			double offset = post_constraint_offset[name];
 			sim_val += offset;
@@ -3377,10 +3347,10 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	*/
 	stringstream ss;
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
-	if (!use_chance)
+	if (!get_use_chance())
 		return;
 	//if we are using fosm chances, then process some jco runs
-	if (use_fosm)
+	if (get_use_fosm())
 	{
 		if (jco.get_par_run_map().size() == 0)
 			return;
@@ -3418,10 +3388,10 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 	/* using the passed run mgr pointer, queue up chance runs
 	
 	*/
-	if (!use_chance)
+	if (!get_use_chance())
 		return;
 	//for fosm, we need to queue up parameter perturbation runs, centered at the current dec var values
-	if (use_fosm)
+	if (get_use_fosm())
 	{
 		pfm.log_event("building FOSM-based parameter perturbation runs");
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
@@ -3444,7 +3414,7 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
-	else if (use_stosag && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
+	else if (get_use_stosag() && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
 	{
 		//do nothing -- we don't need stacks here
 	}
@@ -3469,9 +3439,9 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
  */
 void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
-	if (!use_chance)
+	if (!get_use_chance())
 		return;
-	if (use_fosm)
+	if (get_use_fosm())
 	{
 		throw_constraints_error("add_runs() error: FOSM-based chance constraints not supported for ensemble/population-based algorithms");
 	}
@@ -3616,7 +3586,7 @@ map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe
 vector<string> Constraints::get_fosm_par_names()
 {
 	/* get a vector of the fosm-based "parameter" names - adjustable, non-dec-var parameters in the control file*/
-	if (use_fosm)
+	if (get_use_fosm())
 		return adj_par_names;
 	else
 		return vector<string>();
@@ -3673,7 +3643,7 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 			throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
 
 	// Check if we should use ensemble-based risk shifting
-	bool use_ensemble_risk_shift = (shift_ensemble_oe != nullptr) && (risk_val != 0.5) && (risk_val >= 0.0) && (risk_val <= 1.0) && use_chance;
+	bool use_ensemble_risk_shift = (shift_ensemble_oe != nullptr) && (risk_val != 0.5) && (risk_val >= 0.0) && (risk_val <= 1.0) && get_use_chance();
 
 	Observations shifted_constraints;
 	if (use_ensemble_risk_shift && shift_ensemble_oe->shape().first > 0)
@@ -3713,7 +3683,7 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 		}
 		else
 		{
-			// Use standard approach (with internal state-based shifting if use_chance)
+			// Use standard approach (with internal state-based shifting if get_use_chance())
 			vmap = get_unsatified_obs_constraints(obs, tol, true, include_weight);
 		}
 		violations[name] = vmap;
@@ -3785,7 +3755,7 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 	double sim_val, obs_val, scaled_diff;
 	map<string, double> unsatisfied;
 	Observations _constraints_sim(constraints_sim);
-	if ((do_shift) && (use_chance))
+	if ((do_shift) && (get_use_chance()))
 		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
 	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	double weight;
@@ -3793,7 +3763,7 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		sim_val = constraints_sim[name];
-		if ((do_shift) && (use_chance))
+		if ((do_shift) && (get_use_chance()))
 		{
 			double offset = post_constraint_offset[name];
 			sim_val += offset;
@@ -3844,14 +3814,14 @@ map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars
 	double sim_val, obs_val;
 	map<string, double> constraint_map;
 	Observations _constraints_sim(constraints_sim);
-	if ((do_shift) && (use_chance))
+	if ((do_shift) && (get_use_chance()))
 		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
 	//for (int i = 0; i < num_obs_constraints(); ++i)
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
 		//string name = ctl_ord_obs_constraint_names[i];
 		sim_val = constraints_sim[name];
-		if ((do_shift) && (use_chance))
+		if ((do_shift) && (get_use_chance()))
 		{
 			double offset = post_constraint_offset[name];
 			sim_val += offset;

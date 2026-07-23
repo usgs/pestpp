@@ -13,7 +13,13 @@
  */
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include "pest_data_structs.h"
+#include "Pest.h"
+#include "FileManager.h"
+#include "OutputFileWriter.h"
+#include "PerformanceLog.h"
+#include "constraints.h"
 
 using namespace std;
 using PO = PestppOptions;
@@ -107,6 +113,36 @@ static void test_tool_defaults()
       CHK(o.get_max_run_fail() == 7, "user-set value not overridden (provenance-aware)"); }
 }
 
+static void test_constraints_live()
+{
+    cout << "[Constraints live chance/risk propagation]" << endl;
+    ofstream flog("selftest_perf.log");
+    PerformanceLog pfm(flog);
+    FileManager fm;
+    Pest p; p.set_defaults();
+    OutputFileWriter ofw(fm, p);
+    Constraints c(p, &fm, ofw, pfm);   // getters read only options; no initialize() needed
+    PestppOptions* o = p.get_pestpp_options_ptr();
+    o->set_option("SQP_RISK", "0.5");   // keep use_stosag false so opt_risk drives it
+
+    o->set_option("OPT_RISK", "0.5");
+    CHK(!c.get_use_chance(), "opt_risk 0.5 -> use_chance false");
+    // the latching-bug fix: with the old cached member this stayed false forever
+    o->set_option("OPT_RISK", "0.95");
+    CHK(c.get_use_chance(), "opt_risk 0.95 -> use_chance TRUE (live, was latched at init)");
+    CHK(c.get_risk() == 0.95, "get_risk reflects live opt_risk");
+    o->set_option("OPT_RISK", "1.5");
+    CHK(c.get_risk() == 0.999, "get_risk clamps high in the accessor");
+    o->set_option("OPT_RISK", "0.0001");
+    CHK(c.get_risk() == 0.001, "get_risk clamps low in the accessor");
+    // use_fosm derives live from stack options
+    o->set_option("OPT_RISK", "0.9");
+    o->set_option("OPT_STACK_SIZE", "0");
+    CHK(c.get_use_fosm(), "no stacks -> use_fosm true");
+    o->set_option("OPT_STACK_SIZE", "50");
+    CHK(!c.get_use_fosm(), "opt_stack_size>0 -> use_fosm false (live)");
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -114,6 +150,7 @@ int main()
     test_mutability();
     test_control_info();
     test_tool_defaults();
+    test_constraints_live();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

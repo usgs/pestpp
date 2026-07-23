@@ -127,10 +127,25 @@ public:
 	//get the max scale constraint change against upgrade_obs - used for convergence testing
 	double get_max_constraint_change(Observations& current_obs, Observations& upgrade_obs);
 	
-	//get the flags related to chance constraints
-	bool get_std_weights() { return std_weights; }
-	bool get_use_chance() { return use_chance; }
-	bool get_use_fosm() { return use_fosm; }
+	//the chance-related flags are now derived live from the options so a runtime change to
+	//opt_risk/sqp_risk/opt_std_weights/opt_*_stack propagates instead of being latched at
+	//initialize() (the old cached use_chance stayed false forever if opt_risk started at 0.5).
+	bool get_std_weights() const { return pest_scenario.get_pestpp_options().get_opt_std_weights(); }
+	bool get_use_stosag() const { return pest_scenario.get_pestpp_options().get_sqp_risk() != 0.5; }
+	double get_risk() const
+	{
+		double r = get_use_stosag() ? pest_scenario.get_pestpp_options().get_sqp_risk()
+									: pest_scenario.get_pestpp_options().get_opt_risk();
+		return std::min(0.999, std::max(0.001, r));   // clamp to a practical range (was done in place)
+	}
+	bool get_use_chance() const { return get_risk() != 0.5; }
+	bool get_use_fosm() const
+	{
+		if (get_use_stosag()) return false;
+		const PestppOptions& o = pest_scenario.get_pestpp_options();
+		bool has_stacks = (o.get_opt_stack_size() > 0) || (!o.get_opt_par_stack().empty()) || (!o.get_opt_obs_stack().empty());
+		return !((!get_std_weights()) && has_stacks);
+	}
 
 	//get the dimensions
 	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
@@ -176,14 +191,8 @@ private:
 	std::mt19937 rand_gen;
 	FileManager* file_mgr_ptr;
 	OutputFileWriter& of_wr;
-	int stack_size;
-	bool use_chance;
-	bool use_fosm;
-	bool use_stosag;
-	bool std_weights;
+	int stack_size;   // starts at opt_stack_size, then re-set to the loaded stack's row count
 	bool stack_runs_processed;
-	double risk;
-	double probit_val;
 	double dbl_max;
     map<int,bool> chance_schedule;
 
