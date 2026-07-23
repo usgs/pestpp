@@ -250,6 +250,18 @@ public:
 	std::string get_option(const std::string& name) const;
 	bool is_user_set(const std::string& name) const;
 
+	// mutability metadata + init-only change detection. An init-only option is consumed once
+	// during setup and cannot change the current run afterward; once an algorithm calls
+	// mark_options_initialized(), a set_option on such an option is recorded as a warning
+	// rather than silently taking no effect.
+	bool is_init_only(const std::string& name) const;
+	std::string get_option_scope(const std::string& name) const;
+	void mark_options_initialized() { options_initialized = true; }
+	void reset_options_initialized() { options_initialized = false; init_only_change_warnings.clear(); }
+	bool get_options_initialized() const { return options_initialized; }
+	std::vector<std::string> get_init_only_change_warnings() const { return init_only_change_warnings; }
+	void clear_init_only_change_warnings() { init_only_change_warnings.clear(); }
+
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
 	bool assign_da_value_by_key(const string& key, const string& value, const string& org_value);
@@ -800,6 +812,8 @@ private:
 	set<string> passed_args;
 	set<string> passed_da_ies_args;
 	bool use_da_args;
+	bool options_initialized = false;
+	std::vector<std::string> init_only_change_warnings;
 	bool forgive_unknown_args;
 	int n_iter_base;
 	int n_iter_super;
