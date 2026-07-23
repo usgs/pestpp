@@ -1,9 +1,8 @@
 /**
  * @file pest_options_registry.cpp
- * @brief Stage 3 option registry: single source of truth for the ++ options.
- * Generated table (docs/options_centralization/stage3/gen_registry.py) drives the
- * registry-driven set_defaults/summary/assign_value_by_key. Kept alongside the legacy
- * implementations until self_verify() proves byte-for-byte equivalence.
+ * @brief The option registry: the single source of truth for the ++ options.
+ * The table drives set_defaults, summary, and assign_value_by_key. The *_legacy
+ * implementations are retained as an equivalence reference that self_verify() checks against.
  */
 #include <string>
 #include <vector>
@@ -1079,12 +1078,17 @@ set<string> PestppOptions::get_registered_args() const
     return out;
 }
 
-PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_registry(string key, const string org_value)
+// Shared core for both the control-file parse path and the programmatic set_option() path.
+// check_duplicate=true is the file-parse behavior (a repeated ++arg is an error); the
+// programmatic path passes false so a caller can change an option repeatedly (e.g. between
+// algorithm iterations). Both record provenance in passed_args so tool-default overrides
+// treat the option as user-supplied.
+PestppOptions::ARG_STATUS PestppOptions::assign_registry_impl(string key, const string org_value, bool check_duplicate)
 {
     upper_ip(key);
     string value = upper_cp(org_value);
     if (value.size() == 0) return ARG_STATUS::ARG_INVALID;
-    if (passed_args.find(key) != passed_args.end()) return ARG_STATUS::ARG_DUPLICATE;
+    if (check_duplicate && passed_args.find(key) != passed_args.end()) return ARG_STATUS::ARG_DUPLICATE;
     arg_map[key] = value;
     const auto& idx = registry_index();
     auto it = idx.find(key);
@@ -1127,7 +1131,44 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_registry(string key
     return ARG_STATUS::ARG_NOTFOUND;
 }
 
-// ---- public entry points: parsing + defaults delegate to the registry (the flip) ----
+PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_registry(string key, const string org_value)
+{
+    return assign_registry_impl(key, org_value, true);   // file parse: duplicate is an error
+}
+
+// ---- generic programmatic option access ----
+
+// String-keyed programmatic setter: the parse path without the duplicate guard, so a caller
+// may change an option repeatedly at runtime. org_value is preserved for case-sensitive
+// (filename) options exactly as the file-parse path does.
+PestppOptions::ARG_STATUS PestppOptions::set_option(const string& name, const string& org_value)
+{
+    return assign_registry_impl(name, org_value, false);
+}
+
+// Current value of an option rendered as a string (via the registry to_str). Empty string
+// if the name is not a registered option.
+string PestppOptions::get_option(const string& name) const
+{
+    const auto& idx = registry_index();
+    auto it = idx.find(upper_cp(name));
+    return (it == idx.end()) ? string() : it->second->to_str(*this);
+}
+
+// Was this option explicitly supplied (by the user in the .pst OR via set_option)? Resolves
+// aliases so any spelling of an aliased option answers consistently.
+bool PestppOptions::is_user_set(const string& name) const
+{
+    string key = upper_cp(name);
+    const auto& idx = registry_index();
+    auto it = idx.find(key);
+    if (it == idx.end()) return passed_args.count(key) > 0;
+    if (passed_args.count(it->second->name)) return true;
+    for (const auto& a : it->second->aliases) if (passed_args.count(a)) return true;
+    return false;
+}
+
+// ---- public entry points: parsing + defaults route through the registry ----
 void PestppOptions::set_defaults() { set_defaults_registry(); }
 PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
 {
@@ -1135,7 +1176,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 }
 void PestppOptions::summary(ostream& os) const { summary_registry(os); }
 
-// ---- local self-verification: registry-driven vs legacy, byte-for-byte via to_str dumps ----
+// ---- self-verification: registry vs the *_legacy reference, byte-for-byte via to_str dumps ----
 static string registry_dump(const PestppOptions& o)
 {
     ostringstream ss;

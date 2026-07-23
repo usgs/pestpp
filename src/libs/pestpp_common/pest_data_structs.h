@@ -209,7 +209,7 @@ public:
 };
 
 
-struct OptionSpec;  // Stage 3 registry entry, defined in pest_options_registry.cpp
+struct OptionSpec;  // one option's metadata + accessors, defined in pest_options_registry.cpp
 
 class PestppOptions {
 public:
@@ -228,19 +228,27 @@ public:
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	void rectify_ies_da_args();
 
-	// Stage 3 option registry (single source of truth). Implemented in
-	// pest_options_registry.cpp. The legacy *_legacy implementations are retained only so
-	// self_verify() can prove equivalence; remove them once CI confirms.
+	// the option registry: the single source of truth for the ++ options, driving parsing,
+	// defaults, and summary. Implemented in pest_options_registry.cpp. The *_legacy
+	// implementations are retained as an equivalence reference checked by self_verify().
 	static const std::vector<OptionSpec>& get_option_registry();
 	void set_defaults_registry();
 	void summary_registry(std::ostream& os) const;
 	ARG_STATUS assign_value_by_key_registry(std::string key, const std::string org_value);
+	ARG_STATUS assign_registry_impl(std::string key, const std::string org_value, bool check_duplicate);
 	ARG_STATUS assign_value_by_key_legacy(string key, const string org_value);
 	void set_defaults_legacy();
 	void summary_legacy(std::ostream& os) const;
 	bool is_valid_arg(const std::string& key) const;
 	std::set<std::string> get_registered_args() const;
 	static bool self_verify(std::ostream& os);
+
+	// generic programmatic option access. set_option is the parse path without the duplicate
+	// guard, so an option can be changed repeatedly at runtime; it records provenance so
+	// is_user_set() and tool-default logic see the change.
+	ARG_STATUS set_option(const std::string& name, const std::string& org_value);
+	std::string get_option(const std::string& name) const;
+	bool is_user_set(const std::string& name) const;
 
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
@@ -1097,10 +1105,17 @@ public:
 	double splitswh;
 	PestMode pestmode;
 	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value, ofstream& f_rec);
+	// generic programmatic access to the * control data values, matching the PestppOptions
+	// surface. set_option skips the duplicate guard so a value (e.g. noptmax) can be changed
+	// repeatedly at runtime; get_option/is_user_set mirror the option-object accessors.
+	PestppOptions::ARG_STATUS set_option(const std::string& name, const std::string& value);
+	std::string get_option(const std::string& name) const;
+	bool is_user_set(const std::string& name) const;
 	ControlInfo() { ; }
 	void set_defaults();
 
 private:
+	PestppOptions::ARG_STATUS assign_value_by_key_impl(std::string key, const std::string org_value, std::ostream& f_rec, bool check_duplicate);
 	set<string> passed_args;
 };
 ostream& operator<< (ostream& os, const ControlInfo& val);

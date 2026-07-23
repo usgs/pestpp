@@ -2773,6 +2773,49 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 
 PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value, ofstream& f_rec)
 {
+	return assign_value_by_key_impl(key, org_value, f_rec, true);   // file parse: duplicate is an error
+}
+
+PestppOptions::ARG_STATUS ControlInfo::set_option(const std::string& name, const std::string& value)
+{
+	std::ostringstream discard;   // programmatic path: no rec file to warn into
+	return assign_value_by_key_impl(name, value, discard, false);
+}
+
+std::string ControlInfo::get_option(const std::string& name) const
+{
+	std::string key = upper_cp(name);
+	std::ostringstream ss;
+	if (key == "NOPTMAX") ss << noptmax;
+	else if (key == "RELPARMAX") ss << relparmax;
+	else if (key == "FACPARMAX") ss << facparmax;
+	else if (key == "FACORIG") ss << facorig;
+	else if (key == "PHIREDSTP") ss << phiredstp;
+	else if (key == "NPHISTP") ss << nphistp;
+	else if (key == "NPHINORED") ss << nphinored;
+	else if (key == "RELPARSTP") ss << relparstp;
+	else if (key == "NOPTSWITCH") ss << noptswitch;
+	else if (key == "SPLITSWH") ss << splitswh;
+	else if (key == "PHIREDSWH") ss << phiredswh;
+	else if (key == "NRELPAR") ss << nrelpar;
+	else if (key == "PESTMODE")
+	{
+		if (pestmode == PestMode::ESTIMATION) ss << "estimation";
+		else if (pestmode == PestMode::REGUL) ss << "regularization";
+		else if (pestmode == PestMode::PARETO) ss << "pareto";
+		else ss << "unknown";
+	}
+	return ss.str();
+}
+
+bool ControlInfo::is_user_set(const std::string& name) const
+{
+	return passed_args.find(upper_cp(name)) != passed_args.end();
+}
+
+PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key_impl(std::string key, const string org_value, std::ostream& f_rec, bool check_duplicate)
+{
+	upper_ip(key);
 	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
 	double phiredswh;
 	int noptmax;
@@ -2795,11 +2838,11 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
                          "LASTRUN","PHIABANDON","ICOV","ICOR","IEIG","IRES","JCOSAVE","VERBOSEREC","JCOSAVEITN",
                          "REISAVEITN","PARSAVEITN","PARSAVERUN"};
 	string value = upper_cp(org_value);
-	if (passed_args.find(key) != passed_args.end())
+	if (check_duplicate && passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
 	passed_args.insert(key);
 
-	if (key == "NOPTMAX") 
+	if (key == "NOPTMAX")
 		convert_ip(value, noptmax);
 	else if (key == "RELPARMAX")
 		convert_ip(value, relparmax);
