@@ -2574,6 +2574,40 @@ void PestppOptions::set_defaults_legacy()
 
 }
 
+void PestppOptions::apply_tool_defaults(ToolType tool, std::ostream& f_rec)
+{
+	// the ensemble/iterative tools tolerate run failure better than GLM/PEST, so they lower
+	// max_run_fail and tighten the overdue-giveup factor unless the user set them. Previously
+	// this lived (and silently diverged) in each program main(): ies/da were correct, sqp/mou
+	// had a mixed-case OVERDUE_RESCHED_FAC key that never matched, and mou's block was
+	// commented out entirely.
+	switch (tool)
+	{
+	case ToolType::IES:
+	case ToolType::DA:
+	case ToolType::MOU:
+	case ToolType::SQP:
+		if (!is_user_set("MAX_RUN_FAIL"))
+		{
+			set_max_run_fail(1);
+			f_rec << "...resetting max_run_fail to 1" << std::endl;
+		}
+		if (!is_user_set("OVERDUE_GIVEUP_FAC"))
+		{
+			set_overdue_giveup_fac(2.0);
+			f_rec << "...resetting overdue_giveup_fac to 2.0" << std::endl;
+		}
+		if (!is_user_set("OVERDUE_RESCHED_FAC"))
+		{
+			set_overdue_reched_fac(1.15);
+			f_rec << "...resetting overdue_resched_fac to 1.15" << std::endl;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 ostream& operator<< (ostream &os, const ParameterInfo& val)
 {
 	for(unordered_map<string, ParameterRec>::const_iterator s=val.parameter_info.begin(),

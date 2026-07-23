@@ -2403,7 +2403,7 @@ void MOEA::sanity_checks()
 		ss.str("");
 		ss << "population_size < " << error_min_members << ", this is redic, increasing to " << warn_min_members;
 		warnings.push_back(ss.str());
-		ppo->set_ies_num_reals(warn_min_members);
+		ppo->set_mou_population_size(warn_min_members);   // was set_ies_num_reals (wrong option)
 	}
 	if ((ppo->get_mou_population_size() < warn_min_members) && (population_dv_file.size() == 0))
 	{

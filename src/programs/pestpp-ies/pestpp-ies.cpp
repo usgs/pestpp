@@ -201,23 +201,7 @@ int main(int argc, char* argv[])
             output_file_writer.scenario_obs_report(fout_rec);
         }
 
-        //reset some default args for ies here:
-        PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
-        set<string> pp_args = ppo->get_passed_args();
-        if (pp_args.find("MAX_RUN_FAIL") == pp_args.end()) {
-            ppo->set_max_run_fail(1);
-            fout_rec << "...resetting max_run_fail to 1" << endl;
-        }
-
-        if (pp_args.find("OVERDUE_GIVEUP_FAC") == pp_args.end()) {
-            ppo->set_overdue_giveup_fac(2.0);
-            fout_rec << "...resetting overdue_giveup_fac to 2.0" << endl;
-        }
-
-        if (pp_args.find("OVERDUE_RESCHED_FAC") == pp_args.end()) {
-            ppo->set_overdue_reched_fac(1.15);
-            fout_rec << "...resetting overdue_resched_fac to 1.15" << endl;
-        }
+        pest_scenario.get_pestpp_options_ptr()->apply_tool_defaults(PestppOptions::ToolType::IES, fout_rec);
 
 
         RunManagerAbstract *run_manager_ptr;

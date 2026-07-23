@@ -216,6 +216,7 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
+	enum class ToolType { GLM, IES, DA, MOU, SQP, OPT, SWEEP, GSA };
 	enum GLMNormalForm { IDENT,DIAG, PRIOR, HP };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	PestppOptions() { use_da_args=false; }
@@ -805,6 +806,10 @@ public:
 	//void set_use_dat_args(bool _flag) { use_da_args = _flag; }
 
 	void set_defaults();
+	// per-tool default overrides, centralized from the individual program main()s. Only
+	// overrides options the user did not set (is_user_set), so it is idempotent and does not
+	// clobber a caller's value. Logs each reset to f_rec.
+	void apply_tool_defaults(ToolType tool, std::ostream& f_rec);
 	void summary(ostream& os) const;
 
 private:
