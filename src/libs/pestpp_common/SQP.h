@@ -183,8 +183,6 @@ private:
 	bool reset = false;
 	int recalc_attempt = 0;
 	int n_consec_infeas;
-    int MAX_CONSEC_INFEAS_IES;
-    double SF_DEC_FAC;
     double BASE_SCALE_FACTOR = 1.0;
     bool SOLVE_EACH_REAL = false;
 	bool reset_corr = false;
@@ -214,7 +212,6 @@ private:
 	double best_phi_yet;
 	double best_violation_yet;
 	double working_set_tol;
-	double sqp_risk;
 
 	map<string, double> obj_map, total_viol_map;
 	map<string, Eigen::VectorXd>  step_length_map;
@@ -227,7 +224,12 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	vector<string> adj_par_names;
-	bool use_subset, use_cma = true, adjust_step_control = false;
+	bool use_cma = true, adjust_step_control = false;
+
+	// sqp_subset_size follows the ies convention: 0 => no subset (use the full ensemble);
+	// any non-zero value (negative = percentage of the ensemble, positive = absolute count)
+	// requests a subset.  Read live so a mid-run change to sqp_subset_size propagates.
+	bool get_use_subset() const { return pest_scenario.get_pestpp_options().get_sqp_subset_size() != 0; }
 
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;

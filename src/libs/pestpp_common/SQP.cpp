@@ -1039,22 +1039,10 @@ void SeqQuadProgram::initialize()
 
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
-	MAX_CONSEC_INFEAS_IES = pest_scenario.get_pestpp_options().get_sqp_max_consec_infeas_ies();
-	SF_DEC_FAC = pest_scenario.get_pestpp_options().get_sqp_scale_down_factor();
 
 	stringstream ss;
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
-	int subset_size = pest_scenario.get_pestpp_options().get_sqp_subset_size();
-	//sqp_subset_size follows the ies convention: a NEGATIVE value is a percentage of the
-	//ensemble size and a POSITIVE value is an absolute count - both request a subset.  only
-	//0 means "no subset, use the full ensemble".  (a subset larger than the ensemble is
-	//handled downstream: reduced to the ensemble size, and get_subset_idxs returns all when
-	//nreal_subset >= size.)  the previous `subset_size >= 0` test wrongly disabled subsetting
-	//for negative values - including the default of -10 - so the requested/default subset
-	//size was computed and reported but never actually applied.
-	use_subset = (subset_size != 0);
-	
 	if (pp_args.find("PAR_SIGMA_RANGE") == pp_args.end())
 	{
 		message(1, "resetting par_sigma_range to 20.0");
@@ -1263,10 +1251,9 @@ void SeqQuadProgram::initialize()
 		prep_4_fd_grad();
 	}
 
-	sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
 	if (constraints.get_use_chance())
 	{
-		constraints.presolve_chance_report(iter, current_obs, &oe, sqp_risk, true, "initial chance constraint report");
+		constraints.presolve_chance_report(iter, current_obs, &oe, pest_scenario.get_pestpp_options().get_sqp_risk(), true, "initial chance constraint report");
 	}
 	working_set_tol = pest_scenario.get_pestpp_options().get_sqp_working_set_tol();
 
@@ -2662,11 +2649,12 @@ void SeqQuadProgram::iterate_2_solution()
 		else
 		{
 			n_consec_infeas++;
-			if (n_consec_infeas > MAX_CONSEC_INFEAS_IES)
+			int max_consec_infeas_ies = pest_scenario.get_pestpp_options().get_sqp_max_consec_infeas_ies();
+			if (n_consec_infeas > max_consec_infeas_ies)
 			{
 				seek_ies = true;
 				ss.str("");
-				ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS_IES << ", switching to IES to seek feasibility";
+				ss << "number of consecutive infeasible iterations > " << max_consec_infeas_ies << ", switching to IES to seek feasibility";
 				message(0, ss.str());
 				seek_feasible();
 				n_consec_infeas = 0;
@@ -3465,7 +3453,7 @@ pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observa
 				base_obs.update_without_clear(obs_names, base_vec);
 			}
 
-			Observations shifted_obs = constraints.get_chance_shifted_constraints(base_obs, oe, sqp_risk);
+			Observations shifted_obs = constraints.get_chance_shifted_constraints(base_obs, oe, pest_scenario.get_pestpp_options().get_sqp_risk());
 			vector<string> constraint_names = constraints.get_obs_constraint_names();
 			for (auto& name : constraint_names)
 			{
@@ -4812,7 +4800,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 			message(2, ss.str());
 		}
 	}
-	if ((use_subset) && (local_subset_size > _dvs.shape().first))
+	if ((get_use_subset()) && (local_subset_size > _dvs.shape().first))
 	{
 		ss.str("");
 		ss << "subset size (" << local_subset_size << ") greater than ensemble size (" << _dvs.shape().first << ")";
@@ -5005,7 +4993,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 	else
 	{
 		is_good_search = false;
-		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * SF_DEC_FAC);
+		BASE_SCALE_FACTOR = max(1E-4, BASE_SCALE_FACTOR * pest_scenario.get_pestpp_options().get_sqp_scale_down_factor());
 	}
 	message(1, "new base scale factor: ", BASE_SCALE_FACTOR);
 
@@ -5381,6 +5369,7 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		obs_map[d] = o;
 	}
 	double viol_pad = pest_scenario.get_pestpp_options().get_sqp_viol_pad();
+	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
 	map<string, map<string, double>> violations, violations_nominal;
 	if (constraints.get_use_chance() && (sqp_risk != 0.5))
 	{
@@ -6121,7 +6110,7 @@ void SeqQuadProgram::finalize()
 vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 {
 	vector<int> subset_idxs;
-	if ((!use_subset) || (nreal_subset >= size))
+	if ((!get_use_subset()) || (nreal_subset >= size))
 	{
 		for (int i = 0; i < size; i++)
 			subset_idxs.push_back(i);
@@ -6130,6 +6119,7 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 
 	vector<string> dv_real_names = dv.get_real_names();
 
+	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
 	map<string, map<string, double>> violations_nominal;
 	if (constraints.get_use_chance() && (sqp_risk != 0.5))
 	{
