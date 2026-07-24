@@ -2234,7 +2234,6 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
     }
 
 	//save the org reg factor and org q vector
-	org_reg_factor = pest_scenario->get_pestpp_options().get_ies_reg_factor();
 	//Eigen::VectorXd parcov_inv_diag = parcov_inv.e_ptr()->diagonal();
 	parcov_inv_diag = _parcov->e_ptr()->diagonal();
 	for (int i = 0; i < parcov_inv_diag.size(); i++)
@@ -2486,7 +2485,7 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 	}
 
 
-	if (org_reg_factor != 0.0)
+	if (get_reg_factor() != 0.0)
 	{
 		par_group_idx_map.clear();
 		vector<string> pars = pe_base->get_var_names();
@@ -2565,7 +2564,7 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, Obse
     }
 
 
-    if (org_reg_factor != 0.0)
+    if (get_reg_factor() != 0.0)
     {
         par_group_idx_map.clear();
         vector<string> pars = pe_base->get_var_names();
@@ -3125,7 +3124,7 @@ void L2PhiHandler::report(bool echo, bool group_report)
 		cout << get_summary_header();
 	if (pest_scenario->get_pestpp_options().get_ies_no_noise())
 	{
-		if (org_reg_factor == 0)
+		if (get_reg_factor() == 0)
 		{
 			s = get_summary_string(L2PhiHandler::phiType::ACTUAL);
 			f << s;
@@ -3156,7 +3155,7 @@ void L2PhiHandler::report(bool echo, bool group_report)
 		f << s;
 		if (echo)
 			cout << s;
-		if (org_reg_factor == 0.0)
+		if (get_reg_factor() == 0.0)
 		{
 			s = get_summary_string(L2PhiHandler::phiType::ACTUAL);
 			f << s;
@@ -3183,7 +3182,7 @@ void L2PhiHandler::report(bool echo, bool group_report)
 
 	}
 		
-	if (org_reg_factor != 0.0)
+	if (get_reg_factor() != 0.0)
 	{
 
 		f << "     note: 'regularization' phi reported above does not " << endl;
@@ -3230,7 +3229,7 @@ void L2PhiHandler::write(int iter_num, int total_runs, bool write_group)
 	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.meas.csv"), phiType::MEAS, oreal_names);
     //write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.noise.csv"), phiType::NOISE, oreal_names);
 
-    if (pest_scenario->get_pestpp_options().get_ies_reg_factor() != 0.0)
+    if (get_reg_factor() != 0.0)
 	{
 		write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.regul.csv"), phiType::REGUL, preal_names);	
 	}
@@ -3291,7 +3290,7 @@ void L2PhiHandler::write_group_csv(int iter_num, int total_runs, ofstream &csv, 
 				csv << ',' << 0.0;
 			else
 				csv  << ',' << obs_group_phi_map[oreal][name];
-		if (org_reg_factor != 0.0)
+		if (get_reg_factor() != 0.0)
 		{
 			for (auto& name : pest_scenario->get_ctl_ordered_par_group_names())
 				if (par_group_phi_map[preal].find(name) == par_group_phi_map[preal].end())
@@ -3321,7 +3320,7 @@ void L2PhiHandler::prepare_group_csv(ofstream &csv, vector<string> extra)
 		csv << ',' << pest_utils::lower_cp(name);
 	for (auto &name : pest_scenario->get_ctl_ordered_obs_group_names())
 		csv << ',' << pest_utils::lower_cp(name);
-	if (org_reg_factor != 0.0)
+	if (get_reg_factor() != 0.0)
 	{
 		for (auto& name : pest_scenario->get_ctl_ordered_par_group_names())
 			csv << ',' << pest_utils::lower_cp(name);
@@ -3827,7 +3826,7 @@ map<string, double> L2PhiHandler::calc_composite(map<string, double> &_meas, map
 		{
 			mea = _meas.at(orn);
 			reg = _regul.at(prn);
-			phi_map[orn] = mea + (reg * org_reg_factor);
+			phi_map[orn] = mea + (reg * get_reg_factor());
 		}
 	}
 	return phi_map;
@@ -5241,7 +5240,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         reinflate_to_minphi_real = true;
         //pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_reinflate(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate());
     }
-	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
+	vector<double> lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();   // local, just for the log below
 	if (lam_mults.size() == 0)
 		lam_mults.push_back(1.0);
 	message(1, "using lambda multipliers: ", lam_mults);
@@ -5270,14 +5269,13 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	int subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
 
-    reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor();
-    if (reg_factor < 0)
+    // reg_factor is no longer cached: the magnitude is read live via get_reg_factor()
+    // (= abs of the option) for the upgrade calc, and the phi handler derives the negative
+    // 'full solution' semantics live via max(0, option). We no longer mutate the option to
+    // 0.0, which previously left reg_factor stale and inconsistent across three copies.
+    if (pest_scenario.get_pestpp_options().get_ies_reg_factor() < 0)
     {
-        reg_factor *= -1.0;
-        message(1, "using reg_factor in upgrade calculations with full solution: ", reg_factor);
-        //reset the passed reg factor to 0.0 so that the phi handler wont try to use it
-        pest_scenario.get_pestpp_options_ptr()->set_ies_reg_factor(0.0);
-
+        message(1, "using reg_factor in upgrade calculations with full solution: ", get_reg_factor());
         if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
         {
             message(1, "WARNING: negative reg_factor passed, implying a full solution, resetting 'ies_use_approx' to false ");
@@ -7225,7 +7223,11 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 
 bool EnsembleMethod::solve_glm(int cycle)
 {
-	vector<double> lambdas = lam_mults;
+	// read the lambda multipliers live from the options (was a member cached at initialize),
+	// so a runtime change to ies_lambda_mults takes effect on the next solve
+	vector<double> lambdas = pest_scenario.get_pestpp_options().get_ies_lam_mults();
+	if (lambdas.size() == 0)
+		lambdas.push_back(1.0);
 	message(1, "current lambda: ", last_best_lam);
 	for (auto& m : lambdas)
 		m *= last_best_lam;
@@ -7425,7 +7427,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	pe_upgrade.set_trans_status(pe.get_trans_status());
 	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
     EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, weights, localizer, parcov, Am, ph,
-		use_localizer, iter, act_par_names, act_obs_names, reg_factor);
+		use_localizer, iter, act_par_names, act_obs_names, get_reg_factor());
     double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
     if (mm_alpha > 0.0)
     {

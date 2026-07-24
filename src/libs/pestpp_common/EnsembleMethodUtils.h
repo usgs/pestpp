@@ -150,7 +150,10 @@ private:
 	void write_group_csv(int iter_num, int total_runs, ofstream &csv,
 		vector<double> extra = vector<double>());
 
-	double org_reg_factor;
+	// live reg factor for phi: negative option value means 'full solution', for which the
+	// phi handler must ignore regularization (0.0); otherwise the option value. Was cached in
+	// org_reg_factor after the option got mutated to 0.0 at init.
+	double get_reg_factor() const { double r = pest_scenario->get_pestpp_options().get_ies_reg_factor(); return r < 0.0 ? 0.0 : r; }
 	vector<string> oreal_names,preal_names;
 	Pest* pest_scenario;
 	FileManager* file_manager;
@@ -441,7 +444,9 @@ protected:
 	L2PhiHandler ph;
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
-	double reg_factor;
+	// live reg factor magnitude for the upgrade calc (abs of the option; a negative option
+	// value signals 'full solution' but still uses the magnitude). Was a cached member.
+	double get_reg_factor() const { double r = pest_scenario.get_pestpp_options().get_ies_reg_factor(); return r < 0.0 ? -r : r; }
 	bool use_localizer;
 	Localizer localizer;
 	int num_threads;
@@ -457,7 +462,6 @@ protected:
 	int consec_bad_lambda_cycles;
 	double lambda_max, lambda_min;
 	int warn_min_reals, error_min_reals;
-	vector<double> lam_mults;
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> violation_obs;
