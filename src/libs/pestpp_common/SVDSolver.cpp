@@ -134,16 +134,17 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 	OutputFileWriter &_output_file_writer,
 	PerformanceLog *_performance_log, Covariance& _parcov,std::mt19937* _rand_gen_ptr, const string &_description, bool _phiredswh_flag, 
 	bool _splitswh_flag, bool _save_next_jacobian)
-	: pest_scenario(_pest_scenario), ctl_info(&_pest_scenario.get_control_info()), svd_info(_pest_scenario.get_svd_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
+	: pest_scenario(_pest_scenario), ctl_info(&_pest_scenario.get_control_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
 	ctl_par_info_ptr(&_pest_scenario.get_ctl_parameter_info()), obs_info_ptr(&_pest_scenario.get_ctl_observation_info()), obj_func(_obj_func),
-	file_manager(_file_manager), observations_ptr(&_pest_scenario.get_ctl_observations()), par_transform(_par_transform), der_forgive(_pest_scenario.get_pestpp_options().get_der_forgive()), phiredswh_flag(_phiredswh_flag),
+	file_manager(_file_manager), observations_ptr(&_pest_scenario.get_ctl_observations()), par_transform(_par_transform), phiredswh_flag(_phiredswh_flag),
 	splitswh_flag(_splitswh_flag), save_next_jacobian(_save_next_jacobian), prior_info_ptr(_pest_scenario.get_prior_info_ptr()), jacobian(_jacobian),
 	regul_scheme_ptr(_pest_scenario.get_regul_scheme_ptr()), output_file_writer(_output_file_writer), description(_description), best_lambda(20.0),
-	performance_log(_performance_log), base_lambda_vec(_pest_scenario.get_pestpp_options().get_base_lambda_vec()), lambda_scale_vec(_pest_scenario.get_pestpp_options().get_lambda_scale_vec()),
+	performance_log(_performance_log),
 	terminate_local_iteration(false), parcov(_parcov), rand_gen_ptr(_rand_gen_ptr)
 {
 	svd_package = new SVD_REDSVD();
-	glm_normal_form = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	// pest_scenario.get_pestpp_options().get_glm_normal_form() / pest_scenario.get_pestpp_options().get_der_forgive() / svd_info / base_lambda_vec / lambda_scale_vec are now
+	// read live from the options at point of use (see the getters below) instead of cached here.
 
 }
 
@@ -166,8 +167,8 @@ void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
 
 	}
 
-	svd_package->set_max_sing(svd_info.maxsing);
-	svd_package->set_eign_thres(svd_info.eigthresh);
+	svd_package->set_max_sing(pest_scenario.get_svd_info().maxsing);
+	svd_package->set_eign_thres(pest_scenario.get_svd_info().eigthresh);
 	svd_package->set_performance_log(performance_log);
 }
 
@@ -292,7 +293,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 				jacobian.report_errors(os);
 				os << endl;
 				os.flush();
-				if (!der_forgive) exit(0);
+				if (!pest_scenario.get_pestpp_options().get_der_forgive()) exit(0);
 			}
 		}
 
@@ -481,7 +482,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	Eigen::VectorXd upgrade_vec;
 	stringstream info_str;
 	//PestppOptions::GLMNormalForm mar_mat = pest_scenario.get_pestpp_options().get_glm_normal_form();
-	if (glm_normal_form == PestppOptions::GLMNormalForm::DIAG)
+	if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::DIAG)
 	{
 		
 		Eigen::SparseMatrix<double> S;
@@ -530,18 +531,18 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
 		
 	}
-	else if ((glm_normal_form == PestppOptions::GLMNormalForm::IDENT) ||
-		(glm_normal_form == PestppOptions::GLMNormalForm::PRIOR))
+	else if ((pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::IDENT) ||
+		(pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR))
 	{
 		JtQJ = jac.transpose() * q_mat * jac;
 		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 		
-		if (glm_normal_form == PestppOptions::GLMNormalForm::IDENT)
+		if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::IDENT)
 		{
 			//nothing to do here
 		}
 		
-		else if (glm_normal_form == PestppOptions::GLMNormalForm::PRIOR)
+		else if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
 		{
 			
 			//work up the inverse prior par cov
@@ -593,7 +594,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation));
 
 	}
-	else if (glm_normal_form == PestppOptions::GLMNormalForm::HP)
+	else if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::HP)
 	{
 		performance_log->log_event("commencing HP-style scaling (PEST_HP logic) with robust guards");
 
@@ -1162,6 +1163,10 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
  */
 ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)
 {
+	// per-call copy read live from the options; the HP-lambda path below rewrites/resizes it,
+	// so scoping it here (was a member) means each iteration starts fresh from the options
+	// instead of the previous iteration's destructively-resized leftovers.
+	std::vector<double> lambda_scale_vec = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	int num_success_calc = 0;

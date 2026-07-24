@@ -108,13 +108,11 @@ protected:
 	std::mt19937* rand_gen_ptr;
 	Covariance& parcov;
 	Pest &pest_scenario;
-	PestppOptions::GLMNormalForm glm_normal_form;
 	const static string svd_solver_type_name;
 	SVDPackage *svd_package;
 	//MarquardtMatrix mar_mat;
 	const string description;
 	const ControlInfo *ctl_info;
-	SVDInfo svd_info;
 	ObjectiveFunc *obj_func;
 	const ParameterInfo *ctl_par_info_ptr;
 	const ParameterGroupInfo *par_group_info_ptr;
@@ -131,10 +129,7 @@ protected:
 	double best_lambda;
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
-	std::vector<double> base_lambda_vec;
-	std::vector<double> lambda_scale_vec;
 	bool terminate_local_iteration;
-	bool der_forgive;
 		
 	virtual Parameters limit_parameters_freeze_all_ip(const Parameters &init_active_ctl_pars,
 		Parameters &upgrade_active_ctl_pars, const Parameters &frozen_active_ctl_pars = Parameters());
