@@ -650,15 +650,14 @@ int main(int argc, char* argv[])
             }
         }
         // process the parameter csv file
-        string par_csv_file;
         if (pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file().empty())
         {
             //throw runtime_error("control file pest++ type argument 'SWEEP_PARAMETER_CSV_FILE' is required for sweep");
             cout << "pest++ arg SWEEP_PARAMETER_CSV_FILE not set, using 'SWEEP_IN.CSV'" << endl;
-            par_csv_file = "sweep_in.csv";
+            //write the default back to the options so the scenario is the source of truth
+            pest_scenario.get_pestpp_options_ptr()->set_sweep_parameter_csv_file("sweep_in.csv");
         }
-        else
-            par_csv_file = pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file();
+        string par_csv_file = pest_scenario.get_pestpp_options().get_sweep_parameter_csv_file();
 
 
 		fout_rec << "    sweep parameter file = " << left << setw(50) << par_csv_file << endl;
@@ -818,7 +817,6 @@ int main(int argc, char* argv[])
 
 		prep_sweep_output_file(pest_scenario,obs_stream,is_binary_output);
 
-		int chunk = pest_scenario.get_pestpp_options().get_sweep_chunk();
 		//pair<vector<string>,vector<Parameters>> sweep_par_info;
 
 		//if desired, add the base run to the list of runs
@@ -833,6 +831,8 @@ int main(int argc, char* argv[])
 		vector<int> irun_ids;
 		while (true)
 		{
+			//read sweep_chunk live each pass so a mid-run change to the option propagates
+			int chunk = pest_scenario.get_pestpp_options().get_sweep_chunk();
 			//read some realizations
 			//sweep_pars.clear();
 			cout << "reading par values...";
