@@ -187,7 +187,7 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	int iter, warn_min_members, error_min_members;
 	int member_count;
-	int archive_size, infill_size;
+	int infill_size;   // archive_size is now read live from the options
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string pi_pop_file_tag = "pi_pop";
@@ -206,7 +206,6 @@ private:
 	bool prob_pareto = false; //probabilistic pareto dominance
 	bool ppd_sort;
 	int restart_iter_offset;
-	int save_every;
 	map<int,int> population_schedule;
 	vector<double> inertia_info, cog_const_range, social_const_range;
 	double curr_omega;

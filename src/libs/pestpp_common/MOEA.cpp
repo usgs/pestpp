@@ -2502,15 +2502,15 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
         dp_archive.keep_rows(dompair.first);
     }
 
-	if (op_archive.shape().first > archive_size)
+	if (op_archive.shape().first > pest_scenario.get_pestpp_options().get_mou_max_archive_size())
 	{
 	    vector<string> keep;
 		ss.str("");
-		ss << "trimming archive size from " << op_archive.shape().first << " to max archive size " << archive_size;
+		ss << "trimming archive size from " << op_archive.shape().first << " to max archive size " << pest_scenario.get_pestpp_options().get_mou_max_archive_size();
 		message(2, ss.str());
 		vector<string> members = op_archive.get_real_names();
 		keep.clear();
-		for (int i = 0; i < archive_size; i++)
+		for (int i = 0; i < pest_scenario.get_pestpp_options().get_mou_max_archive_size(); i++)
 			keep.push_back(members[i]);
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
@@ -2864,7 +2864,7 @@ void MOEA::initialize()
 	else
 		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
 
-	save_every = ppo->get_mou_save_population_every();
+	int save_every = ppo->get_mou_save_population_every();   // local, just for the init message
 	if (save_every <= 0)
 	{
 		message(1, "'mou_save_population_every' less than/equal to zero, not saving generation-specific populations (and archives)");
@@ -3670,7 +3670,6 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obj_names, obs_obj_names, obs_obj_sd_names, pi_obj_names, pi_obj_sd_names, obj_dir_mult,ppd_obj_to_sd);
-	archive_size = ppo->get_mou_max_archive_size();
 	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
@@ -3797,7 +3796,7 @@ void MOEA::initialize()
 			ss << "initialized archives with " << keep.size() << " nondominated members";
 			message(2, ss.str());
 			//dont set this here b/c it is set dynamically each gen using population schedule
-			//archive_size = num_members * 2;
+			//pest_scenario.get_pestpp_options().get_mou_max_archive_size() = num_members * 2;
 
 			//this causes the initial archive pareto summary file to be written
 			objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
@@ -4125,8 +4124,9 @@ void MOEA::iterate_to_solution()
 	vector<string> keep;
 	stringstream ss;
 	map<string, map<string, double>> summary;
-	int noptmax = pest_scenario.get_control_info().noptmax;
-	while(iter <= noptmax)
+	// read noptmax live in the loop condition (was hoisted to a local), matching the other
+	// tools, so a runtime change to noptmax extends/ends the run
+	while(iter <= pest_scenario.get_control_info().noptmax)
 	{
 		message(0, "starting generation ", iter);
 
@@ -5837,7 +5837,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
-	if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
+	if (((pest_scenario.get_pestpp_options().get_mou_save_population_every() > 0) && (iter % pest_scenario.get_pestpp_options().get_mou_save_population_every() == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
 	{
 		ss << file_manager.get_base_filename() << "." << iter;
 		if (tag.size() > 0)
@@ -5905,7 +5905,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		ss << "saved prior information population of size " << _dpi.shape().first << " X " << _dpi.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 		ss.str("");
-		if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
+		if (((pest_scenario.get_pestpp_options().get_mou_save_population_every() > 0) && (iter % pest_scenario.get_pestpp_options().get_mou_save_population_every() == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
 		{
 			ss << file_manager.get_base_filename() << "." << iter;
 			if (tag.size() > 0)
@@ -5964,7 +5964,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "saved observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 
-	if ((save_every > 0) && (iter % save_every == 0))
+	if ((pest_scenario.get_pestpp_options().get_mou_save_population_every() > 0) && (iter % pest_scenario.get_pestpp_options().get_mou_save_population_every() == 0))
 	{
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter;
