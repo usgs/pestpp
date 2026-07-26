@@ -10,6 +10,9 @@
  *  - is_init_only / get_option_scope + init-only change detection
  *  - ControlInfo programmatic access
  *  - apply_tool_defaults (centralized per-tool defaults)
+ *  - Constraints chance/risk flags derived live from options (the flagship proof that a
+ *    post-construction option change actually propagates: opt_risk, sqp_risk/STOSAG,
+ *    opt_std_weights and their effect on use_chance/use_stosag/use_fosm/get_risk)
  */
 #include <iostream>
 #include <sstream>
@@ -141,6 +144,111 @@ static void test_constraints_live()
     CHK(c.get_use_fosm(), "no stacks -> use_fosm true");
     o->set_option("OPT_STACK_SIZE", "50");
     CHK(!c.get_use_fosm(), "opt_stack_size>0 -> use_fosm false (live)");
+
+    // the STOSAG path: sqp_risk (not opt_risk) drives use_stosag, and use_stosag in turn
+    // drives use_chance and forces use_fosm off - all live from the options (Stage 5)
+    o->set_option("OPT_RISK", "0.5");        // opt_risk neutral so sqp_risk is the sole driver
+    o->set_option("SQP_RISK", "0.5");
+    CHK(!c.get_use_stosag(), "sqp_risk 0.5 -> use_stosag false");
+    CHK(!c.get_use_chance(), "both risks 0.5 -> use_chance false");
+    o->set_option("SQP_RISK", "0.9");
+    CHK(c.get_use_stosag(), "sqp_risk 0.9 -> use_stosag TRUE (live)");
+    CHK(c.get_risk() == 0.9, "get_risk follows sqp_risk when use_stosag (live)");
+    CHK(c.get_use_chance(), "sqp_risk drives use_chance even with opt_risk 0.5 (live)");
+    CHK(!c.get_use_fosm(), "use_stosag -> use_fosm false (live)");
+    o->set_option("SQP_RISK", "0.5");        // reset: stosag off
+
+    // opt_std_weights propagates live and gates use_fosm when stacks are present (Stage 5)
+    o->set_option("OPT_RISK", "0.9");
+    o->set_option("OPT_STACK_SIZE", "50");   // stacks present
+    o->set_option("OPT_STD_WEIGHTS", "false");
+    CHK(!c.get_std_weights(), "opt_std_weights false -> get_std_weights false (live)");
+    CHK(!c.get_use_fosm(), "std_weights false + stacks -> use_fosm false (live)");
+    o->set_option("OPT_STD_WEIGHTS", "true");
+    CHK(c.get_std_weights(), "opt_std_weights true -> get_std_weights true (live)");
+    CHK(c.get_use_fosm(), "std_weights true -> use_fosm true even with stacks (live)");
+}
+
+static void test_ies_reinflate_reset()
+{
+    cout << "[ies/da reinflation options: live reset propagation]" << endl;
+    PO o; o.set_defaults();
+    // registry defaults
+    CHK((o.get_ies_n_iter_reinflate() == vector<int>{0}), "n_iter_reinflate default {0}");
+    CHK((o.get_ies_reinflate_factor() == vector<double>{1.0}), "reinflate_factor default {1.0}");
+    CHK((o.get_ies_reinflate_num_reals() == vector<int>{0}), "reinflate_num_reals default {0}");
+    // all three reinflation controls are LIVE (resettable at an iteration boundary)
+    CHK(!o.is_init_only("IES_N_ITER_MEAN"), "n_iter_reinflate is live (not init-only)");
+    CHK(!o.is_init_only("IES_REINFLATE_FACTOR"), "reinflate_factor is live");
+    CHK(!o.is_init_only("IES_REINFLATE_NUM_REALS"), "reinflate_num_reals is live");
+
+    // set, then RESET to a different schedule; the getter reflects the latest each time
+    o.set_option("IES_N_ITER_REINFLATE", "3");                 // alias -> IES_N_ITER_MEAN
+    CHK((o.get_ies_n_iter_reinflate() == vector<int>{3}), "n_iter_reinflate set via alias");
+    CHK(o.is_user_set("IES_N_ITER_MEAN"), "alias->canonical provenance for reinflate schedule");
+    o.set_option("IES_N_ITER_MEAN", "2,4,6");                  // reset to a vector schedule
+    CHK((o.get_ies_n_iter_reinflate() == vector<int>{2,4,6}), "n_iter_reinflate reset to vector");
+    o.set_option("IES_REINFLATE_FACTOR", "0.5");
+    CHK((o.get_ies_reinflate_factor() == vector<double>{0.5}), "reinflate_factor set");
+    o.set_option("IES_REINFLATE_FACTOR", "0.9,0.8");           // reset
+    CHK((o.get_ies_reinflate_factor() == vector<double>{0.9,0.8}), "reinflate_factor reset to vector");
+    o.set_option("IES_REINFLATE_NUM_REALS", "-30");            // negative = draw-from-current path
+    CHK((o.get_ies_reinflate_num_reals() == vector<int>{-30}), "reinflate_num_reals set (negative)");
+    o.set_option("IES_REINFLATE_NUM_REALS", "50");             // reset positive = truncate path
+    CHK((o.get_ies_reinflate_num_reals() == vector<int>{50}), "reinflate_num_reals reset positive");
+
+    // the DA_* -> IES_* rewrite: pestpp-da reads the same reinflation controls
+    o.set_option("DA_N_ITER_REINFLATE", "7");
+    CHK((o.get_ies_n_iter_reinflate() == vector<int>{7}), "DA_N_ITER_REINFLATE resets IES reinflate schedule");
+    o.set_option("DA_REINFLATE_FACTOR", "0.6");
+    CHK((o.get_ies_reinflate_factor() == vector<double>{0.6}), "DA_REINFLATE_FACTOR resets IES reinflate factor");
+
+    // resetting a live reinflation option AFTER initialization is honored WITHOUT a warning
+    o.mark_options_initialized();
+    o.set_option("IES_REINFLATE_FACTOR", "0.7");
+    CHK((o.get_ies_reinflate_factor() == vector<double>{0.7}), "reinflate_factor reset post-init took effect");
+    CHK(o.get_init_only_change_warnings().empty(), "live reinflation reset post-init: no warning");
+}
+
+static void test_ies_ensemble_reset()
+{
+    cout << "[ies ensemble source options: par/obs/noise reset semantics]" << endl;
+    PO o; o.set_defaults();
+    // the par/obs/weights/restart ensemble SOURCES are loaded at initialize(); they are
+    // init-only, so a post-init reset must be FLAGGED (surfaced), not silently ignored
+    const char* sources[] = {"IES_PAR_EN","IES_OBS_EN","IES_WEIGHTS_ENSEMBLE",
+                             "IES_RESTART_PARAMETER_ENSEMBLE","IES_RESTART_OBSERVATION_ENSEMBLE",
+                             "IES_NUM_REALS"};
+    for (const char* k : sources)
+        CHK(o.is_init_only(k), string("ensemble source is init-only: ") + k);
+    // observation noise is generated from obs+weights; the on/off switch is LIVE
+    CHK(!o.is_init_only("IES_NO_NOISE"), "ies_no_noise is live");
+
+    // provenance + filename-case preservation for the ensemble sources (round-trip)
+    o.set_option("IES_PARAMETER_ENSEMBLE", "PriorPars.csv");   // alias, mixed case
+    CHK(o.is_user_set("IES_PAR_EN"), "par-en alias->canonical provenance");
+    CHK(o.get_ies_par_csv() == "PriorPars.csv", "par-en filename case preserved");
+    o.set_option("IES_OBS_EN", "Obs.jcb");
+    CHK(o.get_ies_obs_csv() == "Obs.jcb", "obs-en set");
+    o.set_option("IES_WEIGHTS_ENSEMBLE", "Weights.csv");
+    CHK(o.get_ies_weights_csv() == "Weights.csv", "weights-en set");
+
+    // noise toggle propagates live and can be reset
+    o.set_option("IES_NO_NOISE", "true");
+    CHK(o.get_ies_no_noise(), "ies_no_noise true (live)");
+    o.set_option("IES_NO_NOISE", "false");
+    CHK(!o.get_ies_no_noise(), "ies_no_noise reset false (live)");
+
+    // init-only SAFETY: resetting an ensemble source post-init is surfaced, per change
+    o.mark_options_initialized();
+    o.set_option("IES_PAR_EN", "NewPars.csv");
+    CHK(o.get_init_only_change_warnings().size() == 1,
+        "resetting par ensemble post-init is FLAGGED (not silently ignored)");
+    o.set_option("IES_OBS_EN", "NewObs.csv");
+    CHK(o.get_init_only_change_warnings().size() == 2, "resetting obs ensemble post-init also flagged");
+    // a live noise reset in the same window adds NO warning
+    o.set_option("IES_NO_NOISE", "true");
+    CHK(o.get_init_only_change_warnings().size() == 2, "live noise reset post-init: no new warning");
 }
 
 int main()
@@ -151,6 +259,8 @@ int main()
     test_control_info();
     test_tool_defaults();
     test_constraints_live();
+    test_ies_reinflate_reset();
+    test_ies_ensemble_reset();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;
