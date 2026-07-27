@@ -158,6 +158,36 @@ public:
 	void throw_sqp_error(string message);
 	bool should_terminate();
 
+	// ---- per-iteration building blocks -------------------------------------------------
+	// SQP does not decompose into one generate -> run -> evaluate per iteration the way ies
+	// and mou do: the line search and trust-region step each propose a step, run it, judge
+	// it, and may try again, so a single iteration issues several run batches. These are the
+	// units that shape actually has. solve_new_ensemble() is the in-tree composition of them.
+
+	/// One iteration: search direction, then line search / trust region until a step is taken.
+	bool solve_new_ensemble();
+
+	/// The 'generate' half - the search direction for the current point.
+	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
+	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
+
+	/// Propose-run-judge cycles. Each runs candidates internally via
+	/// queue_candidate_ensemble()/harvest_candidate_ensemble().
+	FilterRec line_search(map<string, Eigen::VectorXd>& search_d_map, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
+	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
+	FilterRec trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
+		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset, bool recalc);
+
+	// queue -> (drive the run manager) -> harvest. The run_* calls are the in-tree
+	// compositions; the halves let a caller run its own run_slice() loop in between.
+	map<int, int> queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs=vector<int>());
+	vector<int> harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<int, int>& real_run_ids);
+	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
+
+	map<int, int> queue_candidate_ensemble(ParameterEnsemble& dv_candidates);
+	ObservationEnsemble harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<int, int>& real_run_ids);
+	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
+
 protected:
 	// Derived live from the options.  Protected rather than private only so the selftest
 	// harness can subclass and assert they track a post-initialize() option change; this is
@@ -329,10 +359,8 @@ private:
 	// dv_cov = dv_anoms^T*dv_anoms/(m-1) internally and caches the decomposition keyed on
 	// the anomalies so repeated calls on the same dv ensemble reuse the O(n_dv^3) SVD.
 	void dvcov_svd(const Eigen::MatrixXd& dv_anoms, Eigen::MatrixXd& s, Eigen::MatrixXd& U, Eigen::MatrixXd& V);
-	bool solve_new_ensemble();
 
 	bool seek_feasible();
-	FilterRec line_search(map<string, Eigen::VectorXd>& search_d_map, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	void generate_intermediate_candidates(const string& parent_name, double start_scale, double end_scale,	int num_points,	ParameterEnsemble* dvs_subset,	const map<string, Eigen::VectorXd>& search_d_map, ParameterEnsemble& dv_intermediate, vector<string>& intermediate_cand_names);
 	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool recalc = true);
@@ -341,9 +369,6 @@ private:
 	double compute_actual_reduction(Parameters& trial_dv_values, Observations& trial_obs);
 	double compute_predicted_reduction(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
 
-	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
-	FilterRec trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
-		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset, bool recalc);
 	Eigen::VectorXd solve_trust_region_subproblem_dogleg(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, double radius);
 	Eigen::VectorXd solve_constrained_trust_region_step(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, const Eigen::MatrixXd& A, double radius);
 
@@ -357,21 +382,10 @@ private:
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	pair<Mat, bool> get_constraint_mat(Parameters& _dv_vals, Observations&_obs_vals, double working_set_tol = 0.005, const Eigen::VectorXd* lagrange_mults = nullptr, vector<string> curr_ws = vector<string>());
 
-	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(Parameters& _current_dv_, Observations& _current_obs_values, Eigen::VectorXd& grad_vector, Eigen::MatrixXd* _constraint_jco ,vector<string>* _cnames = nullptr);
-	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 
-	// queue -> (drive the run manager) -> harvest. The run_* calls are the in-tree
-	// compositions; the halves let a caller run its own run_slice() loop in between.
-	map<int, int> queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs=vector<int>());
-	vector<int> harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<int, int>& real_run_ids);
-	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
-
-	map<int, int> queue_candidate_ensemble(ParameterEnsemble& dv_candidates);
-	ObservationEnsemble harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<int, int>& real_run_ids);
-	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
 	FilterRec run_search_routine(Eigen::VectorXd& grad, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 
 	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);

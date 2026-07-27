@@ -4192,17 +4192,15 @@ void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnse
 /**
  * @brief Iterate to solution.
  */
-void MOEA::iterate_to_solution()
+/**
+ * @brief Generate the next generation's candidate population.
+ *
+ * The 'generate' phase of a generation: guard the current population size, build the
+ * offspring, and size the observation population that will receive their results. No model
+ * runs. Split out so an API caller can inspect or modify the candidates before running them.
+ */
+void MOEA::generate_generation(GenerationContext& ctx)
 {
-	iter = 1;
-	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
-	vector<string> keep;
-	stringstream ss;
-	map<string, map<string, double>> summary;
-	// read noptmax live in the loop condition (was hoisted to a local), matching the other
-	// tools, so a runtime change to noptmax extends/ends the run
-	while(iter <= pest_scenario.get_control_info().noptmax)
-	{
 		message(0, "starting generation ", iter);
 
 		if (dp.shape().first < error_min_members)
@@ -4215,26 +4213,48 @@ void MOEA::iterate_to_solution()
         }
 
 		//generate offspring
-		ParameterEnsemble new_dp = generate_population();
-		
-		//run offspring thru the model while also running risk runs, possibly at many points in dec var space	
-		ObservationEnsemble new_op(&pest_scenario, &rand_gen);
-		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
-		run_population(new_dp, new_op, true);
+		ctx.new_dp = generate_population();
+}
 
-		save_populations(new_dp, new_op);
-        //update_sim_maps(new_dp,new_op);
+/**
+ * @brief Run the candidate population (including any chance runs).
+ *
+ * The in-tree composition of queue_population()/harvest_population(); a caller driving its
+ * own run_slice() loop calls those two directly instead.
+ */
+void MOEA::run_generation(GenerationContext& ctx)
+{
+	// size the obs population here rather than in generate_generation(), so that members
+	// added to or removed from new_dp between the two phases are honored
+	ctx.new_op.reserve(ctx.new_dp.get_real_names(), op.get_var_names());
+	run_population(ctx.new_dp, ctx.new_op, true);
+}
+
+/**
+ * @brief Evaluate the run results and pick the surviving population.
+ *
+ * The 'evaluate' phase: chance shifting, merging parents and offspring, then environmental
+ * selection (nsga2 or spea2), archive update, and finally replacing dp/op with the
+ * survivors. This is where the env selectors are reached.
+ */
+void MOEA::evaluate_generation(GenerationContext& ctx)
+{
+	stringstream ss;
+	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	vector<string>& keep = ctx.keep;
+		save_populations(ctx.new_dp, ctx.new_op);
+        //update_sim_maps(ctx.new_dp,ctx.new_op);
 
 
         if (pest_scenario.get_pestpp_options().get_mou_use_multigen())
         {
-            update_sim_maps(new_dp,new_op);
+            update_sim_maps(ctx.new_dp,ctx.new_op);
         }
 
         if (should_use_multigen())
         {
             message(1,"using multi-generational population in dominance sorting");
-            fill_populations_from_maps(new_dp,new_op);
+            fill_populations_from_maps(ctx.new_dp,ctx.new_op);
         }
 
 		if (constraints.get_use_chance())
@@ -4243,41 +4263,41 @@ void MOEA::iterate_to_solution()
             if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 2) {
                 ss.str("");
                 ss << "all.pre-shift";
-                save_populations(new_dp, new_op, ss.str());
+                save_populations(ctx.new_dp, ctx.new_op, ss.str());
             }
 
 
-            string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
+            string csum = constraints.mou_population_observation_constraint_summary(iter,ctx.new_op,"pre-shift",obs_obj_names);
 		    cout << csum;
 		    file_manager.rec_ofstream() << csum;
 		    string opt_member;
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op, opt_member);
 			constraints.presolve_chance_report(iter, po.second,true, "chance constraint summary (calculated at optimal/mean decision variable point)");
-			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_dp, new_op,opt_member);
-			save_populations(new_dp, new_op_shifted,"chance");
-			new_op = new_op_shifted;
+			ObservationEnsemble new_op_shifted = get_chance_shifted_op(ctx.new_dp, ctx.new_op,opt_member);
+			save_populations(ctx.new_dp, new_op_shifted,"chance");
+			ctx.new_op = new_op_shifted;
 		}
         else if (!should_use_multigen()) {
             //append offspring dp and (risk-shifted) op to make new dp and op containers
 
-            new_dp.append_other_rows(dp);
+            ctx.new_dp.append_other_rows(dp);
             if (dp.get_fixed_info().get_map_size() > 0)
             {
                 map<string,map<string,double>> fi = dp.get_fixed_info().get_fixed_info_map();
-                new_dp.get_fixed_info().add_realizations(fi);
+                ctx.new_dp.get_fixed_info().add_realizations(fi);
             }
-            new_op.append_other_rows(op);
+            ctx.new_op.append_other_rows(op);
         }
 
         vector<MouGenType> pso_check = get_gen_types();
         if (find(pso_check.begin(),pso_check.end(),MouGenType::PSO) != pso_check.end()) {
-            update_pso_pbest(new_dp, new_op);
+            update_pso_pbest(ctx.new_dp, ctx.new_op);
         }
 
 		if (get_envtype() == MouEnvType::NSGA)
 		{
-			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
-			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, prob_pareto, true, POP_SUM_TAG);
+			message(1, "pareto dominance sorting combined parent-child populations of size ", ctx.new_dp.shape().first);
+			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, ctx.new_op, ctx.new_dp, &constraints, prob_pareto, true, POP_SUM_TAG);
 			//the ordering must not be by fitness
 
             if (should_use_multigen()) {
@@ -4296,9 +4316,9 @@ void MOEA::iterate_to_solution()
 			if (keep.size() > 0)
 			{
 				//update the archive of nondom members
-				ParameterEnsemble new_dp_nondom = new_dp;
+				ParameterEnsemble new_dp_nondom = ctx.new_dp;
 				new_dp_nondom.keep_rows(keep);
-				ObservationEnsemble new_op_nondom = new_op;
+				ObservationEnsemble new_op_nondom = ctx.new_op;
 				new_op_nondom.keep_rows(keep);
 				update_archive_nsga(new_op_nondom, new_dp_nondom);
 			}
@@ -4312,10 +4332,10 @@ void MOEA::iterate_to_solution()
 			}
 
 			message(1, "resizing current populations to ", keep.size());
-			new_dp.keep_rows(keep);
-			new_op.keep_rows(keep);
-			dp = new_dp;
-			op = new_op;
+			ctx.new_dp.keep_rows(keep);
+			ctx.new_op.keep_rows(keep);
+			dp = ctx.new_dp;
+			op = ctx.new_op;
 
 
 
@@ -4323,16 +4343,16 @@ void MOEA::iterate_to_solution()
 
 		else if (get_envtype() == MouEnvType::SPEA)
 		{
-			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
+			map<string, double> fit = objectives.get_spea2_fitness(iter, ctx.new_op, ctx.new_dp, &constraints, true, POP_SUM_TAG);
 			//first find all members with fitness less than 1 (nondom)
             if (should_use_multigen())
             {
                 message(2,"keeping all feasible nondom members from multigenerational population");
-                keep = new_dp.get_real_names();
+                keep = ctx.new_dp.get_real_names();
             }
             else {
                 keep.clear();
-                for (auto member : new_dp.get_real_names()) {
+                for (auto member : ctx.new_dp.get_real_names()) {
                     if (fit[member] < 1.0)
                         keep.push_back(member);
                 }
@@ -4354,13 +4374,13 @@ void MOEA::iterate_to_solution()
             }
 			if (keep.size() > num_members)
 			{
-				objectives.get_spea2_archive_names_to_keep(num_members, keep, new_op, new_dp);
+				objectives.get_spea2_archive_names_to_keep(num_members, keep, ctx.new_op, ctx.new_dp);
 			}
 			message(1, "resizing current populations to ", keep.size());
-			new_dp.keep_rows(keep);
-			new_op.keep_rows(keep);
-			dp = new_dp;
-			op = new_op;
+			ctx.new_dp.keep_rows(keep);
+			ctx.new_op.keep_rows(keep);
+			dp = ctx.new_dp;
+			op = ctx.new_op;
 			update_archive_spea(op, dp);
 		}
 
@@ -4368,6 +4388,15 @@ void MOEA::iterate_to_solution()
 		{
 			throw_moea_error("unrecognized 'mou_env'");
 		}
+}
+
+/**
+ * @brief Per-generation decision-variable and objective reporting.
+ */
+void MOEA::report_generation(GenerationContext& ctx)
+{
+	stringstream ss;
+	map<string, map<string, double>> summary;
         ss.str("");
         ss << "generation " << iter << " decision variable summary:";
         message(0, ss.str());
@@ -4388,10 +4417,30 @@ void MOEA::iterate_to_solution()
 		message(0, ss.str());
 		obj_func_change_report(summary);
 		previous_obj_summary = summary;
-		constraints.mou_report(iter, new_dp, new_op, obs_obj_names, pi_obj_names, true);
+		constraints.mou_report(iter, ctx.new_dp, ctx.new_op, obs_obj_names, pi_obj_names, true);
         ss.str("");
         ss << "number of feasible solutions at the end of generation " << iter << ": " << objectives.get_num_feasible();
         message(1,ss.str());
+}
+
+/**
+ * @brief The generation loop, composed from the phases above.
+ *
+ * generate -> run -> evaluate -> report is exactly the sequence an API caller writes; this
+ * is the in-tree client of that surface.
+ */
+void MOEA::iterate_to_solution()
+{
+	iter = 1;
+	// read noptmax live in the loop condition (was hoisted to a local), matching the other
+	// tools, so a runtime change to noptmax extends/ends the run
+	while(iter <= pest_scenario.get_control_info().noptmax)
+	{
+		GenerationContext ctx(&pest_scenario, &rand_gen);
+		generate_generation(ctx);
+		run_generation(ctx);
+		evaluate_generation(ctx);
+		report_generation(ctx);
 		iter++;
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2))

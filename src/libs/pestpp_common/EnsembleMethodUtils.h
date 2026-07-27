@@ -549,6 +549,48 @@ public:
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
 
+	// ---- per-iteration building blocks --------------------------------------------------
+	// The loop in IterEnsembleSmoother::iterate_2_solution() and DataAssimilator::da_update()
+	// is written against nothing but these, so if the built-in loop compiles, an API caller
+	// can write any loop. solve()/solve_glm()/solve_mda() are the in-tree compositions of the
+	// stages below and double as the worked example of how to sequence them.
+	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
+
+	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
+
+	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
+	// The stages solve() is built from, in call order. Each takes the shared UpgradeContext
+	// by reference; a status other than CONTINUE means the iteration is over. Split out so an
+	// API caller can drive generate -> run -> evaluate itself and own run management in
+	// between; solve() is now just the in-tree composition of these.
+	UpgradeStatus prepare_upgrades(UpgradeContext& ctx, bool use_mda,
+		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
+	void generate_upgrades(UpgradeContext& ctx, bool use_mda,
+		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
+	UpgradeStatus check_noniterative_shortcut(UpgradeContext& ctx);
+	void run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
+		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
+	UpgradeStatus evaluate_upgrades(UpgradeContext& ctx);
+	UpgradeStatus complete_subset_runs(UpgradeContext& ctx, int cycle, bool use_mda);
+	UpgradeStatus accept_or_reject(UpgradeContext& ctx, bool use_mda, int cycle);
+
+	// Candidate lifetime. Called inline by the stages above unless the context asks to defer
+	// (UpgradeContext::defer_candidate_release), in which case they are the caller's to call.
+	void release_unused_candidates(UpgradeContext& ctx, bool include_responses = false);
+	void release_spilled_candidate_files(UpgradeContext& ctx);
+
+	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
+
+	// queue -> (drive the run manager) -> harvest. run_lambda_ensembles() is the in-tree
+	// composition of the two halves; a caller that wants to watch or cancel runs while they
+	// are in flight calls the halves itself with its own run_slice() loop in between.
+	vector<map<int, int>> queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
+	vector<ObservationEnsemble> harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, vector<map<int, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
+	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
+
+	void report_and_save(int cycle);
+	void adjust_weights(bool save=false);
+    void reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals);
 
 protected:
 	string alg_tag;
@@ -602,42 +644,7 @@ protected:
     // not an option cache: this records a one-time resolved decision (the save_binary +
     // oversized-problem fallback flips save_dense on, erasing the state it was derived from)
     string dense_file_ext = ".bin";
-	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
 
-	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
-
-	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
-
-	// The stages solve() is built from, in call order. Each takes the shared UpgradeContext
-	// by reference; a status other than CONTINUE means the iteration is over. Split out so an
-	// API caller can drive generate -> run -> evaluate itself and own run management in
-	// between; solve() is now just the in-tree composition of these.
-	UpgradeStatus prepare_upgrades(UpgradeContext& ctx, bool use_mda,
-		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
-	void generate_upgrades(UpgradeContext& ctx, bool use_mda,
-		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
-	UpgradeStatus check_noniterative_shortcut(UpgradeContext& ctx);
-	void run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
-		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
-	UpgradeStatus evaluate_upgrades(UpgradeContext& ctx);
-	UpgradeStatus complete_subset_runs(UpgradeContext& ctx, int cycle, bool use_mda);
-	UpgradeStatus accept_or_reject(UpgradeContext& ctx, bool use_mda, int cycle);
-
-	// Candidate lifetime. Called inline by the stages above unless the context asks to defer
-	// (UpgradeContext::defer_candidate_release), in which case they are the caller's to call.
-	void release_unused_candidates(UpgradeContext& ctx, bool include_responses = false);
-	void release_spilled_candidate_files(UpgradeContext& ctx);
-
-	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
-
-	// queue -> (drive the run manager) -> harvest. run_lambda_ensembles() is the in-tree
-	// composition of the two halves; a caller that wants to watch or cancel runs while they
-	// are in flight calls the halves itself with its own run_slice() loop in between.
-	vector<map<int, int>> queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
-	vector<ObservationEnsemble> harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, vector<map<int, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
-	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
-
-	void report_and_save(int cycle);
 
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
 
@@ -658,7 +665,6 @@ protected:
 
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
-	void adjust_weights(bool save=false);
 
     void adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
             map<string,double>& phi_fracs);
@@ -676,6 +682,5 @@ protected:
 
     double get_lambda();
 
-    void reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals);
 };
 #endif

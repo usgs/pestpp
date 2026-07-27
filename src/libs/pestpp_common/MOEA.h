@@ -165,9 +165,29 @@ private:
 };
 
 
+/**
+ * @brief State carried across the phases of one generation.
+ *
+ * generate_generation() fills new_dp and sizes new_op; run_generation() fills new_op;
+ * evaluate_generation() consumes both and decides who survives. Holding them here is what
+ * lets the phases be called separately - and lets a caller add or remove members between
+ * them, since everything downstream keys off member names rather than positions.
+ */
+struct GenerationContext
+{
+	GenerationContext(Pest* _pest_scenario, std::mt19937* _rand_gen)
+		: new_dp(_pest_scenario, _rand_gen), new_op(_pest_scenario, _rand_gen) {}
+	GenerationContext(const GenerationContext&) = delete;
+	GenerationContext& operator=(const GenerationContext&) = delete;
+
+	ParameterEnsemble new_dp;    ///< the candidate population
+	ObservationEnsemble new_op;  ///< their model results
+	vector<string> keep;         ///< members surviving environmental selection
+};
+
 class MOEA
 {
-	
+
 public:
 	
 	static mt19937_64 rand_engine;
@@ -176,6 +196,13 @@ public:
 	void initialize();
     void iterate_to_solution();
 	void finalize();
+
+	// One generation, as separately callable phases: generate -> run -> evaluate -> report.
+	// iterate_to_solution() is the in-tree composition of exactly these calls.
+	void generate_generation(GenerationContext& ctx);
+	void run_generation(GenerationContext& ctx);
+	void evaluate_generation(GenerationContext& ctx);
+	void report_generation(GenerationContext& ctx);
 	typedef pair<vector<string>, vector<string>> DomPair;
 protected:
 	// Derived live from the options so they can be swapped between generations - each was a
