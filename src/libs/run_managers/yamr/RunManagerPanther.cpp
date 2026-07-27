@@ -718,7 +718,7 @@ void RunManagerPanther::run()
  * @brief Start a batch: reset the per-batch counters and get the workers ready.
  *
  * Split out of run_until() so a caller can drive the batch itself - begin_batch(),
- * then pump() in slices with queries and cancels in between, then end_batch().
+ * then run_slice() in slices with queries and cancels in between, then end_batch().
  * run_until() is now just the in-tree composition of those three.
  */
 void RunManagerPanther::begin_batch()
@@ -781,9 +781,9 @@ void RunManagerPanther::begin_batch()
  * @brief Run the scheduling loop until the given condition trips or the batch finishes.
  *
  * This is the body of the old run_until() loop, unchanged. Nothing here resets batch
- * state, so it is safe to call repeatedly - which is what makes pump() work.
+ * state, so it is safe to call repeatedly - which is what makes run_slice() work.
  */
-RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::pump_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
+RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
 {
 	RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL;
 	stringstream ss;
@@ -995,12 +995,12 @@ void RunManagerPanther::end_batch(RUN_UNTIL_COND terminate_reason)
 }
 
 /**
- * @brief One batch, composed from begin_batch()/pump_until()/end_batch().
+ * @brief One batch, composed from begin_batch()/run_scheduling_loop()/end_batch().
  */
 RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
 {
 	begin_batch();
-	RUN_UNTIL_COND terminate_reason = pump_until(condition, max_no_ops, max_time_sec);
+	RUN_UNTIL_COND terminate_reason = run_scheduling_loop(condition, max_no_ops, max_time_sec);
 	end_batch(terminate_reason);
 	return terminate_reason;
 }
@@ -2917,16 +2917,16 @@ void RunManagerYAMRCondor::parse_submit_file()
 }
 
 /**
- * @brief Pump the scheduling loop for one time slice.
+ * @brief Run the scheduling loop for one time slice.
  *
  * The master is never blocked on a model run - the models execute on the workers and this
  * loop only polls sockets - so returning between slices costs nothing and gives the caller
  * a lock-free window to inspect state or cancel runs.
  */
-PantherPumpStatus RunManagerPanther::pump(double max_seconds)
+RunManagerAbstract::RUN_SLICE_STATUS RunManagerPanther::run_slice(double max_seconds)
 {
-	pump_until(RUN_UNTIL_COND::TIME, 0, max_seconds);
-	return all_runs_complete() ? PantherPumpStatus::ALL_DONE : PantherPumpStatus::RUNNING;
+	run_scheduling_loop(RUN_UNTIL_COND::TIME, 0, max_seconds);
+	return all_runs_complete() ? RUN_SLICE_STATUS::ALL_DONE : RUN_SLICE_STATUS::RUNNING;
 }
 
 /**

@@ -68,6 +68,18 @@ public:
 	virtual void update_run(int run_id, const Parameters &pars, const Observations &obs);
 	virtual void run() = 0;
 	virtual RunManagerAbstract::RUN_UNTIL_COND run_until(RUN_UNTIL_COND condition, int n_nops = 0, double sec = 0.0);
+
+	/// Whether a run_slice() slice left work outstanding.
+	enum class RUN_SLICE_STATUS { RUNNING, ALL_DONE };
+
+	// Sliced batch driving: begin_batch(), run_slice() until ALL_DONE, end_batch(). Lets a caller
+	// - the tools here, or an API user - get control back between slices to watch progress,
+	// query run states or cancel runs. Only PANTHER can actually yield mid-batch; the
+	// defaults below run the whole batch in the first run_slice(), so every run manager can be
+	// driven the same way and callers do not have to special-case.
+	virtual void begin_batch() {}
+	virtual RUN_SLICE_STATUS run_slice(double max_seconds = 0.05) { run(); return RUN_SLICE_STATUS::ALL_DONE; }
+	virtual void end_batch(RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL) {}
 	virtual const std::vector<std::string> &get_par_name_vec() const;
 	virtual const std::vector<std::string> &get_obs_name_vec() const;
 	virtual void get_info(int run_id, int &run_status, std::string &info_txt, double &info_value);

@@ -19,6 +19,26 @@
 
 using namespace std;
 
+/**
+ * @brief Drive one batch of model runs through the run manager's sliced interface.
+ *
+ * Does the same work as run_mgr_ptr->run(), but in slices, so control comes back between
+ * them. That gap is the seam an API caller uses to watch run states, read timings or cancel
+ * runs while the batch is in flight; driving the in-tree path through it too keeps both on
+ * the same code. Run managers that cannot yield mid-batch finish it in the first slice.
+ */
+static void drive_run_batch(RunManagerAbstract* run_mgr_ptr, double slice_sec = 0.05)
+{
+	run_mgr_ptr->begin_batch();
+	while (run_mgr_ptr->run_slice(slice_sec) == RunManagerAbstract::RUN_SLICE_STATUS::RUNNING)
+	{
+		// control is here between slices - nothing the tools need to do yet, but this is
+		// where a caller-supplied progress/cancel hook would go
+	}
+	run_mgr_ptr->end_batch();
+}
+
+
 //util functions
 typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
 // Defining a lambda function to compare two pairs. It will compare two pairs using second field
@@ -2741,7 +2761,13 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
  *
  * @return Description.
  */
-vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
+/**
+ * @brief Queue a population (plus any chance runs) with the run manager.
+ *
+ * First half of run_population(). Paired with harvest_population(); a caller that wants to
+ * watch or cancel runs mid-generation drives the run manager itself in between.
+ */
+map<int, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chance)
 {
 	run_mgr_ptr->reinitialize();
 	//queue up any chance related runs
@@ -2772,22 +2798,15 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	{
 		throw_moea_error(string("run_ensemble() error queueing runs"));
 	}
-	performance_log->log_event("making runs");
-	try
-	{
-		run_mgr_ptr->run();
-	}
-	catch (const exception& e)
-	{
-		stringstream ss;
-		ss << "error running ensemble: " << e.what();
-		throw_moea_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_moea_error(string("error running ensemble"));
-	}
+	return real_run_ids;
+}
 
+/**
+ * @brief Collect a queued population's runs into _op, returning the failed indices.
+ */
+vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<int, int>& real_run_ids)
+{
+	stringstream ss;
 	performance_log->log_event("processing runs");
 	
 	vector<int> failed_real_indices;
@@ -2835,6 +2854,30 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 		constraints.update_chance_offsets();
 	}
 	return failed_real_indices;
+}
+
+/**
+ * @brief Queue, run and harvest a population - the in-tree composition.
+ */
+vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
+{
+	map<int, int> real_run_ids = queue_population(_dp, allow_chance);
+	performance_log->log_event("making runs");
+	try
+	{
+		drive_run_batch(run_mgr_ptr);
+	}
+	catch (const exception& e)
+	{
+		stringstream ss;
+		ss << "error running population: " << e.what();
+		throw_moea_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_moea_error(string("error running ensemble"));
+	}
+	return harvest_population(_dp, _op, allow_chance, real_run_ids);
 }
 
 /**

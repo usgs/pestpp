@@ -149,9 +149,6 @@ struct PantherRunTimeStats
 	int n_workers_total = 0, n_workers_active = 0, n_workers_waiting = 0, n_workers_unavailable = 0;
 };
 
-/// Whether a pump() slice left work outstanding.
-enum class PantherPumpStatus { RUNNING, ALL_DONE };
-
 class RunManagerPanther : public RunManagerAbstract
 {
 public:
@@ -181,15 +178,15 @@ public:
 	// cancel in between, on the same thread and without locks.
 
 	/// Start a batch: reset per-batch counters and get the workers ready. Call once before
-	/// pumping. run_until() calls this for you.
-	void begin_batch();
+	/// slicing. run_until() calls this for you.
+	virtual void begin_batch();
 
-	/// Pump the scheduling loop for one slice, then hand control back so the caller can
+	/// Run the scheduling loop for one slice, then hand control back so the caller can
 	/// query, cancel or adjust. ALL_DONE means the batch is finished.
-	PantherPumpStatus pump(double max_seconds = 0.05);
+	virtual RUN_SLICE_STATUS run_slice(double max_seconds = 0.05);
 
 	/// Finish a batch: drain outstanding file transfers, report, release workers.
-	void end_batch(RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL);
+	virtual void end_batch(RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL);
 
 	/// Aggregate timings and counts for the batch in flight.
 	PantherRunTimeStats get_run_time_stats();
@@ -246,7 +243,7 @@ private:
 	std::set<int> user_cancelled_runs;   ///< runs a caller gave up on; never rescheduled
 	std::set<int> timed_out_runs;        ///< runs killed for running past the overdue threshold
 	std::chrono::system_clock::time_point batch_start_time;
-	RUN_UNTIL_COND pump_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec);
+	RUN_UNTIL_COND run_scheduling_loop(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec);
 	void record_timed_out(int run_id);
 	pest_utils::thread_flag terminate_idle_thread;
 	pest_utils::thread_flag currently_idle;

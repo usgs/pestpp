@@ -17,6 +17,26 @@
 #include "constraints.h"
 #include "EnsembleSmoother.h"
 
+/**
+ * @brief Drive one batch of model runs through the run manager's sliced interface.
+ *
+ * Does the same work as run_mgr_ptr->run(), but in slices, so control comes back between
+ * them. That gap is the seam an API caller uses to watch run states, read timings or cancel
+ * runs while the batch is in flight; driving the in-tree path through it too keeps both on
+ * the same code. Run managers that cannot yield mid-batch finish it in the first slice.
+ */
+static void drive_run_batch(RunManagerAbstract* run_mgr_ptr, double slice_sec = 0.05)
+{
+	run_mgr_ptr->begin_batch();
+	while (run_mgr_ptr->run_slice(slice_sec) == RunManagerAbstract::RUN_SLICE_STATUS::RUNNING)
+	{
+		// control is here between slices - nothing the tools need to do yet, but this is
+		// where a caller-supplied progress/cancel hook would go
+	}
+	run_mgr_ptr->end_batch();
+}
+
+
 
 bool SqpFilter::accept(double obj_val, double violation_val, double violation_padded, Parameters p, Observations o, string rname, int iter, bool keep)
 {
@@ -1394,7 +1414,7 @@ void SeqQuadProgram::prep_4_fd_grad()
 			int run_id = run_mgr_ptr->add_run(pts.ctl2model_cp(current_ctl_dv_values));
 			queue_chance_runs();
 
-			run_mgr_ptr->run();
+			drive_run_batch(run_mgr_ptr);
 			bool success = run_mgr_ptr->get_run(run_id, current_ctl_dv_values, current_obs);
 			if (!success)
 				throw_sqp_error("initial (base) run with initial decision vars failed...cannot continue");
@@ -1415,7 +1435,7 @@ void SeqQuadProgram::prep_4_fd_grad()
 			if (constraints.get_use_chance())
 			{
 				queue_chance_runs();
-				run_mgr_ptr->run();
+				drive_run_batch(run_mgr_ptr);
 				constraints.process_runs(run_mgr_ptr, iter);
 			}
 		}
@@ -5784,7 +5804,13 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 
 }
 
-ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates)
+/**
+ * @brief Queue the runs with the run manager (first half of the composed call below).
+ *
+ * Paired with the harvest half so a caller can drive the run manager itself in between
+ * and watch or cancel runs while they are in flight.
+ */
+map<int, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_candidates)
 {
 	run_mgr_ptr->reinitialize();
 	ofstream &frec = file_manager.rec_ofstream();
@@ -5809,23 +5835,15 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 		throw_sqp_error(string("run_ensembles() error queueing runs"));
 	}
 	
-	performance_log->log_event("making runs");
-	try
-	{
+	return real_run_ids;
+}
 
-		run_mgr_ptr->run();
-	}
-	catch (const exception &e)
-	{
-		stringstream ss;
-		ss << "error running ensembles: " << e.what();
-		throw_sqp_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_sqp_error(string("error running ensembles"));
-	}
-
+/**
+ * @brief Collect the queued runs (second half); assumes the runs have been made.
+ */
+ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<int, int>& real_run_ids)
+{
+	stringstream ss;
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
 	
@@ -5953,6 +5971,30 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 }
 
 /**
+ * @brief Queue, run and harvest - the in-tree composition.
+ */
+ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates)
+{
+	map<int, int> real_run_ids = queue_candidate_ensemble(dv_candidates);
+	performance_log->log_event("making runs");
+	try
+	{
+		drive_run_batch(run_mgr_ptr);
+	}
+	catch (const exception &e)
+	{
+		stringstream ss;
+		ss << "error running ensemble: " << e.what();
+		throw_sqp_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_sqp_error(string("error running ensemble"));
+	}
+	return harvest_candidate_ensemble(dv_candidates, real_run_ids);
+}
+
+/**
  * @brief Queue chance runs.
  */
 void SeqQuadProgram::queue_chance_runs()
@@ -6006,7 +6048,13 @@ void SeqQuadProgram::queue_chance_runs()
  *
  * @return Description.
  */
-vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
+/**
+ * @brief Queue the runs with the run manager (first half of the composed call below).
+ *
+ * Paired with the harvest half so a caller can drive the run manager itself in between
+ * and watch or cancel runs while they are in flight.
+ */
+map<int, int> SeqQuadProgram::queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs)
 {
 	run_mgr_ptr->reinitialize();
 	stringstream ss;
@@ -6031,22 +6079,15 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 
 	queue_chance_runs();
 
-	performance_log->log_event("making runs");
-	try
-	{
-		run_mgr_ptr->run();
-	}
-	catch (const exception &e)
-	{
-		stringstream ss;
-		ss << "error running ensemble: " << e.what();
-		throw_sqp_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_sqp_error(string("error running ensemble"));
-	}
+	return real_run_ids;
+}
 
+/**
+ * @brief Collect the queued runs (second half); assumes the runs have been made.
+ */
+vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<int, int>& real_run_ids)
+{
+	stringstream ss;
 	performance_log->log_event("processing runs");
 	_oe.reserve(_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 	if (real_idxs.size() > 0)
@@ -6095,6 +6136,30 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	constraints.process_runs(run_mgr_ptr, iter);
 
 	return failed_real_indices;
+}
+
+/**
+ * @brief Queue, run and harvest - the in-tree composition.
+ */
+vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
+{
+	map<int, int> real_run_ids = queue_ensemble(_pe, real_idxs);
+	performance_log->log_event("making runs");
+	try
+	{
+		drive_run_batch(run_mgr_ptr);
+	}
+	catch (const exception &e)
+	{
+		stringstream ss;
+		ss << "error running ensemble: " << e.what();
+		throw_sqp_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_sqp_error(string("error running ensemble"));
+	}
+	return harvest_ensemble(_pe, _oe, real_idxs, real_run_ids);
 }
 
 

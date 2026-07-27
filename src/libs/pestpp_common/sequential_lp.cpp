@@ -19,6 +19,26 @@
 #include <iomanip>
 #include "utilities.h"
 
+/**
+ * @brief Drive one batch of model runs through the run manager's sliced interface.
+ *
+ * Does the same work as run_mgr_ptr->run(), but in slices, so control comes back between
+ * them. That gap is the seam an API caller uses to watch run states, read timings or cancel
+ * runs while the batch is in flight; driving the in-tree path through it too keeps both on
+ * the same code. Run managers that cannot yield mid-batch finish it in the first slice.
+ */
+static void drive_run_batch(RunManagerAbstract* run_mgr_ptr, double slice_sec = 0.05)
+{
+	run_mgr_ptr->begin_batch();
+	while (run_mgr_ptr->run_slice(slice_sec) == RunManagerAbstract::RUN_SLICE_STATUS::RUNNING)
+	{
+		// control is here between slices - nothing the tools need to do yet, but this is
+		// where a caller-supplied progress/cancel hook would go
+	}
+	run_mgr_ptr->end_batch();
+}
+
+
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
 	Covariance &_parcov, FileManager* _file_mgr_ptr, OutputFileWriter _of_wr, PerformanceLog& _pfm) 
 	: pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
@@ -589,7 +609,7 @@ void sequentialLP::iter_solve()
     //    chance ("more constrained") optimum ends up with a BETTER objective than the
     //    deterministic one - which is backwards;
     //  - contaminates the reported offset with the decision-variable move at postsolve, so
-    //    zero-parameter-variance constraints (e.g. pumping-rate WEL constraints, which are
+    //    zero-parameter-variance constraints (e.g. slicing-rate WEL constraints, which are
     //    pure functions of the decision variables) get a spurious non-zero chance offset;
     //  - has no analog in the FOSM chance path (current_sim +/- probit*stdev, a margin on
     //    the base run) and is noise-sensitive to the finite stack's mean.
@@ -1106,7 +1126,7 @@ bool sequentialLP::make_upgrade_run(Parameters &upgrade_pars, Observations &upgr
 
 	cout << "  ---  running the model once with optimal decision variables  ---  " << endl;
 	int run_id = run_mgr_ptr->add_run(par_trans.active_ctl2model_cp(upgrade_pars));
-	run_mgr_ptr->run();
+	drive_run_batch(run_mgr_ptr);
 	bool success = run_mgr_ptr->get_run(run_id, upgrade_pars, upgrade_obs);
 	if (success)
 		par_trans.model2active_ctl_ip(upgrade_pars);
@@ -1204,7 +1224,7 @@ void sequentialLP::iter_presolve()
 			{
 				cout << "  ---  running the model once with initial decision variables  ---  " << endl;
 			}*/
-			run_mgr_ptr->run();
+			drive_run_batch(run_mgr_ptr);
 			Parameters pars;
 			bool success = run_mgr_ptr->get_run(run_id, pars, current_constraints_sim);
 			if (!success)
@@ -1280,7 +1300,7 @@ void sequentialLP::iter_presolve()
 
 
 		//jco.make_runs(*run_mgr_ptr);
-		run_mgr_ptr->run();
+		drive_run_batch(run_mgr_ptr);
 		set<int> failed = run_mgr_ptr->get_failed_run_ids();
 
 		//process the remaining responses

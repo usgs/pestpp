@@ -363,7 +363,14 @@ private:
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(const Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& _constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>* _cnames = nullptr);
 
+	// queue -> (drive the run manager) -> harvest. The run_* calls are the in-tree
+	// compositions; the halves let a caller run its own run_slice() loop in between.
+	map<int, int> queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs=vector<int>());
+	vector<int> harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<int, int>& real_run_ids);
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
+
+	map<int, int> queue_candidate_ensemble(ParameterEnsemble& dv_candidates);
+	ObservationEnsemble harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<int, int>& real_run_ids);
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
 	FilterRec run_search_routine(Eigen::VectorXd& grad, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 

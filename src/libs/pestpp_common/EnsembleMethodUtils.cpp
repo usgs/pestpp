@@ -13,6 +13,26 @@
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
+
+/**
+ * @brief Drive one batch of model runs through the run manager's sliced interface.
+ *
+ * Does the same work as run_mgr_ptr->run(), but in slices, so control comes back between
+ * them. That gap is the seam an API caller uses to watch run states, read timings or cancel
+ * runs while the batch is in flight; driving the in-tree path through it too keeps both on
+ * the same code. Run managers that cannot yield mid-batch finish it in the first slice.
+ */
+static void drive_run_batch(RunManagerAbstract* run_mgr_ptr, double slice_sec = 0.05)
+{
+	run_mgr_ptr->begin_batch();
+	while (run_mgr_ptr->run_slice(slice_sec) == RunManagerAbstract::RUN_SLICE_STATUS::RUNNING)
+	{
+		// control is here between slices - nothing the tools need to do yet, but this is
+		// where a caller-supplied progress/cancel hook would go
+	}
+	run_mgr_ptr->end_batch();
+}
+
 #include "Ensemble.h"
 #include "ObjectiveFunc.h"
 #include "covariance.h"
@@ -4225,7 +4245,13 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 }
 
 
-vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe, 
+/**
+ * @brief Queue one ensemble's runs and hand back the run-id map.
+ *
+ * First half of run_ensemble_util(). Paired with harvest_ensemble_util(); the caller drives
+ * the run manager in between and so can watch or cancel runs while they are in flight.
+ */
+map<int, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag)
 {
 	stringstream ss;
@@ -4247,24 +4273,18 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		throw runtime_error(string("run_ensemble() error queueing runs"));
 	}
-	performance_log->log_event("making runs");
-	try
-	{
-		run_mgr_ptr->run();
-	}
-	catch (const exception& e)
-	{
-		ss.str("");
-		ss << "error running ensemble: " << e.what();
-		performance_log->log_event(ss.str());
-		throw runtime_error(ss.str());
-	}
-	catch (...)
-	{
-        performance_log->log_event("error running ensemble");
-		throw runtime_error(string("error running ensemble"));
-	}
+	return real_run_ids;
+}
 
+/**
+ * @brief Collect one ensemble's completed runs into _oe, returning the failed indices.
+ *
+ * Second half of run_ensemble_util(); assumes the runs have been made.
+ */
+vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe, ObservationEnsemble& _oe,
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, map<int, int>& real_run_ids)
+{
+	stringstream ss;
 	performance_log->log_event("processing runs");
 	if (real_idxs.size() > 0)
 	{
@@ -4354,6 +4374,34 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 		}
 	}
 	return failed_real_indices;
+}
+
+/**
+ * @brief Queue, run and harvest one ensemble - the in-tree composition.
+ */
+vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe,
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag)
+{
+	map<int, int> real_run_ids = queue_ensemble_util(performance_log, frec, _pe, run_mgr_ptr, check_pe_consistency, real_idxs, da_cycle, additional_tag);
+	stringstream ss;
+	performance_log->log_event("making runs");
+	try
+	{
+		drive_run_batch(run_mgr_ptr);
+	}
+	catch (const exception& e)
+	{
+		ss.str("");
+		ss << "error running ensemble: " << e.what();
+		performance_log->log_event(ss.str());
+		throw runtime_error(ss.str());
+	}
+	catch (...)
+	{
+		performance_log->log_event("error running ensemble");
+		throw runtime_error(string("error running ensemble"));
+	}
+	return harvest_ensemble_util(performance_log, frec, _pe, _oe, run_mgr_ptr, check_pe_consistency, real_idxs, real_run_ids);
 }
 
 EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
@@ -4671,7 +4719,15 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 }
 
 
-vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, 
+/**
+ * @brief Queue the candidate upgrade ensembles with the run manager.
+ *
+ * First half of the old run_lambda_ensembles(): everything up to, but not including, making
+ * the runs. Returns the per-candidate run-id maps that harvest_lambda_ensembles() needs.
+ * Split out so a caller can queue, drive the run manager itself - watching run states or
+ * cancelling as it goes - and harvest when it is ready.
+ */
+vector<map<int, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
 	ofstream& frec = file_manager.rec_ofstream();
@@ -4714,23 +4770,20 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 			throw_em_error(string("run_ensembles() error queueing runs"));
 		}
 	}
-	performance_log->log_event("making runs");
-	try
-	{
+	return real_run_ids_vec;
+}
 
-		run_mgr_ptr->run();
-	}
-	catch (const exception& e)
-	{
-		stringstream ss;
-		ss << "error running ensembles: " << e.what();
-		throw_em_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_em_error(string("error running ensembles"));
-	}
-
+/**
+ * @brief Collect the results of the queued candidate ensembles.
+ *
+ * Second half of the old run_lambda_ensembles(): assumes the runs have been made, and turns
+ * them into one observation ensemble per candidate, dropping failed realizations from both
+ * the parameter and observation side as it goes.
+ */
+vector<ObservationEnsemble> EnsembleMethod::harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
+	vector<double>& scale_vals, vector<map<int, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
+{
+	ofstream& frec = file_manager.rec_ofstream();
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
 	vector<ObservationEnsemble> obs_lams;
@@ -4829,6 +4882,31 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		obs_lams.push_back(_oe);
 	}
 	return obs_lams;
+}
+
+/**
+ * @brief Queue, run and harvest the candidate ensembles - the in-tree composition.
+ */
+vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
+	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
+{
+	vector<map<int, int>> real_run_ids_vec = queue_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, pe_subset_idxs, oe_subset_idxs);
+	performance_log->log_event("making runs");
+	try
+	{
+		drive_run_batch(run_mgr_ptr);
+	}
+	catch (const exception& e)
+	{
+		stringstream ss;
+		ss << "error running ensembles: " << e.what();
+		throw_em_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_em_error(string("error running ensembles"));
+	}
+	return harvest_lambda_ensembles(pe_lams, lam_vals, scale_vals, real_run_ids_vec, pe_subset_idxs, oe_subset_idxs);
 }
 
 pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe)
