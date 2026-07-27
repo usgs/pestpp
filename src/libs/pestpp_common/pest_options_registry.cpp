@@ -467,7 +467,7 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_ies_localize_how(value); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_ies_localize_how("PARAMETERS"); },
         [](const PestppOptions& o)->string{ return o.get_ies_localize_how(); } },
-    OptionSpec{ "IES_NUM_THREADS", {}, OptType::INT, "ies", true,
+    OptionSpec{ "IES_NUM_THREADS", {}, OptType::INT, "ies", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_ies_num_threads(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_ies_num_threads(-1); },
         [](const PestppOptions& o)->string{ return std::to_string(o.get_ies_num_threads()); } },
@@ -931,7 +931,9 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_sqp_filter_tol(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_sqp_filter_tol(0.001); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_sqp_filter_tol(); return ss.str(); } },
-    OptionSpec{ "SQP_WORKING_SET_TOL", {}, OptType::DOUBLE, "sqp", false,
+    // init-only: SeqQuadProgram seeds its adaptive working_set_tol from this once and then
+    // tightens it per accepted iteration, so a later change would be silently ignored
+    OptionSpec{ "SQP_WORKING_SET_TOL", {}, OptType::DOUBLE, "sqp", true,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_sqp_working_set_tol(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_sqp_working_set_tol(0.10); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_sqp_working_set_tol(); return ss.str(); } },

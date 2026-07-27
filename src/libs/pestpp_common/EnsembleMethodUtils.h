@@ -433,7 +433,6 @@ public:
 
 protected:
 	string alg_tag;
-	int  verbose_level;
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	std::mt19937 rand_gen;
@@ -447,12 +446,23 @@ protected:
 	// live reg factor magnitude for the upgrade calc (abs of the option; a negative option
 	// value signals 'full solution' but still uses the magnitude). Was a cached member.
 	double get_reg_factor() const { double r = pest_scenario.get_pestpp_options().get_ies_reg_factor(); return r < 0.0 ? -r : r; }
+	// live verbosity - was cached at initialize(), so bumping it mid-run did nothing
+	int get_verbose_level() const { return pest_scenario.get_pestpp_options().get_ies_verbose_level(); }
+	// live thread count - each solve() spins its own pool, so this is safe to change per iteration
+	int get_num_threads() const { return pest_scenario.get_pestpp_options().get_ies_num_threads(); }
+	// derived: subset testing is off when the requested subset is at least the whole ensemble.
+	// negative (percentage) subset sizes always compare below the ensemble size, so they enable it
+	bool get_use_subset() { return pest_scenario.get_pestpp_options().get_ies_subset_size() <= pe.shape().first; }
+	// derived: any negative entry in n_iter_reinflate selects the min-phi realization to reinflate around
+	bool get_reinflate_to_minphi_real() const {
+		for (auto n : pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate())
+			if (n < 0) return true;
+		return false;
+	}
 	bool use_localizer;
 	Localizer localizer;
-	int num_threads;
 	set<string> pp_args;
 	int iter;
-	bool use_subset;
 	double last_best_lam, last_best_mean, last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;
@@ -469,8 +479,9 @@ protected:
 	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
-    bool reinflate_to_minphi_real;
     ObservationInfo org_obs_info;
+    // not an option cache: this records a one-time resolved decision (the save_binary +
+    // oversized-problem fallback flips save_dense on, erasing the state it was derived from)
     string dense_file_ext = ".bin";
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
 

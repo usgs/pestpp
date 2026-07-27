@@ -658,7 +658,7 @@ void SeqQuadProgram::sanity_checks()
 	{
 		warnings.push_back("unrecognized 'pestmode', using 'estimation'");
 	}
-	if ((use_ensemble_grad) && (ppo->get_sqp_num_reals() < warn_min_reals) && (par_csv.size() == 0))
+	if ((get_use_ensemble_grad()) && (ppo->get_sqp_num_reals() < warn_min_reals) && (par_csv.size() == 0))
 	{
 		ss.str("");
 		ss << "ies_num_reals < " << warn_min_reals << ", this is prob too few";
@@ -1214,10 +1214,9 @@ void SeqQuadProgram::initialize()
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
-	use_ensemble_grad = false;
-	if ((ppo->get_sqp_num_reals() > 0) || (ppo->get_sqp_dv_en().size() > 0))
+	// the flag itself is derived live by get_use_ensemble_grad(); only the tracking reset here
+	if (get_use_ensemble_grad())
 	{
-		use_ensemble_grad = true;
 		sampling_tracking_initialized = false;
 	}
 	sanity_checks();
@@ -1242,7 +1241,7 @@ void SeqQuadProgram::initialize()
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_obs = pest_scenario.get_ctl_observations();
 
-	if (use_ensemble_grad)
+	if (get_use_ensemble_grad())
 	{
 		prep_4_ensemble_grad();
 	}
@@ -1493,7 +1492,7 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs)
 {
 	stringstream ss;
-	if (use_ensemble_grad)
+	if (get_use_ensemble_grad())
 	{
 		
 		ParameterEnsemble _dv(&pest_scenario, &rand_gen);
@@ -2000,7 +1999,7 @@ Covariance SeqQuadProgram::calc_objective_hessian()
 {
 	message(1, "starting ensemble hessian approximation for iteration ", iter);
 
-	if (!use_ensemble_grad)
+	if (!get_use_ensemble_grad())
 	{
 		message(1, "Ensemble Hessian requires ensemble gradient mode - skipping");
 		return Covariance();
@@ -2118,7 +2117,7 @@ bool SeqQuadProgram::hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_
 
 		if (pest_scenario.get_pestpp_options().get_sqp_use_ensemble_approx_hessian())
 		{
-			if (use_ensemble_grad && dv.shape().first >= 2)
+			if (get_use_ensemble_grad() && dv.shape().first >= 2)
 			{
 				Covariance obj_hessian = calc_objective_hessian();
 				if (obj_hessian.get_col_names().empty())
@@ -2497,7 +2496,7 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 		bool use_stosag = false;
 		Eigen::MatrixXd H_stosag;
 
-		if (use_ensemble_grad && dv.shape().first >= 2 && (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG"))
+		if (get_use_ensemble_grad() && dv.shape().first >= 2 && (pest_scenario.get_pestpp_options().get_sqp_hessian_update_method() == "STOSAG"))
 		{
 			
 			Covariance obj_hessian = calc_objective_hessian();
@@ -2634,7 +2633,7 @@ void SeqQuadProgram::iterate_2_solution()
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{ 		
 		iter++;
-		if (use_ensemble_grad)
+		if (get_use_ensemble_grad())
 			accept = solve_new_ensemble();
 		else {
 			throw_sqp_error("only ensemble gradient currently implemented");
@@ -2643,7 +2642,7 @@ void SeqQuadProgram::iterate_2_solution()
 		if (accept)
 		{
 			n_consec_infeas = 0;
-			if (!use_ensemble_grad)
+			if (!get_use_ensemble_grad())
 				working_set_tol = max(0.05, working_set_tol * 0.5);
 		}
 		else
@@ -2693,7 +2692,7 @@ void SeqQuadProgram::iterate_2_solution()
 
 		make_gradient_runs(current_ctl_dv_values, current_obs);
 
-		if (use_ensemble_grad)
+		if (get_use_ensemble_grad())
 			report_and_save_ensemble(dv, oe);
 		else
 			save_current_dv_obs();
@@ -2710,7 +2709,7 @@ void SeqQuadProgram::iterate_2_solution()
 
         constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
-        if (use_ensemble_grad)
+        if (get_use_ensemble_grad())
         {
             ss.str("");
             ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
@@ -2961,7 +2960,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	if (!_center_on.empty())
 		center_on = _center_on;
 
-	if (use_ensemble_grad)
+	if (get_use_ensemble_grad())
 	{
 		// compute sample dec var cov matrix and its pseudo inverse
 		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
@@ -3439,7 +3438,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct(const Eigen::
 
 pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observations& _obs_vals, double working_set_tol, const Eigen::VectorXd* lm, vector<string> curr_ws)
 {
-	if (use_ensemble_grad) 
+	if (get_use_ensemble_grad()) 
 	{
 		Parameters decvar = _dv_vals.get_subset(dv_names.begin(), dv_names.end());
 
@@ -4064,7 +4063,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 	}
 
 	sv_lineage_map.clear();
-	if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
+	if ((get_use_ensemble_grad()) && (SOLVE_EACH_REAL))
 	{
 		for (auto sv : scale_vals)
 		{
@@ -4078,7 +4077,7 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 		}
 
 	}
-	else if (use_ensemble_grad)
+	else if (get_use_ensemble_grad())
 	{
 		if (dvs_subset != nullptr) 
 		{
@@ -5144,7 +5143,7 @@ bool SeqQuadProgram::seek_feasible()
 
     file_manager.set_base_filename(ss.str());
     IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
-    if (use_ensemble_grad) {
+    if (get_use_ensemble_grad()) {
 
         ies.set_pe(dv);
         ies.set_oe(oe);
@@ -5964,7 +5963,7 @@ void SeqQuadProgram::queue_chance_runs()
 	stringstream ss;
 	if (constraints.should_update_chance(iter))
 	{
-		if (use_ensemble_grad)
+		if (get_use_ensemble_grad())
 		{
 			if (chancepoints == chancePoints::ALL)
 			{

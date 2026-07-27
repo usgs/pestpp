@@ -2030,6 +2030,68 @@ void MOEA::throw_moea_error(const string& message)
 }
 
 /**
+ * @brief The environmental selector, derived live from 'mou_env_selector'.
+ *
+ * Was cached during initialize(); read at point of use now so the selector can be
+ * switched between generations. NSGA_PPD shares the NSGA type - the probabilistic
+ * pareto part rides on `prob_pareto`, which is still set during initialize().
+ */
+MouEnvType MOEA::get_envtype()
+{
+	string env = pest_scenario.get_pestpp_options().get_mou_env_selector();
+	if ((env == "NSGA") || (env == "NSGA_PPD"))
+		return MouEnvType::NSGA;
+	else if (env == "SPEA")
+		return MouEnvType::SPEA;
+	throw_moea_error("'mou_env_selector' type not recognized: " + env + ", should be 'NSGA' or 'SPEA'");
+	return MouEnvType::NSGA;   // not reached
+}
+
+/**
+ * @brief The mating pool selector, derived live from 'mou_mating_selector'.
+ */
+MouMateType MOEA::get_mattype()
+{
+	string mate = pest_scenario.get_pestpp_options().get_mou_mating_selector();
+	if (mate == "RANDOM")
+		return MouMateType::RANDOM;
+	else if (mate == "TOURNAMENT")
+		return MouMateType::TOURNAMENT;
+	throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
+	return MouMateType::RANDOM;   // not reached
+}
+
+/**
+ * @brief The generator list, parsed live from 'mou_generator'.
+ *
+ * Was accumulated into a member during initialize() (and never cleared, so a second
+ * initialize() doubled it); parsing at point of use lets the generator mix change
+ * between generations.
+ */
+vector<MouGenType> MOEA::get_gen_types()
+{
+	vector<MouGenType> types;
+	vector<string> tokens;
+	pest_utils::tokenize(pest_utils::upper_cp(pest_scenario.get_pestpp_options().get_mou_generator()), tokens, ",");
+	for (auto token : tokens)
+	{
+		if (token == "DE")
+			types.push_back(MouGenType::DE);
+		else if (token == "SBX")
+			types.push_back(MouGenType::SBX);
+		else if (token == "PM")
+			types.push_back(MouGenType::PM);
+		else if (token == "PSO")
+			types.push_back(MouGenType::PSO);
+		else if (token == "SIMPLEX")
+			types.push_back(MouGenType::SMP);
+		else
+			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
+	}
+	return types;
+}
+
+/**
  * @brief Get max len obj name.
  *
  * @return Description.
@@ -2413,11 +2475,12 @@ void MOEA::sanity_checks()
 	}
 	
 	bool use_pso = false;
-	for (auto gt : gen_types)
+	vector<MouGenType> check_gen_types = get_gen_types();
+	for (auto gt : check_gen_types)
 		if (gt == MouGenType::PSO)
 			use_pso = true;
 	if (use_pso)
-		if (gen_types.size() > 1)
+		if (check_gen_types.size() > 1)
 			errors.push_back("'PSO' generator cannot be used with other generators...");
 
 	
@@ -2785,7 +2848,7 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
  */
 ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member)
 {
-	if (risk_obj)
+	if (get_risk_obj())
 		return constraints.get_chance_shifted_constraints(_dp, _op, iter, RISK_NAME, opt_member);
 	else
 		return constraints.get_chance_shifted_constraints(_dp, _op, iter, string(), opt_member);
@@ -2826,43 +2889,32 @@ void MOEA::initialize()
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
+	// get_envtype() validates the option; only the prob_pareto side-effects on `objectives`
+	// and the init messages live here
 	string env = ppo->get_mou_env_selector();
+	get_envtype();
 	if (env == "NSGA")
 	{
-		envtype = MouEnvType::NSGA;
 		prob_pareto = false;
 		objectives.set_prob_pareto(prob_pareto);
 		message(1, "using 'nsga2' env selector");
 	}
 	else if (env == "NSGA_PPD")
 	{
-		envtype = MouEnvType::NSGA;
 		prob_pareto = true;
 		objectives.set_ppd_beta();
 		objectives.set_prob_pareto(prob_pareto);
 		message(1, "using 'nsga2_ppd' env selector");
 	}
-	else if (env == "SPEA")
+	else
 	{
-		envtype = MouEnvType::SPEA;
 		message(1, "using 'spea2' env selector");
 	}
-	else
-		throw_moea_error("'mou_env_selector' type not recognized: " + env + ", should be 'NSGA' or 'SPEA'");
 
-	string mate = ppo->get_mou_mating_selector();
-	if (mate == "RANDOM")
-	{
-		mattype = MouMateType::RANDOM;
+	if (get_mattype() == MouMateType::RANDOM)
 		message(1, "using random mating pool selector");
-	}	
-	else if (mate == "TOURNAMENT")
-	{
-		mattype = MouMateType::TOURNAMENT;
-		message(1, "using binary tournament mating pool selector");
-	}
 	else
-		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
+		message(1, "using binary tournament mating pool selector");
 
 	int save_every = ppo->get_mou_save_population_every();   // local, just for the init message
 	if (save_every <= 0)
@@ -3165,8 +3217,6 @@ void MOEA::initialize()
 	file_manager.rec_ofstream() << ss.str();
 	cout << ss.str();
 
-	risk_obj = pest_scenario.get_pestpp_options().get_mou_risk_obj();
-	
 	if (pi_obj_names.size() > 0)
 	{
 		ss.str("");
@@ -3180,7 +3230,7 @@ void MOEA::initialize()
 
 	}
 	
-	if (risk_obj)
+	if (get_risk_obj())
 	{
 		set<string> snames(act_par_names.begin(), act_par_names.end());
 		if (snames.find(RISK_NAME) == snames.end())
@@ -3315,44 +3365,24 @@ void MOEA::initialize()
 		return;
 	}
 	
-	string mou_generator = pest_utils::upper_cp(pest_scenario.get_pestpp_options().get_mou_generator());
-	vector<string> tokens;
 	int pop_size = pest_scenario.get_pestpp_options().get_mou_population_size();
-	pest_utils::tokenize(mou_generator, tokens, ",");
-	for (auto token : tokens)
+	// the list itself is parsed live by get_gen_types() (which also validates); this is the
+	// init report plus the one piece of genuine pso start-up state (curr_omega)
+	for (auto gen_type : get_gen_types())
 	{
-		if (token == "DE")
-		{
-			gen_types.push_back(MouGenType::DE);
+		if (gen_type == MouGenType::DE)
 			message(1, "using differential evolution generator");
-		}
-		else if (token == "SBX")
-		{
-			gen_types.push_back(MouGenType::SBX);
+		else if (gen_type == MouGenType::SBX)
 			message(1, "using simulated binary cross over generator");
-		}
-		else if (token == "PM")
-		{
-			gen_types.push_back(MouGenType::PM);
+		else if (gen_type == MouGenType::PM)
 			message(1, "using polynomial mutation generator");
-		}
-		else if (token == "PSO")
+		else if (gen_type == MouGenType::PSO)
 		{
-			gen_types.push_back(MouGenType::PSO);
 			message(1, "using particle swarm generator");
-			inertia_info = pest_scenario.get_pestpp_options().get_mou_pso_inertia();
-			curr_omega = inertia_info[0];
-			pso_dv_bound_handling = pest_scenario.get_pestpp_options().get_mou_pso_dv_bound_handling();
+			curr_omega = pest_scenario.get_pestpp_options().get_mou_pso_inertia()[0];
 		}
-        else if (token == "SIMPLEX")
-        {
-            gen_types.push_back(MouGenType::SMP);
-            message(1, "using simplex generator");
-        }
-        else
-		{
-			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
-		}
+		else if (gen_type == MouGenType::SMP)
+			message(1, "using simplex generator");
 	}
 	//TODO: report constraints being applied
 
@@ -3671,7 +3701,7 @@ void MOEA::initialize()
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obj_names, obs_obj_names, obs_obj_sd_names, pi_obj_names, pi_obj_sd_names, obj_dir_mult,ppd_obj_to_sd);
 	vector<string> keep;
-	if (envtype == MouEnvType::NSGA)
+	if (get_envtype() == MouEnvType::NSGA)
 	{
 
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
@@ -3766,7 +3796,7 @@ void MOEA::initialize()
 			
 				
 	}
-	else if (envtype == MouEnvType::SPEA)
+	else if (get_envtype() == MouEnvType::SPEA)
 	{
 		map<string, double> fit = objectives.get_spea2_fitness(iter, op, dp, &constraints, true, POP_SUM_TAG);
 		keep.clear();
@@ -4020,11 +4050,13 @@ ParameterEnsemble MOEA::generate_population()
     int total_new_members = population_schedule.at(iter);
 	//add new members for any missing
 	//total_new_members += (total_new_members - dp.shape().first);
-	int new_members_per_gen = int(total_new_members / gen_types.size());
+	// one live read per generation - the generator mix can change between generations
+	vector<MouGenType> cur_gen_types = get_gen_types();
+	int new_members_per_gen = int(total_new_members / cur_gen_types.size());
 	ParameterEnsemble new_pop(&pest_scenario, &rand_gen);
 	new_pop.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, prob_pareto, false);
-	for (auto gen_type : gen_types)
+	for (auto gen_type : cur_gen_types)
 	{
 		ParameterEnsemble p(&pest_scenario);
 		if (gen_type == MouGenType::DE)
@@ -4194,11 +4226,12 @@ void MOEA::iterate_to_solution()
             new_op.append_other_rows(op);
         }
 
-        if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
+        vector<MouGenType> pso_check = get_gen_types();
+        if (find(pso_check.begin(),pso_check.end(),MouGenType::PSO) != pso_check.end()) {
             update_pso_pbest(new_dp, new_op);
         }
 
-		if (envtype == MouEnvType::NSGA)
+		if (get_envtype() == MouEnvType::NSGA)
 		{
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, prob_pareto, true, POP_SUM_TAG);
@@ -4245,7 +4278,7 @@ void MOEA::iterate_to_solution()
 
 		}
 
-		else if (envtype == MouEnvType::SPEA)
+		else if (get_envtype() == MouEnvType::SPEA)
 		{
 			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 			//first find all members with fitness less than 1 (nondom)
@@ -4671,7 +4704,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 		}
 		else
 		{
-			new_dom_old = objectives.compare_two(f, s, envtype);
+			new_dom_old = objectives.compare_two(f, s, get_envtype());
 			if (!new_dom_old)
 			{
 				real = pso_pbest_dp.get_real_vector(s);
@@ -4732,6 +4765,8 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 	set<string> snames(real_names.begin(), real_names.end());
 
 	double omega;
+	vector<double> inertia_info = pest_scenario.get_pestpp_options().get_mou_pso_inertia();
+	string pso_dv_bound_handling = pest_scenario.get_pestpp_options().get_mou_pso_dv_bound_handling();
 	if (((iter - 1) <= inertia_info[2]) && (inertia_info[2] != 0))
 	{
 		omega = inertia_info[0] + (inertia_info[1] - inertia_info[0]) * ((iter - 1) / inertia_info[2]);
@@ -5388,7 +5423,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	map<string,string> primary_parent_map;
 	while (i < num_members)
     {
-		selected = selection(4, _dp, mattype);
+		selected = selection(4, _dp, get_mattype());
 		if (adaptive_f)
 		{
 			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
@@ -5516,7 +5551,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	map<string,string> primary_parent_map;
 	while (imember < num_members)
 	{
-		selected = selection(1, _dp, mattype);
+		selected = selection(1, _dp, get_mattype());
 		parent = _dp.get_real_vector(selected[0]);
 		if (adaptive_mr)
 			mut_prob = parent[var_map[MR_NAME]];
@@ -5564,7 +5599,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
  *
  * @return Description.
  */
-vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& _mattype)
+vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateType _mattype)
 {
 	int i_member = 0, p1_idx,p2_idx;
 	vector<int> member_count, working_count, selected, r_int_vec;
@@ -5593,7 +5628,7 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 		s2 = real_names[p2_idx];
 		if (_mattype==MouMateType::TOURNAMENT)
 		{
-			if (objectives.compare_two(s1, s2, envtype))
+			if (objectives.compare_two(s1, s2, get_envtype()))
 				selected_members.emplace(p1_idx);
 			else
 				selected_members.emplace(p2_idx);
@@ -5666,7 +5701,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	map<string,string> primary_parent_map;
 	while (i_member < num_members)
 	{
-		selected = selection(2, _dp, mattype);
+		selected = selection(2, _dp, get_mattype());
 		p1_idx = selected[0];
 		p2_idx = selected[1];
 
@@ -5713,7 +5748,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
-	//if (find(gen_types.begin(),gen_types.end(),MouGenType::PM) == gen_types.end())
+	//if (find(get_gen_types().begin(),get_gen_types().end(),MouGenType::PM) == get_gen_types().end())
 	gauss_mutation_ip(tmp_dp);
 	//generate_pm_population(tmp_dp.shape().first, tmp_dp);
 	

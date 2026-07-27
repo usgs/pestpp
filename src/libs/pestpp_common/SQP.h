@@ -211,6 +211,9 @@ private:
 	vector<double> best_violations;
 	double best_phi_yet;
 	double best_violation_yet;
+	// adaptive state, not an option cache: seeded from sqp_working_set_tol at initialize()
+	// and then tightened on each accepted fd iteration, so the option is an initial value
+	// only (registered init-only, so a later change is surfaced rather than ignored)
 	double working_set_tol;
 
 	map<string, double> obj_map, total_viol_map;
@@ -224,7 +227,9 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	vector<string> adj_par_names;
-	bool use_cma = true, adjust_step_control = false;
+	// resolved init state: latched off during initialize() when cma was requested but could
+	// not be set up (sqp_num_reals is init-only, so this cannot go stale mid-run)
+	bool use_cma = true;
 
 	// sqp_subset_size follows the ies convention: 0 => no subset (use the full ensemble);
 	// any non-zero value (negative = percentage of the ensemble, positive = absolute count)
@@ -264,7 +269,12 @@ private:
 	set<int> unselected_dv_indices;  
 	bool sampling_tracking_initialized, cma_reset_archive = true;
 
-	bool use_ensemble_grad;
+	// derived: an ensemble gradient is used whenever an ensemble was requested, either by
+	// size or by file.  both drivers are init-only, so this is stable across a run
+	bool get_use_ensemble_grad() const {
+		return (pest_scenario.get_pestpp_options().get_sqp_num_reals() > 0) ||
+		       (pest_scenario.get_pestpp_options().get_sqp_dv_en().size() > 0);
+	}
 	bool is_blocking_constraint = false;
 	bool is_base_infeas = false;
 	bool seek_ies = false;

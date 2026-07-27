@@ -178,12 +178,14 @@ public:
 	void finalize();
 	typedef pair<vector<string>, vector<string>> DomPair;
 private:
-	MouEnvType envtype;
-	MouMateType mattype;
+	// env selector, mating selector and generator list are derived live from the options so
+	// they can be swapped between generations - each was a member cached during initialize()
+	MouEnvType get_envtype();
+	MouMateType get_mattype();
+	vector<MouGenType> get_gen_types();
 	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;
-	vector<MouGenType> gen_types;
 	vector<string> act_obs_names, act_par_names;
 	int iter, warn_min_members, error_min_members;
 	int member_count;
@@ -202,15 +204,15 @@ private:
 	map<string, double> obj_dir_mult;
 	int n_adaptive_dvs;
 	map<string, map<string, double>> previous_obj_summary, previous_dv_summary;
-	bool risk_obj;
+	bool get_risk_obj() const { return pest_scenario.get_pestpp_options().get_mou_risk_obj(); }
+	// still a member: flipping it also has to re-push state into `objectives` (set_ppd_beta)
 	bool prob_pareto = false; //probabilistic pareto dominance
 	bool ppd_sort;
 	int restart_iter_offset;
 	map<int,int> population_schedule;
-	vector<double> inertia_info, cog_const_range, social_const_range;
+	// pso inertia/cognitive/social ranges and the bound handling are read live at point of use
 	double curr_omega;
 	map<string, double> pso_vmax;
-	string pso_dv_bound_handling;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
@@ -274,7 +276,7 @@ private:
 
 	map<string, string> current_pso_lineage_map, current_empcov_lineage_map;
 
-	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
+	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType matetype);
 
 	string get_new_member_name(string tag = string());
 

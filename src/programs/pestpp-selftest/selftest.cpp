@@ -251,6 +251,96 @@ static void test_ies_ensemble_reset()
     CHK(o.get_init_only_change_warnings().size() == 2, "live noise reset post-init: no new warning");
 }
 
+static void test_ies_iteration_controls()
+{
+    cout << "[ies per-iteration controls: subset/threads/verbosity are live]" << endl;
+    PO o; o.set_defaults();
+    // these three used to be snapshotted into EnsembleMethod members during initialize();
+    // they are now read at point of use, so the registry must advertise them as live
+    CHK(!o.is_init_only("IES_SUBSET_SIZE"), "ies_subset_size is live");
+    CHK(!o.is_init_only("IES_NUM_THREADS"), "ies_num_threads is live (each solve spins its own pool)");
+    CHK(!o.is_init_only("IES_VERBOSE_LEVEL"), "ies_verbose_level is live");
+    CHK(!o.is_init_only("IES_LAM_MULTS"), "ies_lam_mults is live");
+    CHK(!o.is_init_only("IES_REG_FACTOR"), "ies_reg_factor is live");
+
+    // values round-trip through the generic setter, including the negative (percentage)
+    // subset convention and the negative reg_factor 'full solution' signal
+    o.set_option("IES_SUBSET_SIZE", "-25");
+    CHK(o.get_ies_subset_size() == -25, "subset_size negative (percentage) accepted");
+    o.set_option("IES_NUM_THREADS", "8");
+    CHK(o.get_ies_num_threads() == 8, "num_threads set");
+    o.set_option("IES_VERBOSE_LEVEL", "3");
+    CHK(o.get_ies_verbose_level() == 3, "verbose_level set");
+
+    // all three reset AFTER initialization, with no init-only warning
+    o.mark_options_initialized();
+    o.set_option("IES_SUBSET_SIZE", "12");
+    o.set_option("IES_NUM_THREADS", "2");
+    o.set_option("IES_VERBOSE_LEVEL", "1");
+    CHK(o.get_ies_subset_size() == 12, "subset_size reset post-init took effect");
+    CHK(o.get_ies_num_threads() == 2, "num_threads reset post-init took effect");
+    CHK(o.get_ies_verbose_level() == 1, "verbose_level reset post-init took effect");
+    CHK(o.get_init_only_change_warnings().empty(), "iteration controls reset post-init: no warning");
+}
+
+static void test_mou_generation_controls()
+{
+    cout << "[mou per-generation controls: selectors/generator/risk are live]" << endl;
+    PO o; o.set_defaults();
+    // MOEA used to cache envtype/mattype/gen_types/risk_obj at initialize(); they are
+    // derived live now, so the generator mix and selectors can change per generation
+    const char* live[] = {"MOU_ENV_SELECTOR","MOU_MATING_SELECTOR","MOU_GENERATOR",
+                          "MOU_RISK_OBJECTIVE","MOU_PSO_INERTIA","MOU_PSO_DV_BOUND_HANDLING",
+                          "MOU_SAVE_POPULATION_EVERY"};
+    for (const char* k : live)
+        CHK(!o.is_init_only(k), string("mou generation control is live: ") + k);
+    // the population size sizes the initial draw, so it stays init-only (the per-generation
+    // member count comes from the population_schedule, which is a live lookup)
+    CHK(o.is_init_only("MOU_POPULATION_SIZE"), "mou_population_size is init-only (sizes the initial draw)");
+
+    o.set_option("MOU_ENV_SELECTOR", "spea");
+    CHK(o.get_mou_env_selector() == "SPEA", "env selector set (upper-cased)");
+    o.set_option("MOU_GENERATOR", "de,sbx");
+    CHK(o.get_mou_generator() == "de,sbx", "generator list set");
+    o.set_option("MOU_RISK_OBJECTIVE", "true");
+    CHK(o.get_mou_risk_obj(), "risk objective set");
+
+    // switching the whole generation strategy AFTER initialization is honored, unflagged
+    o.mark_options_initialized();
+    o.set_option("MOU_ENV_SELECTOR", "nsga");
+    o.set_option("MOU_MATING_SELECTOR", "random");
+    o.set_option("MOU_GENERATOR", "pso");
+    o.set_option("MOU_RISK_OBJECTIVE", "false");
+    CHK(o.get_mou_env_selector() == "NSGA", "env selector switched post-init");
+    CHK(o.get_mou_mating_selector() == "RANDOM", "mating selector switched post-init");
+    CHK(o.get_mou_generator() == "pso", "generator switched post-init");
+    CHK(!o.get_mou_risk_obj(), "risk objective switched post-init");
+    CHK(o.get_init_only_change_warnings().empty(), "generation controls switched post-init: no warning");
+}
+
+static void test_sqp_controls()
+{
+    cout << "[sqp controls: live subset/risk vs init-only ensemble + working set seed]" << endl;
+    PO o; o.set_defaults();
+    // the ensemble sources are loaded once, and working_set_tol is adaptive state seeded
+    // from its option, so all three are init-only - a later change must be surfaced
+    CHK(o.is_init_only("SQP_NUM_REALS"), "sqp_num_reals is init-only (drives the gradient mode)");
+    CHK(o.is_init_only("SQP_DV_EN"), "sqp_dv_en is init-only");
+    CHK(o.is_init_only("SQP_WORKING_SET_TOL"), "sqp_working_set_tol is init-only (adaptive after seeding)");
+    // the per-iteration knobs stay live
+    CHK(!o.is_init_only("SQP_SUBSET_SIZE"), "sqp_subset_size is live");
+    CHK(!o.is_init_only("SQP_RISK"), "sqp_risk is live");
+    CHK(!o.is_init_only("SQP_MAX_CONSEC_INFEAS_IES"), "sqp_max_consec_infeas_ies is live");
+
+    o.mark_options_initialized();
+    o.set_option("SQP_SUBSET_SIZE", "5");
+    CHK(o.get_sqp_subset_size() == 5, "sqp_subset_size reset post-init took effect");
+    CHK(o.get_init_only_change_warnings().empty(), "live sqp reset post-init: no warning");
+    o.set_option("SQP_WORKING_SET_TOL", "0.02");
+    CHK(o.get_init_only_change_warnings().size() == 1,
+        "resetting sqp_working_set_tol post-init is FLAGGED (the solver has already adapted it)");
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -261,6 +351,9 @@ int main()
     test_constraints_live();
     test_ies_reinflate_reset();
     test_ies_ensemble_reset();
+    test_ies_iteration_controls();
+    test_mou_generation_controls();
+    test_sqp_controls();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

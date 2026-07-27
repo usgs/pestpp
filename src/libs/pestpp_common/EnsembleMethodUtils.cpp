@@ -4360,7 +4360,7 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 	RunManagerAbstract* _run_mgr_ptr, string _alg_tag) : alg_tag(_alg_tag), pest_scenario(_pest_scenario),
 	file_manager(_file_manager),output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario), verbose_level(1)
+	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 
@@ -4742,7 +4742,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
 		real_run_ids = real_run_ids_vec[i];
 
-		if ((use_subset) && ((_oe.shape().first > pe_lams[i].shape().first) || (pe_subset_idxs.size() < pe_lams[i].shape().first)))
+		if ((get_use_subset()) && ((_oe.shape().first > pe_lams[i].shape().first) || (pe_subset_idxs.size() < pe_lams[i].shape().first)))
 		{
 			_oe.keep_rows(oe_subset_idxs);
 			int ireal = 0;
@@ -5164,8 +5164,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(1, "using glm algorithm");
 	}
 
-	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
-
 	message(1, "using REDSVD for truncated svd solve");
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
@@ -5181,7 +5179,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ofstream& frec = file_manager.rec_ofstream();
 		use_localizer = localizer.initialize(performance_log, frec, forgive_missing);
 	}
-	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
 	if (!use_localizer)
 		message(1, "not using localization");
 	else
@@ -5203,10 +5200,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
 		message(1, ss.str());
 		ss.str("");
-		if (num_threads > 0)
+		if (get_num_threads() > 0)
 		{
 			ss.str("");
-			ss << "using multithreaded localization calculation with " << num_threads << " threads";
+			ss << "using multithreaded localization calculation with " << get_num_threads() << " threads";
 			message(1, ss.str());
 
 		}
@@ -5223,22 +5220,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	lambda_min = 1.0E-30;
 
 	consec_bad_lambda_cycles = 0;
-    reinflate_to_minphi_real = false;
-    bool use_min = false;
-    for (auto& fac : pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate())
-    {
-        if (fac < 0)
-        {
-            use_min = true;
-            //fac *= -1;
-        }
-    }
-
-    if (use_min)
+    // just the report here - the flag itself is derived live from the option (get_reinflate_to_minphi_real())
+    if (get_reinflate_to_minphi_real())
     {
         message(2,"n_iter_reinflate < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
-        reinflate_to_minphi_real = true;
-        //pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_reinflate(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate());
     }
 	vector<double> lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();   // local, just for the log below
 	if (lam_mults.size() == 0)
@@ -5261,7 +5246,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	sanity_checks();
 
 	bool echo = false;
-	if (verbose_level > 1)
+	if (get_verbose_level() > 1)
 		echo = true;
 
 	initialize_parcov();
@@ -5393,7 +5378,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs+noise en to align with par en...");
-                if (verbose_level > 1) {
+                if (get_verbose_level() > 1) {
                     cout << "oe names: " << endl;
                     for (auto &name : oe_names)
                         cout << name << endl;
@@ -5405,7 +5390,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
                     oe_base.reorder(pe.get_real_names(), vector<string>());
 
-                if (verbose_level > 1)
+                if (get_verbose_level() > 1)
                 {
                     oe_names = oe_base.get_real_names();
                     cout << "new oe names: " << endl;
@@ -5612,11 +5597,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
     ss.str("");
 
-	if (subset_size > pe.shape().first)
-	{
-		use_subset = false;
-	}
-	else
+	// just the report here - the subset flag itself is derived live from the option
+	if (get_use_subset())
 	{
 	    if (subset_size < 0)
         {
@@ -5628,7 +5610,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         }
 		string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 		message(1, "subset how: ", how);
-		use_subset = true;
 	}
 
 	oe_org_real_names = oe.get_real_names();
@@ -6769,7 +6750,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
         real_adj_group_phis[swr_map.first] = init_group_phis;
 
     }
-    if (verbose_level > 2)
+    if (get_verbose_level() > 2)
     {
         ss.str("");
         ss << file_manager.get_base_filename() << "." << iter << ".obsgroupadj.summary.csv";
@@ -6885,7 +6866,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
            << total / cur_mean_phi << ")";
         message(1, ss.str());
     }
-    if (verbose_level > 2)
+    if (get_verbose_level() > 2)
     {
         ss.str("");
         ss << file_manager.get_base_filename() << "." << iter << ".obsgroupadj.summary.csv";
@@ -7264,8 +7245,22 @@ bool EnsembleMethod::solve_mda(bool last_iter,int cycle)
 		}
 		mda_lambdas = scaled_mda_facs;
 	}	
-	else 
+	else
 	{
+		// the schedule was sized from noptmax back at iter 1; if noptmax has since been raised,
+		// extend it along the same geometric decay so the indexing below stays in range - the
+		// renormalization that follows redistributes the remaining mass across the new tail
+		int need = max(iter, pest_scenario.get_control_info().noptmax);
+		if ((int)mda_lambdas.size() < need)
+		{
+			stringstream mss;
+			mss << "extending mda lambda schedule from " << mda_lambdas.size() << " to " << need;
+			mss << " entries (noptmax raised since the schedule was built)";
+			message(2, mss.str());
+			double dec_fac = pest_scenario.get_pestpp_options().get_ies_mda_dec_fac();
+			while ((int)mda_lambdas.size() < need)
+				mda_lambdas.push_back(mda_lambdas.back() * dec_fac);
+		}
 		if (last_iter) // trim unused lambdas after the last iteration
 		{
 			mda_lambdas.erase(mda_lambdas.begin()+iter, mda_lambdas.end());
@@ -7350,7 +7345,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         }
     }
 
-	if ((use_subset) && (local_subset_size > pe.shape().first))
+	if ((get_use_subset()) && (local_subset_size > pe.shape().first))
 	{
 		ss.str("");
 		ss << "subset size (" << local_subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
@@ -7452,10 +7447,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		if (mm_alpha > 0.0)
         {
             message(1,"multimodal solve for inflation factor ",cur_lam);
-            es.solve_multimodal(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map, mm_alpha);
+            es.solve_multimodal(get_num_threads(), cur_lam, !use_mda, pe_upgrade, loc_map, mm_alpha);
         }
 		else{
-            es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
+            es.solve(get_num_threads(), cur_lam, !use_mda, pe_upgrade, loc_map);
 		}
 
 		map<string, double> norm_map;
@@ -7593,7 +7588,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
     double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 	ObservationEnsemble oe_lam_best(&pest_scenario);
 	bool echo = false;
-	if (verbose_level > 1)
+	if (get_verbose_level() > 1)
 		echo = true;
 	for (int i = 0; i < pe_lams.size(); i++)
 	{
@@ -7658,7 +7653,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	}
 
-    if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first)) {
+    if ((best_idx != -1) && (get_use_subset()) && (local_subset_size < pe.shape().first)) {
         double acc_phi = last_best_mean * acc_fac;
 
         if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi()) {
@@ -8105,7 +8100,7 @@ void EnsembleMethod::reinflate_par_ensemble(double reinflate_factor,int reinflat
     Eigen::VectorXd offset(mean_vec.size());
     for (int i=0;i<mean_vec.size();i++)
         offset[i] = mean_vec[i];
-    if (reinflate_to_minphi_real)
+    if (get_reinflate_to_minphi_real())
     {
         offset = pe.get_real_vector(min_phi_name);
         message(2,"using min-phi realization for offset");
@@ -8211,7 +8206,7 @@ void EnsembleMethod::message(int level, const string& _message, vector<string> _
 	}
 	if (level == 0)
 		ss << "  ---  ";
-	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+	if ((echo) && ((get_verbose_level() >= 2) || (level < 2)))
 		cout << ss.str() << endl;
 	file_manager.rec_ofstream() << ss.str() << endl;
 	performance_log->log_event(_message);
@@ -8245,7 +8240,7 @@ void EnsembleMethod::message(int level, const string& _message, vector<int> _ext
 	}
 	if (level == 0)
 		ss << "  ---  ";
-	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+	if ((echo) && ((get_verbose_level() >= 2) || (level < 2)))
 		cout << ss.str() << endl;
 	file_manager.rec_ofstream() << ss.str() << endl;
 	performance_log->log_event(_message);
@@ -8279,7 +8274,7 @@ void EnsembleMethod::message(int level, const string& _message, vector<double> _
 	}
 	if (level == 0)
 		ss << "  ---  ";
-	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+	if ((echo) && ((get_verbose_level() >= 2) || (level < 2)))
 		cout << ss.str() << endl;
 	file_manager.rec_ofstream() << ss.str() << endl;
 	performance_log->log_event(_message);
@@ -8984,11 +8979,11 @@ void EnsembleMethod::initialize_restart()
 	vector<string> missing;
 	start = oe_base_real_names.begin();
 	end = oe_base_real_names.end();
-	if (verbose_level > 3)
+	if (get_verbose_level() > 3)
 	    cout << "restart oe real names: " << endl;
 	for (auto& rname : oe_real_names)
 	{
-	    if (verbose_level > 3)
+	    if (get_verbose_level() > 3)
 		    cout << rname << endl;
 		if (find(start, end, rname) == end)
 			missing.push_back(rname);
@@ -9317,10 +9312,10 @@ Eigen::MatrixXd EnsembleMethod::get_Am(const vector<string>& real_names, const v
 	double scale = (1.0 / (sqrt(double(real_names.size() - 1))));
 	Eigen::MatrixXd par_diff = scale * pe_base.get_eigen_anomalies(real_names, par_names, pest_scenario.get_pestpp_options().get_ies_center_on());
 	par_diff.transposeInPlace();
-	if (verbose_level > 1)
+	if (get_verbose_level() > 1)
 	{
 		cout << "prior_par_diff shape: " << par_diff.rows() << ',' << par_diff.cols() << endl;
-		if (verbose_level > 2)
+		if (get_verbose_level() > 2)
 			save_mat("prior_par_diff.dat", par_diff);
 	}
 
@@ -9506,7 +9501,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 {
 	vector<int> subset_idxs;
-	if ((!use_subset) || (nreal_subset >= size))
+	if ((!get_use_subset()) || (nreal_subset >= size))
 	{
 		for (int i = 0; i < size; i++)
 			subset_idxs.push_back(i);
