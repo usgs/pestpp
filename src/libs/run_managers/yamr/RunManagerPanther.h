@@ -70,6 +70,17 @@ public:
 	void reset_last_ping_time();
 	void reset_runtime() { run_time = std::chrono::system_clock::duration::zero(); }
 	int seconds_since_last_ping_time() const;
+
+	// per-worker run history. failed_runs above is only a count; these record *which* runs
+	// this worker finished, lost or ran past the overdue threshold, so a caller can tell a
+	// consistently bad worker from an unlucky one
+	void add_completed_run_id(int _run_id) { completed_run_ids.push_back(_run_id); }
+	void add_failed_run_id(int _run_id) { failed_run_ids.push_back(_run_id); }
+	void add_timed_out_run_id(int _run_id) { timed_out_run_ids.push_back(_run_id); }
+	const std::vector<int>& get_completed_run_ids() const { return completed_run_ids; }
+	const std::vector<int>& get_failed_run_ids() const { return failed_run_ids; }
+	const std::vector<int>& get_timed_out_run_ids() const { return timed_out_run_ids; }
+
 	~AgentInfoRec(){}
 private:
 	int socket_fd;
@@ -78,6 +89,9 @@ private:
 	bool ping;
 	int failed_pings;
 	int failed_runs;
+	std::vector<int> completed_run_ids;
+	std::vector<int> failed_run_ids;
+	std::vector<int> timed_out_run_ids;
 	State state;
 	std::chrono::system_clock::duration linpack_time;
 	std::chrono::system_clock::duration run_time;
@@ -94,6 +108,49 @@ public:
 	};
 };
 
+
+/// What a run is doing right now. TIMED_OUT means it ran past the overdue threshold and was
+/// killed by the master; CANCELLED means a caller gave up on it via cancel_runs().
+enum class PantherRunStatus { QUEUED, RUNNING, COMPLETED, FAILED, TIMED_OUT, CANCELLED };
+
+/// A point-in-time view of one model run.
+struct PantherRunState
+{
+	int run_id = -1;
+	PantherRunStatus status = PantherRunStatus::QUEUED;
+	std::string host;          ///< worker currently running it; empty unless RUNNING
+	std::string work_dir;      ///< that worker's working directory
+	int agent_socket = -1;     ///< -1 unless RUNNING
+	double elapsed_sec = 0.0;  ///< how long it has been running on that worker
+	int n_concurrent = 0;      ///< workers currently running this same run_id
+	int n_failures = 0;        ///< failures accrued against this run_id so far
+};
+
+/// A point-in-time view of one worker, including what it has done so far this session.
+struct PantherWorkerState
+{
+	int socket_fd = -1;
+	std::string hostname, port, work_dir;
+	std::string state;              ///< AgentInfoRec::State as text
+	int current_run_id = -1;        ///< -1 when idle
+	double current_elapsed_sec = 0.0;
+	double avg_runtime_sec = 0.0;   ///< this worker's own average, not the global one
+	double linpack_sec = 0.0;       ///< benchmark result, a rough speed proxy
+	int n_failed_pings = 0;
+	std::vector<int> completed_runs, failed_runs, timed_out_runs;
+};
+
+/// Aggregate timing and counts for the batch in flight.
+struct PantherRunTimeStats
+{
+	double global_avg_run_sec = 0.0;
+	int n_completed = 0, n_failed = 0, n_timed_out = 0;
+	int n_queued = 0, n_running = 0;
+	int n_workers_total = 0, n_workers_active = 0, n_workers_waiting = 0, n_workers_unavailable = 0;
+};
+
+/// Whether a pump() slice left work outstanding.
+enum class PantherPumpStatus { RUNNING, ALL_DONE };
 
 class RunManagerPanther : public RunManagerAbstract
 {
@@ -117,6 +174,38 @@ public:
 	int get_n_waiting_runs() { return waiting_runs.size(); }
 	void close_agents();
 	map<string, int> get_agent_stats();
+
+	// ---- cooperative control surface -------------------------------------------------
+	// The master never blocks on a model run - run() is a select() loop and the models
+	// execute on the workers - so a caller can drive the batch in slices and query or
+	// cancel in between, on the same thread and without locks.
+
+	/// Start a batch: reset per-batch counters and get the workers ready. Call once before
+	/// pumping. run_until() calls this for you.
+	void begin_batch();
+
+	/// Pump the scheduling loop for one slice, then hand control back so the caller can
+	/// query, cancel or adjust. ALL_DONE means the batch is finished.
+	PantherPumpStatus pump(double max_seconds = 0.05);
+
+	/// Finish a batch: drain outstanding file transfers, report, release workers.
+	void end_batch(RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL);
+
+	/// Aggregate timings and counts for the batch in flight.
+	PantherRunTimeStats get_run_time_stats();
+
+	/// State of every run in this batch, or just the ones asked for.
+	std::vector<PantherRunState> get_run_states();
+	std::vector<PantherRunState> get_run_states(const std::vector<int>& run_ids);
+
+	/// State and per-session history of every connected worker.
+	std::vector<PantherWorkerState> get_worker_states();
+
+	/// Give up on runs mid-flight. Kills them on whatever workers hold them and marks them
+	/// so the scheduler will not put them back in the queue. Returns how many were killed.
+	int cancel_runs(const std::vector<int>& run_ids);
+	int cancel_run(int run_id) { return cancel_runs(std::vector<int>{ run_id }); }
+	const std::set<int>& get_cancelled_run_ids() const { return user_cancelled_runs; }
 	
 private:
 	std::string port;
@@ -154,6 +243,11 @@ private:
 	multimap<int, list<AgentInfoRec>::iterator> active_runid_to_iterset_map;
 	std::deque<int> waiting_runs;
 	std::unordered_multimap<int, int> failure_map;
+	std::set<int> user_cancelled_runs;   ///< runs a caller gave up on; never rescheduled
+	std::set<int> timed_out_runs;        ///< runs killed for running past the overdue threshold
+	std::chrono::system_clock::time_point batch_start_time;
+	RUN_UNTIL_COND pump_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec);
+	void record_timed_out(int run_id);
 	pest_utils::thread_flag terminate_idle_thread;
 	pest_utils::thread_flag currently_idle;
 	pest_utils::thread_flag idling;

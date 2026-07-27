@@ -714,9 +714,15 @@ void RunManagerPanther::run()
  *
  * @return Description.
  */
-RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
+/**
+ * @brief Start a batch: reset the per-batch counters and get the workers ready.
+ *
+ * Split out of run_until() so a caller can drive the batch itself - begin_batch(),
+ * then pump() in slices with queries and cancels in between, then end_batch().
+ * run_until() is now just the in-tree composition of those three.
+ */
+void RunManagerPanther::begin_batch()
 {
-	RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL;
 	stringstream message;
 	NetPackage net_pack;
 
@@ -767,9 +773,22 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		cout << "'panther_echo' is 'false', running in silent mode - see rmr file for details" << endl;
 	}
 
-	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+	batch_start_time = std::chrono::system_clock::now();
     last_echo_time = std::chrono::system_clock::now();
+}
 
+/**
+ * @brief Run the scheduling loop until the given condition trips or the batch finishes.
+ *
+ * This is the body of the old run_until() loop, unchanged. Nothing here resets batch
+ * state, so it is safe to call repeatedly - which is what makes pump() work.
+ */
+RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::pump_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
+{
+	RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL;
+	stringstream ss;
+	NetPackage net_pack;
+	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
         int q = pest_utils::quit_file_found();
@@ -810,6 +829,18 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
+	return terminate_reason;
+}
+
+/**
+ * @brief Finish a batch: drain outstanding file transfers, report, and release workers.
+ */
+void RunManagerPanther::end_batch(RUN_UNTIL_COND terminate_reason)
+{
+	stringstream ss;
+	stringstream message;
+	NetPackage net_pack;
+	std::chrono::system_clock::time_point start_time = batch_start_time;
     w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 	n_no_ops = 0;
     while (true)
@@ -961,6 +992,16 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
     }
     resume_idle();
 
+}
+
+/**
+ * @brief One batch, composed from begin_batch()/pump_until()/end_batch().
+ */
+RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
+{
+	begin_batch();
+	RUN_UNTIL_COND terminate_reason = pump_until(condition, max_no_ops, max_time_sec);
+	end_batch(terminate_reason);
 	return terminate_reason;
 }
 
@@ -1447,6 +1488,12 @@ void RunManagerPanther::schedule_runs()
 	//first try to schedule waiting runs
 	for (auto it_run = waiting_runs.begin(); !free_agent_list.empty() && it_run != waiting_runs.end();)
 	{
+		// a run the caller gave up on must not be restarted here
+		if (user_cancelled_runs.find(*it_run) != user_cancelled_runs.end())
+		{
+			it_run = waiting_runs.erase(it_run);
+			continue;
+		}
 		int success = schedule_run(*it_run, free_agent_list, n_responsive_agents);
 		if (success >= 0)
 		{
@@ -1492,6 +1539,7 @@ void RunManagerPanther::schedule_runs()
 						stringstream ss;
 						ss << "overdue. duration:" << duration << ", avg:" << avg_runtime;
 						//kill_run(it_slave, ss.str());
+						record_timed_out(run_id);
 						kill_runs(run_id, true, ss.str());
 						should_schedule = false;
 						//update_run_failed(run_id, it_slave->get_socket_fd());
@@ -1500,6 +1548,7 @@ void RunManagerPanther::schedule_runs()
 					else if (overdue_kill_runs_vec.size() > max_concurrent_runs)
 					{
 						// kill the overdue runs
+						record_timed_out(run_id);
 						kill_runs(run_id, true, "overdue");
 						// reschedule runs as we still haven't reach the max failure threshold
 						// and there are not concurrent runs for this id because we just killed all of them
@@ -1515,6 +1564,7 @@ void RunManagerPanther::schedule_runs()
 						// This is necessary to keep runs with small numbers of slaves behaving
 						stringstream ss;
 						ss << "overdue. duration:" << duration << ", avg:" << avg_runtime;
+						record_timed_out(run_id);
 						kill_run(it_agent, ss.str());
 						update_run_failed(run_id, it_agent->get_socket_fd());
 
@@ -2201,6 +2251,7 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 		//slave_info_iter->set_state(SlaveInfoRec::State::WAITING);
 		use_run = true;
 		model_runs_done++;
+		agent_info_iter->add_completed_run_id(run_id);
 
 	}
 	else
@@ -2650,6 +2701,7 @@ void RunManagerPanther::kill_all_active_runs()
 	 failure_map.insert(make_pair(run_id, socket_fd));
 	 list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(socket_fd);
 	 agent_info_iter->add_failed_run();
+	 agent_info_iter->add_failed_run_id(run_id);
  }
 
 /**
@@ -2862,4 +2914,190 @@ void RunManagerYAMRCondor::parse_submit_file()
 			runtime_error("error converting '" + tokens[2] + "' from line '" + q_line + "' to int");
 		}
 	}
+}
+
+/**
+ * @brief Pump the scheduling loop for one time slice.
+ *
+ * The master is never blocked on a model run - the models execute on the workers and this
+ * loop only polls sockets - so returning between slices costs nothing and gives the caller
+ * a lock-free window to inspect state or cancel runs.
+ */
+PantherPumpStatus RunManagerPanther::pump(double max_seconds)
+{
+	pump_until(RUN_UNTIL_COND::TIME, 0, max_seconds);
+	return all_runs_complete() ? PantherPumpStatus::ALL_DONE : PantherPumpStatus::RUNNING;
+}
+
+/**
+ * @brief Note that a run was killed for exceeding the overdue threshold.
+ *
+ * Records it against the batch and against every worker currently holding it, so a caller
+ * can see which workers are running slow rather than just that something timed out.
+ * Must be called before the kill, while the run is still scheduled.
+ */
+void RunManagerPanther::record_timed_out(int run_id)
+{
+	timed_out_runs.insert(run_id);
+	auto range = active_runid_to_iterset_map.equal_range(run_id);
+	for (auto i = range.first; i != range.second; ++i)
+		i->second->add_timed_out_run_id(run_id);
+}
+
+/**
+ * @brief Aggregate timings and counts for the batch in flight.
+ */
+PantherRunTimeStats RunManagerPanther::get_run_time_stats()
+{
+	PantherRunTimeStats stats;
+	stats.global_avg_run_sec = get_global_runtime_minute() * 60.0;
+	stats.n_completed = model_runs_done;
+	stats.n_failed = model_runs_failed;
+	stats.n_timed_out = model_runs_timed_out;
+	stats.n_queued = (int)waiting_runs.size();
+
+	set<int> running;
+	for (auto& i : active_runid_to_iterset_map)
+		running.insert(i.first);
+	stats.n_running = (int)running.size();
+
+	for (auto& agent : agent_info_set)
+	{
+		AgentInfoRec::State s = agent.get_state();
+		if (s == AgentInfoRec::State::WAITING)
+			stats.n_workers_waiting++;
+		else if (s == AgentInfoRec::State::ACTIVE)
+			stats.n_workers_active++;
+		else
+			stats.n_workers_unavailable++;
+	}
+	stats.n_workers_total = (int)agent_info_set.size();
+	return stats;
+}
+
+/**
+ * @brief State of the runs asked for.
+ *
+ * Current state wins over history: a run that timed out once and has been rescheduled
+ * reports RUNNING, not TIMED_OUT.
+ */
+vector<PantherRunState> RunManagerPanther::get_run_states(const vector<int>& run_ids)
+{
+	vector<PantherRunState> states;
+	set<int> queued(waiting_runs.begin(), waiting_runs.end());
+
+	for (int run_id : run_ids)
+	{
+		PantherRunState st;
+		st.run_id = run_id;
+		st.n_failures = (int)failure_map.count(run_id);
+		st.n_concurrent = get_n_concurrent(run_id);
+
+		auto range = active_runid_to_iterset_map.equal_range(run_id);
+		bool is_running = (range.first != range.second);
+		if (is_running)
+		{
+			// report the first worker holding it; n_concurrent says how many there are
+			auto agent = range.first->second;
+			st.host = agent->get_hostname();
+			st.work_dir = agent->get_work_dir();
+			st.agent_socket = agent->get_socket_fd();
+			st.elapsed_sec = agent->get_duration_sec();
+		}
+
+		if (is_running)
+			st.status = PantherRunStatus::RUNNING;
+		else if (queued.find(run_id) != queued.end())
+			st.status = PantherRunStatus::QUEUED;
+		else if (user_cancelled_runs.find(run_id) != user_cancelled_runs.end())
+			st.status = PantherRunStatus::CANCELLED;
+		else if (run_finished(run_id))
+			st.status = PantherRunStatus::COMPLETED;
+		else if (timed_out_runs.find(run_id) != timed_out_runs.end())
+			st.status = PantherRunStatus::TIMED_OUT;
+		else if (st.n_failures > 0)
+			st.status = PantherRunStatus::FAILED;
+		else
+			st.status = PantherRunStatus::QUEUED;
+
+		states.push_back(st);
+	}
+	return states;
+}
+
+/**
+ * @brief State of every run in this batch.
+ */
+vector<PantherRunState> RunManagerPanther::get_run_states()
+{
+	vector<int> all_ids;
+	int n = get_nruns();
+	for (int i = 0; i < n; i++)
+		all_ids.push_back(i);
+	return get_run_states(all_ids);
+}
+
+/**
+ * @brief State and per-session history of every connected worker.
+ */
+vector<PantherWorkerState> RunManagerPanther::get_worker_states()
+{
+	vector<PantherWorkerState> states;
+	for (auto& agent : agent_info_set)
+	{
+		PantherWorkerState ws;
+		ws.socket_fd = agent.get_socket_fd();
+		ws.hostname = agent.get_hostname();
+		ws.port = agent.get_port();
+		ws.work_dir = agent.get_work_dir();
+		int state_idx = (int)agent.get_state();
+		if ((state_idx >= 0) && (state_idx < (int)agent.state_strings.size()))
+			ws.state = agent.state_strings[state_idx];
+		ws.current_run_id = agent.get_run_id();
+		ws.current_elapsed_sec = (agent.get_state() == AgentInfoRec::State::ACTIVE) ? agent.get_duration_sec() : 0.0;
+		ws.avg_runtime_sec = agent.get_runtime_sec();
+		ws.linpack_sec = agent.get_linpack_time();
+		ws.n_failed_pings = agent.get_failed_pings();
+		ws.completed_runs = agent.get_completed_run_ids();
+		ws.failed_runs = agent.get_failed_run_ids();
+		ws.timed_out_runs = agent.get_timed_out_run_ids();
+		states.push_back(ws);
+	}
+	return states;
+}
+
+/**
+ * @brief Give up on runs that are in flight or still queued.
+ *
+ * Kills them on whatever workers hold them and remembers them, so schedule_runs() will not
+ * put them back in the queue - without that the scheduler would simply restart them on the
+ * next slice. Returns how many run_ids were acted on.
+ */
+int RunManagerPanther::cancel_runs(const vector<int>& run_ids)
+{
+	int n_cancelled = 0;
+	for (int run_id : run_ids)
+	{
+		if (run_finished(run_id))
+			continue;   // nothing to give up on
+		user_cancelled_runs.insert(run_id);
+
+		// drop it from the queue if it has not been dispatched yet
+		for (auto it = waiting_runs.begin(); it != waiting_runs.end(); )
+		{
+			if (*it == run_id)
+				it = waiting_runs.erase(it);
+			else
+				++it;
+		}
+		// and kill any worker currently running it
+		if (active_runid_to_iterset_map.count(run_id) > 0)
+			kill_runs(run_id, false, "cancelled by caller");
+
+		stringstream ss;
+		ss << " run_id:" << run_id << " cancelled by caller";
+		report(ss.str(), false);
+		n_cancelled++;
+	}
+	return n_cancelled;
 }

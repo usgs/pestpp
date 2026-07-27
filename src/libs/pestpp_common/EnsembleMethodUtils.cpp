@@ -8060,7 +8060,11 @@ UpgradeStatus EnsembleMethod::accept_or_reject(UpgradeContext& ctx, bool use_mda
 	else
 	{
 		//message(0, "not updating parameter ensemble");
-		if ((!use_mda) && (!pest_scenario.get_pestpp_options().get_ies_updatebyreals()))
+		// the whole ensemble didn't improve, so salvage the realizations that did. this runs
+		// regardless of ies_update_by_reals: that option chooses what happens when the
+		// ensemble *does* improve, and should not take away the salvage here (it used to,
+		// which left a rejected iteration updating nothing at all)
+		if (!use_mda)
 		{
 			message(0, "only updating realizations with reduced phi");
 			update_reals_by_phi(ctx.pe_lams[ctx.best_idx], ctx.oe_lam_best);
