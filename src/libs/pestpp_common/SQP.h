@@ -158,6 +158,23 @@ public:
 	void throw_sqp_error(string message);
 	bool should_terminate();
 
+protected:
+	// Derived live from the options.  Protected rather than private only so the selftest
+	// harness can subclass and assert they track a post-initialize() option change; this is
+	// not part of the intended public surface.
+
+	// sqp_subset_size follows the ies convention: 0 => no subset (use the full ensemble);
+	// any non-zero value (negative = percentage of the ensemble, positive = absolute count)
+	// requests a subset.  Read live so a mid-run change to sqp_subset_size propagates.
+	bool get_use_subset() const { return pest_scenario.get_pestpp_options().get_sqp_subset_size() != 0; }
+
+	// an ensemble gradient is used whenever an ensemble was requested, either by size or by
+	// file.  both drivers are init-only, so this is stable across a run
+	bool get_use_ensemble_grad() const {
+		return (pest_scenario.get_pestpp_options().get_sqp_num_reals() > 0) ||
+		       (pest_scenario.get_pestpp_options().get_sqp_dv_en().size() > 0);
+	}
+
 private:
 	int  verbose_level = 1;   // default until initialize() syncs it from ies_verbose_level
 	Pest &pest_scenario;
@@ -231,11 +248,6 @@ private:
 	// not be set up (sqp_num_reals is init-only, so this cannot go stale mid-run)
 	bool use_cma = true;
 
-	// sqp_subset_size follows the ies convention: 0 => no subset (use the full ensemble);
-	// any non-zero value (negative = percentage of the ensemble, positive = absolute count)
-	// requests a subset.  Read live so a mid-run change to sqp_subset_size propagates.
-	bool get_use_subset() const { return pest_scenario.get_pestpp_options().get_sqp_subset_size() != 0; }
-
 	Parameters current_ctl_dv_values, prev_ctl_dv_values, trial_ctl_dv_values, infeas_cand_dv_values;
 	Observations current_obs, trial_obs, infeas_cand_obs;
 	
@@ -269,12 +281,6 @@ private:
 	set<int> unselected_dv_indices;  
 	bool sampling_tracking_initialized, cma_reset_archive = true;
 
-	// derived: an ensemble gradient is used whenever an ensemble was requested, either by
-	// size or by file.  both drivers are init-only, so this is stable across a run
-	bool get_use_ensemble_grad() const {
-		return (pest_scenario.get_pestpp_options().get_sqp_num_reals() > 0) ||
-		       (pest_scenario.get_pestpp_options().get_sqp_dv_en().size() > 0);
-	}
 	bool is_blocking_constraint = false;
 	bool is_base_infeas = false;
 	bool seek_ies = false;

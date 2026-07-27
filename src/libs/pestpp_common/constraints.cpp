@@ -1683,7 +1683,7 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
 	if (full_obs)
 		shifted_obs = Observations(current_obs);
 	//work out which realization index corresponds to the risk value
-	if (_stack_oe.shape().first < 3)
+	if (_stack_oe.shape().first < MIN_STACK_REALS)
 		throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
 	int cur_num_reals = _stack_oe.shape().first;
 	//get the index (which realization number) represents the risk value according to constraint sense
@@ -3163,20 +3163,35 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			}
 			if (stack_info.first.size() > 0)
 			{
-				if (stack_info.first.size() == stack_pe.shape().first)
+				// a member whose stack lost runs can end up with too few survivors to
+				// support a risk quantile.  get_stack_shifted_chance_constraints() needs
+				// MIN_STACK_REALS, so drop the member here rather than throwing later -
+				// same remedy as the all-failed case, just at the usable threshold.
+				// note this only fires when runs actually failed: a too-small *configured*
+				// stack still reaches the error downstream, which is the right diagnostic
+				int n_survive = stack_pe.shape().first - (int)stack_info.first.size();
+				if (n_survive <= 0)
 				{
 					ss.str("");
-					ss << "WARNING: all stack runs failed for population member '" << real_info.first << 
+					ss << "WARNING: all stack runs failed for population member '" << real_info.first <<
 						", removing this member from chance calcs" << endl;
 					file_mgr_ptr->rec_ofstream() << ss.str();
 					cout << ss.str();
 					drop_members.push_back(real_info.first);
 					continue;
 				}
-				else
+				else if (n_survive < MIN_STACK_REALS)
 				{
-					//nothing to do here since we have only stored the dec var values, not the full stack of par values.
+					ss.str("");
+					ss << "WARNING: only " << n_survive << " stack runs survived for population member '"
+						<< real_info.first << ", fewer than the " << MIN_STACK_REALS
+						<< " needed for a stack-based chance estimate, removing this member from chance calcs" << endl;
+					file_mgr_ptr->rec_ofstream() << ss.str();
+					cout << ss.str();
+					drop_members.push_back(real_info.first);
+					continue;
 				}
+				//otherwise nothing to do here since we have only stored the dec var values, not the full stack of par values.
 			}
 
 			names1 = stack_info.second.get_real_names();

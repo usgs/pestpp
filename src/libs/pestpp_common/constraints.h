@@ -21,6 +21,11 @@ using namespace std;
 
 const string NESTED_STACK_NAME_SEP = "||";
 
+// smallest stack that can support a risk quantile in get_stack_shifted_chance_constraints().
+// a population member whose stack falls below this after run failures is dropped from the
+// chance calcs rather than carried forward into an error
+const int MIN_STACK_REALS = 3;
+
 class OptObjFunc
 {
 public:

@@ -23,9 +23,40 @@
 #include "OutputFileWriter.h"
 #include "PerformanceLog.h"
 #include "constraints.h"
+#include "EnsembleMethodUtils.h"
+#include "MOEA.h"
+#include "SQP.h"
 
 using namespace std;
 using PO = PestppOptions;
+
+// Test-only subclasses that expose each tool's derived option accessors. These are the
+// decision points the algorithms actually read, so asserting through them proves the whole
+// chain - option -> accessor -> algorithm - rather than just the options object.
+struct IesProbe : public EnsembleMethod
+{
+    using EnsembleMethod::EnsembleMethod;
+    bool p_use_subset()             { return get_use_subset(); }
+    int  p_num_threads()      const { return get_num_threads(); }
+    int  p_verbose_level()    const { return get_verbose_level(); }
+    bool p_reinflate_minphi() const { return get_reinflate_to_minphi_real(); }
+};
+
+struct MouProbe : public MOEA
+{
+    using MOEA::MOEA;
+    MouEnvType         p_envtype()   { return get_envtype(); }
+    MouMateType        p_mattype()   { return get_mattype(); }
+    vector<MouGenType> p_gen_types() { return get_gen_types(); }
+    bool               p_risk_obj() const { return get_risk_obj(); }
+};
+
+struct SqpProbe : public SeqQuadProgram
+{
+    using SeqQuadProgram::SeqQuadProgram;
+    bool p_use_subset()         const { return get_use_subset(); }
+    bool p_use_ensemble_grad()  const { return get_use_ensemble_grad(); }
+};
 
 static int g_fail = 0;
 static int g_total = 0;
@@ -341,6 +372,94 @@ static void test_sqp_controls()
         "resetting sqp_working_set_tol post-init is FLAGGED (the solver has already adapted it)");
 }
 
+static void test_tool_objects_track_live_options()
+{
+    cout << "[tool objects re-read their options after initialize()]" << endl;
+    ofstream flog("selftest_tool_perf.log");
+    PerformanceLog pfm(flog);
+    FileManager fm;
+    Pest p; p.set_defaults();
+    OutputFileWriter ofw(fm, p);
+    PO* o = p.get_pestpp_options_ptr();
+
+    // constructing a tool is side-effect free (no files, no runs) - the option-derived state
+    // that used to be snapshotted lives behind accessors, so no initialize() is needed here
+    IesProbe ies(p, fm, ofw, &pfm, nullptr, "selftest-ies");
+    MouProbe mou(p, fm, ofw, &pfm, nullptr);
+    SqpProbe sqp(p, fm, ofw, &pfm, nullptr);
+
+    // everything from here on is a change made AFTER the tool exists and options are sealed:
+    // exactly the shared-library case (mutate a control, run the next iteration)
+    o->mark_options_initialized();
+
+    // --- ies: the four controls that used to latch during initialize() ---
+    o->set_option("IES_NUM_THREADS", "6");
+    CHK(ies.p_num_threads() == 6, "ies object sees num_threads post-init");
+    o->set_option("IES_NUM_THREADS", "1");
+    CHK(ies.p_num_threads() == 1, "ies object tracks a second num_threads change");
+
+    o->set_option("IES_VERBOSE_LEVEL", "3");
+    CHK(ies.p_verbose_level() == 3, "ies object sees verbose_level post-init");
+
+    // the ensemble is empty here, so use_subset reduces to subset_size <= 0; that still
+    // exercises the live read and the ensemble-size comparison it now performs
+    o->set_option("IES_SUBSET_SIZE", "5");
+    CHK(!ies.p_use_subset(), "subset larger than the ensemble -> use_subset false (live)");
+    o->set_option("IES_SUBSET_SIZE", "-10");
+    CHK(ies.p_use_subset(), "percentage subset -> use_subset TRUE post-init (was latched)");
+
+    o->set_option("IES_N_ITER_MEAN", "3");
+    CHK(!ies.p_reinflate_minphi(), "positive n_iter_reinflate -> reinflate to mean");
+    o->set_option("IES_N_ITER_MEAN", "-3");
+    CHK(ies.p_reinflate_minphi(), "negative n_iter_reinflate -> reinflate to min-phi real (live)");
+
+    // --- mou: swap the whole generation strategy between generations ---
+    o->set_option("MOU_ENV_SELECTOR", "nsga");
+    CHK(mou.p_envtype() == MouEnvType::NSGA, "mou object sees nsga env selector");
+    o->set_option("MOU_ENV_SELECTOR", "spea");
+    CHK(mou.p_envtype() == MouEnvType::SPEA, "mou env selector switched post-init (was latched)");
+    o->set_option("MOU_ENV_SELECTOR", "nsga_ppd");
+    CHK(mou.p_envtype() == MouEnvType::NSGA, "nsga_ppd maps to the nsga env type");
+
+    o->set_option("MOU_MATING_SELECTOR", "random");
+    CHK(mou.p_mattype() == MouMateType::RANDOM, "mou object sees random mating selector");
+    o->set_option("MOU_MATING_SELECTOR", "tournament");
+    CHK(mou.p_mattype() == MouMateType::TOURNAMENT, "mou mating selector switched post-init");
+
+    o->set_option("MOU_GENERATOR", "de,sbx");
+    vector<MouGenType> gt = mou.p_gen_types();
+    CHK(gt.size() == 2, "mou generator list parsed live (2 generators)");
+    CHK(gt[0] == MouGenType::DE && gt[1] == MouGenType::SBX, "generator list order preserved");
+    // the old member accumulated across calls; the accessor must be idempotent
+    CHK(mou.p_gen_types().size() == 2, "repeated read does not accumulate generators");
+    o->set_option("MOU_GENERATOR", "pso");
+    gt = mou.p_gen_types();
+    CHK(gt.size() == 1 && gt[0] == MouGenType::PSO, "generator mix switched post-init (was latched)");
+
+    o->set_option("MOU_RISK_OBJECTIVE", "true");
+    CHK(mou.p_risk_obj(), "mou object sees risk objective post-init");
+    o->set_option("MOU_RISK_OBJECTIVE", "false");
+    CHK(!mou.p_risk_obj(), "mou risk objective reset post-init");
+
+    // --- sqp ---
+    o->set_option("SQP_SUBSET_SIZE", "0");
+    CHK(!sqp.p_use_subset(), "sqp subset_size 0 -> no subset");
+    o->set_option("SQP_SUBSET_SIZE", "10");
+    CHK(sqp.p_use_subset(), "sqp subset switched on post-init");
+
+    // none of the above should have tripped the init-only detector
+    CHK(o->get_init_only_change_warnings().empty(),
+        "every per-iteration control above changed post-init WITHOUT a warning");
+
+    // by contrast, the gradient mode is driven by an init-only option: the value still
+    // propagates to the accessor, but the change is surfaced rather than silently taken
+    CHK(!sqp.p_use_ensemble_grad(), "no ensemble requested -> fd gradient");
+    o->set_option("SQP_NUM_REALS", "20");
+    CHK(sqp.p_use_ensemble_grad(), "sqp_num_reals -> ensemble gradient (derived, not cached)");
+    CHK(o->get_init_only_change_warnings().size() == 1,
+        "changing the init-only sqp_num_reals post-init IS flagged");
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -354,6 +473,7 @@ int main()
     test_ies_iteration_controls();
     test_mou_generation_controls();
     test_sqp_controls();
+    test_tool_objects_track_live_options();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

@@ -7308,7 +7308,66 @@ bool EnsembleMethod::solve_mda(bool last_iter,int cycle)
 	
 }
 
-bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
+/**
+ * @brief Drop the candidate upgrade ensembles that lost the lambda test.
+ *
+ * Once evaluate_upgrades() has picked a winner nothing reads the losers again, so this is
+ * purely reclaiming memory. solve() calls it at the point it always has - immediately before
+ * the remaining-realization runs, where memory peaks - but a caller comparing candidates
+ * across lambdas can set UpgradeContext::defer_candidate_release and call this when done.
+ *
+ * @param include_responses also drop the losing observation ensembles. Off by default so the
+ *        in-tree path keeps its exact memory behavior; the responses are usually the more
+ *        interesting half to hold on to for an algorithm experiment.
+ */
+void EnsembleMethod::release_unused_candidates(UpgradeContext& ctx, bool include_responses)
+{
+	// only meaningful once a winner exists - before that every candidate is still live, and
+	// releasing would throw away the whole set
+	if (ctx.best_idx < 0)
+		return;
+	for (int i = 0; i < ctx.pe_lams.size(); i++)
+	{
+		if (i == ctx.best_idx)
+			continue;
+		ctx.pe_lams[i] = pe.zeros_like(0);
+	}
+	if (include_responses)
+	{
+		for (int i = 0; i < ctx.oe_lams.size(); i++)
+		{
+			if (i == ctx.best_idx)
+				continue;
+			ctx.oe_lams[i] = ObservationEnsemble(&pest_scenario);
+		}
+	}
+}
+
+/**
+ * @brief Delete the candidate ensembles that were spilled to disk (ies_upgrades_in_memory).
+ *
+ * Only does anything on the spill path. Must not be called until the winning candidate has
+ * been read back from its file - call it too early and that load has nothing to read.
+ *
+ * Unlike release_unused_candidates(), skipping this one leaks *disk*: the filenames are
+ * iteration-stamped, so a long run that never releases keeps every candidate it ever wrote.
+ */
+void EnsembleMethod::release_spilled_candidate_files(UpgradeContext& ctx)
+{
+	if (ctx.pe_filenames.size() == 0)
+		return;
+	remove_external_pe_filenames(ctx.pe_filenames);
+}
+
+/**
+ * @brief Stage 1 of an upgrade solve: everything that has to be true before upgrades can be
+ *        calculated - realization-count guards, subset sizing, fast-lookup rebuilds, the
+ *        localizer case map and the Am matrix.
+ *
+ * No model runs and no upgrade math; on return the context holds what stages 2..6 need.
+ */
+UpgradeStatus EnsembleMethod::prepare_upgrades(UpgradeContext& ctx, bool use_mda,
+	const vector<double>& inflation_factors, const vector<double>& backtrack_factors)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
@@ -7326,34 +7385,34 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(1, s);
 	}
 
-	int local_subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
-	if (local_subset_size < 0)
+	ctx.local_subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+	if (ctx.local_subset_size < 0)
     {
 	    ss.str("");
 
-	    local_subset_size = (int)((double)pe.shape().first) * ((-1. * (double)local_subset_size) / 100.);
+	    ctx.local_subset_size = (int)((double)pe.shape().first) * ((-1. * (double)ctx.local_subset_size) / 100.);
 
-        ss << "subset defined as a percentage of ensemble size, using " << local_subset_size;
+        ss << "subset defined as a percentage of ensemble size, using " << ctx.local_subset_size;
         ss << " realizations for subset" << endl;
         message(2,ss.str());
-        if (local_subset_size < 4)
+        if (ctx.local_subset_size < 4)
         {
             ss.str("");
             ss << "percentage-based subset size too small, increasing to 4" << endl;
-            local_subset_size = 4;
+            ctx.local_subset_size = 4;
             message(2,ss.str());
         }
     }
 
-	if ((get_use_subset()) && (local_subset_size > pe.shape().first))
+	if ((get_use_subset()) && (ctx.local_subset_size > pe.shape().first))
 	{
 		ss.str("");
-		ss << "subset size (" << local_subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
+		ss << "subset size (" << ctx.local_subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
 		frec << "  ---  " << ss.str() << endl;
 		cout << "  ---  " << ss.str() << endl;
 		frec << "  ...reducing subset size to " << pe.shape().first << endl;
 		cout << "  ...reducing subset size to " << pe.shape().first << endl;
-		local_subset_size = pe.shape().first;
+		ctx.local_subset_size = pe.shape().first;
 	}
 
 	else if ((inflation_factors.size() == 1) && (backtrack_factors.size() == 1))
@@ -7362,13 +7421,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		ss << "only testing one inflation/lambda factor and one scale/backtrack factor, not using subset";
 		frec << "  ---  " << ss.str() << endl;
 		cout << "  ---  " << ss.str() << endl;
-		local_subset_size = pe.shape().first;
+		ctx.local_subset_size = pe.shape().first;
 	}
 
 	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
-	vector<ParameterEnsemble> pe_lams;
-	vector<double> lam_vals, scale_vals;
 	//update all the fast-lookup structures
 	performance_log->log_event("reordering variables in pe");
 	pe.reorder(vector<string>(), act_par_names);
@@ -7391,37 +7448,49 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
     }
 
 	//build up this container here and then reuse it for each lambda later...
-	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
 
-		loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log, frec);
+		ctx.loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log, frec);
 	}
 	else
 	{
 		pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
-		loc_map["all"] = p;
+		ctx.loc_map["all"] = p;
 	}
-	if (loc_map.size() == 0)
+	if (ctx.loc_map.size() == 0)
 	{
 		throw_em_error("EnsembleMethod::solve() internal error: loc_map is empty");
 	}
 	//get this once and reuse it for each lambda
-	Eigen::MatrixXd Am;
 	if ((!use_mda) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
 	{
-		Am = get_Am(pe.get_real_names(), pe.get_var_names());
+		ctx.Am = get_Am(pe.get_real_names(), pe.get_var_names());
 	}
 
-	vector<int> subset_idxs = get_subset_idxs(pe.shape().first, local_subset_size);
-	vector<string> pe_filenames;
+	ctx.subset_idxs = get_subset_idxs(pe.shape().first, ctx.local_subset_size);
+	return UpgradeStatus::CONTINUE;
+}
+
+/**
+ * @brief Stage 2: calculate the candidate upgrade ensembles - one per lambda x scale factor.
+ *
+ * This is the "generate" half of a generate/run/evaluate loop: the linear algebra runs here
+ * (via EnsembleSolver), bounds and change limits are enforced, and the candidates land in
+ * ctx.pe_lams ready to be queued. Still no model runs.
+ */
+void EnsembleMethod::generate_upgrades(UpgradeContext& ctx, bool use_mda,
+	const vector<double>& inflation_factors, const vector<double>& backtrack_factors)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
 
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 	pe_upgrade.set_zeros();
 	pe_upgrade.set_trans_status(pe.get_trans_status());
 	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-    EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, weights, localizer, parcov, Am, ph,
+    EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, weights, localizer, parcov, ctx.Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names, get_reg_factor());
     double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
     if (mm_alpha > 0.0)
@@ -7447,10 +7516,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		if (mm_alpha > 0.0)
         {
             message(1,"multimodal solve for inflation factor ",cur_lam);
-            es.solve_multimodal(get_num_threads(), cur_lam, !use_mda, pe_upgrade, loc_map, mm_alpha);
+            es.solve_multimodal(get_num_threads(), cur_lam, !use_mda, pe_upgrade, ctx.loc_map, mm_alpha);
         }
 		else{
-            es.solve(get_num_threads(), cur_lam, !use_mda, pe_upgrade, loc_map);
+            es.solve(get_num_threads(), cur_lam, !use_mda, pe_upgrade, ctx.loc_map);
 		}
 
 		map<string, double> norm_map;
@@ -7472,11 +7541,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
 
-			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (subset_idxs.size() < pe.shape().first) && ((inflation_factors.size() > 1) || (backtrack_factors.size() > 1)))
+			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (ctx.subset_idxs.size() < pe.shape().first) && ((inflation_factors.size() > 1) || (backtrack_factors.size() > 1)))
 			{
 				pe_lam_scale.to_dense(ss.str() + ".bin");
-				pe_filenames.push_back(ss.str() + ".bin");
-				pe_lam_scale.keep_rows(subset_idxs,true);
+				ctx.pe_filenames.push_back(ss.str() + ".bin");
+				pe_lam_scale.keep_rows(ctx.subset_idxs,true);
 				message(1,"upgrade ensemble saved to " + ss.str() + ".bin");
 
 			}
@@ -7485,9 +7554,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				message(1, "even though 'ies_upgrades_in_memory' is 'false', there is no benefit to using this option because either you aren't testing multiple upgrades or you aren't using a subset");
 			}
 
-			pe_lams.push_back(pe_lam_scale);
-			lam_vals.push_back(cur_lam);
-			scale_vals.push_back(sf);
+			ctx.pe_lams.push_back(pe_lam_scale);
+			ctx.lam_vals.push_back(cur_lam);
+			ctx.scale_vals.push_back(sf);
 			if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 				continue;
 
@@ -7511,16 +7580,23 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(1, "finished calcs for:", cur_lam);
 
 	}
+}
 
+/**
+ * @brief Stage 3: the two cases that finish an iteration without running the candidates -
+ *        the ies_debug_upgrade_only escape hatch, and non-iterative state estimation.
+ */
+UpgradeStatus EnsembleMethod::check_noniterative_shortcut(UpgradeContext& ctx)
+{
 	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
 	{
 		message(0, "ies_debug_upgrade_only is true, exiting");
-		if (pe_filenames.size() > 0)
+		if (ctx.pe_filenames.size() > 0)
 		{
-			message(1, "first attempting to load upgrade ensemble " + pe_filenames[0]);
+			message(1, "first attempting to load upgrade ensemble " + ctx.pe_filenames[0]);
 			performance_log->log_event("loading dense pe upgrade ensemble");
 			ParameterEnsemble remaining_pe_lam(&pest_scenario);
-			remaining_pe_lam.from_binary(pe_filenames[0]);
+			remaining_pe_lam.from_binary(ctx.pe_filenames[0]);
 			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
 		}
 		throw_em_error("ies_debug_upgrade_only is true, exiting");
@@ -7528,42 +7604,61 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	//the case for all state estimation and non-iterative
 	//only one upgrade lambda and all pars are states
-	if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
+	if (((ctx.pe_lams.size() == 1) && (par_dyn_state_names.size() == ctx.pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
 	{
 		message(1, "non-iterative state-estimation detected, not evaluating update ensemble for current cycle");
-		pe = pe_lams[0];
+		pe = ctx.pe_lams[0];
 		//move the estimated states to the oe, which will then later be transferred back to the pe
 		ph.update(oe, pe, weights);
         double best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		best_mean_phis.push_back(best_mean);
 
-		return true;
+		return UpgradeStatus::ACCEPTED;
 	}
+	return UpgradeStatus::CONTINUE;
+}
 
-	vector<map<int, int>> real_run_ids_lams;
-	int best_idx = -1;
-	double best_mean = 1.0e+300, best_std = 1.0e+300; // todo (Ayman): read those from input
-	double mean, std;
+/**
+ * @brief Stage 4: hand the candidate ensembles to the run manager and harvest the results.
+ *
+ * This is the first of the two run-manager round trips in an upgrade solve; the second is in
+ * complete_subset_runs(). An API caller driving the run manager itself replaces this stage.
+ */
+void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
+	const vector<double>& inflation_factors, const vector<double>& backtrack_factors)
+{
+	stringstream ss;
 	message(0, "running upgrade ensembles");
 	ss.str("");
 	ss << inflation_factors.size() << " inflation factors (lambdas) times " << backtrack_factors.size() << " backtracking factors" << endl;
-	ss << "   times " << subset_idxs.size() << " realizations";
-	ss << " yields " << inflation_factors.size() * backtrack_factors.size() * subset_idxs.size() << " model runs for upgrade testing";
+	ss << "   times " << ctx.subset_idxs.size() << " realizations";
+	ss << " yields " << inflation_factors.size() * backtrack_factors.size() * ctx.subset_idxs.size() << " model runs for upgrade testing";
 	message(1,ss.str());
 
-	vector<ObservationEnsemble> oe_lams;
-	
 	//if we are saving upgrades to disk
-	if (pe_filenames.size() > 0)
+	if (ctx.pe_filenames.size() > 0)
 	{
 		vector<int> temp;
-		for (int i = 0; i < subset_idxs.size(); i++)
+		for (int i = 0; i < ctx.subset_idxs.size(); i++)
 			temp.push_back(i);
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp, subset_idxs);
+		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, temp, ctx.subset_idxs);
 	}
 	else
- 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs,subset_idxs);
+ 		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, ctx.subset_idxs, ctx.subset_idxs);
+}
+
+/**
+ * @brief Stage 5: score every candidate that came back and pick the best one.
+ *
+ * Returns REJECTED_RETRY when no candidate produced a usable phi - lambda has been raised and
+ * the iteration should be attempted again.
+ */
+UpgradeStatus EnsembleMethod::evaluate_upgrades(UpgradeContext& ctx)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+	double mean, std;
 
 	message(0, "evaluating upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
@@ -7583,50 +7678,46 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         }
     }
 
-    double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-    double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
-    double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
-	ObservationEnsemble oe_lam_best(&pest_scenario);
 	bool echo = false;
 	if (get_verbose_level() > 1)
 		echo = true;
-	for (int i = 0; i < pe_lams.size(); i++)
+	for (int i = 0; i < ctx.pe_lams.size(); i++)
 	{
-		if (oe_lams[i].shape().first == 0)
+		if (ctx.oe_lams[i].shape().first == 0)
 			continue;
-		vector<double> vals({ lam_vals[i],scale_vals[i] });
+		vector<double> vals({ ctx.lam_vals[i],ctx.scale_vals[i] });
 		if (pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 
 		{
 			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
+			ss << file_manager.get_base_filename() << "." << iter << "." << ctx.lam_vals[i] << ".lambda." << ctx.scale_vals[i] << ".scale.obs";
 
             if (pest_scenario.get_pestpp_options().get_save_dense())
             {
                 ss << dense_file_ext;
-                oe_lams[i].to_dense(ss.str());
+                ctx.oe_lams[i].to_dense(ss.str());
             }
 			else if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				ss << ".jcb";
-				oe_lams[i].to_binary(ss.str());
+				ctx.oe_lams[i].to_binary(ss.str());
 			}
 			else
 			{
 				ss << ".csv";
-				oe_lams[i].to_csv(ss.str());
+				ctx.oe_lams[i].to_csv(ss.str());
 			}
-			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " obs ensemble saved to " << ss.str() << endl;
+			frec << "lambda, scale value " << ctx.lam_vals[i] << ',' << ctx.scale_vals[i] << " obs ensemble saved to " << ss.str() << endl;
 
 		}
-        drop_bad_reals(pe_lams[i], oe_lams[i], subset_idxs);
-		if (oe_lams[i].shape().first == 0)
+        drop_bad_reals(ctx.pe_lams[i], ctx.oe_lams[i], ctx.subset_idxs);
+		if (ctx.oe_lams[i].shape().first == 0)
 		{
 			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
 			continue;
 		}
 
-		ph.update(oe_lams[i], pe_lams[i], weights);
+		ph.update(ctx.oe_lams[i], ctx.pe_lams[i], weights);
 
 		message(0, "phi summary for lambda, scale fac:", vals, echo);
 		ph.report(echo);
@@ -7634,67 +7725,85 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 
 		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-        ph.write_lambda(iter,oe_lams[i].shape().first,last_best_lam,last_best_mean,
+        ph.write_lambda(iter,ctx.oe_lams[i].shape().first,last_best_lam,last_best_mean,
                         last_best_std,
-                        scale_vals[i],lam_vals[i],mean,std);
-		if (mean < best_mean)
+                        ctx.scale_vals[i],ctx.lam_vals[i],mean,std);
+		if (mean < ctx.best_mean)
 		{
-			oe_lam_best = oe_lams[i];
-			best_mean = mean;
-			best_std = std;
-			best_idx = i;
+			ctx.oe_lam_best = ctx.oe_lams[i];
+			ctx.best_mean = mean;
+			ctx.best_std = std;
+			ctx.best_idx = i;
 		}
 	}
-	if (best_idx == -1)
+	if (ctx.best_idx == -1)
 	{
 		message(0, "WARNING:  unsuccessful upgrade testing, multiplying lambda by 10000.0 and returning to upgrade calculations");
 		last_best_lam *= 10000.0;
-		return false;
+		return UpgradeStatus::REJECTED_RETRY;
 
 	}
+	return UpgradeStatus::CONTINUE;
+}
 
-    if ((best_idx != -1) && (get_use_subset()) && (local_subset_size < pe.shape().first)) {
+/**
+ * @brief Stage 6: when a subset was tested, run the realizations that were held back and
+ *        stitch them onto the winning candidate.
+ *
+ * This is the second run-manager round trip, and it is conditional: it only happens when a
+ * subset was actually used and the subset phi cleared the acceptance factor. When no subset
+ * was used this just re-scores the winner.
+ */
+UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycle, bool use_mda)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+    double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+    double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
+    double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
+
+    if ((ctx.best_idx != -1) && (get_use_subset()) && (ctx.local_subset_size < pe.shape().first)) {
         double acc_phi = last_best_mean * acc_fac;
 
         if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi()) {
             cout << "ies_debug_high_subset_phi active" << endl;
             frec << "ies_debug_high_subset_phi active" << endl;
-            best_mean = acc_phi + 1.0;
+            ctx.best_mean = acc_phi + 1.0;
         }
 
-        if ((best_mean > acc_phi)) {
+        if ((ctx.best_mean > acc_phi)) {
 
             ss.str("");
-            ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
+            ss << "best subset mean phi  (" << ctx.best_mean << ") greater than acceptable phi : " << acc_phi;
             string m = ss.str();
             message(0, m);
             ph.update(oe, pe, weights);
             best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
             if (!use_mda) {
                 message(1, "updating realizations with reduced phi");
-                update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx], subset_idxs);
+                update_reals_by_phi(ctx.pe_lams[ctx.best_idx], ctx.oe_lams[ctx.best_idx], ctx.subset_idxs);
             }
 
             ph.update(oe, pe, weights);
             //re-check phi
             double new_best_mean;
             new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-            if (new_best_mean < best_mean) {
-                best_mean = new_best_mean;
-                best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+            if (new_best_mean < ctx.best_mean) {
+                ctx.best_mean = new_best_mean;
+                ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
                 //replace the last entry in the best mean phi tracker
-                best_mean_phis[best_mean_phis.size() - 1] = best_mean;
-                message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
-                if (best_mean < last_best_mean * acc_fac) {
-                    if (best_std < last_best_std * acc_fac) {
-                        double new_lam = lam_vals[best_idx] * lam_dec;
+                best_mean_phis[best_mean_phis.size() - 1] = ctx.best_mean;
+                message(1, "current best mean phi (after updating reduced-phi reals): ", ctx.best_mean);
+                if (ctx.best_mean < last_best_mean * acc_fac) {
+                    if (ctx.best_std < last_best_std * acc_fac) {
+                        double new_lam = ctx.lam_vals[ctx.best_idx] * lam_dec;
                         new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
                         message(0, "partial update improved phi stats, updating lambda to ", new_lam);
                         last_best_lam = new_lam;
                     } else {
                         message(0, "not updating lambda (standard deviation reduction criteria not met)");
                     }
-                    last_best_std = best_std;
+                    last_best_std = ctx.best_std;
                 }
             } else {
                 double new_lam = last_best_lam * lam_inc;
@@ -7707,46 +7816,47 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             }
             message(1, "returning to upgrade calculations...");
 
-            return false;
+            return UpgradeStatus::REJECTED_RETRY;
         }
 
-        //release the memory of the unneeded pe_lams
-        for (int i = 0; i < pe_lams.size(); i++) {
-            if (i == best_idx)
-                continue;
-            pe_lams[i] = pe.zeros_like(0);
-        }
+        //release the memory of the unneeded pe_lams (unless the caller has taken ownership
+        //of that decision - see UpgradeContext::defer_candidate_release)
+        if (!ctx.defer_candidate_release)
+            release_unused_candidates(ctx);
         //need to work out which par and obs en real names to run - some may have failed during subset testing...
         ObservationEnsemble remaining_oe_lam = oe;//copy
 
-        ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+        ParameterEnsemble remaining_pe_lam = ctx.pe_lams[ctx.best_idx];
         remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
 
-        if (pe_filenames.size() > 0) {
+        if (ctx.pe_filenames.size() > 0) {
             performance_log->log_event(
                     "'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" +
-                    pe_filenames[best_idx] + "'");
+                    ctx.pe_filenames[ctx.best_idx] + "'");
             vector<string> missing;
-            if (oe_lams[best_idx].shape().first != remaining_pe_lam.shape().first) {
+            if (ctx.oe_lams[ctx.best_idx].shape().first != remaining_pe_lam.shape().first) {
                 set<string> ssub_names;
-                for (auto real_name: oe_lams[best_idx].get_real_names())
+                for (auto real_name: ctx.oe_lams[ctx.best_idx].get_real_names())
                     ssub_names.emplace(real_name);
                 vector<string> oreal_names = oe.get_real_names();
                 vector<string> preal_names = pe.get_real_names();
 
-                for (auto idx: subset_idxs)
+                for (auto idx: ctx.subset_idxs)
                     if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
                         missing.push_back(preal_names[idx]);
                 if (missing.size() > 0)
-                    pe_lams[best_idx].drop_rows(missing);
+                    ctx.pe_lams[ctx.best_idx].drop_rows(missing);
             }
 
-            remaining_pe_lam.from_binary(pe_filenames[best_idx]);
+            remaining_pe_lam.from_binary(ctx.pe_filenames[ctx.best_idx]);
             remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
             //remove any failed runs from subset testing
             if (missing.size() > 0)
                 remaining_pe_lam.drop_rows(missing);
-            remove_external_pe_filenames(pe_filenames);
+            //the spilled candidates are on disk and the winner has just been read back, so
+            //they can go now - unless the caller has taken ownership of that decision
+            if (!ctx.defer_candidate_release)
+                release_spilled_candidate_files(ctx);
 
         }
 
@@ -7756,7 +7866,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
         vector<string> org_pe_idxs, org_oe_idxs;
         set<string> ssub;
-        for (auto &i: subset_idxs)
+        for (auto &i: ctx.subset_idxs)
             ssub.emplace(pe_names[i]);
         for (int i = 0; i < pe_names.size(); i++)
             if (ssub.find(pe_names[i]) == ssub.end()) {
@@ -7764,18 +7874,18 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
                 //oe_keep_names.push_back(oe_names[i]);
             }
         ssub.clear();
-        for (auto &i: subset_idxs)
+        for (auto &i: ctx.subset_idxs)
             ssub.emplace(oe_names[i]);
         for (int i = 0; i < oe_names.size(); i++)
             if (ssub.find(oe_names[i]) == ssub.end()) {
                 oe_keep_names.push_back(oe_names[i]);
             }
         message(0, "phi summary for best lambda, scale fac: ",
-                vector<double>({lam_vals[best_idx], scale_vals[best_idx]}));
-        ph.update(oe_lams[best_idx], pe_lams[best_idx], weights);
+                vector<double>({ctx.lam_vals[ctx.best_idx], ctx.scale_vals[ctx.best_idx]}));
+        ph.update(ctx.oe_lams[ctx.best_idx], ctx.pe_lams[ctx.best_idx], weights);
         ph.report(true, false);
         message(0, "running remaining realizations for best lambda, scale:",
-                vector<double>({lam_vals[best_idx], scale_vals[best_idx]}));
+                vector<double>({ctx.lam_vals[ctx.best_idx], ctx.scale_vals[ctx.best_idx]}));
 
         //pe_keep_names and oe_keep_names are names of the remaining reals to eval
         performance_log->log_event("dropping subset idxs from remaining_pe_lam");
@@ -7790,7 +7900,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2)) {
             message(1, "'pest.stp' found, quitting");
-            return true;
+            return UpgradeStatus::HALTED;
         }
         else if (q == 4)
         {
@@ -7817,7 +7927,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
             message(1, "all remaining realizations failed...something is prob wrong, returning to upgrade calculations and increasing lambda to ",
                     new_lam);
-            return false;
+            return UpgradeStatus::REJECTED_RETRY;
         }
 		if (fails.size() > 0)
 		{
@@ -7844,14 +7954,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 		//drop the remaining runs from the par en then append the remaining par runs (in case some failed)
 		performance_log->log_event("assembling ensembles");
-		pe_lams[best_idx].drop_rows(pe_keep_names);
-		pe_lams[best_idx].append_other_rows(remaining_pe_lam);
-		pe_lams[best_idx].set_fixed_info(pe.get_fixed_info());
+		ctx.pe_lams[ctx.best_idx].drop_rows(pe_keep_names);
+		ctx.pe_lams[ctx.best_idx].append_other_rows(remaining_pe_lam);
+		ctx.pe_lams[ctx.best_idx].set_fixed_info(pe.get_fixed_info());
 		//append the remaining obs en
-		oe_lam_best.append_other_rows(remaining_oe_lam);
-		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
-        drop_bad_reals(pe_lams[best_idx], oe_lam_best);
-		if (oe_lam_best.shape().first == 0)
+		ctx.oe_lam_best.append_other_rows(remaining_oe_lam);
+		assert(ctx.pe_lams[ctx.best_idx].shape().first == ctx.oe_lam_best.shape().first);
+        drop_bad_reals(ctx.pe_lams[ctx.best_idx], ctx.oe_lam_best);
+		if (ctx.oe_lam_best.shape().first == 0)
 		{
 			//throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
             double new_lam = last_best_lam * lam_inc;
@@ -7859,66 +7969,83 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
             message(1, "all realization dropped after finishing subset runs...something is prob wrong, returning to upgrade calculations and increasing lambda to ",
                     new_lam);
-            return false;
+            return UpgradeStatus::REJECTED_RETRY;
 		}
 		performance_log->log_event("updating phi");
-		ph.update(oe_lam_best, pe_lams[best_idx], weights);
+		ph.update(ctx.oe_lam_best, ctx.pe_lams[ctx.best_idx], weights);
 
-        best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+        ctx.best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+		ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ ctx.lam_vals[ctx.best_idx],ctx.scale_vals[ctx.best_idx] }));
 		ph.report(true, false);
 	}
 	else
 	{
-		ph.update(oe_lam_best, pe_lams[best_idx], weights);
-        best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+		ph.update(ctx.oe_lam_best, ctx.pe_lams[ctx.best_idx], weights);
+        ctx.best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+		ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	}
+	return UpgradeStatus::CONTINUE;
+}
 
-	ph.update(oe_lam_best, pe_lams[best_idx], weights);
-    best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+/**
+ * @brief Stage 7: decide whether the winning candidate replaces the current ensembles, and
+ *        move lambda accordingly.
+ *
+ * On rejection the ensembles are left alone (or only the reduced-phi realizations are taken)
+ * and lambda is raised - the iteration is over either way, so this always ends the solve.
+ */
+UpgradeStatus EnsembleMethod::accept_or_reject(UpgradeContext& ctx, bool use_mda, int cycle)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+    double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+    double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
+    double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
+
+	ph.update(ctx.oe_lam_best, ctx.pe_lams[ctx.best_idx], weights);
+    ctx.best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+	ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
-	message(1, "current best mean phi: ", best_mean);
+	message(1, "current best mean phi: ", ctx.best_mean);
 
 	if (pest_scenario.get_pestpp_options().get_ies_debug_high_upgrade_phi())
 	{
 		cout << "ies_debug_high_upgrade_phi active" << endl;
         frec << "ies_debug_high_upgrade_phi active" << endl;
-		best_mean = (last_best_mean * acc_fac) + 1.0;
+		ctx.best_mean = (last_best_mean * acc_fac) + 1.0;
 	}
 
 	//track this here for phi-based termination check
-	best_mean_phis.push_back(best_mean);
+	best_mean_phis.push_back(ctx.best_mean);
 
-	if ((best_mean < last_best_mean * acc_fac))
+	if ((ctx.best_mean < last_best_mean * acc_fac))
 	{
 		message(0, "updating parameter ensemble");
 		performance_log->log_event("updating parameter ensemble");
-		last_best_mean = best_mean;
+		last_best_mean = ctx.best_mean;
         if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
         {
 
-            if (pe.shape().first > pe_lams[best_idx].shape().first)
+            if (pe.shape().first > ctx.pe_lams[ctx.best_idx].shape().first)
             {
                 performance_log->log_event("aligning rows of pe with pe_lams[best_idx]");
-                pe.keep_rows(pe_lams[best_idx].get_real_names());
+                pe.keep_rows(ctx.pe_lams[ctx.best_idx].get_real_names());
             }
-            if (oe.shape().first > oe_lam_best.shape().first) {
+            if (oe.shape().first > ctx.oe_lam_best.shape().first) {
                 performance_log->log_event("aligning rows of oe with oe_lam_best");
-                oe.keep_rows(oe_lam_best.get_real_names());
+                oe.keep_rows(ctx.oe_lam_best.get_real_names());
             }
             message(0, "only updating realizations with reduced phi");
-            update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
+            update_reals_by_phi(ctx.pe_lams[ctx.best_idx], ctx.oe_lam_best);
         }
         else {
-            pe = pe_lams[best_idx];
-            oe = oe_lam_best;
+            pe = ctx.pe_lams[ctx.best_idx];
+            oe = ctx.oe_lam_best;
         }
-		if (best_std < last_best_std * acc_fac)
+		if (ctx.best_std < last_best_std * acc_fac)
 		{
-			double new_lam = lam_vals[best_idx] * lam_dec;
+			double new_lam = ctx.lam_vals[ctx.best_idx] * lam_dec;
 			new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
 			message(0, "updating lambda to ", new_lam);
 			last_best_lam = new_lam;
@@ -7927,7 +8054,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		{
 			message(0, "not updating lambda (standard deviation reduction criteria not met)");
 		}
-		last_best_std = best_std;
+		last_best_std = ctx.best_std;
 	}
 
 	else
@@ -7936,25 +8063,25 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		if ((!use_mda) && (!pest_scenario.get_pestpp_options().get_ies_updatebyreals()))
 		{
 			message(0, "only updating realizations with reduced phi");
-			update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
+			update_reals_by_phi(ctx.pe_lams[ctx.best_idx], ctx.oe_lam_best);
 		}
 		ph.update(oe, pe, weights);
 		//re-check phi
 		double new_best_mean;
         new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-		if (new_best_mean < best_mean)
+		if (new_best_mean < ctx.best_mean)
 		{
-			best_mean = new_best_mean;
+			ctx.best_mean = new_best_mean;
 
-			best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+			ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 			//replace the last entry in the best mean phi tracker
-			best_mean_phis[best_mean_phis.size() - 1] = best_mean;
-			message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
-			if (best_mean < last_best_mean * acc_fac)
+			best_mean_phis[best_mean_phis.size() - 1] = ctx.best_mean;
+			message(1, "current best mean phi (after updating reduced-phi reals): ", ctx.best_mean);
+			if (ctx.best_mean < last_best_mean * acc_fac)
 			{
-				if (best_std < last_best_std * acc_fac)
+				if (ctx.best_std < last_best_std * acc_fac)
 				{
-					double new_lam = lam_vals[best_idx] * lam_dec;
+					double new_lam = ctx.lam_vals[ctx.best_idx] * lam_dec;
 					new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
 					message(0, "updating lambda to ", new_lam);
 					last_best_lam = new_lam;
@@ -7963,7 +8090,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				{
 					message(0, "not updating lambda (standard deviation reduction criteria not met)");
 				}
-				last_best_std = best_std;
+				last_best_std = ctx.best_std;
 			}
 			else
 			{
@@ -7979,7 +8106,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             message(0, "increasing lambda to: ", new_lam);
             last_best_lam = new_lam;
         }
-        save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
+        save_ensembles("rejected",cycle,ctx.pe_lams[ctx.best_idx],ctx.oe_lam_best);
 	}
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_phi_lambda_iters()) {
@@ -7994,7 +8121,86 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	}
 
-	return true;
+	return UpgradeStatus::ACCEPTED;
+}
+
+/**
+ * @brief One upgrade solve, composed from the public stages above.
+ *
+ * This is the in-tree client of the stage API: the sequence here is exactly what an external
+ * caller running its own loop would write, which is what keeps the two paths from drifting.
+ * The bool return is preserved for solve_glm()/solve_mda() and the tool loops - false means
+ * "no upgrade taken, retry with the new lambda", not "error".
+ */
+bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
+{
+	UpgradeContext ctx(&pest_scenario);
+	UpgradeStatus status;
+
+	status = prepare_upgrades(ctx, use_mda, inflation_factors, backtrack_factors);
+	if (status != UpgradeStatus::CONTINUE)
+		return status != UpgradeStatus::REJECTED_RETRY;
+
+	generate_upgrades(ctx, use_mda, inflation_factors, backtrack_factors);
+
+	status = check_noniterative_shortcut(ctx);
+	if (status != UpgradeStatus::CONTINUE)
+		return status != UpgradeStatus::REJECTED_RETRY;
+
+	run_upgrade_ensembles(ctx, cycle, inflation_factors, backtrack_factors);
+
+	status = evaluate_upgrades(ctx);
+	if (status != UpgradeStatus::CONTINUE)
+		return status != UpgradeStatus::REJECTED_RETRY;
+
+	status = complete_subset_runs(ctx, cycle, use_mda);
+	if (status != UpgradeStatus::CONTINUE)
+		return status != UpgradeStatus::REJECTED_RETRY;
+
+	status = accept_or_reject(ctx, use_mda, cycle);
+	return status != UpgradeStatus::REJECTED_RETRY;
+}
+
+/**
+ * @brief Seed the schedule from the three parallel reinflation options.
+ *
+ * The num_reals lookahead is deliberate and matches the original loop: the *first* entry is
+ * taken from index 1 when one exists, while n_iter and factor are taken from index 0.
+ */
+ReinflationSchedule::ReinflationSchedule(Pest& pest_scenario)
+{
+	n_iter_reinflate = pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate();
+	reinflate_factor = pest_scenario.get_pestpp_options().get_ies_reinflate_factor();
+	reinflate_num_reals = pest_scenario.get_pestpp_options().get_ies_reinflate_num_reals();
+
+	// the registry guarantees each of these has at least one entry (and pestpp-selftest
+	// asserts it), but don't index blind
+	if (n_iter_reinflate.size() > 0)
+		current_n_iter = abs(n_iter_reinflate[0]);
+	if (reinflate_factor.size() > 0)
+		current_factor = reinflate_factor[0];
+	if (reinflate_num_reals.size() > 0)
+		current_num_reals = reinflate_num_reals[0];
+	if (reinflate_num_reals.size() > 1)
+		current_num_reals = reinflate_num_reals[1];
+}
+
+/**
+ * @brief Consume the current reinflation and step to the next schedule entry.
+ *
+ * Each vector is only advanced if it actually has an entry at the new index, so a short
+ * vector holds its last value for the rest of the run.
+ */
+void ReinflationSchedule::advance()
+{
+	iters_since = 0;
+	idx++;
+	if ((int)reinflate_factor.size() > idx)
+		current_factor = reinflate_factor[idx];
+	if ((int)n_iter_reinflate.size() > idx)
+		current_n_iter = abs(n_iter_reinflate[idx]);
+	if ((int)reinflate_num_reals.size() > idx + 1)
+		current_num_reals = reinflate_num_reals[idx + 1];
 }
 
 void EnsembleMethod::reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals){

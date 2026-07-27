@@ -177,12 +177,16 @@ public:
     void iterate_to_solution();
 	void finalize();
 	typedef pair<vector<string>, vector<string>> DomPair;
-private:
-	// env selector, mating selector and generator list are derived live from the options so
-	// they can be swapped between generations - each was a member cached during initialize()
+protected:
+	// Derived live from the options so they can be swapped between generations - each was a
+	// member cached during initialize().  Protected rather than private only so the selftest
+	// harness can subclass and assert they track a post-initialize() option change; this is
+	// not part of the intended public surface.
 	MouEnvType get_envtype();
 	MouMateType get_mattype();
 	vector<MouGenType> get_gen_types();
+	bool get_risk_obj() const { return pest_scenario.get_pestpp_options().get_mou_risk_obj(); }
+private:
 	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;
@@ -204,7 +208,6 @@ private:
 	map<string, double> obj_dir_mult;
 	int n_adaptive_dvs;
 	map<string, map<string, double>> previous_obj_summary, previous_dv_summary;
-	bool get_risk_obj() const { return pest_scenario.get_pestpp_options().get_mou_risk_obj(); }
 	// still a member: flipping it also has to re-push state into `objectives` (set_ppd_beta)
 	bool prob_pareto = false; //probabilistic pareto dominance
 	bool ppd_sort;

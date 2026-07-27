@@ -370,6 +370,114 @@ public:
 	void work(int thread_id, int iter, double cur_lam,bool use_glm_form, vector<string> par_names, vector<string> obs_names);
 };
 
+/**
+ * @brief The par-ensemble reinflation schedule: when to reinflate, by how much, over how many
+ *        realizations.
+ *
+ * ies_n_iter_reinflate / ies_reinflate_factor / ies_reinflate_num_reals are parallel vectors
+ * walked one entry at a time as reinflations are consumed. That bookkeeping used to live as
+ * six loose locals in IterEnsembleSmoother::iterate_2_solution(), which meant any caller
+ * writing its own loop had to re-derive it - and re-derive the index quirks with it. Holding
+ * it here keeps the built-in loop and an API caller on identical rules.
+ *
+ * Usage per solution iteration: tick(), then if due() reinflate with get_factor() /
+ * get_num_reals() and call advance().
+ */
+class ReinflationSchedule
+{
+public:
+	ReinflationSchedule(Pest& pest_scenario);
+
+	/// count one completed solution iteration
+	void tick() { iters_since++; }
+	/// is a reinflation due now? (never when the current entry is 0 == reinflation off)
+	bool due() const { return (current_n_iter != 0) && (iters_since >= current_n_iter); }
+	/// consume this reinflation and move to the next schedule entry
+	void advance();
+
+	/// iterations between reinflations for the current entry; 0 means reinflation is off
+	int get_n_iter() const { return current_n_iter; }
+	double get_factor() const { return current_factor; }
+	int get_num_reals() const { return current_num_reals; }
+	/// is reinflation in use at this point in the schedule?
+	bool is_active() const { return current_n_iter != 0; }
+
+private:
+	vector<int> n_iter_reinflate;
+	vector<double> reinflate_factor;
+	vector<int> reinflate_num_reals;
+	int iters_since = 0;
+	int idx = 0;
+	int current_n_iter = 0;
+	double current_factor = 1.0;
+	int current_num_reals = 0;
+};
+
+/**
+ * @brief Outcome of one stage of an upgrade solve.
+ *
+ * The old solve() signalled all of this through a bool, where `false` did not mean "error"
+ * but "retry this iteration with a different lambda". Naming the outcomes lets the stages be
+ * driven one at a time - by solve(), or by an API caller running its own loop.
+ */
+enum class UpgradeStatus
+{
+	CONTINUE,        ///< stage finished, go on to the next one
+	ACCEPTED,        ///< the upgrade was taken; the iteration is done
+	REJECTED_RETRY,  ///< no usable upgrade; lambda was adjusted, run the iteration again
+	HALTED           ///< a 'pest.stp' quit file was seen; stop without further work
+};
+
+/**
+ * @brief State carried across the stages of a single upgrade solve.
+ *
+ * These were locals inside the 688-line solve(). Holding them in one place is what lets the
+ * stages be called separately: generate the upgrade ensembles, hand them to the run manager,
+ * then evaluate what came back.
+ *
+ * Deliberately non-copyable: `pe_lams`/`oe_lams` are large, and stages take it by reference.
+ */
+struct UpgradeContext
+{
+	UpgradeContext(Pest* _pest_scenario) : oe_lam_best(_pest_scenario) {}
+	UpgradeContext(const UpgradeContext&) = delete;
+	UpgradeContext& operator=(const UpgradeContext&) = delete;
+
+	// -- filled by prepare_upgrades()
+	int local_subset_size = 0;
+	vector<int> subset_idxs;
+	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
+	Eigen::MatrixXd Am;
+
+	// -- filled by generate_upgrades(): one entry per lambda x scale-factor combination
+	vector<ParameterEnsemble> pe_lams;
+	vector<double> lam_vals, scale_vals;
+	vector<string> pe_filenames;   ///< non-empty only when ies_upgrades_in_memory is false
+
+	// -- filled by run_upgrade_ensembles()
+	vector<ObservationEnsemble> oe_lams;
+
+	// -- filled by evaluate_upgrades()
+	ObservationEnsemble oe_lam_best;
+	int best_idx = -1;
+	double best_mean = 1.0e+300, best_std = 1.0e+300;
+
+	/**
+	 * Who decides when the losing candidates die.
+	 *
+	 * Left false, they are reclaimed inline at the point solve() has always done it -
+	 * immediately before the remaining-realization runs, which is where memory peaks. Set
+	 * true and nothing is released automatically: the caller owns the lifetime and calls
+	 * release_unused_candidates() / release_spilled_candidate_files() itself. That is what
+	 * lets an API caller keep every candidate and response around to compare, and it also
+	 * means a borrowed view into pe_lams stays valid until the caller says otherwise.
+	 *
+	 * Beware the asymmetry: unreleased memory comes back when the context dies, but
+	 * unreleased spill files do not - those filenames are iteration-stamped and accumulate.
+	 */
+	bool defer_candidate_release = false;
+};
+
 class EnsembleMethod
 {
 
@@ -488,6 +596,26 @@ protected:
 	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
 
 	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
+
+	// The stages solve() is built from, in call order. Each takes the shared UpgradeContext
+	// by reference; a status other than CONTINUE means the iteration is over. Split out so an
+	// API caller can drive generate -> run -> evaluate itself and own run management in
+	// between; solve() is now just the in-tree composition of these.
+	UpgradeStatus prepare_upgrades(UpgradeContext& ctx, bool use_mda,
+		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
+	void generate_upgrades(UpgradeContext& ctx, bool use_mda,
+		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
+	UpgradeStatus check_noniterative_shortcut(UpgradeContext& ctx);
+	void run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
+		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
+	UpgradeStatus evaluate_upgrades(UpgradeContext& ctx);
+	UpgradeStatus complete_subset_runs(UpgradeContext& ctx, int cycle, bool use_mda);
+	UpgradeStatus accept_or_reject(UpgradeContext& ctx, bool use_mda, int cycle);
+
+	// Candidate lifetime. Called inline by the stages above unless the context asks to defer
+	// (UpgradeContext::defer_candidate_release), in which case they are the caller's to call.
+	void release_unused_candidates(UpgradeContext& ctx, bool include_responses = false);
+	void release_spilled_candidate_files(UpgradeContext& ctx);
 
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
 
