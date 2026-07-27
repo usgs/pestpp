@@ -23,6 +23,7 @@
 #include "OutputFileWriter.h"
 #include "PerformanceLog.h"
 #include "constraints.h"
+#include "EnsembleView.h"
 #include "EnsembleMethodUtils.h"
 #include "MOEA.h"
 #include "SQP.h"
@@ -460,6 +461,80 @@ static void test_tool_objects_track_live_options()
         "changing the init-only sqp_num_reals post-init IS flagged");
 }
 
+
+static void test_ensemble_zero_copy_view()
+{
+    cout << "[zero-copy ensemble view: borrowed window + invalidation]" << endl;
+    Pest p; p.set_defaults();
+    std::mt19937 rgen(11);
+
+    vector<string> rnames{"R0","R1","R2"};
+    vector<string> vnames{"V0","V1"};
+    Eigen::MatrixXd m(3,2);
+    m << 1.0, 4.0,
+         2.0, 5.0,
+         3.0, 6.0;
+    ObservationEnsemble oe(&p, &rgen, m, rnames, vnames);
+
+    {
+        EnsembleView v(oe);
+        CHK(v.valid(), "fresh view is valid");
+        CHK(v.rows() == 3 && v.cols() == 2, "view reports the ensemble shape");
+        // Eigen is column-major, so the buffer runs down each column in turn
+        CHK(v.strides_bytes()[0] == (int64_t)sizeof(double), "row stride is one element");
+        CHK(v.strides_bytes()[1] == (int64_t)(sizeof(double)*3), "col stride is one column");
+        CHK(v.at(0,0) == 1.0 && v.at(2,0) == 3.0 && v.at(0,1) == 4.0 && v.at(2,1) == 6.0,
+            "view reads the right values through the raw buffer");
+        // it is the ensemble's own buffer, not a copy
+        CHK(v.data() == oe.get_eigen_ptr()->data(), "view aliases the ensemble buffer (no copy)");
+        CHK(v.row_names().size() == 3 && v.col_names()[1] == "V1", "view reports live labels");
+
+        // an in-place write lands in the ensemble and does NOT invalidate
+        v.set(1, 1, 99.0);
+        CHK(oe.get_eigen()(1,1) == 99.0, "in-place write through the view reaches the ensemble");
+        CHK(v.valid(), "in-place write leaves the view valid");
+    }
+
+    // a structural mutation reallocates reals -> outstanding views go invalid
+    {
+        EnsembleView v(oe);
+        CHK(v.valid(), "view valid before drop_rows");
+        vector<string> drop{"R0"};
+        oe.drop_rows(drop);
+        CHK(!v.valid(), "drop_rows invalidates the view");
+        bool threw = false;
+        try { v.at(0,0); } catch (const EnsembleViewInvalidated&) { threw = true; }
+        CHK(threw, "using an invalidated view throws EnsembleViewInvalidated");
+    }
+
+    // set_eigen replaces the whole matrix
+    {
+        EnsembleView v(oe);
+        Eigen::MatrixXd m2(2,2); m2 << 7,8,9,10;
+        oe.set_eigen(m2);
+        CHK(!v.valid(), "set_eigen invalidates the view");
+    }
+
+    // assigning one ensemble over another invalidates views onto the target
+    {
+        ObservationEnsemble other(&p, &rgen, m, rnames, vnames);
+        EnsembleView v(other);
+        CHK(v.valid(), "view valid before assignment");
+        other = oe;
+        CHK(!v.valid(), "assigning over an ensemble invalidates its views");
+    }
+
+    // destruction expires the guard, and valid() must not touch the dead object
+    {
+        ObservationEnsemble* tmp = new ObservationEnsemble(&p, &rgen, m, rnames, vnames);
+        EnsembleView v(*tmp);
+        CHK(v.valid(), "view valid before destruction");
+        delete tmp;
+        CHK(!v.valid(), "destroying the ensemble invalidates the view");
+    }
+}
+
+
 int main()
 {
     test_registry_equivalence();
@@ -474,6 +549,7 @@ int main()
     test_mou_generation_controls();
     test_sqp_controls();
     test_tool_objects_track_live_options();
+    test_ensemble_zero_copy_view();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

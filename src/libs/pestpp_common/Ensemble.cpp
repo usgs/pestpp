@@ -800,6 +800,7 @@ void Ensemble::from_eigen_mat(Eigen::MatrixXd _reals, const vector<string> &_rea
 	if (_reals.cols() != _var_names.size())
 		throw_ensemble_error("Ensemble.from_eigen_mat() cols != var_names.size");
 	reals = _reals;
+	view_guard.invalidate();
 	var_names = _var_names;
 	real_names = _real_names;
 	org_real_names = real_names;
@@ -818,6 +819,7 @@ void Ensemble::set_eigen(Eigen::MatrixXd _reals)
 	if (_reals.cols() != var_names.size())
 		throw_ensemble_error("Ensemble.set_reals() cols != var_names.size");
 	reals = _reals;
+	view_guard.invalidate();
 }
 
 
@@ -3868,23 +3870,30 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
  * @param csv Description.
  * @param write_header Description.
  */
-void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
+/**
+ * @brief Assemble the complete CTL-space values, fixed and tied parameters included.
+ *
+ * This is the single assembly path: to_csv_by_reals() writes what this produces, so the
+ * DataFrame a caller gets and the csv on disk cannot disagree.
+ *
+ * Per realization: start from the control-file parameters, push them into the ensemble's
+ * current transform space so the adjustable values line up, overlay this realization's
+ * values, back-transform to CTL, then substitute the per-realization fixed values.
+ */
+ParameterSnapshot ParameterEnsemble::get_ctl_snapshot()
 {
-	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	if (write_header)
-	{
-		csv << "real_name";
-		for (auto& vname : names)
-			csv << ',' << pest_utils::lower_cp(vname);
-		csv << endl;
-	}
+	ParameterSnapshot snap;
+	if (pest_scenario_ptr == nullptr)
+		throw_ensemble_error("ParameterEnsemble::get_ctl_snapshot(): no pest scenario set");
+	snap.col_names = pest_scenario_ptr->get_ctl_ordered_par_names();
 
-	//for (int ireal = 0; ireal < reals.rows(); ireal++)
+	// this is a public entry point now, so don't assume the transform seq is populated -
+	// a null tied pointer means an ensemble that was never tied to a real control file
 	bool has_tied = false;
-	if (par_transform.get_tied_ptr()->get_items().size() > 0)
-	    has_tied = true;
+	TranTied* tied_ptr = par_transform.get_tied_ptr();
+	if ((tied_ptr != nullptr) && (tied_ptr->get_items().size() > 0))
+		has_tied = true;
 
-	int ireal = 0;
 	map<string, int> real_map;
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
@@ -3892,10 +3901,17 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 	vector<string> rnames = org_real_names;
 	if (rnames.size() == 0)
 		rnames = real_names;
+
+	// the emitted order follows org_real_names, restricted to realizations still present
+	vector<string> ordered;
 	for (auto rname : rnames)
+		if (real_map.find(rname) != end)
+			ordered.push_back(rname);
+
+	snap.values.resize(ordered.size(), snap.col_names.size());
+	int irow = 0;
+	for (auto rname : ordered)
 	{
-		if (real_map.find(rname) == end)
-			continue;
 		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 		if (tstat == transStatus::NUM)
 		{
@@ -3905,8 +3921,7 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 			par_transform.active_ctl2model_ip(pars);
 		}
 
-		ireal = real_map[rname];
-		csv << pest_utils::lower_cp(real_names[ireal]);
+		int ireal = real_map[rname];
 		pars.update_without_clear(var_names, reals.row(ireal));
 		if (tstat == transStatus::MODEL)
 			par_transform.model2ctl_ip(pars);
@@ -3914,14 +3929,153 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 			par_transform.numeric2ctl_ip(pars);
 		// here we need to check for tied parameters...
 		else if ((has_tied) && (tstat == transStatus::CTL))
-        {
-            par_transform.active_ctl2model_ip(pars);
-            par_transform.model2ctl_ip(pars);
-        }
-		replace_fixed(real_names[ireal],pars);
+		{
+			par_transform.active_ctl2model_ip(pars);
+			par_transform.model2ctl_ip(pars);
+		}
+		replace_fixed(real_names[ireal], pars);
 
-		for (auto &name : names)
-			csv << ',' << pars[name];
+		snap.row_names.push_back(real_names[ireal]);
+		for (int j = 0; j < snap.col_names.size(); j++)
+			snap.values(irow, j) = pars[snap.col_names[j]];
+		irow++;
+	}
+	return snap;
+}
+
+/**
+ * @brief Push CTL-space values back into the ensemble.
+ *
+ * The inverse of get_ctl_snapshot(): forward-transform each realization from CTL into
+ * whatever space this ensemble is currently in, keep the adjustable columns in `reals`, and
+ * put the fixed values back into the per-realization fixed store (in the offset/scale form
+ * save_fixed() uses). Tied parameters are skipped - they are derived from their parents when
+ * needed, so there is nothing to write.
+ *
+ * Everything is matched by name, so the snapshot may be in any row/column order.
+ */
+void ParameterEnsemble::set_from_ctl_snapshot(const ParameterSnapshot& snap)
+{
+	if (pest_scenario_ptr == nullptr)
+		throw_ensemble_error("ParameterEnsemble::set_from_ctl_snapshot(): no pest scenario set");
+	if (snap.values.rows() != (int)snap.row_names.size())
+		throw_ensemble_error("set_from_ctl_snapshot(): row count != row_names.size()");
+	if (snap.values.cols() != (int)snap.col_names.size())
+		throw_ensemble_error("set_from_ctl_snapshot(): col count != col_names.size()");
+
+	map<string, int> col_idx, row_idx;
+	for (int j = 0; j < snap.col_names.size(); j++)
+		col_idx[snap.col_names[j]] = j;
+	for (int i = 0; i < snap.row_names.size(); i++)
+		row_idx[snap.row_names[i]] = i;
+
+	vector<string> missing;
+	for (auto& rname : real_names)
+		if (row_idx.find(rname) == row_idx.end())
+			missing.push_back(rname);
+	if (missing.size() > 0)
+		throw_ensemble_error("set_from_ctl_snapshot(): snapshot is missing realizations", missing);
+
+	for (auto& vname : var_names)
+		if (col_idx.find(vname) == col_idx.end())
+			missing.push_back(vname);
+	vector<string> fixed_names = pfinfo.get_fixed_names();
+	for (auto& fname : fixed_names)
+		if (col_idx.find(fname) == col_idx.end())
+			missing.push_back(fname);
+	if (missing.size() > 0)
+		throw_ensemble_error("set_from_ctl_snapshot(): snapshot is missing parameters", missing);
+
+	// Only realizations the caller actually changed are written. Going CTL -> NUM is not
+	// bit-identical to the NUM values already stored (a log/exp round trip moves the last
+	// bit), and in an iterative solve that ULP-level nudge grows over iterations. Comparing
+	// against the current CTL values first makes "read a snapshot and write it back
+	// unmodified" a true no-op, and leaves untouched realizations exactly as they were.
+	ParameterSnapshot current = get_ctl_snapshot();
+	map<string, int> cur_row_idx, cur_col_idx;
+	for (int i = 0; i < current.row_names.size(); i++)
+		cur_row_idx[current.row_names[i]] = i;
+	for (int j = 0; j < current.col_names.size(); j++)
+		cur_col_idx[current.col_names[j]] = j;
+
+	vector<double> row_vals(snap.col_names.size());
+	for (int i = 0; i < real_names.size(); i++)
+	{
+		int si = row_idx[real_names[i]];
+
+		map<string, int>::iterator cur_it = cur_row_idx.find(real_names[i]);
+		if (cur_it != cur_row_idx.end())
+		{
+			bool unchanged = true;
+			for (int j = 0; j < snap.col_names.size(); j++)
+			{
+				map<string, int>::iterator cj = cur_col_idx.find(snap.col_names[j]);
+				if (cj == cur_col_idx.end())
+					continue;
+				if (snap.values(si, j) != current.values(cur_it->second, cj->second))
+				{
+					unchanged = false;
+					break;
+				}
+			}
+			if (unchanged)
+				continue;
+		}
+
+		for (int j = 0; j < snap.col_names.size(); j++)
+			row_vals[j] = snap.values(si, j);
+
+		// overlay the snapshot on a full control-file parameter set, then push it into
+		// whatever space this ensemble stores
+		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		pars.update_without_clear(snap.col_names, row_vals);
+		if (tstat == transStatus::NUM)
+			par_transform.ctl2numeric_ip(pars);
+		else if (tstat == transStatus::MODEL)
+			par_transform.ctl2model_ip(pars);
+
+		for (int j = 0; j < var_names.size(); j++)
+			reals(i, j) = pars.get_rec(var_names[j]);
+
+		// fixed values are held with offset/scale applied - mirror save_fixed()
+		if (fixed_names.size() > 0)
+		{
+			map<string, double> fmap;
+			for (auto& fname : fixed_names)
+			{
+				double v = snap.values(si, col_idx[fname]);
+				double scale = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(fname)->scale;
+				double offset = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(fname)->offset;
+				fmap[fname] = (v * scale) + offset;
+			}
+			pfinfo.add_realization(real_names[i], fmap);
+		}
+	}
+	// the numbers were replaced wholesale, so any outstanding borrowed view is stale
+	view_guard.invalidate();
+}
+
+/**
+ * @brief To csv by reals.
+ *
+ * @param csv Description.
+ * @param write_header Description.
+ */
+void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
+{
+	ParameterSnapshot snap = get_ctl_snapshot();
+	if (write_header)
+	{
+		csv << "real_name";
+		for (auto& vname : snap.col_names)
+			csv << ',' << pest_utils::lower_cp(vname);
+		csv << endl;
+	}
+	for (int i = 0; i < snap.row_names.size(); i++)
+	{
+		csv << pest_utils::lower_cp(snap.row_names[i]);
+		for (int j = 0; j < snap.col_names.size(); j++)
+			csv << ',' << snap.values(i, j);
 		csv << endl;
 	}
 }

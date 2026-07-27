@@ -20,6 +20,42 @@ const string BASE_REAL_NAME = "BASE";
 const string MEDIAN_CENTER_ON_NAME = "_MEDIAN_";
 const string MEAN_REAL_NAME = "MEAN";
 
+/**
+ * @brief Lifetime token that outstanding EnsembleViews hold a weak_ptr onto.
+ *
+ * An EnsembleView borrows the raw `reals` buffer, so it must be able to tell when the
+ * ensemble it came from has gone away or been replaced wholesale. Making that a member
+ * with these copy/move semantics means Ensemble's *implicit* assignment operators do the
+ * invalidating for free - there is no hand-written operator= to keep in sync, and a future
+ * member cannot break it by forgetting.
+ *
+ * Reallocation of `reals` by an ordinary mutator is caught separately, by the view
+ * re-checking the buffer address and dimensions; that needs no bookkeeping at the ~28 sites
+ * that reassign or resize `reals`, which is the part most likely to rot.
+ */
+struct EnsembleViewGuard
+{
+	std::shared_ptr<int> token = std::make_shared<int>(0);
+
+	EnsembleViewGuard() = default;
+	// a copy is a different ensemble with different storage, so it starts with a fresh token
+	// rather than sharing one - a view must never silently follow a copy
+	EnsembleViewGuard(const EnsembleViewGuard&) : token(std::make_shared<int>(0)) {}
+	EnsembleViewGuard& operator=(const EnsembleViewGuard&) { token = std::make_shared<int>(0); return *this; }
+	EnsembleViewGuard(EnsembleViewGuard&& o) noexcept : token(std::make_shared<int>(0)) { o.token.reset(); }
+
+	/// Expire every outstanding view. Needed only where the whole matrix is swapped for a
+	/// same-shaped one: Eigen reuses the buffer there, so the address/dimension check that
+	/// covers every other mutator cannot see it.
+	void invalidate() { token = std::make_shared<int>(0); }
+	EnsembleViewGuard& operator=(EnsembleViewGuard&& o) noexcept
+	{
+		token = std::make_shared<int>(0);
+		o.token.reset();   // views onto the moved-from corpse are dead
+		return *this;
+	}
+};
+
 class Ensemble
 {
 public:
@@ -107,10 +143,15 @@ public:
 
 	bool try_align_other_rows(PerformanceLog* performance_log, Ensemble& other);
 
+	/// Token an EnsembleView weak_ptr's onto, to detect this ensemble being destroyed or
+	/// replaced. See EnsembleView.h for the borrowed-window handle itself.
+	std::weak_ptr<int> get_view_guard() const { return view_guard.token; }
+
 protected:
 	std::mt19937* rand_gen_ptr;
 	Pest* pest_scenario_ptr;
 	Eigen::MatrixXd reals;
+	EnsembleViewGuard view_guard;
 	vector<string> var_names;
 	vector<string> real_names;	
 	vector<string> org_real_names;
@@ -154,6 +195,25 @@ private:
 	void initialize();
 };
 
+/**
+ * @brief A complete, CTL-space copy of a ParameterEnsemble - what to_csv() writes.
+ *
+ * The zero-copy EnsembleView hands back the *raw* matrix: whatever transform space the
+ * ensemble happens to be in (usually NUM during a solve, i.e. log/offset/scaled), holding
+ * only the adjustable parameters. That is the right thing for a caller who wants the numbers
+ * the algorithm is actually working on, and it is free.
+ *
+ * This is the other half: back-transformed to CTL and with fixed and tied parameters merged
+ * back in, in control-file order. It costs a copy and a transform per realization, which is
+ * unavoidable - the values simply do not exist in that form anywhere in memory.
+ */
+struct ParameterSnapshot
+{
+	Eigen::MatrixXd values;      ///< n_reals x n_ctl_pars, CTL space
+	vector<string> row_names;    ///< realization names, in the order to_csv writes them
+	vector<string> col_names;    ///< every control-file parameter, in control-file order
+};
+
 class ParameterEnsemble : public Ensemble
 {
 
@@ -176,6 +236,19 @@ public:
 	map<string,double> enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other);
 	void to_csv(string file_name);
 	void to_csv_by_reals(ofstream &csv, bool write_header=true);
+
+	/// A complete CTL-space copy including fixed and tied parameters - the same values
+	/// to_csv() writes, which is why to_csv_by_reals() is built on this. Use an EnsembleView
+	/// instead when the raw (usually NUM-space, adjustable-only) numbers are what is wanted;
+	/// consult get_trans_status() to know which space that view is in.
+	ParameterSnapshot get_ctl_snapshot();
+
+	/// Push a CTL-space snapshot back into the ensemble - the inverse of get_ctl_snapshot().
+	/// Realizations and parameters are matched by name, so column or row order in the
+	/// snapshot does not matter; the snapshot must cover every realization and every
+	/// adjustable and fixed parameter this ensemble currently holds. Tied parameters are
+	/// ignored because they are derived from their parents, not stored.
+	void set_from_ctl_snapshot(const ParameterSnapshot& snap);
 	void to_csv_by_vars(ofstream &csv, bool write_header=true);
 	//Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	transStatus get_trans_status() const { return tstat; }
