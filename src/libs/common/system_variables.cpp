@@ -30,6 +30,8 @@
 #include <cmath>
 #include <vector>
 #include <iostream>
+#include <filesystem>
+#include "pest_error.h"
 #include "system_variables.h"
 
 #ifdef OS_WIN
@@ -84,20 +86,13 @@ void OperSys::string2pathname(string &s)
  */
 string OperSys::getcwd()
 {
-    #ifdef OS_WIN
-	char *buffer;
-	buffer = _getcwd( NULL, 0 );
-	string cwd(buffer);
-    free(buffer);
-	return cwd;
-    #endif
-    #ifdef OS_LINUX
-        char *buffer;
-	buffer = ::getcwd( NULL, 0 );
-	string cwd(buffer);
-        free(buffer);
-	return cwd;
-    #endif
+	// std::filesystem (C++17) replaces the old _getcwd/::getcwd #ifdef split - one
+	// implementation, no manual free(), and it reports failure instead of returning null
+	std::error_code ec;
+	std::filesystem::path p = std::filesystem::current_path(ec);
+	if (ec)
+		throw PestError("OperSys::getcwd() failed: " + ec.message());
+	return p.string();
 }
 
 /**
@@ -107,12 +102,14 @@ string OperSys::getcwd()
  */
 void OperSys::chdir(const char *str)
 {
-   #ifdef OS_WIN
-      _chdir(str);
-   #endif
-   #ifdef OS_LINUX
-      //chdir(str);
-   #endif
+	// NOTE: the POSIX branch of this used to be commented out, so this was a silent no-op
+	// on mac and linux while working on windows. Nothing calls it today (the one call site
+	// in RunManagerSerial is itself commented out), so implementing it properly is safe -
+	// but be aware that it now actually changes directory everywhere.
+	std::error_code ec;
+	std::filesystem::current_path(std::filesystem::path(str), ec);
+	if (ec)
+		throw PestError("OperSys::chdir() failed for \"" + string(str) + "\": " + ec.message());
 }
 
 /**

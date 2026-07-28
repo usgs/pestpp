@@ -7280,7 +7280,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
     }
 }
 
-bool EnsembleMethod::solve_glm(int cycle)
+UpgradeStatus EnsembleMethod::solve_glm(int cycle)
 {
 	// read the lambda multipliers live from the options (was a member cached at initialize),
 	// so a runtime change to ies_lambda_mults takes effect on the next solve
@@ -7296,7 +7296,7 @@ bool EnsembleMethod::solve_glm(int cycle)
 
 }
 
-bool EnsembleMethod::solve_mda(bool last_iter,int cycle)
+UpgradeStatus EnsembleMethod::solve_mda(bool last_iter,int cycle)
 {
 
 	//this function should cover the case where noptmax = 1 (vanilla) also...
@@ -8211,36 +8211,36 @@ UpgradeStatus EnsembleMethod::accept_or_reject(UpgradeContext& ctx, bool use_mda
  *
  * This is the in-tree client of the stage API: the sequence here is exactly what an external
  * caller running its own loop would write, which is what keeps the two paths from drifting.
- * The bool return is preserved for solve_glm()/solve_mda() and the tool loops - false means
- * "no upgrade taken, retry with the new lambda", not "error".
+ * Returns the UpgradeStatus rather than a bool: REJECTED_RETRY means "no upgrade taken, try
+ * again with the new lambda", which a bool could never distinguish from an error.
  */
-bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
+UpgradeStatus EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
 {
 	UpgradeContext ctx(&pest_scenario);
 	UpgradeStatus status;
 
 	status = prepare_upgrades(ctx, use_mda, inflation_factors, backtrack_factors);
 	if (status != UpgradeStatus::CONTINUE)
-		return status != UpgradeStatus::REJECTED_RETRY;
+		return status;
 
 	generate_upgrades(ctx, use_mda, inflation_factors, backtrack_factors);
 
 	status = check_noniterative_shortcut(ctx);
 	if (status != UpgradeStatus::CONTINUE)
-		return status != UpgradeStatus::REJECTED_RETRY;
+		return status;
 
 	run_upgrade_ensembles(ctx, cycle, inflation_factors, backtrack_factors);
 
 	status = evaluate_upgrades(ctx);
 	if (status != UpgradeStatus::CONTINUE)
-		return status != UpgradeStatus::REJECTED_RETRY;
+		return status;
 
 	status = complete_subset_runs(ctx, cycle, use_mda);
 	if (status != UpgradeStatus::CONTINUE)
-		return status != UpgradeStatus::REJECTED_RETRY;
+		return status;
 
 	status = accept_or_reject(ctx, use_mda, cycle);
-	return status != UpgradeStatus::REJECTED_RETRY;
+	return status;
 }
 
 /**

@@ -66,10 +66,10 @@ void IterEnsembleSmoother::iterate_2_solution()
 		performance_log->log_event(ss.str());
 		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
         {
-		    accept = solve_mda(false);
+		    accept = (solve_mda(false) != UpgradeStatus::REJECTED_RETRY);
         }
 		else {
-            accept = solve_glm();
+            accept = (solve_glm() != UpgradeStatus::REJECTED_RETRY);
         }
 		report_and_save(NetPackage::NULL_DA_CYCLE);
 		ph.update(oe,pe, weights);

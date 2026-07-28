@@ -554,11 +554,11 @@ public:
 	// is written against nothing but these, so if the built-in loop compiles, an API caller
 	// can write any loop. solve()/solve_glm()/solve_mda() are the in-tree compositions of the
 	// stages below and double as the worked example of how to sequence them.
-	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
+	UpgradeStatus solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
 
-	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
+	UpgradeStatus solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
 
-	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
+	UpgradeStatus solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
 	// The stages solve() is built from, in call order. Each takes the shared UpgradeContext
 	// by reference; a status other than CONTINUE means the iteration is over. Split out so an
 	// API caller can drive generate -> run -> evaluate itself and own run management in

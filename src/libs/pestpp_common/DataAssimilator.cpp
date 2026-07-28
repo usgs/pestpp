@@ -166,9 +166,9 @@ void DataAssimilator::da_update(int cycle)
 		performance_log->log_event(ss.str());
 		//accept = solve_new_da();
 		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
-			accept = solve_mda(islast_iter,cycle);
+			accept = (solve_mda(islast_iter,cycle) != UpgradeStatus::REJECTED_RETRY);
 		else
-			accept = solve_glm(cycle);
+			accept = (solve_glm(cycle) != UpgradeStatus::REJECTED_RETRY);
 		report_and_save(cycle);
 		ph.update(oe, pe, weights);
 		last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);

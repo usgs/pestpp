@@ -165,6 +165,11 @@ jobs:
           echo "running $bin"
           "$bin"
 
+      - name: public API surface check
+        shell: bash -l {0}
+        run: |
+          python3 scripts/check_public_surface.py
+
       - name: aux bin path hackery
         shell: bash -l {0}
         run: |

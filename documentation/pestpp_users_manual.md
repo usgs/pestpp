@@ -3856,7 +3856,7 @@ If users want to have more fine-grained control of the weight adjustment, option
 
 ### <a id='s13-2-11' />9.2.11 Selective Updates 
 
-In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is false by default.
+In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is false by default. When the ensemble mean phi does *not* meet the reduction criteria, the realizations that did improve are always kept, regardless of this option – previously, setting *ies_update_by_reals* to true suppressed that salvage, so a rejected iteration updated nothing at all. Setting the option to true additionally applies the same realization-by-realization update when the ensemble mean phi *does* meet the criteria, instead of replacing the whole ensemble.
 
 <img src="./media/image7.png" style="width:6.26806in;height:3.20347in" alt="A graph of a graph Description automatically generated with medium confidence" />
 
@@ -4214,7 +4214,7 @@ Note also that the number of control variables may change with time. Refer to th
 <tr class="odd">
 <td><em>ies_update_by_reals</em></td>
 <td>bool</td>
-<td>Flag to indicate whether or not to update each realization according to its phi reduction. Default is False.</td>
+<td>Flag to indicate whether or not to update each realization according to its phi reduction when the ensemble mean phi meets the reduction criteria. Realizations that improve are always kept when the ensemble mean phi does not meet the criteria, independent of this flag. Default is False.</td>
 </tr>
 <tr class="even">
 <td><em>Ies_autoadaloc_indicator_pars</em></td>

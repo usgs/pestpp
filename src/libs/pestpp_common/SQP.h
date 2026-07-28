@@ -178,6 +178,30 @@ public:
 	FilterRec trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
 		map<string, Eigen::MatrixXd>& constraint_jco_en, ParameterEnsemble* dvs_subset, bool recalc);
 
+	// ---- called by the shipped loop, so it must be public ------------------------
+	// scripts/check_public_surface.py enforces that iterate_* uses only public
+	// methods: the guarantee is that an API caller can write any loop the tool can.
+	void save_current_dv_obs();
+	bool update_hessian(string how);
+	Covariance calc_objective_hessian();
+	bool seek_feasible();
+	Parameters calc_gradient_vector(const Parameters& _current_dv_values, string _center_on=string());
+	void make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs);
+	void report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+
+	/// An ensemble gradient is used whenever an ensemble was requested, either by size or by
+	/// file. Both drivers are init-only, so this is stable across a run. Public because
+	/// iterate_2_solution() branches on it.
+	bool get_use_ensemble_grad() const {
+		return (pest_scenario.get_pestpp_options().get_sqp_num_reals() > 0) ||
+		       (pest_scenario.get_pestpp_options().get_sqp_dv_en().size() > 0);
+	}
+	template<typename T, typename A>
+	void message(int level, const string &_message, vector<T, A> _extras, bool echo=true);
+	void message(int level, const string &_message);
+	template<typename T>
+	void message(int level, const string &_message, T extra);
+
 	// queue -> (drive the run manager) -> harvest. The run_* calls are the in-tree
 	// compositions; the halves let a caller run its own run_slice() loop in between.
 	map<int, int> queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs=vector<int>());
@@ -198,12 +222,6 @@ protected:
 	// requests a subset.  Read live so a mid-run change to sqp_subset_size propagates.
 	bool get_use_subset() const { return pest_scenario.get_pestpp_options().get_sqp_subset_size() != 0; }
 
-	// an ensemble gradient is used whenever an ensemble was requested, either by size or by
-	// file.  both drivers are init-only, so this is stable across a run
-	bool get_use_ensemble_grad() const {
-		return (pest_scenario.get_pestpp_options().get_sqp_num_reals() > 0) ||
-		       (pest_scenario.get_pestpp_options().get_sqp_dv_en().size() > 0);
-	}
 
 private:
 	int  verbose_level = 1;   // default until initialize() syncs it from ies_verbose_level
@@ -302,7 +320,6 @@ private:
 	vector<string> cnames_base;
 	Eigen::VectorXd lm_base;
 
-	void save_current_dv_obs();
 
 	Constraints constraints;
 
@@ -348,19 +365,16 @@ private:
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
 
-	bool update_hessian(string how);
 	void update_scaling(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);
 	Eigen::MatrixXd regularize_hessian(const Eigen::MatrixXd& H, const string& context);
 	bool try_modify_hessian();
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
-	Covariance calc_objective_hessian();
 	// Cached SVD of the dv-covariance (V*s^-1*U^T is the StoSAG pseudoinverse).  Forms
 	// dv_cov = dv_anoms^T*dv_anoms/(m-1) internally and caches the decomposition keyed on
 	// the anomalies so repeated calls on the same dv ensemble reuse the O(n_dv^3) SVD.
 	void dvcov_svd(const Eigen::MatrixXd& dv_anoms, Eigen::MatrixXd& s, Eigen::MatrixXd& U, Eigen::MatrixXd& V);
 
-	bool seek_feasible();
 	void generate_intermediate_candidates(const string& parent_name, double start_scale, double end_scale,	int num_points,	ParameterEnsemble* dvs_subset,	const map<string, Eigen::VectorXd>& search_d_map, ParameterEnsemble& dv_intermediate, vector<string>& intermediate_cand_names);
 	FilterRec pick_upgrade_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool cma_reset_arc = true, bool report = false, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	tuple<FilterRec, SqpFilter> pick_from_filter(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, bool recalc = true);
@@ -373,7 +387,6 @@ private:
 	Eigen::VectorXd solve_constrained_trust_region_step(const Eigen::MatrixXd& B, const Eigen::VectorXd& g, const Eigen::MatrixXd& A, double radius);
 
 
-	Parameters calc_gradient_vector(const Parameters& _current_dv_values, string _center_on=string());
 	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
@@ -390,12 +403,10 @@ private:
 
 	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
 
-	void make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs);
 
 	ObservationEnsemble combine_obs_and_pi(ObservationEnsemble& _oe, ParameterEnsemble& _pe);
 	Ensemble get_pi_ensemble(ParameterEnsemble& _dv, vector<string>& pinames);
 
-	void report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	void save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base=true);
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
@@ -403,13 +414,6 @@ private:
 	void initialize_parcov();
 	void initialize_objfunc();
 	void queue_chance_runs();
-
-	template<typename T, typename A>
-	void message(int level, const string &_message, vector<T, A> _extras, bool echo=true);
-	void message(int level, const string &_message);
-
-	template<typename T>
-	void message(int level, const string &_message, T extra);
 
 	void sanity_checks();
 	bool isfullrank(const Eigen::MatrixXd& mat);

@@ -203,6 +203,16 @@ public:
 	void run_generation(GenerationContext& ctx);
 	void evaluate_generation(GenerationContext& ctx);
 	void report_generation(GenerationContext& ctx);
+
+	// ---- called by the shipped loop, so it must be public ------------------------
+	// scripts/check_public_surface.py enforces that iterate_* uses only public
+	// methods: the guarantee is that an API caller can write any loop the tool can.
+	template<typename T, typename A>
+	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
+	void message(int level, const string& _message);
+	template<typename T>
+	void message(int level, const string& _message, T extra);
+	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string(), bool force_save=false);
 	typedef pair<vector<string>, vector<string>> DomPair;
 protected:
 	// Derived live from the options so they can be swapped between generations - each was a
@@ -270,11 +280,6 @@ private:
 
 	void throw_moea_error(const string& message);
 
-	template<typename T, typename A>
-	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
-	void message(int level, const string& _message);
-	template<typename T>
-	void message(int level, const string& _message, T extra);
 
 	void sanity_checks();
 	// queue -> (drive the run manager) -> harvest. run_population() is the in-tree
@@ -315,7 +320,6 @@ private:
 	string get_new_member_name(string tag = string());
 
 	Ensemble save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinames);
-	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string(), bool force_save=false);
 	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
