@@ -9,6 +9,7 @@ target_link_libraries(pestpp-opt
   rm_external
   rm_serial
   rm_yamr
+  rm_agent
 )
 
 install(TARGETS pestpp-opt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

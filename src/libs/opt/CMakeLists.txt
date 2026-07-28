@@ -136,4 +136,6 @@ endif()
 
 target_compile_options(opt PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 
-target_link_libraries(opt pestpp_com)
+# opt is vendored Coin-OR and uses nothing from pestpp_com; this edge only created a
+# dependency cycle, which blocks any shared-library build
+#target_link_libraries(opt pestpp_com)

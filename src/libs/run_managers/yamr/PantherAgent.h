@@ -31,6 +31,7 @@
 #include "network_package.h"
 #include "Transformable.h"
 #include "model_interface.h"
+#include "Pest.h"   // PantherAgent processes the control file itself
 
 class PANTHERAgent{
 public:

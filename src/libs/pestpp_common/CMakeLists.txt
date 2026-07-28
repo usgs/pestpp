@@ -49,6 +49,4 @@ target_link_libraries(pestpp_com
   rm_yamr
 )
 
-if(BUILD_SHARED_LIBS)
-  set_property(TARGET pestpp_com PROPERTY POSITION_INDEPENDENT_CODE ON)
-endif()
+# PIC is set globally now (CMAKE_POSITION_INDEPENDENT_CODE in the top-level CMakeLists)

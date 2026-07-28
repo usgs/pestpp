@@ -7,6 +7,7 @@ target_compile_options(pestpp-da PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 target_link_libraries(pestpp-da
   rm_serial
   rm_yamr
+  rm_agent
   rm_external
 )
 

@@ -27,9 +27,18 @@ if(WIN32)
   if(CMAKE_VERSION VERSION_LESS 3.15.0)
     set(_change_MSVC_flags TRUE)
   else()
-    # Set MSVC runtime to MultiThreaded (/MT)
+    # MSVC runtime. /MT (static CRT) is the default because the shipped executables are
+    # meant to run without a redistributable. A CPython extension module, however, must be
+    # built against the DLL runtime (/MD) to share a heap and CRT state with the
+    # interpreter, so make this selectable rather than hard-coded.
     cmake_policy(SET CMP0091 NEW)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    option(PESTPP_MSVC_STATIC_RUNTIME "Link the static MSVC runtime (/MT). OFF gives /MD, required for Python extension modules." ON)
+    if(PESTPP_MSVC_STATIC_RUNTIME)
+      set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    else()
+      set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
+    endif()
+    message(STATUS "PESTPP_MSVC_STATIC_RUNTIME=${PESTPP_MSVC_STATIC_RUNTIME} -> ${CMAKE_MSVC_RUNTIME_LIBRARY}")
   endif()
 endif()
 
@@ -80,6 +89,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE)
 
 add_compile_definitions(_HAS_STD_BYTE=0)
+
+# Position-independent code for every target, not just shared builds. Objects that are not
+# PIC cannot be linked into a shared library or a Python extension module on Linux, so
+# gating this on BUILD_SHARED_LIBS meant the static libs could never be reused that way.
+# The cost on a normal static build is negligible.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Use global "-fvisibility=hidden" see https://gcc.gnu.org/wiki/Visibility
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
