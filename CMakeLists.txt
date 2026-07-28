@@ -82,8 +82,10 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 message(STATUS "CMAKE_THREAD_LIBS_INIT=${CMAKE_THREAD_LIBS_INIT}")
 
-# Ensure C++11 is used
-set(CMAKE_CXX_STANDARD 11)
+# C++17. Not C++20: the bundled Eigen 3.3.9 uses std::result_of, removed in C++20, and the
+# remaining bare throw() specifications become errors there. Both are fixable, but they are
+# a separate job (Eigen 3.4+ plus a noexcept sweep).
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE)
