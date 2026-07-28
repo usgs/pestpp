@@ -58,12 +58,8 @@ void IterEnsembleSmoother::iterate_2_solution()
     int q;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
-		iter++;
+		begin_iteration();
         solution_iter++;
-		message(0, "starting solve for iteration:", iter);
-		ss.str("");
-		ss << "starting solve for iteration: " << iter;
-		performance_log->log_event(ss.str());
 		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
         {
 		    accept = (solve_mda(false) != UpgradeStatus::REJECTED_RETRY);
@@ -71,20 +67,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else {
             accept = (solve_glm() != UpgradeStatus::REJECTED_RETRY);
         }
-		report_and_save(NetPackage::NULL_DA_CYCLE);
-		ph.update(oe,pe, weights);
-		last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		ph.report(true);
-        ss.str("");
-        ss << "." << iter << ".pdc.csv";
-        ph.detect_simulation_data_conflict(oe,ss.str());
-		ph.write(iter, run_mgr_ptr->get_total_runs());
-		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
-			ph.save_residual_cov(oe,iter);
-		ss.str("");
-		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-		pcs.summarize(pe,ss.str());
+		end_iteration(NetPackage::NULL_DA_CYCLE);
         q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2)) {
             message(1, "'pest.stp' found, quitting");

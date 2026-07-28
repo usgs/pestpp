@@ -8295,6 +8295,44 @@ void ReinflationSchedule::advance()
 		current_num_reals = reinflate_num_reals[idx + 1];
 }
 
+/**
+ * @brief Open an iteration: advance the counter and log it.
+ *
+ * The counter used to be bumped inline by the tool's own loop, which meant a caller driving
+ * iterations itself got no iteration number and no per-iteration output. Splitting it out
+ * keeps the shipped loop and an API caller on identical bookkeeping.
+ */
+void EnsembleMethod::begin_iteration()
+{
+	iter++;
+	stringstream ss;
+	message(0, "starting solve for iteration:", iter);
+	ss << "starting solve for iteration: " << iter;
+	performance_log->log_event(ss.str());
+}
+
+/**
+ * @brief Close an iteration: save, recompute phi, and write the per-iteration reports.
+ */
+void EnsembleMethod::end_iteration(int cycle)
+{
+	stringstream ss;
+	report_and_save(cycle);
+	ph.update(oe, pe, weights);
+	last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+	ph.report(true);
+	ss.str("");
+	ss << "." << iter << ".pdc.csv";
+	ph.detect_simulation_data_conflict(oe, ss.str());
+	ph.write(iter, run_mgr_ptr->get_total_runs());
+	if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
+		ph.save_residual_cov(oe, iter);
+	ss.str("");
+	ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
+	pcs.summarize(pe, ss.str());
+}
+
 void EnsembleMethod::reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals){
 
     string min_phi_name = "";

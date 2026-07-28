@@ -520,6 +520,11 @@ public:
 	ParameterEnsemble get_pe() { return pe; }
 	ParameterEnsemble* get_pe_ptr() { return &pe; }
 	ObservationEnsemble* get_oe_ptr() {return &oe; }
+	/// Pointer accessors for the other two coupled ensembles, matching get_pe_ptr()/
+	/// get_oe_ptr(). get_noise_oe() returns by value, which is a copy an API caller does
+	/// not want for a large ensemble.
+	ObservationEnsemble* get_noise_oe_ptr() { return &oe_base; }
+	ObservationEnsemble* get_weights_ptr() { return &weights; }
 	void set_pe(ParameterEnsemble& new_pe) { pe = new_pe; }
 	void set_oe(ObservationEnsemble& new_oe) { oe = new_oe; }
 	void set_noise_oe(ObservationEnsemble& new_noise) { oe_base = new_noise; }
@@ -593,6 +598,10 @@ public:
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 
 	void report_and_save(int cycle);
+	/// One iteration's bookkeeping, either side of the solve. The shipped loop and an API
+	/// caller both go through these, so iteration numbering and per-iteration output match.
+	void begin_iteration();
+	void end_iteration(int cycle = NetPackage::NULL_DA_CYCLE);
 	void adjust_weights(bool save=false);
     void reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals);
 
