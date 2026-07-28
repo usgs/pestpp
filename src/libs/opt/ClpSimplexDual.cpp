@@ -93,6 +93,7 @@
 #endif
 
 #include "CoinPragma.hpp"
+#include <stdexcept>   // PEST++: exit() calls replaced with throws
 
 #include <math.h>
 
@@ -1734,7 +1735,9 @@ ClpSimplexDual::whileIterating(double * & givenDuals, int ifValuesPass)
                     if (numberIterations_ > 206033)
                          handler_->setLogLevel(63);
                     if (numberIterations_ > 210567)
-                         exit(77);
+                         // PEST++: was exit(77). Vendored Coin-OR bailout - throwing lets the
+                         // stack unwind instead of killing the process (or a host interpreter).
+                         throw std::runtime_error("Clp internal error in ClpSimplexDual.cpp (was exit(77))");
 #endif
                     if (!givenDuals && ifValuesPass && ifValuesPass != 2) {
                          handler_->message(CLP_END_VALUES_PASS, messages_)
@@ -5040,7 +5043,9 @@ ClpSimplexDual::statusOfProblemInDual(int & lastCleaned, int type,
                        i, status_[i], lower_[i], solution_[i], upper_[i], cost_[i], dj_[i]);
           fclose(fp);
           if (ixxxxxx == ixxyyyy)
-               exit(6);
+               // PEST++: was exit(6). Vendored Coin-OR bailout - throwing lets the
+               // stack unwind instead of killing the process (or a host interpreter).
+               throw std::runtime_error("Clp internal error in ClpSimplexDual.cpp (was exit(6))");
      }
 #endif
      realDualInfeasibilities = sumDualInfeasibilities_;

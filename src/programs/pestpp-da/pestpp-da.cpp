@@ -65,6 +65,9 @@ int main(int argc, char* argv[])
         auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
         CmdLine cmdline(argc, argv);
+        // -v/--version has already printed the version; nothing else is set up
+        if (cmdline.version_requested)
+        	return 0;
 
         if (quit_file_found())
         {

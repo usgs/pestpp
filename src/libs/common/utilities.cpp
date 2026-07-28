@@ -2307,7 +2307,8 @@ for (int i = 0; i < argc; ++i)
 	{
 		string version = PESTPP_VERSION;
 		cout << version << endl;
-		exit(0);
+		version_requested = true;
+		return;
 	}
 
 	if (org_cmdline_vec.size() >= 2)
@@ -2443,7 +2444,9 @@ void CmdLine::throw_cmdline_error(string message)
 
 	cerr << " additional options can be found in the PEST++ users manual" << endl;
 	cerr << "--------------------------------------------------------" << endl;
-	exit(1);
+	// the usage block above is the useful output; throw so callers can unwind instead of
+	// having the process (or a host interpreter) killed from inside library code
+	throw PestError("COMMAND LINE ERROR: " + message);
 }
 
 void CmdLine::startup_report(std::ostream &s, string start_string) {

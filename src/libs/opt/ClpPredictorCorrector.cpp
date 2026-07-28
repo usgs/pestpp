@@ -10,6 +10,7 @@
 //#define SOME_DEBUG
 
 #include "CoinPragma.hpp"
+#include <stdexcept>   // PEST++: exit() calls replaced with throws
 #include <math.h>
 
 #include "CoinHelperFunctions.hpp"
@@ -264,7 +265,9 @@ int ClpPredictorCorrector::solve ( )
           if (numberIterations_ == -1) {
                saveSolution("xxx.sav");
                if (yyyyyy)
-                    exit(99);
+                    // PEST++: was exit(99). Vendored Coin-OR bailout - throwing lets the
+                    // stack unwind instead of killing the process (or a host interpreter).
+                    throw std::runtime_error("Clp internal error in ClpPredictorCorrector.cpp (was exit(99))");
           }
 #endif
           // move up history
@@ -1651,7 +1654,9 @@ CoinWorkDouble ClpPredictorCorrector::findDirectionVector(const int phase)
                     for (int i = 0; i < numberRows_; i++)
                          printf("%d %.18g\n", i, deltaY_[i]);
                }
-               exit(66);
+               // PEST++: was exit(66). Vendored Coin-OR bailout - throwing lets the
+               // stack unwind instead of killing the process (or a host interpreter).
+               throw std::runtime_error("Clp internal error in ClpPredictorCorrector.cpp (was exit(66))");
 #endif
                if (numberTries) {
                     //refine?
@@ -2359,7 +2364,9 @@ int ClpPredictorCorrector::createSolution()
                       upperSlack_[i], wVec_[i],
                       lowerSlack_[i], zVec_[i] );
      }
-     exit(66);
+     // PEST++: was exit(66). Vendored Coin-OR bailout - throwing lets the
+     // stack unwind instead of killing the process (or a host interpreter).
+     throw std::runtime_error("Clp internal error in ClpPredictorCorrector.cpp (was exit(66))");
 #endif
      return 0;
 }
@@ -2615,7 +2622,9 @@ void ClpPredictorCorrector::setupForSolve(const int phase)
                            rhsW_[i], rhsU_[i],
                            rhsZ_[i], rhsL_[i]);
           }
-          exit(66);
+          // PEST++: was exit(66). Vendored Coin-OR bailout - throwing lets the
+          // stack unwind instead of killing the process (or a host interpreter).
+          throw std::runtime_error("Clp internal error in ClpPredictorCorrector.cpp (was exit(66))");
 #endif
           break;
      case 2:
@@ -2747,7 +2756,9 @@ void ClpPredictorCorrector::setupForSolve(const int phase)
                for (int i = 0; i < numberTotal; i++)
                     printf("%d %.18g\n", i, workArray_[i]);
           }
-          exit(66);
+          // PEST++: was exit(66). Vendored Coin-OR bailout - throwing lets the
+          // stack unwind instead of killing the process (or a host interpreter).
+          throw std::runtime_error("Clp internal error in ClpPredictorCorrector.cpp (was exit(66))");
 #endif
      } else {
           // KKT

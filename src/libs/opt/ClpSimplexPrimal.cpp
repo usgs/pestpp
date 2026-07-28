@@ -79,6 +79,7 @@
 
 
 #include "CoinPragma.hpp"
+#include <stdexcept>   // PEST++: exit() calls replaced with throws
 
 #include <math.h>
 
@@ -739,7 +740,9 @@ ClpSimplexPrimal::whileIterating(int valuesOption)
                                 dj_[checkSequence], dualIn);
                          rowArray_[3]->clear();
                          if (numberIterations_ > 2000)
-                              exit(1);
+                              // PEST++: was exit(1). Vendored Coin-OR bailout - throwing lets the
+                              // stack unwind instead of killing the process (or a host interpreter).
+                              throw std::runtime_error("Clp internal error in ClpSimplexPrimal.cpp (was exit(1))");
                     }
                }
 #endif

@@ -6,6 +6,7 @@
   This code is licensed under the terms of the Eclipse Public License (EPL).
 */
 #include "CoinPragma.hpp"
+#include <stdexcept>   // PEST++: exit() calls replaced with throws
 #include "CoinHelperFunctions.hpp"
 #include "ClpConfig.h"
 #include "ClpHelperFunctions.hpp"
@@ -544,7 +545,9 @@ int ClpCholeskyDense::bNumber(const longDouble * array, int &iRow, int &iCol)
      iRow = iCol + k;
      counter++;
      if(counter > 100000)
-          exit(77);
+          // PEST++: was exit(77). Vendored Coin-OR bailout - throwing lets the
+          // stack unwind instead of killing the process (or a host interpreter).
+          throw std::runtime_error("Clp internal error in ClpCholeskyDense.cpp (was exit(77))");
      return kk;
 }
 #endif

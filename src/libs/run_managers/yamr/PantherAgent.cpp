@@ -793,7 +793,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				err = send_message(net_pack);
 				w_close(sockfd);
 				w_cleanup();
-				exit(-1);
+				// sockets are already closed above; throw rather than exit so the stack
+				// unwinds and a caller that embedded this can recover
+				throw PestError(ss.str());
 			}	
 			snames.clear();
 			snames.insert(par_name_vec.begin(), par_name_vec.end());
@@ -816,7 +818,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				err = send_message(net_pack);
 				w_close(sockfd);
 				w_cleanup();
-				exit(-1);
+				// sockets are already closed above; throw rather than exit so the stack
+				// unwinds and a caller that embedded this can recover
+				throw PestError(ss.str());
 			}
 
 		}
@@ -864,7 +868,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				err = send_message(net_pack);
 				w_close(sockfd);
 				w_cleanup();
-				exit(-1);
+				// sockets are already closed above; throw rather than exit so the stack
+				// unwinds and a caller that embedded this can recover
+				throw PestError(ss.str());
 			}
 			snames.clear();
 			snames.insert(obs_name_vec.begin(), obs_name_vec.end());
@@ -887,7 +893,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				err = send_message(net_pack);
 				w_close(sockfd);
 				w_cleanup();
-				exit(-1);
+				// sockets are already closed above; throw rather than exit so the stack
+				// unwinds and a caller that embedded this can recover
+				throw PestError(ss.str());
 			}
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_LINPACK)
@@ -1340,7 +1348,13 @@ void PANTHERAgent::terminate_or_restart(int error_code) const
 	w_sleep(poll_interval_seconds * 10000);
 	if(!restart_on_error)
 	{
-		exit(error_code);
+		// deliberately NOT PANTHERAgentRestartError - that type means "restart", and this
+		// branch is the one where the agent is meant to stop
+		stringstream ess;
+		ess << "PANTHER agent terminating, error code " << error_code;
+		w_close(sockfd);
+		w_cleanup();
+		throw PestError(ess.str());
 	}
 	
 	// Cleanup sockets and throw exception to signal restart

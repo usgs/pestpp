@@ -293,7 +293,11 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 				jacobian.report_errors(os);
 				os << endl;
 				os.flush();
-				if (!pest_scenario.get_pestpp_options().get_der_forgive()) exit(0);
+				// NOTE: this used to be exit(0) - a *success* status on a derivative
+				// failure. Now a throw, so the caller decides; the executables report it
+				// as an error, which is what it always was.
+				if (!pest_scenario.get_pestpp_options().get_der_forgive())
+					throw PestError("failed parameter runs during jacobian calculation and 'der_forgive' is false");
 			}
 		}
 

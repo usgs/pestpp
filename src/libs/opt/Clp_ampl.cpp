@@ -30,6 +30,7 @@ THIS SOFTWARE.
 */
 
 #include "ClpConfig.h"
+#include <stdexcept>   // PEST++: exit() calls replaced with throws
 
 #ifdef COIN_HAS_ASL
 
@@ -621,7 +622,9 @@ readAmpl(ampl_info * info, int argc, char **argv, void ** coinModel)
             fprintf(stderr, "Type q to quit, anything else to continue\n");
             int getChar = getc(stdin);
             if (getChar == 'q' || getChar == 'Q')
-                exit(1);
+                // PEST++: was exit(1). Vendored Coin-OR bailout - throwing lets the
+                // stack unwind instead of killing the process (or a host interpreter).
+                throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(1))");
         }
     }
     /* add -quit */
@@ -1112,43 +1115,59 @@ CoinModel::gdb( int nonLinear, const char * fileName, const void * info)
         break;
         case ASL_readerr_nofile : {
             printf( "Cannot open .nl file\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         case ASL_readerr_nonlin : {
             assert(false); // this better not be an error!
             printf( "model involves nonlinearities (ed0read)\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         case  ASL_readerr_argerr : {
             printf( "user-defined function with bad args\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         case ASL_readerr_unavail : {
             printf( "user-defined function not available\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         case ASL_readerr_corrupt : {
             printf( "corrupt .nl file\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         case ASL_readerr_bug : {
             printf( "bug in .nl reader\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         case ASL_readerr_CLP : {
             printf( "ASL error message: \"solver cannot handle CLP extensions\"\n");
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         default: {
             printf( "Unknown error in stub file read. retcode = %d\n", retcode);
-            exit(-1);
+            // PEST++: was exit(-1). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(-1))");
         }
         break;
         }
@@ -1451,7 +1470,9 @@ CoinModel::gdb( int nonLinear, const char * fileName, const void * info)
         }
         if (nOdd) {
             printf("%d non-linear constraints could not be converted to quadratic\n", nOdd);
-            exit(77);
+            // PEST++: was exit(77). Vendored Coin-OR bailout - throwing lets the
+            // stack unwind instead of killing the process (or a host interpreter).
+            throw std::runtime_error("Clp internal error in Clp_ampl.cpp (was exit(77))");
         }
     }
     free(colqp);

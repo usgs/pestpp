@@ -54,7 +54,7 @@ sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_pt
 	catch (const runtime_error& error)
 	{
 		cout << "error initializing sequentialLP process: " << error.what() << endl;
-		exit(1);
+		throw;
 	}
 
 }

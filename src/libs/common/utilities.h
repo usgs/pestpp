@@ -412,6 +412,11 @@ public:
 	string cwd;
 	bool jac_restart;
 	bool restart;
+	/// set when -v/--version was asked for. The version has already been printed and no
+	/// other member is populated; the caller should just stop. This is a flag rather than a
+	/// throw because asking for the version is not an error - and it used to be an exit(0)
+	/// buried in library code, which is fatal to an embedding process.
+	bool version_requested = false;
 	RunManagerType runmanagertype;
 
 	void startup_report(ostream& s,string start_string);

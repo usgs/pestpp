@@ -6,6 +6,7 @@
 //#undef NDEBUG
 
 #include "ClpConfig.h"
+#include <stdexcept>   // PEST++: exit() calls replaced with throws
 
 #include "CoinPragma.hpp"
 #include <math.h>
@@ -1128,7 +1129,9 @@ ClpSimplex::computePrimals ( const double * rowActivities,
      previousVector->clear();
 #ifdef CLP_DEBUG
      if (numberIterations_ == -3840) {
-          exit(77);
+          // PEST++: was exit(77). Vendored Coin-OR bailout - throwing lets the
+          // stack unwind instead of killing the process (or a host interpreter).
+          throw std::runtime_error("Clp internal error in ClpSimplex.cpp (was exit(77))");
      }
 #endif
 }
@@ -1932,7 +1935,9 @@ int ClpSimplex::internalFactorize ( int solveType)
                if (getColumnStatus(i) == basic)
                     printf ("yy %d basic\n", i);
           if (k > 20)
-               exit(0);
+               // PEST++: was exit(0). Vendored Coin-OR bailout - throwing lets the
+               // stack unwind instead of killing the process (or a host interpreter).
+               throw std::runtime_error("Clp internal error in ClpSimplex.cpp (was exit(0))");
           k++;
      }
 #    endif
