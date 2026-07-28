@@ -456,7 +456,11 @@ struct UpgradeContext
 
 	// -- filled by prepare_upgrades()
 	int local_subset_size = 0;
-	vector<int> subset_idxs;
+	/// Realizations chosen for subset testing, held by NAME rather than by position.
+	/// Positions go stale the moment membership changes - which is exactly what an API
+	/// caller does when it culls realizations mid-iteration - so the names are the state
+	/// and positions are resolved fresh at each point of use.
+	vector<string> subset_names;
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	Eigen::MatrixXd Am;
 
@@ -657,6 +661,10 @@ protected:
 	void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs=vector<int>());
 
 	vector<int> get_subset_idxs(int size, int _subset_size);
+	/// Map subset realization names onto their current positions in `current_names`.
+	/// Names no longer present are silently skipped, so a caller that dropped realizations
+	/// gets a smaller subset rather than an out-of-range index.
+	vector<int> resolve_subset_idxs(const vector<string>& names, const vector<string>& current_names) const;
 
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 

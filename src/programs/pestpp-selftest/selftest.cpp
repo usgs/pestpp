@@ -41,6 +41,8 @@ struct IesProbe : public EnsembleMethod
     int  p_num_threads()      const { return get_num_threads(); }
     int  p_verbose_level()    const { return get_verbose_level(); }
     bool p_reinflate_minphi() const { return get_reinflate_to_minphi_real(); }
+    vector<int> p_resolve(const vector<string>& n, const vector<string>& cur) const
+    { return resolve_subset_idxs(n, cur); }
 };
 
 struct MouProbe : public MOEA
@@ -535,6 +537,52 @@ static void test_ensemble_zero_copy_view()
 }
 
 
+
+static void test_subset_names_survive_membership_change()
+{
+    cout << "[subset is held by name, so it survives a membership change]" << endl;
+    ofstream flog("selftest_subset.log");
+    PerformanceLog pfm(flog);
+    FileManager fm;
+    Pest p; p.set_defaults();
+    OutputFileWriter ofw(fm, p);
+    IesProbe ies(p, fm, ofw, &pfm, nullptr, "selftest-subset");
+
+    vector<string> all{"R0","R1","R2","R3","R4"};
+    vector<string> subset{"R1","R3"};
+
+    // baseline: names map to their positions
+    vector<int> idx = ies.p_resolve(subset, all);
+    CHK(idx.size() == 2 && idx[0] == 1 && idx[1] == 3, "subset names resolve to positions");
+
+    // a realization removed BEFORE the subset shifts every later position. Positions would
+    // now be wrong; names still land on the right realizations.
+    vector<string> dropped_first{"R1","R2","R3","R4"};
+    idx = ies.p_resolve(subset, dropped_first);
+    CHK(idx.size() == 2 && idx[0] == 0 && idx[1] == 2,
+        "dropping an earlier realization re-resolves the subset (positions shifted)");
+
+    // a member OF the subset removed -> the subset shrinks, no out-of-range index
+    vector<string> dropped_member{"R0","R2","R3","R4"};
+    idx = ies.p_resolve(subset, dropped_member);
+    CHK(idx.size() == 1 && idx[0] == 2, "dropping a subset member shrinks the subset");
+
+    // reordering is absorbed too
+    vector<string> reordered{"R4","R3","R2","R1","R0"};
+    idx = ies.p_resolve(subset, reordered);
+    CHK(idx.size() == 2 && idx[0] == 3 && idx[1] == 1, "reordering re-resolves correctly");
+
+    // order follows the SUBSET, not the ensemble - update_reals_by_phi maps subset
+    // position i to a name, so this ordering is load-bearing
+    vector<string> rev{"R3","R1"};
+    idx = ies.p_resolve(rev, all);
+    CHK(idx.size() == 2 && idx[0] == 3 && idx[1] == 1, "result order follows the subset order");
+
+    // everything gone
+    vector<string> none{"X","Y"};
+    CHK(ies.p_resolve(subset, none).size() == 0, "no surviving members -> empty subset");
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -550,6 +598,7 @@ int main()
     test_sqp_controls();
     test_tool_objects_track_live_options();
     test_ensemble_zero_copy_view();
+    test_subset_names_survive_membership_change();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

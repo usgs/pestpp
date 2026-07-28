@@ -7546,7 +7546,12 @@ UpgradeStatus EnsembleMethod::prepare_upgrades(UpgradeContext& ctx, bool use_mda
 		ctx.Am = get_Am(pe.get_real_names(), pe.get_var_names());
 	}
 
-	ctx.subset_idxs = get_subset_idxs(pe.shape().first, ctx.local_subset_size);
+	// choose the subset by position as before, then remember it by name
+	vector<int> _subset_idxs = get_subset_idxs(pe.shape().first, ctx.local_subset_size);
+	vector<string> _pe_names = pe.get_real_names();
+	ctx.subset_names.clear();
+	for (auto i : _subset_idxs)
+		ctx.subset_names.push_back(_pe_names[i]);
 	return UpgradeStatus::CONTINUE;
 }
 
@@ -7619,11 +7624,11 @@ void EnsembleMethod::generate_upgrades(UpgradeContext& ctx, bool use_mda,
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
 
-			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (ctx.subset_idxs.size() < pe.shape().first) && ((inflation_factors.size() > 1) || (backtrack_factors.size() > 1)))
+			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (ctx.subset_names.size() < pe.shape().first) && ((inflation_factors.size() > 1) || (backtrack_factors.size() > 1)))
 			{
 				pe_lam_scale.to_dense(ss.str() + ".bin");
 				ctx.pe_filenames.push_back(ss.str() + ".bin");
-				pe_lam_scale.keep_rows(ctx.subset_idxs,true);
+				pe_lam_scale.keep_rows(ctx.subset_names,true);
 				message(1,"upgrade ensemble saved to " + ss.str() + ".bin");
 
 			}
@@ -7710,20 +7715,25 @@ void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
 	message(0, "running upgrade ensembles");
 	ss.str("");
 	ss << inflation_factors.size() << " inflation factors (lambdas) times " << backtrack_factors.size() << " backtracking factors" << endl;
-	ss << "   times " << ctx.subset_idxs.size() << " realizations";
-	ss << " yields " << inflation_factors.size() * backtrack_factors.size() * ctx.subset_idxs.size() << " model runs for upgrade testing";
+	ss << "   times " << ctx.subset_names.size() << " realizations";
+	ss << " yields " << inflation_factors.size() * backtrack_factors.size() * ctx.subset_names.size() << " model runs for upgrade testing";
 	message(1,ss.str());
 
 	//if we are saving upgrades to disk
+	// resolve against the CURRENT membership of each ensemble
+	vector<int> pe_subset = resolve_subset_idxs(ctx.subset_names, pe.get_real_names());
+	vector<int> oe_subset = resolve_subset_idxs(ctx.subset_names, oe.get_real_names());
 	if (ctx.pe_filenames.size() > 0)
 	{
+		// on the spill path pe_lams have already been reduced to the subset rows, so the
+		// parameter side is simply 0..n-1
 		vector<int> temp;
-		for (int i = 0; i < ctx.subset_idxs.size(); i++)
+		for (int i = 0; i < ctx.subset_names.size(); i++)
 			temp.push_back(i);
-		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, temp, ctx.subset_idxs);
+		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, temp, oe_subset);
 	}
 	else
- 		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, ctx.subset_idxs, ctx.subset_idxs);
+ 		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, pe_subset, oe_subset);
 }
 
 /**
@@ -7788,7 +7798,7 @@ UpgradeStatus EnsembleMethod::evaluate_upgrades(UpgradeContext& ctx)
 			frec << "lambda, scale value " << ctx.lam_vals[i] << ',' << ctx.scale_vals[i] << " obs ensemble saved to " << ss.str() << endl;
 
 		}
-        drop_bad_reals(ctx.pe_lams[i], ctx.oe_lams[i], ctx.subset_idxs);
+        drop_bad_reals(ctx.pe_lams[i], ctx.oe_lams[i], resolve_subset_idxs(ctx.subset_names, oe.get_real_names()));
 		if (ctx.oe_lams[i].shape().first == 0)
 		{
 			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
@@ -7859,7 +7869,7 @@ UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycl
             best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
             if (!use_mda) {
                 message(1, "updating realizations with reduced phi");
-                update_reals_by_phi(ctx.pe_lams[ctx.best_idx], ctx.oe_lams[ctx.best_idx], ctx.subset_idxs);
+                update_reals_by_phi(ctx.pe_lams[ctx.best_idx], ctx.oe_lams[ctx.best_idx], resolve_subset_idxs(ctx.subset_names, pe.get_real_names()));
             }
 
             ph.update(oe, pe, weights);
@@ -7919,7 +7929,8 @@ UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycl
                 vector<string> oreal_names = oe.get_real_names();
                 vector<string> preal_names = pe.get_real_names();
 
-                for (auto idx: ctx.subset_idxs)
+                vector<int> _sub = resolve_subset_idxs(ctx.subset_names, oe.get_real_names());
+                for (auto idx: _sub)
                     if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
                         missing.push_back(preal_names[idx]);
                 if (missing.size() > 0)
@@ -7944,16 +7955,16 @@ UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycl
 
         vector<string> org_pe_idxs, org_oe_idxs;
         set<string> ssub;
-        for (auto &i: ctx.subset_idxs)
-            ssub.emplace(pe_names[i]);
+        for (auto &n: ctx.subset_names)
+            ssub.emplace(n);
         for (int i = 0; i < pe_names.size(); i++)
             if (ssub.find(pe_names[i]) == ssub.end()) {
                 pe_keep_names.push_back(pe_names[i]);
                 //oe_keep_names.push_back(oe_names[i]);
             }
         ssub.clear();
-        for (auto &i: ctx.subset_idxs)
-            ssub.emplace(oe_names[i]);
+        for (auto &n: ctx.subset_names)
+            ssub.emplace(n);
         for (int i = 0; i < oe_names.size(); i++)
             if (ssub.find(oe_names[i]) == ssub.end()) {
                 oe_keep_names.push_back(oe_names[i]);
@@ -8222,7 +8233,6 @@ UpgradeStatus EnsembleMethod::solve(bool use_mda, vector<double> inflation_facto
 	status = prepare_upgrades(ctx, use_mda, inflation_factors, backtrack_factors);
 	if (status != UpgradeStatus::CONTINUE)
 		return status;
-
 	generate_upgrades(ctx, use_mda, inflation_factors, backtrack_factors);
 
 	status = check_noniterative_shortcut(ctx);
@@ -9785,6 +9795,29 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 
 }
 
+
+/**
+ * @brief Map subset realization names onto their positions in the given name list.
+ *
+ * The subset is stored by name so that it survives a membership change; this turns it back
+ * into the positional form the ensemble APIs want, against whatever the membership is right
+ * now. Names that have gone away are skipped rather than throwing - dropping a realization
+ * should shrink the subset, not break the iteration.
+ */
+vector<int> EnsembleMethod::resolve_subset_idxs(const vector<string>& names, const vector<string>& current_names) const
+{
+	map<string, int> pos;
+	for (int i = 0; i < current_names.size(); i++)
+		pos[current_names[i]] = i;
+	vector<int> idxs;
+	for (auto& n : names)
+	{
+		map<string, int>::iterator it = pos.find(n);
+		if (it != pos.end())
+			idxs.push_back(it->second);
+	}
+	return idxs;
+}
 
 vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 {
