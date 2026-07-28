@@ -1,6 +1,11 @@
 # This CMake file is part of PEST++
 
 # This library is only linked by pestpp-opt, so force it static
+# Deliberately STATIC even when BUILD_SHARED_LIBS is ON. This is vendored Coin-OR, and the
+# compiled subset references symbols from Clp's command-line driver (saveSolution, mainTest,
+# CbcOrClpParam::set*Parameter) that are not built here. A static archive never pulls those
+# objects in, so it links fine; a shared library must resolve every symbol and cannot.
+# Global PIC means it still links cleanly into the shared pestpp_com.
 add_library(opt STATIC
   CbcOrClpParam.cpp
   Clp_ampl.cpp

@@ -1,7 +1,7 @@
 # This CMake file is part of PEST++
 
 # This library depends on rm_abstract; avoid cyclic dependency
-add_library(pestpp_com STATIC
+add_library(pestpp_com
   constraints.cpp
   covariance.cpp
   DifferentialEvolution.cpp
@@ -28,7 +28,6 @@ add_library(pestpp_com STATIC
   Regularization.cpp
   RestartController.cpp
   SVDPackage.cpp
-  SVD_PROPACK.cpp
   SVDSolver.cpp
   TerminationController.cpp
   Transformation.cpp
@@ -37,6 +36,11 @@ add_library(pestpp_com STATIC
   sequential_lp.cpp
   DataAssimilator.cpp
 )
+
+# SVD_PROPACK.cpp is deliberately NOT built. It needs the Fortran PROPACK routines
+# (dlamch_, dlansvd_sparce_), and nothing constructs SVD_PROPACK anyway - ++SVD_PACK(PROPACK)
+# is deprecated and silently falls back to REDSVD. A static archive hid this because the
+# object was never pulled in; a shared library must resolve every symbol.
 
 target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}" /src/libs/opt)
 

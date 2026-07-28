@@ -1,6 +1,6 @@
 # This CMake file is part of PEST++
 
-add_library(rm_abstract STATIC
+add_library(rm_abstract
   debug.cpp
   linpackc.cpp
   model_interface.cpp

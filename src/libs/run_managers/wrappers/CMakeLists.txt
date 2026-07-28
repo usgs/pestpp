@@ -1,7 +1,7 @@
 # This CMake file is part of PEST++
 
 # This library is only linked by pestpp-pso, so force it static
-add_library(rm_wrappers STATIC
+add_library(rm_wrappers
   RunManagerCWrapper.cpp
   RunManagerFortranWrapper.cpp
 )

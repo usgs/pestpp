@@ -98,8 +98,21 @@ add_compile_definitions(_HAS_STD_BYTE=0)
 # The cost on a normal static build is negligible.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Use global "-fvisibility=hidden" see https://gcc.gnu.org/wiki/Visibility
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static, OFF)" OFF)
+message(STATUS "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
+
+# Symbol visibility. Hidden is right for the executables - smaller, faster to load - but a
+# shared library that hides everything exports nothing and is useless to link against.
+# Exporting all symbols is the pragmatic choice: annotating the API with export macros is a
+# separate job, and the point of the shared build today is that it works at all.
+# See https://gcc.gnu.org/wiki/Visibility
+if(BUILD_SHARED_LIBS)
+  set(CMAKE_CXX_VISIBILITY_PRESET default)
+  set(CMAKE_VISIBILITY_INLINES_HIDDEN OFF)
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+else()
+  set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+endif()
 
 # Global warning flags
 set(PESTPP_CXX_WARN_FLAGS "${PESTPP_CXX_WARN_FLAGS}"
@@ -109,9 +122,6 @@ set(PESTPP_CXX_WARN_FLAGS "${PESTPP_CXX_WARN_FLAGS}"
 if(WIN32)
   add_compile_definitions(_WIN32_WINNT=0x0600)
 endif()
-
-option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static, OFF)" OFF)
-message(STATUS "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
 
 option(FORCE_STATIC "Force '-static' flag to link applications (default OFF)" OFF)
 message(STATUS "FORCE_STATIC=${FORCE_STATIC}")

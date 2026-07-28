@@ -8,7 +8,7 @@ add_library(rm_yamr
   RunManagerPanther.cpp
 )
 
-add_library(rm_agent STATIC
+add_library(rm_agent
   PantherAgent.cpp
 )
 
