@@ -15,12 +15,14 @@ import os
 from ctypes import (
     CDLL,
     POINTER,
+    Structure,
     byref,
     c_char,
     c_char_p,
     c_double,
     c_int,
     create_string_buffer,
+    sizeof,
 )
 
 import numpy as np
@@ -43,6 +45,26 @@ RUN_STATUS = {
 }
 WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT = 0, 1, 2
 
+RM_SERIAL, RM_PANTHER, RM_EXTERNAL = 0, 1, 2
+RUN_MANAGER = {RM_SERIAL: "serial", RM_PANTHER: "panther", RM_EXTERNAL: "external"}
+
+
+class CreateOptions(Structure):
+    """Mirrors pestpp_create_options. Field order and types must match the header exactly.
+
+    struct_size is set for you in PestppLib.__init__; it is how the library tells which
+    version of the struct it was handed, so fields added later stay source-compatible.
+    """
+    from ctypes import c_void_p as _vp  # noqa: F401  (kept local; see _fields_ below)
+    _fields_ = [
+        ("struct_size", c_int),
+        ("tool", c_int),
+        ("ctl_file", c_char_p),
+        ("working_dir", c_char_p),
+        ("run_manager", c_int),
+        ("panther_port", c_char_p),
+    ]
+
 
 class PestppError(Exception):
     """Raised when a C ABI call returns a non-zero status.
@@ -55,11 +77,11 @@ class PestppLib:
     """One loaded shared library plus one session handle."""
 
     def __init__(self, lib_path: str, tool: int, ctl_file: str, working_dir: str = ".",
-                 port: str | None = None):
-        """port=None uses the serial run manager; a port starts a PANTHER master.
+                 port: str | None = None, run_manager: int | None = None):
+        """run_manager is RM_SERIAL / RM_PANTHER / RM_EXTERNAL.
 
-        Only the PANTHER master can be observed or interrupted mid-batch -- see
-        supports_live_control().
+        Left as None it is inferred: a port means PANTHER, otherwise serial. Only PANTHER can
+        be observed or interrupted mid-batch -- see supports_live_control().
         """
         if not os.path.exists(lib_path):
             raise FileNotFoundError(lib_path)
@@ -72,13 +94,18 @@ class PestppLib:
         from ctypes import c_void_p
 
         self.handle = c_void_p()
-        if port is None:
-            status = self.lib.pestpp_create(
-                c_int(tool), ctl_file.encode(), working_dir.encode(), byref(self.handle))
-        else:
-            status = self.lib.pestpp_create_panther(
-                c_int(tool), ctl_file.encode(), working_dir.encode(), str(port).encode(),
-                byref(self.handle))
+        if run_manager is None:
+            run_manager = RM_PANTHER if port is not None else RM_SERIAL
+        opts = CreateOptions()
+        opts.struct_size = sizeof(CreateOptions)
+        opts.tool = tool
+        opts.ctl_file = ctl_file.encode()
+        opts.working_dir = working_dir.encode()
+        opts.run_manager = run_manager
+        opts.panther_port = None if port is None else str(port).encode()
+        # keep the encoded strings alive: ctypes does not own what c_char_p points at
+        self._opts = opts
+        status = self.lib.pestpp_create(byref(opts), byref(self.handle))
         if status != PESTPP_OK:
             raise PestppError(self.lib.pestpp_last_create_error().decode())
 
@@ -93,11 +120,10 @@ class PestppLib:
         from ctypes import c_void_p
 
         lib = self.lib
-        lib.pestpp_create.argtypes = (c_int, c_char_p, c_char_p, POINTER(c_void_p))
+        lib.pestpp_create.argtypes = (POINTER(CreateOptions), POINTER(c_void_p))
         lib.pestpp_create.restype = c_int
-        lib.pestpp_create_panther.argtypes = (c_int, c_char_p, c_char_p, c_char_p,
-                                              POINTER(c_void_p))
-        lib.pestpp_create_panther.restype = c_int
+        lib.pestpp_get_run_manager.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_get_run_manager.restype = c_int
         lib.pestpp_destroy.argtypes = (c_void_p,)
         lib.pestpp_destroy.restype = c_int
         lib.pestpp_last_error.argtypes = (c_void_p,)
@@ -303,6 +329,13 @@ class PestppLib:
         return buf.value.decode()
 
     # -- run management ----------------------------------------------------------------
+
+    def get_run_manager(self) -> str:
+        """Which run manager this handle got: 'serial', 'panther' or 'external'."""
+        v = c_int()
+        self._check(self.lib.pestpp_get_run_manager(self.handle, byref(v)),
+                    "pestpp_get_run_manager")
+        return RUN_MANAGER.get(v.value, str(v.value))
 
     def supports_live_control(self) -> bool:
         """False for the serial run manager, whose runs cannot be watched or cancelled."""

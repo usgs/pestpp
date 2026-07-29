@@ -23,10 +23,12 @@ import pyemu
 
 # anchored to this file, not the cwd, so the thin ctypes layer that ships with this checkout
 # is the one under test even if the runner is invoked from elsewhere
-_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_BENCH = os.path.dirname(os.path.abspath(__file__))
+_REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp_lib import (  # noqa: E402
-    PestppLib, PestppError, PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
+    PestppLib, PestppError, PESTPP_OK, PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
+    RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
     TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, WORKER_COMPLETED,
 )
 
@@ -47,7 +49,7 @@ _sub = {"windows": "win", "apple": "mac", "linux": "linux"}[plat]
 # directories exactly two levels below benchmarks/, which is what every other benchmark script
 # happens to use. The serial run manager runs the model from the session working directory, so
 # a case directory at any other depth silently gets "execv() failed for command: mfnwt".
-os.environ["PATH"] += os.pathsep + os.path.abspath(os.path.join("test_bin", _sub))
+os.environ["PATH"] += os.pathsep + os.path.join(_BENCH, "test_bin", _sub)
 
 
 def _find_agent_exe():
@@ -97,29 +99,39 @@ def _find_library():
 # ---- case setup ---------------------------------------------------------------------------
 
 def _copy_base(test_d, base_d=os.path.join("ies_10par_xsec", "template")):
-    # Only ever copy from a directory that is CHECKED IN. Several case directories under
-    # benchmarks/ are created dynamically by other benchmark scripts, so they exist in a
-    # working tree that has run those scripts and not in a fresh CI checkout. Fail with a
-    # readable message rather than a FileNotFoundError from inside shutil.
-    if not os.path.isdir(base_d):
+    """Copy a checked-in base case into a fresh working directory.
+
+    Both paths are anchored to this file's directory rather than the process cwd. The C ABI
+    legitimately changes the working directory while a session is open (see ScopedWorkingDir),
+    so anything cwd-relative here is one restore failure away from resolving somewhere else -
+    which surfaces as a base case that has mysteriously gone missing.
+
+    Only ever copy from a directory that is CHECKED IN. Several case directories under
+    benchmarks/ are created dynamically by other benchmark scripts, so they exist in a working
+    tree that has run those scripts and not in a fresh CI checkout.
+    """
+    base_abs = base_d if os.path.isabs(base_d) else os.path.join(_BENCH, base_d)
+    test_abs = test_d if os.path.isabs(test_d) else os.path.join(_BENCH, test_d)
+    if not os.path.isdir(base_abs):
         raise RuntimeError(
-            "base case '{0}' not found. It must be a checked-in directory - directories "
-            "created dynamically by other benchmark scripts are not available here.".format(base_d))
-    if os.path.exists(test_d):
-        shutil.rmtree(test_d)
-    shutil.copytree(base_d, test_d)
-    return test_d
+            "base case '{0}' not found (cwd is '{1}'). It must be a checked-in directory - "
+            "directories created dynamically by other benchmark scripts are not available "
+            "here.".format(base_abs, os.getcwd()))
+    if os.path.exists(test_abs):
+        shutil.rmtree(test_abs)
+    shutil.copytree(base_abs, test_abs)
+    return test_abs
 
 
 def _setup(test_d, noptmax=1, num_reals=6):
     """A small, fast ies case in its own directory."""
-    _copy_base(test_d)
+    test_d = _copy_base(test_d)
     pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
     pst.control_data.noptmax = noptmax
     pst.pestpp_options["ies_num_reals"] = num_reals
     pst.pestpp_options["random_seed"] = 11
     pst.write(os.path.join(test_d, "pest.pst"), version=2)
-    return os.path.abspath(test_d)
+    return test_d
 
 
 def _setup_da(test_d, noptmax=1, num_reals=6):
@@ -129,7 +141,7 @@ def _setup_da(test_d, noptmax=1, num_reals=6):
     C ABI exposes one cycle only - see the DaAdapter comment in pestpp_capi.cpp - so a
     multi-cycle case would not be driveable through the API yet.
     """
-    _copy_base(test_d)
+    test_d = _copy_base(test_d)
     pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
     for df in (pst.parameter_data, pst.observation_data,
                pst.model_input_data, pst.model_output_data):
@@ -139,7 +151,7 @@ def _setup_da(test_d, noptmax=1, num_reals=6):
     pst.pestpp_options["da_num_reals"] = num_reals
     pst.pestpp_options["random_seed"] = 11
     pst.write(os.path.join(test_d, "pest.pst"), version=2)
-    return os.path.abspath(test_d)
+    return test_d
 
 
 def _setup_sqp(test_d, noptmax=1, num_reals=8):
@@ -148,7 +160,7 @@ def _setup_sqp(test_d, noptmax=1, num_reals=8):
     sqp refuses to initialize without a recognized constraint/objective group, so the group
     names matter here - 'l_' marks a less-than constraint.
     """
-    _copy_base(test_d)
+    test_d = _copy_base(test_d)
     pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
     obs = pst.observation_data
     obj, con = pst.nnz_obs_names[0], pst.nnz_obs_names[1]
@@ -161,7 +173,7 @@ def _setup_sqp(test_d, noptmax=1, num_reals=8):
     pst.pestpp_options["random_seed"] = 11
     pst.control_data.noptmax = noptmax
     pst.write(os.path.join(test_d, "pest.pst"), version=2)
-    return os.path.abspath(test_d)
+    return test_d
 
 
 def _setup_mou(test_d, noptmax=1, pop_size=10):
@@ -172,7 +184,7 @@ def _setup_mou(test_d, noptmax=1, pop_size=10):
     in, already carries obj_fn and l_constraint groups, and its forward run is pure python -
     which also makes this the one tool test that needs no model binary at all.
     """
-    _copy_base(test_d, os.path.join("g07", "template"))
+    test_d = _copy_base(test_d, os.path.join("g07", "template"))
     pst = pyemu.Pst(os.path.join(test_d, "g07.pst"))
     # g07 ships configured for sqp; drop those so the options in play are mou's
     for k in [k for k in pst.pestpp_options if k.startswith("sqp_")]:
@@ -182,7 +194,7 @@ def _setup_mou(test_d, noptmax=1, pop_size=10):
     pst.pestpp_options["random_seed"] = 11
     pst.control_data.noptmax = noptmax
     pst.write(os.path.join(test_d, "g07.pst"), version=2)
-    return os.path.abspath(test_d)
+    return test_d
 
 
 def _drive_batch(ies):
@@ -565,6 +577,66 @@ def capi_tool_ensemble_availability_test():
                     assert "has no ensemble" in str(e), str(e)
 
 
+def capi_run_manager_selection_test():
+    """All three run managers can be asked for, and each reports what it can do.
+
+    Serial and external finish a batch in one slice and cannot be introspected; only PANTHER
+    can. A caller has to be able to find that out rather than discover it from an error, which
+    is what supports_live_control() is for.
+    """
+    for rm, name in ((RM_SERIAL, "serial"), (RM_EXTERNAL, "external")):
+        wd = _setup("capi_rm_{0}".format(name))
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, run_manager=rm) as ies:
+            assert ies.get_run_manager() == name, (ies.get_run_manager(), name)
+            assert not ies.supports_live_control(), \
+                "{0} should not claim live control".format(name)
+
+    # the panther master is the one that can
+    wd = _setup("capi_rm_panther")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=port + 1) as ies:
+        assert ies.get_run_manager() == "panther", ies.get_run_manager()
+        assert ies.supports_live_control(), "panther should claim live control"
+
+
+def capi_create_options_validation_test():
+    """Bad create options are rejected with a message, not a crash or a silent default."""
+    import ctypes
+    from pestpp_lib import CreateOptions
+
+    lib = PestppLib.__new__(PestppLib)          # no handle needed for these
+    lib.lib = ctypes.CDLL(_find_library())
+    lib._prototype()
+    handle = ctypes.c_void_p()
+
+    def attempt(**kw):
+        o = CreateOptions()
+        o.struct_size = kw.pop("struct_size", ctypes.sizeof(CreateOptions))
+        o.tool = kw.pop("tool", TOOL_IES)
+        o.ctl_file = kw.pop("ctl_file", b"pest.pst")
+        o.working_dir = kw.pop("working_dir", b".")
+        o.run_manager = kw.pop("run_manager", RM_SERIAL)
+        o.panther_port = kw.pop("panther_port", None)
+        st = lib.lib.pestpp_create(ctypes.byref(o), ctypes.byref(handle))
+        return st, lib.lib.pestpp_last_create_error().decode()
+
+    # struct_size left at zero is the mistake a caller makes first
+    st, msg = attempt(struct_size=0)
+    assert st != PESTPP_OK and "struct_size" in msg, (st, msg)
+
+    # a struct from a newer header than this library understands
+    st, msg = attempt(struct_size=ctypes.sizeof(CreateOptions) + 64)
+    assert st != PESTPP_OK and "newer header" in msg, (st, msg)
+
+    st, msg = attempt(ctl_file=None)
+    assert st != PESTPP_OK and "ctl_file" in msg, (st, msg)
+
+    st, msg = attempt(run_manager=RM_PANTHER, panther_port=None)
+    assert st != PESTPP_OK and "panther_port" in msg, (st, msg)
+
+    st, msg = attempt(run_manager=99)
+    assert st != PESTPP_OK and "run manager" in msg, (st, msg)
+
+
 # ---- panther ------------------------------------------------------------------------------
 
 def capi_panther_control_test():
@@ -574,7 +646,7 @@ def capi_panther_control_test():
     and cancel mean anything.
     """
     wd = _setup("capi_panther", noptmax=1, num_reals=8)
-    worker_root = os.path.abspath("capi_panther_workers")
+    worker_root = os.path.join(_BENCH, "capi_panther_workers")
     if os.path.exists(worker_root):
         shutil.rmtree(worker_root)
     os.makedirs(worker_root)
@@ -662,6 +734,8 @@ if __name__ == "__main__":
     capi_caller_owned_initial_batch_test()
     capi_initialize_split_guardrails_test()
     capi_initialize_prepare_reports_zero_test()
+    capi_run_manager_selection_test()
+    capi_create_options_validation_test()
     capi_da_test()
     capi_sqp_test()
     capi_mou_test()

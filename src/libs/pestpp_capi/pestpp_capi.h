@@ -71,10 +71,41 @@ PESTPP_API extern const int PESTPP_NAME_LEN;
 
 /* ---- lifecycle -------------------------------------------------------------------- */
 
-/* Create a session. `ctl_file` is resolved relative to `working_dir`. */
-PESTPP_API pestpp_status pestpp_create(int tool, const char* ctl_file,
-                                       const char* working_dir, pestpp_handle* out);
+/* Which run manager backs the session.
+ *
+ * Only PANTHER can be watched or interrupted mid-batch. Serial and external finish the whole
+ * batch in the first run_slice() and answer the run/worker queries with an error - ask
+ * pestpp_supports_live_control() rather than discovering it. */
+typedef enum {
+    PESTPP_RM_SERIAL   = 0,
+    PESTPP_RM_PANTHER  = 1,   /* needs panther_port */
+    PESTPP_RM_EXTERNAL = 2
+} pestpp_run_manager;
+
+/* Create-time settings.
+ *
+ * A struct rather than a parameter list because this will grow - da multi-cycle wants a start
+ * cycle, a restart/hotstart file is an obvious next ask - and every addition to a flat
+ * signature is either a new symbol or a break. `struct_size` is how the library knows which
+ * version of the struct it was handed: set it to sizeof(pestpp_create_options) and zero the
+ * rest, and fields added later default sensibly.
+ *
+ * Everything else a run manager needs is already a regular option, so set it with
+ * pestpp_set_option() rather than looking for it here. */
+typedef struct {
+    int         struct_size;     /* = sizeof(pestpp_create_options); required             */
+    int         tool;            /* pestpp_tool                                           */
+    const char* ctl_file;        /* resolved relative to working_dir                      */
+    const char* working_dir;     /* NULL or "" means the current directory                */
+    int         run_manager;     /* pestpp_run_manager; 0 (serial) if left zeroed         */
+    const char* panther_port;    /* PANTHER only; NULL otherwise                          */
+} pestpp_create_options;
+
+PESTPP_API pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* out);
 PESTPP_API pestpp_status pestpp_destroy(pestpp_handle h);
+
+/* Which run manager this handle actually got. */
+PESTPP_API pestpp_status pestpp_get_run_manager(pestpp_handle h, int* run_manager);
 
 /* Message from the most recent failed call on this handle; "" if none. Valid until the
    next call on the same handle. Never returns NULL. */
@@ -170,12 +201,6 @@ typedef enum {
 
 /* Nonzero when this handle's run manager can yield mid-batch and answer the queries below. */
 PESTPP_API pestpp_status pestpp_supports_live_control(pestpp_handle h, int* out);
-
-/* Create a session whose run manager is a PANTHER master listening on `port`. Same as
-   pestpp_create() otherwise. This is the mode where run management is worth controlling. */
-PESTPP_API pestpp_status pestpp_create_panther(int tool, const char* ctl_file,
-                                               const char* working_dir, const char* port,
-                                               pestpp_handle* out);
 
 /* Drive the queued runs. begin_batch() once, then run_slice() until all_done, then
    end_batch(). max_seconds bounds one slice; it is ignored by the serial manager. */

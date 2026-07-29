@@ -29,6 +29,7 @@
 #include "PerformanceLog.h"
 #include "RunManagerSerial.h"
 #include "RunManagerPanther.h"
+#include "RunManagerExternal.h"
 #include "EnsembleSmoother.h"
 #include "DataAssimilator.h"
 #include "MOEA.h"
@@ -80,7 +81,11 @@ struct ToolAdapter
 struct PestppSession
 {
     pestpp_tool tool;
+    int run_manager_type = 0;      // pestpp_run_manager
     string working_dir;
+    // RunManagerExternal takes its storage filename by non-const reference, so it needs to
+    // outlive the constructor call
+    string rns_filename;
     string last_error;
 
     // Order matters: destruction runs bottom-up, and the tool refers to everything above it.
@@ -332,22 +337,53 @@ struct ScopedWorkingDir
 
 extern "C" {
 
-/* Shared by pestpp_create() and pestpp_create_panther(); `port` empty means serial. */
-static pestpp_status create_session(int tool, const char* ctl_file, const char* working_dir,
-                                    const char* port, pestpp_handle* out)
+pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* out)
 {
     g_create_error.clear();
-    if ((out == nullptr) || (ctl_file == nullptr))
+    if ((out == nullptr) || (opts == nullptr))
     {
         g_create_error = "null argument to pestpp_create";
         return PESTPP_ERROR;
     }
     *out = nullptr;
-    string panther_port = (port == nullptr) ? string() : string(port);
+    // struct_size is how a caller built against an older header stays workable: anything past
+    // the size it declares is a field it never knew about, and must default rather than be read
+    if (opts->struct_size < (int)sizeof(int) * 2)
+    {
+        g_create_error = "pestpp_create_options.struct_size not set; it must be "
+                         "sizeof(pestpp_create_options)";
+        return PESTPP_ERROR;
+    }
+    if (opts->struct_size > (int)sizeof(pestpp_create_options))
+    {
+        g_create_error = "pestpp_create_options.struct_size is larger than this library "
+                         "understands; the caller was built against a newer header";
+        return PESTPP_ERROR;
+    }
+    if (opts->ctl_file == nullptr)
+    {
+        g_create_error = "pestpp_create_options.ctl_file is required";
+        return PESTPP_ERROR;
+    }
+    const char* ctl_file = opts->ctl_file;
+    const char* working_dir = opts->working_dir;
+    int rm_type = opts->run_manager;
+    string panther_port = (opts->panther_port == nullptr) ? string() : string(opts->panther_port);
+    if ((rm_type == PESTPP_RM_PANTHER) && panther_port.empty())
+    {
+        g_create_error = "PESTPP_RM_PANTHER requires panther_port";
+        return PESTPP_ERROR;
+    }
+    if ((rm_type < PESTPP_RM_SERIAL) || (rm_type > PESTPP_RM_EXTERNAL))
+    {
+        g_create_error = "unknown run manager id";
+        return PESTPP_ERROR;
+    }
     unique_ptr<PestppSession> s(new PestppSession());
     try
     {
-        s->tool = static_cast<pestpp_tool>(tool);
+        s->tool = static_cast<pestpp_tool>(opts->tool);
+        s->run_manager_type = rm_type;
         s->working_dir = (working_dir == nullptr) ? string() : string(working_dir);
         ScopedWorkingDir swd(s->working_dir);
 
@@ -392,28 +428,51 @@ static pestpp_status create_session(int tool, const char* ctl_file, const char* 
 
         s->pest_scenario->get_pestpp_options_ptr()->apply_tool_defaults(tool_type, fout_rec);
 
-        s->pest_scenario->check_io(fout_rec);
         const ModelExecInfo& exi = s->pest_scenario->get_model_exec_info();
         const PestppOptions& opt = s->pest_scenario->get_pestpp_options();
-        if (panther_port.empty())
+        switch (rm_type)
         {
+        case PESTPP_RM_SERIAL:
+            // check_io() belongs to the serial branch only, exactly as in the executables: it
+            // requires the template and instruction files to be present locally, which is true
+            // where the model runs and need not be true for a master or an external driver
+            s->pest_scenario->check_io(fout_rec);
             s->run_manager.reset(new RunManagerSerial(
                 exi.comline_vec, exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
                 s->file_manager->build_filename("rns"), ".",
                 opt.get_max_run_fail(), opt.get_fill_tpl_zeros(),
                 opt.get_additional_ins_delimiters(), opt.get_num_tpl_ins_threads(),
                 opt.get_tpl_force_decimal(), opt.get_panther_echo()));
-        }
-        else
-        {
+            break;
+
+        case PESTPP_RM_PANTHER:
             // the master writes its own .rmr log, same as the executables do
             s->rmr_stream.reset(new ofstream(s->file_manager->build_filename("rmr")));
             s->run_manager.reset(new RunManagerPanther(
                 s->file_manager->build_filename("rns"), panther_port, *s->rmr_stream,
                 opt.get_max_run_fail(), opt.get_overdue_reched_fac(), opt.get_overdue_giveup_fac(),
                 opt.get_overdue_giveup_minutes(), opt.get_panther_echo(),
-                s->pest_scenario->get_ctl_ordered_par_names(),
-                s->pest_scenario->get_ctl_ordered_obs_names()));
+                // Empty name vectors, matching every tool except pestpp-da: these become the
+                // par/obs names the master asks each worker to validate, and switching that on
+                // for a tool whose executable leaves it off would be a behavior change.
+                (s->tool == PESTPP_DA) ? s->pest_scenario->get_ctl_ordered_par_names() : vector<string>{},
+                (s->tool == PESTPP_DA) ? s->pest_scenario->get_ctl_ordered_obs_names() : vector<string>{},
+                // and the four the executables pass that were previously left at their defaults
+                opt.get_panther_timeout_milliseconds(),
+                opt.get_panther_echo_interval_milliseconds(),
+                opt.get_panther_persistent_workers(),
+                opt.get_panther_ping_interval_secs()));
+            break;
+
+        case PESTPP_RM_EXTERNAL:
+            s->run_manager.reset(new RunManagerExternal(
+                exi.comline_vec, exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
+                s->rns_filename = s->file_manager->build_filename("rns"),
+                opt.get_max_run_fail()));
+            break;
+
+        default:
+            throw runtime_error("unknown run manager id");
         }
         s->run_manager->set_save_all_runs(
             s->pest_scenario->get_pestpp_options().get_save_all_runs());
@@ -462,23 +521,6 @@ static pestpp_status create_session(int tool, const char* ctl_file, const char* 
     return PESTPP_OK;
 }
 
-pestpp_status pestpp_create(int tool, const char* ctl_file,
-                            const char* working_dir, pestpp_handle* out)
-{
-    return create_session(tool, ctl_file, working_dir, nullptr, out);
-}
-
-pestpp_status pestpp_create_panther(int tool, const char* ctl_file, const char* working_dir,
-                                    const char* port, pestpp_handle* out)
-{
-    if ((port == nullptr) || (*port == '\0'))
-    {
-        g_create_error = "pestpp_create_panther requires a port";
-        return PESTPP_ERROR;
-    }
-    return create_session(tool, ctl_file, working_dir, port, out);
-}
-
 pestpp_status pestpp_destroy(pestpp_handle h)
 {
     PestppSession* s = as_session(h);
@@ -496,6 +538,15 @@ const char* pestpp_last_error(pestpp_handle h)
 }
 
 const char* pestpp_last_create_error(void) { return g_create_error.c_str(); }
+
+pestpp_status pestpp_get_run_manager(pestpp_handle h, int* run_manager)
+{
+    CAPI_BEGIN(h)
+        if (run_manager == nullptr) throw runtime_error("null out-param");
+        *run_manager = s->run_manager_type;
+        return PESTPP_OK;
+    CAPI_END()
+}
 
 pestpp_status pestpp_initialize(pestpp_handle h)
 {

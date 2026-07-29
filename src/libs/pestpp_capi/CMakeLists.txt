@@ -20,6 +20,7 @@ target_link_libraries(pestpp_capi
   rm_abstract
   rm_serial
   rm_yamr
+  rm_external
 )
 
 install(TARGETS pestpp_capi LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
