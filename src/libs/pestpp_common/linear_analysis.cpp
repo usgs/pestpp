@@ -369,12 +369,12 @@ void LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& outp
 
 }
 
-pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, 
+pair<ParameterEnsemble,map<string,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, 
 	ModelRun& optimum_run)
 {
 	set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
 	ofstream& fout_rec = file_manager.rec_ofstream();
-	map<int, int> run_map;
+	map<string, int> run_map;
 	Covariance cov = posterior_parameter_matrix();
 	//check for missing adjustable pars
 	/*vector<string> adj_names = pest_scenario.get_ctl_ordered_adj_par_names();
@@ -439,11 +439,11 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 			oe.to_csv(ss.str() + ".csv");*/
 	}
 	//fout_rec << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
-	return pair<ParameterEnsemble,map<int,int>>(pe,run_map);
+	return pair<ParameterEnsemble,map<string,int>>(pe,run_map);
 }
 
 
-pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble,map<int, int>>& fosm_real_info, int iter,
+pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble,map<string, int>>& fosm_real_info, int iter,
 														double last_best_phi)
 {
 	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
@@ -455,7 +455,9 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 	//Covariance obscov = get_obscov();
 	//oe.draw(num_reals, obscov, &pfm, 1);
 	oe.reserve(oe.get_generic_real_names(num_reals), pest_scenario.get_ctl_ordered_obs_names());
-	oe.update_from_runs(fosm_real_info.second, run_mgr_ptr);
+	//oe here is reserved with generic real names, which need not match the par ensemble's,
+	//so resolve the name-keyed run map against the par side explicitly
+	oe.update_from_runs(fosm_real_info.second, run_mgr_ptr, fosm_real_info.first.get_real_names());
 	if (pest_scenario.get_pestpp_options().get_glm_debug_real_fail())
 	{
 		vector<string> drop;

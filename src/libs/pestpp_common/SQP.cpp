@@ -5810,7 +5810,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
  * Paired with the harvest half so a caller can drive the run manager itself in between
  * and watch or cancel runs while they are in flight.
  */
-map<int, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_candidates)
+map<string, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_candidates)
 {
 	run_mgr_ptr->reinitialize();
 	ofstream &frec = file_manager.rec_ofstream();
@@ -5819,7 +5819,7 @@ map<int, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_can
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
 	
-	map<int, int> real_run_ids;
+	map<string, int> real_run_ids;
 	try
 	{
 		real_run_ids = dv_candidates.add_runs(run_mgr_ptr);
@@ -5841,7 +5841,7 @@ map<int, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_can
 /**
  * @brief Collect the queued runs (second half); assumes the runs have been made.
  */
-ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<int, int>& real_run_ids)
+ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
@@ -5852,7 +5852,7 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
 
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, dv_candidates.get_real_names());
 	}
 	catch (const exception &e)
 	{
@@ -5975,7 +5975,7 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
  */
 ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates)
 {
-	map<int, int> real_run_ids = queue_candidate_ensemble(dv_candidates);
+	map<string, int> real_run_ids = queue_candidate_ensemble(dv_candidates);
 	performance_log->log_event("making runs");
 	try
 	{
@@ -6054,14 +6054,14 @@ void SeqQuadProgram::queue_chance_runs()
  * Paired with the harvest half so a caller can drive the run manager itself in between
  * and watch or cancel runs while they are in flight.
  */
-map<int, int> SeqQuadProgram::queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs)
+map<string, int> SeqQuadProgram::queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs)
 {
 	run_mgr_ptr->reinitialize();
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
-	map<int, int> real_run_ids;
+	map<string, int> real_run_ids;
 	try
 	{
 		real_run_ids = _pe.add_runs(run_mgr_ptr,real_idxs);
@@ -6085,19 +6085,26 @@ map<int, int> SeqQuadProgram::queue_ensemble(ParameterEnsemble &_pe, const vecto
 /**
  * @brief Collect the queued runs (second half); assumes the runs have been made.
  */
-vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<int, int>& real_run_ids)
+vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
 	_oe.reserve(_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+	//par realization names in the order matching _oe's rows - subset them the same way
+	//_oe is subset so the name->position resolution stays aligned
+	vector<string> par_real_names = _pe.get_real_names();
 	if (real_idxs.size() > 0)
 	{
+		vector<string> subset_par_names;
+		for (auto i : real_idxs)
+			subset_par_names.push_back(par_real_names[i]);
+		par_real_names = subset_par_names;
 		_oe.keep_rows(real_idxs);
 	}
 	vector<int> failed_real_indices;
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids,run_mgr_ptr);
+		failed_real_indices = _oe.update_from_runs(real_run_ids,run_mgr_ptr,par_real_names);
 	}
 	catch (const exception &e)
 	{
@@ -6143,7 +6150,7 @@ vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, Observation
  */
 vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
 {
-	map<int, int> real_run_ids = queue_ensemble(_pe, real_idxs);
+	map<string, int> real_run_ids = queue_ensemble(_pe, real_idxs);
 	performance_log->log_event("making runs");
 	try
 	{

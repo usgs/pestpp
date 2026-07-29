@@ -2767,7 +2767,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
  * First half of run_population(). Paired with harvest_population(); a caller that wants to
  * watch or cancel runs mid-generation drives the run manager itself in between.
  */
-map<int, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chance)
+map<string, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chance)
 {
 	run_mgr_ptr->reinitialize();
 	//queue up any chance related runs
@@ -2783,7 +2783,7 @@ map<int, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chance)
 	ss << "queuing " << _dp.shape().first << " runs";
 	performance_log->log_event(ss.str());
 	//run_mgr_ptr->reinitialize();
-	map<int, int> real_run_ids;
+	map<string, int> real_run_ids;
 	try
 	{
 		real_run_ids = _dp.add_runs(run_mgr_ptr);
@@ -2804,7 +2804,7 @@ map<int, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chance)
 /**
  * @brief Collect a queued population's runs into _op, returning the failed indices.
  */
-vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<int, int>& real_run_ids)
+vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
@@ -2812,7 +2812,7 @@ vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble
 	vector<int> failed_real_indices;
 	try
 	{
-		failed_real_indices = _op.update_from_runs(real_run_ids, run_mgr_ptr);
+		failed_real_indices = _op.update_from_runs(real_run_ids, run_mgr_ptr, _dp.get_real_names());
 	}
 	catch (const exception& e)
 	{
@@ -2861,7 +2861,7 @@ vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble
  */
 vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
 {
-	map<int, int> real_run_ids = queue_population(_dp, allow_chance);
+	map<string, int> real_run_ids = queue_population(_dp, allow_chance);
 	performance_log->log_event("making runs");
 	try
 	{

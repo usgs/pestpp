@@ -218,14 +218,16 @@ pair<Parameters,Observations> save_real_par_rei(Pest& pest_scenario, ParameterEn
 
 // queue -> (drive the run manager) -> harvest, for a single ensemble. run_ensemble_util() is
 // the in-tree composition; the halves are available for a caller running its own run loop.
-map<int, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
+// the returned map is keyed by realization NAME, so the caller may change ensemble
+// membership between these two calls without the runs being misattributed
+map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	RunManagerAbstract* run_mgr_ptr,
 	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(), int da_cycle=NetPackage::NULL_DA_CYCLE,
 	string additional_tag="");
 
 vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
-	bool check_pe_consistency, const vector<int>& real_idxs, map<int, int>& real_run_ids);
+	bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids);
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
@@ -593,8 +595,8 @@ public:
 	// queue -> (drive the run manager) -> harvest. run_lambda_ensembles() is the in-tree
 	// composition of the two halves; a caller that wants to watch or cancel runs while they
 	// are in flight calls the halves itself with its own run_slice() loop in between.
-	vector<map<int, int>> queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
-	vector<ObservationEnsemble> harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, vector<map<int, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
+	vector<map<string, int>> queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
+	vector<ObservationEnsemble> harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, vector<map<string, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 
 	void report_and_save(int cycle);

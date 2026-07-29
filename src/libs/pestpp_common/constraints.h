@@ -226,9 +226,9 @@ private:
 	map<string, double> post_constraint_offset;
 	map<string, double> post_constraint_stdev;
 
-	map<int, int> stack_pe_run_map;
+	map<string, int> stack_pe_run_map;
 	
-	map<string, map<int, int>> population_stack_pe_run_map;
+	map<string, map<string, int>> population_stack_pe_run_map;
 
 	vector<string> dec_var_names;
 	vector<string> nz_obs_names;
@@ -245,7 +245,7 @@ private:
 	//get the (risk-shifted) residual (distance) vector between constraints RHS and sim arg
 	vector<double> get_constraint_residual_vec(Observations& sim);
 
-	map<int, int> add_stack_runs(int iter, ParameterEnsemble& current_pe, Parameters& current_pars, 
+	map<string, int> add_stack_runs(int iter, ParameterEnsemble& current_pe, Parameters& current_pars, 
 		Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
 	//error handlers
@@ -262,7 +262,7 @@ private:
 	void write_res_file(Observations& constraints, Parameters& pars_and_dec_vars, string tag, int iter, bool include_chance);
 
 	void process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter);
-	pair<vector<int>,ObservationEnsemble> process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
+	pair<vector<int>,ObservationEnsemble> process_stack_runs(string real_name, int iter, map<string, int> _stack_pe_run_map, 
 		RunManagerAbstract* run_mgr_ptr, bool drop_fails=true, bool debug_fail=false);
 
 	void nested_stack_stdev_summary(map<string, ObservationEnsemble>& _stack_oe_map);

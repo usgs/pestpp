@@ -257,7 +257,9 @@ public:
 	ParamTransformSeq get_par_transform() const { return par_transform; }
 	void transform_ip(transStatus to_tstat);
 	void set_pest_scenario(Pest *_pest_scenario);
-	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),
+	// keyed by realization NAME, not position, so a caller can add, drop or reorder
+	// realizations between queueing the runs and harvesting them
+	map<string,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),
 	        int da_cycle=NetPackage::NULL_DA_CYCLE, string additional_tag="");
 	void set_fixed_names();
 	void draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec);
@@ -301,8 +303,27 @@ public:
 	void from_csv(string file_name);
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
 	void from_binary(string file_name);
-	vector<int> update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr);
-	vector<int> update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe);
+	// Takes the name-keyed map from add_runs(). Only the INPUT needs to be by name: it has to
+	// survive the caller adding, dropping or reordering realizations between queueing the runs
+	// and harvesting them. The returned failed-run positions are resolved here, against the
+	// membership as it stands now, so they stay valid for the caller's drop_rows() calls.
+	//
+	// par_real_names is the parameter ensemble's realization names in current order. It is
+	// needed because real_run_ids is keyed by PAR realization name while this is the OBS
+	// ensemble, and the two name sets are allowed to differ - pest++ pairs par and obs
+	// realizations by position, not by name (see drop_bad_reals()). Pass empty when the two
+	// name sets are known to match.
+	vector<int> update_from_runs(map<string,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr,
+		const vector<string>& par_real_names=vector<string>());
+	vector<int> update_from_runs(map<string,int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe,
+		const vector<string>& par_real_names=vector<string>());
+
+	// Maps queued runs onto the rows they belong to now. key_names is the realization names in
+	// current row order; n_rows bounds it to the receiving ensemble. Returns (row, run_id) in
+	// ascending row order, skipping any run whose realization is gone. Static and free of run
+	// manager state so the mapping can be exercised on its own.
+	static vector<pair<int,int>> resolve_run_positions(const map<string,int>& real_run_ids,
+		const vector<string>& key_names, int n_rows);
 
 	void draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void initialize_without_noise(int num_reals);

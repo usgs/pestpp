@@ -4251,14 +4251,14 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
  * First half of run_ensemble_util(). Paired with harvest_ensemble_util(); the caller drives
  * the run manager in between and so can watch or cancel runs while they are in flight.
  */
-map<int, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
+map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag)
 {
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
-	map<int, int> real_run_ids;
+	map<string, int> real_run_ids;
 	try
 	{
 		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,da_cycle,additional_tag);
@@ -4282,20 +4282,28 @@ map<int, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& fre
  * Second half of run_ensemble_util(); assumes the runs have been made.
  */
 vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe, ObservationEnsemble& _oe,
-	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, map<int, int>& real_run_ids)
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
+	//real_run_ids is keyed by par realization name, so hand over the par-side names to resolve
+	//against - _pe and _oe are paired by position and are not required to share names.
+	//subset the par names the same way _oe is about to be subset, so the two stay aligned.
+	vector<string> par_real_names = _pe.get_real_names();
 	if (real_idxs.size() > 0)
 	{
+		vector<string> subset_par_names;
+		for (auto i : real_idxs)
+			subset_par_names.push_back(par_real_names[i]);
+		par_real_names = subset_par_names;
 		_oe.keep_rows(real_idxs);
 	}
 	vector<int> failed_real_indices;
 	ParameterEnsemble run_mgr_pe = _pe.zeros_like(0);
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
-	} 
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe, par_real_names);
+	}
 	catch (const exception& e)
 	{
 		ss.str("");
@@ -4349,17 +4357,24 @@ vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& fre
 		frec << "checking for consistency in parameter ensemble" << endl;
 		frec << "   full listing of consistency check results:" << endl;
 		vector<string> failing_reals;
-		for (auto rri : real_run_ids)
+		//walk _pe in position order rather than iterating real_run_ids, both so the listing
+		//stays in ensemble order and so realizations that were dropped (failed runs, or the
+		//caller removing them) are simply skipped
+		map<string, int>::iterator rit, rend = real_run_ids.end();
+		for (int i = 0; i < real_names.size(); i++)
 		{
-			org_real = _pe.get_real_vector(rri.first);
-			new_real = run_mgr_pe.get_real_vector(rri.first);
+			rit = real_run_ids.find(real_names[i]);
+			if (rit == rend)
+				continue;
+			org_real = _pe.get_real_vector(i);
+			new_real = run_mgr_pe.get_real_vector(i);
 			diff = (org_real.array() - new_real.array()).cwiseAbs();
 			diff = 100.0 * diff.cwiseQuotient(org_real);
 			percent_diff_max = diff.maxCoeff(&max_idx);
-			frec << "   realization: " << real_names[rri.first] << ", run_id: " << rri.second << ", max % diff: " << percent_diff_max << " at parameter: " << par_names[max_idx] << endl;
+			frec << "   realization: " << real_names[i] << ", run_id: " << rit->second << ", max % diff: " << percent_diff_max << " at parameter: " << par_names[max_idx] << endl;
 			if (percent_diff_max > 2.0)
 			{
-				failing_reals.push_back(real_names[rri.first]);
+				failing_reals.push_back(real_names[i]);
 			}
 		}
 		if (failing_reals.size() > 0)
@@ -4382,7 +4397,7 @@ vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& fre
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe,
 	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag)
 {
-	map<int, int> real_run_ids = queue_ensemble_util(performance_log, frec, _pe, run_mgr_ptr, check_pe_consistency, real_idxs, da_cycle, additional_tag);
+	map<string, int> real_run_ids = queue_ensemble_util(performance_log, frec, _pe, run_mgr_ptr, check_pe_consistency, real_idxs, da_cycle, additional_tag);
 	stringstream ss;
 	performance_log->log_event("making runs");
 	try
@@ -4727,7 +4742,7 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
  * Split out so a caller can queue, drive the run manager itself - watching run states or
  * cancelling as it goes - and harvest when it is ready.
  */
-vector<map<int, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
+vector<map<string, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
 	ofstream& frec = file_manager.rec_ofstream();
@@ -4747,7 +4762,7 @@ vector<map<int, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEns
 	message(1, "subset idx:oe real name: ", ss.str(), false);
 
 	//set_subset_idx(pe_lams[0].shape().first);
-	vector<map<int, int>> real_run_ids_vec;
+	vector<map<string, int>> real_run_ids_vec;
 
 	string additional_tag;
 	for (int i=0;i<pe_lams.size();i++)
@@ -4781,37 +4796,40 @@ vector<map<int, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEns
  * the parameter and observation side as it goes.
  */
 vector<ObservationEnsemble> EnsembleMethod::harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
-	vector<double>& scale_vals, vector<map<int, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
+	vector<double>& scale_vals, vector<map<string, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
 	vector<ObservationEnsemble> obs_lams;
 
-	map<int, int> real_run_ids;
+	map<string, int> real_run_ids;
 	for (int i = 0; i < pe_lams.size(); i++)
 	{
 		ObservationEnsemble _oe = oe;//copy
 		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
 		real_run_ids = real_run_ids_vec[i];
 
+		//par realization names in the order that matches _oe's rows. when a subset is in play
+		//_oe is cut down to the subset rows, so the par names have to be cut the same way.
+		//this replaces the old "renumber the keys 0..n-1" remap, which only worked because
+		//map<int,int> happens to iterate in position order - map<string,int> does not.
+		vector<string> lam_par_names = pe_lams[i].get_real_names();
+		vector<string> key_names;
 		if ((get_use_subset()) && ((_oe.shape().first > pe_lams[i].shape().first) || (pe_subset_idxs.size() < pe_lams[i].shape().first)))
 		{
 			_oe.keep_rows(oe_subset_idxs);
-			int ireal = 0;
-			map<int, int> temp;
-			for (auto& rri : real_run_ids)
-			{
-				temp[ireal] = rri.second;
-				ireal++;
-			}
-
-			real_run_ids = temp;
+			for (auto j : pe_subset_idxs)
+				key_names.push_back(lam_par_names[j]);
+		}
+		else
+		{
+			key_names = lam_par_names;
 		}
 
 		try
 		{
-			failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
+			failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, key_names);
 		}
 		catch (const exception& e)
 		{
@@ -4890,7 +4908,7 @@ vector<ObservationEnsemble> EnsembleMethod::harvest_lambda_ensembles(vector<Para
 vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
-	vector<map<int, int>> real_run_ids_vec = queue_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, pe_subset_idxs, oe_subset_idxs);
+	vector<map<string, int>> real_run_ids_vec = queue_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, pe_subset_idxs, oe_subset_idxs);
 	performance_log->log_event("making runs");
 	try
 	{

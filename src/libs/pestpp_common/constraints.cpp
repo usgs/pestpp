@@ -2962,7 +2962,7 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 	return;
 }
 
-pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
+pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string real_name, int iter, map<string, int> _stack_pe_run_map, 
 	RunManagerAbstract* run_mgr_ptr, bool drop_fails, bool debug_fail)
 {
 	if (_stack_pe_run_map.size() == 0)
@@ -2970,7 +2970,7 @@ pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string rea
 	else
 		stack_runs_processed = true;
 	ObservationEnsemble _stack_oe(stack_oe);//copy
-	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr);
+	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr, stack_pe.get_real_names());
 	if (debug_fail)
 	{
 
@@ -3472,7 +3472,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	f_rec << "queuing up nested sets of chance runs ('opt_chance_points' == 'all') for decision-variable ensemble " << endl;
 	cout << "queuing up nested sets of chance runs for decision-variable ensemble " << endl;
-	map<int, int> _stack_pe_run_map;
+	map<string, int> _stack_pe_run_map;
 	int count = 0;
 	int i = 0;
 	stringstream ss;
@@ -3577,7 +3577,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
  *
  * @return Description.
  */
-map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
+map<string, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	//update _stack_pe parameter values for decision variables using current_pars
 	int num_reals = _stack_pe.shape().first;
@@ -3589,7 +3589,7 @@ map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe
 		_stack_pe.replace_col(dname, dvec,false);
 	}
 	pfm.log_event("building stack-based parameter runs");
-	map<int,int> _stack_pe_run_map = _stack_pe.add_runs(run_mgr_ptr);
+	map<string,int> _stack_pe_run_map = _stack_pe.add_runs(run_mgr_ptr);
 	return _stack_pe_run_map;
 }
 

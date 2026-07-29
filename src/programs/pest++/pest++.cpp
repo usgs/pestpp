@@ -661,7 +661,7 @@ int main(int argc, char* argv[]) {
 			{
 				cout << endl << "...drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;
 				
-				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
+				pair<ParameterEnsemble, map<string, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
 				DynamicRegularization ptr;
 				ptr.set_defaults();
@@ -709,7 +709,7 @@ int main(int argc, char* argv[]) {
 				//	/*ObservationEnsemble oe_upgrade(&pest_scenario);
 				//	oe_upgrade.reserve(oe_real_names, pest_scenario.get_ctl_ordered_obs_names());
 				//	oe_upgrade.update_from_runs(run_id_map, run_manager_ptr);*/
-				//	pair<ParameterEnsemble, map<int, int>> upgrade_fosm_real_info(upgrade_pe, run_id_map);
+				//	pair<ParameterEnsemble, map<string, int>> upgrade_fosm_real_info(upgrade_pe, run_id_map);
 				//	ObservationEnsemble upgrade_oe = la.process_fosm_reals(run_manager_ptr, upgrade_fosm_real_info,-999, optimum_run.get_phi(ptr));
 				//}
 			}

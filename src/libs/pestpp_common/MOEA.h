@@ -284,8 +284,8 @@ private:
 	void sanity_checks();
 	// queue -> (drive the run manager) -> harvest. run_population() is the in-tree
 	// composition; the halves let a caller run its own run_slice() loop in between.
-	map<int, int> queue_population(ParameterEnsemble& _dp, bool allow_chance);
-	vector<int> harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<int, int>& real_run_ids);
+	map<string, int> queue_population(ParameterEnsemble& _dp, bool allow_chance);
+	vector<int> harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids);
 	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance);
 
 	void queue_chance_runs(ParameterEnsemble& _dp);

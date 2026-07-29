@@ -1592,7 +1592,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
     Mat j;
     LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
 
-	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
+	pair<ParameterEnsemble, map<string, int>> fosm_real_info;
 
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{

@@ -583,6 +583,77 @@ static void test_subset_names_survive_membership_change()
     CHK(ies.p_resolve(subset, none).size() == 0, "no surviving members -> empty subset");
 }
 
+// A caller running its own run loop can change the ensemble between queueing the runs and
+// harvesting them. The run->realization map is keyed by name so that change is absorbed;
+// keyed by position, every run after the edit would land on the wrong realization.
+static void test_run_map_survives_resize()
+{
+    cout << "[queued runs are held by name, so a resize between queue and harvest is safe]" << endl;
+
+    vector<string> all{"R0","R1","R2","R3","R4"};
+    // run ids deliberately unlike the positions, so a position/run-id mix-up is visible
+    map<string,int> run_ids{{"R0",100},{"R1",101},{"R2",102},{"R3",103},{"R4",104}};
+
+    // baseline: nothing changed, every run lands on its own row
+    vector<pair<int,int>> r = ObservationEnsemble::resolve_run_positions(run_ids, all, all.size());
+    CHK(r.size() == 5, "unchanged ensemble resolves every queued run");
+    bool ok = true;
+    for (int i = 0; i < 5; i++)
+        ok = ok && (r[i].first == i) && (r[i].second == 100 + i);
+    CHK(ok, "each run maps to its own row");
+
+    // drop a realization AHEAD of the others: every later row shifts down by one. positions
+    // would now be off by one; names follow the realizations.
+    vector<string> dropped_first{"R1","R2","R3","R4"};
+    r = ObservationEnsemble::resolve_run_positions(run_ids, dropped_first, dropped_first.size());
+    CHK(r.size() == 4, "dropping an earlier realization keeps the remaining runs");
+    CHK(r[0].first == 0 && r[0].second == 101, "R1's run follows R1 to its new row 0");
+    CHK(r[3].first == 3 && r[3].second == 104, "R4's run follows R4 to its new row 3");
+
+    // drop a realization in the MIDDLE
+    vector<string> dropped_mid{"R0","R1","R3","R4"};
+    r = ObservationEnsemble::resolve_run_positions(run_ids, dropped_mid, dropped_mid.size());
+    CHK(r.size() == 4 && r[2].second == 103, "R3's run follows R3 across the gap left by R2");
+
+    // R2's run has nowhere to go and is discarded rather than misattributed
+    ok = true;
+    for (auto& p : r)
+        ok = ok && (p.second != 102);
+    CHK(ok, "the dropped realization's run is discarded, not reassigned");
+
+    // reordering is absorbed
+    vector<string> reordered{"R4","R3","R2","R1","R0"};
+    r = ObservationEnsemble::resolve_run_positions(run_ids, reordered, reordered.size());
+    CHK(r.size() == 5 && r[0].second == 104 && r[4].second == 100,
+        "reversing the ensemble reverses which run lands where");
+
+    // a realization the caller ADDED after queueing simply has no run yet
+    vector<string> added{"R0","R1","NEW","R2","R3","R4"};
+    r = ObservationEnsemble::resolve_run_positions(run_ids, added, added.size());
+    CHK(r.size() == 5, "an added realization contributes no run");
+    ok = true;
+    for (auto& p : r)
+        ok = ok && (p.first != 2);
+    CHK(ok, "the added realization's row is left untouched");
+
+    // n_rows bounds the result: the receiving ensemble may be shorter than the name list
+    r = ObservationEnsemble::resolve_run_positions(run_ids, all, 3);
+    CHK(r.size() == 3, "resolution stops at the receiving ensemble's row count");
+
+    // rows come back in ascending order, which is what the harvest loop and the failed-index
+    // list both assume
+    r = ObservationEnsemble::resolve_run_positions(run_ids, reordered, reordered.size());
+    ok = true;
+    for (int i = 1; i < r.size(); i++)
+        ok = ok && (r[i].first > r[i-1].first);
+    CHK(ok, "resolved rows are in ascending order");
+
+    // nothing survived
+    vector<string> none{"X","Y"};
+    CHK(ObservationEnsemble::resolve_run_positions(run_ids, none, none.size()).size() == 0,
+        "no surviving realizations -> no runs to harvest");
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -598,6 +669,7 @@ int main()
     test_sqp_controls();
     test_tool_objects_track_live_options();
     test_ensemble_zero_copy_view();
+    test_run_map_survives_resize();
     test_subset_names_survive_membership_change();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;

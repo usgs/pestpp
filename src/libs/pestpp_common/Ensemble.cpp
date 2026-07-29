@@ -2576,11 +2576,12 @@ ParameterEnsemble ParameterEnsemble::zeros_like(int nrows)
 
 }
 
-map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs,
+map<string,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs,
                                          int da_cycle, string additional_tag)
 {
-	//add runs to the run manager using int indices
-	map<int,int> real_run_ids;
+	//add runs to the run manager, keyed by realization name so the caller can change
+	//ensemble membership before harvesting
+	map<string,int> real_run_ids;
 
 	//get the pars and transform to be in sync with ensemble trans status
 	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
@@ -2647,7 +2648,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
             throw_ensemble_error(ss.str());
         }
 		run_id = run_mgr_ptr->add_run(pars_real,info_txt+"  realization:"+rname);
-		real_run_ids[idx]  = run_id;
+		real_run_ids[rname]  = run_id;
 	}
 	return real_run_ids;
 }
@@ -4393,10 +4394,11 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
  *
  * @return Description.
  */
-vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr)
+vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr,
+	const vector<string>& par_real_names)
 {
 	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
-	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
+	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe, par_real_names);
 }
 
 /**
@@ -4408,41 +4410,67 @@ vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, R
  *
  * @return Description.
  */
-vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe)
+vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe,
+	const vector<string>& par_real_names)
 {
-	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the 
+	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the
 	//par values from the run mgr are consistent with what par values were desired
 
 	//update the obs ensemble in place from the run manager
-	
+
 	set<int> failed_runs = run_mgr_ptr->get_failed_run_ids();
 	vector<int> failed_real_idxs;
 	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	Observations obs = pest_scenario_ptr->get_ctl_observations();
-	string real_name;
-	int ireal = 0;
 	run_mgr_pe = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
 	vector<string> var_names = pars.get_keys();
 	run_mgr_pe.reserve(real_names,var_names);
 	run_mgr_pe.set_zeros();
-	for (auto &real_run_id : real_run_ids)
+
+	//resolve each run's par realization name against membership as it stands right now.
+	//this is the whole point of keying by name: the caller may have added, dropped or
+	//reordered realizations since add_runs() was called.
+	const vector<string>& key_names = par_real_names.size() > 0 ? par_real_names : real_names;
+	vector<pair<int,int>> resolved = resolve_run_positions(real_run_ids, key_names, real_names.size());
+	for (auto &rr : resolved)
 	{
-		if (failed_runs.find(real_run_id.second) != failed_runs.end())
+		if (failed_runs.find(rr.second) != failed_runs.end())
 		{
-			failed_real_idxs.push_back(real_run_id.first);
+			failed_real_idxs.push_back(rr.first);
 		}
 
 		else
 		{
-			run_mgr_ptr->get_run(real_run_id.second, pars, obs);
-			//real_name = real_names[real_run_id.first];
-			update_from_obs(real_run_id.first, obs);
+			run_mgr_ptr->get_run(rr.second, pars, obs);
+			update_from_obs(rr.first, obs);
 			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
-			run_mgr_pe.update_real_ip(real_names[real_run_id.first], real);
+			run_mgr_pe.update_real_ip(real_names[rr.first], real);
 
 		}
 	}
 	return failed_real_idxs;
+}
+
+/**
+ * @brief Map queued runs onto the rows their realizations occupy now.
+ */
+vector<pair<int,int>> ObservationEnsemble::resolve_run_positions(const map<string,int>& real_run_ids,
+	const vector<string>& key_names, int n_rows)
+{
+	vector<pair<int,int>> resolved;
+	//walk positions rather than the map so the result is in ascending row order regardless of
+	//how the names sort, and so a row with no queued run is simply passed over
+	int n = key_names.size() < n_rows ? key_names.size() : n_rows;
+	map<string,int>::const_iterator rit, rend = real_run_ids.end();
+	for (int i = 0; i < n; i++)
+	{
+		rit = real_run_ids.find(key_names[i]);
+		//no run was queued for this realization, or it was added after the runs went out
+		if (rit == rend)
+			continue;
+		resolved.push_back(pair<int,int>(i, rit->second));
+	}
+	return resolved;
 }
 
 /**
