@@ -21,6 +21,7 @@
 #include <set>
 #include <algorithm>
 #include <iostream>
+#include <cstdio>
 #include <filesystem>
 
 #include "Pest.h"
@@ -692,6 +693,18 @@ const char* pestpp_last_error(pestpp_handle h)
 }
 
 const char* pestpp_last_create_error(void) { return g_create_error.c_str(); }
+
+pestpp_status pestpp_flush_output(void)
+{
+    try
+    {
+        cout.flush();     // C++ stream -> the CRT's stdout
+        cerr.flush();
+        fflush(stdout);   // the CRT's buffer -> the OS handle
+        return PESTPP_OK;
+    }
+    catch (...) { return PESTPP_ERROR; }
+}
 
 pestpp_status pestpp_get_run_manager(pestpp_handle h, int* run_manager)
 {

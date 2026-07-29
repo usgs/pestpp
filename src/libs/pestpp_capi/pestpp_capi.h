@@ -113,6 +113,16 @@ PESTPP_API const char* pestpp_last_error(pestpp_handle h);
 /* For pestpp_create() failures, where there is no handle to ask. */
 PESTPP_API const char* pestpp_last_create_error(void);
 
+/* Flush the library's console output.
+ *
+ * Needed because on windows the library links the static CRT (/MT), so it owns a COPY of the
+ * C runtime with its own stdout buffer, independent of the host program's. A caller that
+ * redirects file descriptor 1 to capture output gets the model's output - child processes
+ * inherit the descriptor - but the library's own text stays in that private buffer and
+ * surfaces later, after the redirect has been undone. Call this before restoring, and the
+ * buffer lands where it was meant to. Harmless everywhere else. */
+PESTPP_API pestpp_status pestpp_flush_output(void);
+
 /* ---- driving the algorithm --------------------------------------------------------- */
 
 PESTPP_API pestpp_status pestpp_initialize(pestpp_handle h);

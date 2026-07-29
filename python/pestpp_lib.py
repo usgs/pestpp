@@ -131,6 +131,8 @@ class PestppLib:
         lib.pestpp_last_error.restype = c_char_p
         lib.pestpp_last_create_error.argtypes = ()
         lib.pestpp_last_create_error.restype = c_char_p
+        lib.pestpp_flush_output.argtypes = ()
+        lib.pestpp_flush_output.restype = c_int
 
         lib.pestpp_initialize_prepare.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_initialize_prepare.restype = c_int
@@ -240,6 +242,15 @@ class PestppLib:
         ]
 
     # -- lifecycle --------------------------------------------------------------------
+
+    def flush_output(self) -> None:
+        """Flush the library's console output.
+
+        Matters on windows, where the library has its own static CRT and so its own stdout
+        buffer: without this, output captured by redirecting fd 1 misses everything the
+        library itself printed.
+        """
+        self.lib.pestpp_flush_output()
 
     def destroy(self) -> None:
         if getattr(self, "handle", None) is not None and self.handle:

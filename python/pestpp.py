@@ -116,7 +116,7 @@ def _maybe_lower(df, lower: bool, axis="both"):
 # ---- keeping the library's console output out of the way ----------------------------------
 
 @contextmanager
-def _redirect_c_stdout(path):
+def _redirect_c_stdout(path, flush=None):
     """Send the library's stdout to a file while this block runs.
 
     PEST++ writes to C++ ``cout``, which goes to file descriptor 1 directly -- Python's
@@ -126,6 +126,11 @@ def _redirect_c_stdout(path):
     Captured to a file rather than discarded: the .rec file does not carry everything the
     console does, and swallowing a run manager's complaints outright would be worse than the
     noise. Only fd 1 is touched -- fd 2 is left alone so python tracebacks still surface.
+
+    ``flush`` is called before the descriptor is restored. On windows the library links the
+    static CRT and so buffers its output privately; without flushing it, the file gets the
+    model's output (child processes inherit the descriptor) but not the library's own, which
+    escapes to the console afterwards instead.
     """
     sys.stdout.flush()
     saved = os.dup(1)
@@ -134,6 +139,11 @@ def _redirect_c_stdout(path):
         os.dup2(sink.fileno(), 1)
         yield
     finally:
+        if flush is not None:
+            try:
+                flush()
+            except Exception:
+                pass          # a failed flush must not mask whatever the block raised
         sys.stdout.flush()
         os.dup2(saved, 1)
         os.close(saved)
@@ -184,7 +194,8 @@ class _Tool:
 
     def _q(self):
         """Capture the library's console output for the duration of a call."""
-        return _redirect_c_stdout(self._log) if self._quiet else nullcontext()
+        return (_redirect_c_stdout(self._log, flush=self._lib.flush_output)
+                if self._quiet else nullcontext())
 
     @property
     def log_file(self) -> str:
@@ -220,6 +231,8 @@ class _Tool:
             lib = PestppLib(find_library(lib_path), cls._tool_id, pst_file, workdir,
                             port=str(port) if run_manager == RM_PANTHER else None,
                             run_manager=run_manager)
+            if quiet:
+                lib.flush_output()          # before the redirect unwinds
         for key, value in options.items():
             lib.set_option(key, value)
 

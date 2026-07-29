@@ -385,15 +385,27 @@ def api_drop_realizations_test():
 
 
 def api_quiet_captures_output_test():
-    """The library's console output is captured to a file rather than flooding the session."""
+    """The library's console output is captured to a file rather than flooding the session.
+
+    The content check matters more than it looks. On windows the library links the static CRT
+    and so buffers its output privately: child processes inherit the redirected descriptor and
+    land in the file, but the library's own text escapes to the console unless it is flushed
+    before the redirect unwinds. A size check alone passes in that case - the model output is
+    there - so this asserts on text the library itself prints.
+    """
     wd = _case("api_quiet", noptmax=1)
     with Ies.from_pst("pest.pst", workdir=wd) as ies:
         ies.initialize()
         assert os.path.exists(ies.log_file), ies.log_file
         assert os.path.getsize(ies.log_file) > 0, "quiet mode captured nothing"
-        # the captured text is the tool's, not ours
-        with open(ies.log_file) as f:
-            assert "initializing" in f.read().lower()
+        with open(ies.log_file, errors="replace") as f:
+            captured = f.read()
+        low = captured.lower()
+        # phrases only the library prints, not the model
+        assert any(tok in low for tok in ("initializing", "pest++", "run manager")), (
+            "the library's own output was not captured - only {0} bytes, starting: {1!r}. "
+            "On windows this means pestpp_flush_output() is not reaching the private CRT "
+            "buffer before the descriptor is restored.".format(len(captured), captured[:300]))
         ies.finalize()
 
 
