@@ -37,6 +37,13 @@ typedef enum {
     PESTPP_RETRY = 3           /* algorithmic "no upgrade taken, try again" - not a fault */
 } pestpp_status;
 
+/* All four are driveable. What one "iteration" means differs by tool - ies solves lambdas,
+   mou runs a generation, sqp may issue several run batches while it line-searches - but the
+   calls a caller makes do not: initialize, then solve_iteration, then finalize.
+
+   PESTPP_DA runs a SINGLE cycle. pestpp-da.cpp drives a sequence of cycles, rebuilding the
+   scenario and the tool for each; that machinery is not exposed yet, so a multi-cycle control
+   file will run only its first cycle here. */
 typedef enum {
     PESTPP_IES = 0,
     PESTPP_DA  = 1,
@@ -46,7 +53,11 @@ typedef enum {
 
 /* Which ensemble to look at. The raw parameter ensemble is in whatever transform space the
    tool is currently using (usually NUM during a solve) and holds only adjustable
-   parameters - see pestpp_get_par_transform_status(). */
+   parameters - see pestpp_get_par_transform_status().
+
+   PAR/OBS mean the tool's parameter and result ensembles: pe/oe for ies and da, the decision
+   variable population dp and its results op for mou, dv/oe for sqp. NOISE and WEIGHTS exist
+   only for ies and da; asking mou or sqp for them is an error rather than an empty array. */
 typedef enum {
     PESTPP_PAR_EN     = 0,
     PESTPP_OBS_EN     = 1,
@@ -74,6 +85,26 @@ PESTPP_API const char* pestpp_last_create_error(void);
 /* ---- driving the algorithm --------------------------------------------------------- */
 
 PESTPP_API pestpp_status pestpp_initialize(pestpp_handle h);
+
+/* initialize(), split so the caller owns the prior-ensemble evaluation.
+ *
+ *     int n;
+ *     pestpp_initialize_prepare(h, &n);   // draws the ensembles; runs nothing
+ *     if (n) { queue -> begin_batch/run_slice/end_batch -> harvest }
+ *     pestpp_initialize_finish(h);        // phi, drop failures, write the .0. files
+ *
+ * `n_runs` is how many runs the caller must service. 0 is normal and needs no branch beyond
+ * skipping the batch: a restart or `ies_obs_restart_csv` supplies results instead of
+ * computing them, and mou and sqp initialize atomically and hand over nothing.
+ *
+ * The window between prepare and queue is the useful part: it is the only point at which a
+ * caller can REPLACE the drawn prior ensemble with its own - via pestpp_set_par_snapshot()
+ * or a write through the zero-copy view - and have those realizations be what gets run.
+ *
+ * Calling pestpp_solve_iteration() while a prepare is outstanding is an error: the tool
+ * would be half-initialized, its ensembles drawn but failures and phi unprocessed. */
+PESTPP_API pestpp_status pestpp_initialize_prepare(pestpp_handle h, int* n_runs);
+PESTPP_API pestpp_status pestpp_initialize_finish(pestpp_handle h);
 
 /* One iteration. Returns PESTPP_RETRY where the algorithm rejected the upgrade and wants
    another attempt with a new lambda - a distinct outcome from failure. */

@@ -26,7 +26,8 @@ import pyemu
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp_lib import (  # noqa: E402
-    PestppLib, PestppError, PAR_EN, OBS_EN, TOOL_IES, WORKER_COMPLETED,
+    PestppLib, PestppError, PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
+    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, WORKER_COMPLETED,
 )
 
 plat = "unknown"
@@ -37,11 +38,16 @@ elif "darwin" in platform.platform().lower() or "macos" in platform.platform().l
 else:
     plat = "windows"
 
-# the model binary (mfnwt) has to be findable, same as the other benchmark scripts
-os.environ["PATH"] += os.pathsep + os.path.abspath("test_bin")
-
 exe = ".exe" if plat == "windows" else ""
 _sub = {"windows": "win", "apple": "mac", "linux": "linux"}[plat]
+
+# The model binary (mfnwt) has to be findable by the forward run, and this has to be an
+# ABSOLUTE path to the platform subdirectory. CI puts "../../test_bin/<plat>" on PATH, which
+# is relative and therefore resolves against each process's cwd - it only works for case
+# directories exactly two levels below benchmarks/, which is what every other benchmark script
+# happens to use. The serial run manager runs the model from the session working directory, so
+# a case directory at any other depth silently gets "execv() failed for command: mfnwt".
+os.environ["PATH"] += os.pathsep + os.path.abspath(os.path.join("test_bin", _sub))
 
 
 def _find_agent_exe():
@@ -88,12 +94,18 @@ def _find_library():
         "(always SHARED); if this fires, the build did not produce it.".format(want, roots))
 
 
-def _setup(test_d, noptmax=1, num_reals=6):
-    """A small, fast ies case in its own directory."""
-    base_d = os.path.join("ies_10par_xsec", "template")
+# ---- case setup ---------------------------------------------------------------------------
+
+def _copy_base(test_d, base_d=os.path.join("ies_10par_xsec", "template")):
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     shutil.copytree(base_d, test_d)
+    return test_d
+
+
+def _setup(test_d, noptmax=1, num_reals=6):
+    """A small, fast ies case in its own directory."""
+    _copy_base(test_d)
     pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
     pst.control_data.noptmax = noptmax
     pst.pestpp_options["ies_num_reals"] = num_reals
@@ -101,6 +113,71 @@ def _setup(test_d, noptmax=1, num_reals=6):
     pst.write(os.path.join(test_d, "pest.pst"), version=2)
     return os.path.abspath(test_d)
 
+
+def _setup_da(test_d, noptmax=1, num_reals=6):
+    """A single-cycle da case.
+
+    Every quantity is marked cycle -1 ("all cycles"), which makes this the batch form. The
+    C ABI exposes one cycle only - see the DaAdapter comment in pestpp_capi.cpp - so a
+    multi-cycle case would not be driveable through the API yet.
+    """
+    _copy_base(test_d)
+    pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
+    for df in (pst.parameter_data, pst.observation_data,
+               pst.model_input_data, pst.model_output_data):
+        df.loc[:, "cycle"] = -1
+    pst.control_data.noptmax = noptmax
+    pst.pestpp_options["ies_num_reals"] = num_reals
+    pst.pestpp_options["da_num_reals"] = num_reals
+    pst.pestpp_options["random_seed"] = 11
+    pst.write(os.path.join(test_d, "pest.pst"), version=2)
+    return os.path.abspath(test_d)
+
+
+def _setup_sqp(test_d, noptmax=1, num_reals=8):
+    """An sqp case: one observation becomes the objective, another a constraint.
+
+    sqp refuses to initialize without a recognized constraint/objective group, so the group
+    names matter here - 'l_' marks a less-than constraint.
+    """
+    _copy_base(test_d)
+    pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
+    obs = pst.observation_data
+    obj, con = pst.nnz_obs_names[0], pst.nnz_obs_names[1]
+    obs.loc[obj, "obgnme"] = "obj_fn"
+    obs.loc[con, "obgnme"] = "l_head"
+    obs.loc[con, "obsval"] = float(obs.loc[con, "obsval"]) * 1.5
+    pst.pestpp_options["opt_obj_func"] = obj
+    # a real dv ensemble rather than a single point
+    pst.pestpp_options["sqp_num_reals"] = num_reals
+    pst.pestpp_options["random_seed"] = 11
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(test_d, "pest.pst"), version=2)
+    return os.path.abspath(test_d)
+
+
+def _setup_mou(test_d, noptmax=1, pop_size=10):
+    """A small mou case from the constr benchmark."""
+    _copy_base(test_d, os.path.join("mou_tests", "constr_template"))
+    pst = pyemu.Pst(os.path.join(test_d, "constr.pst"))
+    pst.control_data.noptmax = noptmax
+    pst.pestpp_options["mou_population_size"] = pop_size
+    pst.pestpp_options["random_seed"] = 11
+    pst.write(os.path.join(test_d, "constr.pst"), version=2)
+    return os.path.abspath(test_d)
+
+
+def _drive_batch(ies):
+    """Queue, run and harvest, with the caller owning the run loop."""
+    n_queued = ies.queue_ensemble()
+    ies.begin_batch()
+    while not ies.run_slice(0.05):
+        pass
+    ies.end_batch()
+    return n_queued
+
+
+# ---- ies ----------------------------------------------------------------------------------
 
 def capi_smoke_test():
     """The library loads, a handle runs iterations, and views are live windows on the data."""
@@ -151,16 +228,6 @@ def capi_snapshot_roundtrip_test():
         ies.set_par_snapshot(vals[perm, :], [rows[i] for i in perm], cols)
         after, _, _ = ies.get_par_snapshot()
         assert np.array_equal(vals, after), "snapshot was matched by position, not by name"
-
-
-def _drive_batch(ies):
-    """Queue, run and harvest, with the caller owning the run loop."""
-    n_queued = ies.queue_ensemble()
-    ies.begin_batch()
-    while not ies.run_slice(0.05):
-        pass
-    ies.end_batch()
-    return n_queued
 
 
 def capi_resize_between_queue_and_harvest_test():
@@ -266,6 +333,222 @@ def capi_error_reporting_test():
             assert "already queued" in str(e), str(e)
 
 
+def capi_caller_owned_initial_batch_test():
+    """The caller owns the prior-ensemble evaluation - and can replace it before it runs.
+
+    Before initialize() was split, it drew the prior ensemble and evaluated it in one
+    uninterruptible call, so the realizations that got run were always the ones pest++ drew.
+    Here the caller substitutes its own parameter values in the window between prepare and
+    queue, and the assertion is that *those* are what the model saw.
+
+    Proving it: every realization is set to identical parameter values, so every harvested
+    observation row must be identical too. With the drawn ensemble they are emphatically not
+    - the closest pair differs by ~1 in this case - so this cannot pass by accident.
+    """
+    wd = _setup("capi_init_split")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        n = ies.initialize_prepare()
+        names = ies.get_ensemble_row_names(PAR_EN)
+        assert n == len(names), (n, len(names))
+        assert n > 1, "need several realizations for this to mean anything"
+
+        # the window that did not exist before: replace the drawn prior with our own
+        vals, rows, cols = ies.get_par_snapshot()
+        mine = vals.copy()
+        mine[:, :] = vals[0, :]          # every realization identical to the first
+        ies.set_par_snapshot(mine, rows, cols)
+
+        assert ies.queue_ensemble() == n
+        ies.begin_batch()
+        while not ies.run_slice(0.05):
+            pass
+        ies.end_batch()
+        assert ies.harvest_ensemble() == 0, "runs failed on the substituted ensemble"
+        ies.initialize_finish()
+
+        # our values are what survived
+        after, _, _ = ies.get_par_snapshot()
+        assert np.allclose(after, mine), "the substituted parameter values were not kept"
+
+        # and they are what the model saw
+        oe = ies.get_ensemble_view(OBS_EN)
+        assert oe.shape[0] == n, (oe.shape, n)
+        spread = np.abs(oe - oe[0]).max()
+        assert spread < 1.0e-8, (
+            "identical parameters produced different observations (max spread {0}) - the "
+            "substituted ensemble was not the one evaluated".format(spread))
+
+        # and the tool is properly initialized: it can still take a step
+        ies.solve_iteration()
+        assert ies.get_iteration() == 1, ies.get_iteration()
+        ies.finalize()
+
+
+def capi_initialize_split_guardrails_test():
+    """A half-initialized tool refuses to be stepped, and the two halves must be paired."""
+    wd = _setup("capi_init_guard")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        try:
+            ies.initialize_finish()
+            raise AssertionError("finish without prepare should raise")
+        except PestppError as e:
+            assert "nothing to finish" in str(e), str(e)
+
+        ies.initialize_prepare()
+        try:
+            ies.initialize_prepare()
+            raise AssertionError("a second prepare should raise")
+        except PestppError as e:
+            assert "already in progress" in str(e), str(e)
+
+        # stepping a half-initialized tool would use an unevaluated ensemble
+        try:
+            ies.solve_iteration()
+            raise AssertionError("solve_iteration mid-initialization should raise")
+        except PestppError as e:
+            assert "initialization is incomplete" in str(e), str(e)
+
+
+def capi_initialize_prepare_reports_zero_test():
+    """Tools that hand over no initial batch say so, so callers need no special-casing.
+
+    mou evaluates several populations inside initialize() and sqp's only batch there is a
+    single control-file-values run, so neither exposes a caller-owned batch. Both must report
+    0 rather than leaving a caller to discover it.
+    """
+    for tool, wd, pst_name, tag in (
+            (TOOL_MOU, _setup_mou("capi_init_mou"), "constr.pst", "mou"),
+            (TOOL_SQP, _setup_sqp("capi_init_sqp"), "pest.pst", "sqp")):
+        with PestppLib(_find_library(), tool, pst_name, wd) as t:
+            assert t.initialize_prepare() == 0, "{0} should report no caller-owned batch".format(tag)
+            t.initialize_finish()
+            # still fully initialized: it can take a step
+            t.solve_iteration()
+            assert t.get_iteration() > 0, tag
+
+
+# ---- da, mou, sqp -------------------------------------------------------------------------
+
+def _drive_tool(tool, wd, pst_name, tag):
+    """The caller-owned loop, for any tool: initialize, queue, run, harvest, advance.
+
+    Every tool is driven through the same entry points. That is the point of the API - the
+    differences between ies, da, mou and sqp live behind pestpp_solve_iteration(), not in
+    the shape of the calls a caller has to make.
+    """
+    with PestppLib(_find_library(), tool, pst_name, wd) as t:
+        t.initialize()
+
+        pe = t.get_ensemble_view(PAR_EN)
+        oe = t.get_ensemble_view(OBS_EN)
+        pnames = t.get_ensemble_row_names(PAR_EN)
+        assert pe.shape[0] > 0, "{0}: empty parameter ensemble".format(tag)
+        assert pe.shape == (len(pnames), len(t.get_ensemble_col_names(PAR_EN))), \
+            "{0}: par view {1} disagrees with its name lists".format(tag, pe.shape)
+        assert pe.flags["F_CONTIGUOUS"], "{0}: par view is not column-major".format(tag)
+        assert oe.shape[0] == pe.shape[0], \
+            "{0}: par/obs ensembles disagree on size ({1} vs {2})".format(tag, pe.shape, oe.shape)
+
+        # the caller owns the run loop
+        n_queued = t.queue_ensemble()
+        assert n_queued == pe.shape[0], (tag, n_queued, pe.shape[0])
+        t.begin_batch()
+        while not t.run_slice(0.05):
+            pass
+        t.end_batch()
+        n_failed = t.harvest_ensemble()
+        assert n_failed == 0, "{0}: {1} runs failed".format(tag, n_failed)
+
+        oe = t.get_ensemble_view(OBS_EN)
+        assert np.isfinite(oe).all(), "{0}: harvested obs ensemble has non-finite values".format(tag)
+
+        # and one algorithm step through the same entry point every tool uses
+        before = t.get_iteration()
+        t.solve_iteration()
+        assert t.get_iteration() > before, \
+            "{0}: iteration counter did not advance ({1} -> {2})".format(
+                tag, before, t.get_iteration())
+        t.finalize()
+
+
+def capi_da_test():
+    """da, single cycle, driven through the caller-owned loop."""
+    _drive_tool(TOOL_DA, _setup_da("capi_da"), "pest.pst", "da")
+
+
+def capi_sqp_test():
+    """sqp, driven through the caller-owned loop."""
+    _drive_tool(TOOL_SQP, _setup_sqp("capi_sqp"), "pest.pst", "sqp")
+
+
+def capi_mou_test():
+    """mou, driven through the caller-owned loop - a generation rather than an iteration."""
+    _drive_tool(TOOL_MOU, _setup_mou("capi_mou"), "constr.pst", "mou")
+
+
+def capi_da_resize_between_queue_and_harvest_test():
+    """The resize guard, for da.
+
+    da shares EnsembleMethod's queue/harvest with ies, so the same misattribution is possible
+    and the same reference comparison catches it.
+    """
+    wd = _setup_da("capi_da_resize")
+    with PestppLib(_find_library(), TOOL_DA, "pest.pst", wd) as t:
+        t.initialize()
+        names = t.get_ensemble_row_names(PAR_EN)
+        assert len(names) >= 4, "need a few realizations for this to mean anything"
+
+        assert _drive_batch(t) == len(names)
+        assert t.harvest_ensemble() == 0, "da reference pass had failed runs"
+        oe_names = t.get_ensemble_row_names(OBS_EN)
+        ref_oe = t.get_ensemble_view(OBS_EN)
+        reference = {n: ref_oe[i].copy() for i, n in enumerate(oe_names)}
+        closest = min(np.abs(ref_oe[i] - ref_oe[j]).max()
+                      for i in range(len(oe_names)) for j in range(i + 1, len(oe_names)))
+        assert closest > 1.0e-6, \
+            "da realizations are indistinguishable, so this test proves nothing"
+
+        assert _drive_batch(t) == len(names)
+        victim = names[1]
+        t.drop_realizations([victim])
+        assert victim not in t.get_ensemble_row_names(PAR_EN)
+        assert t.harvest_ensemble() == 0
+
+        oe = t.get_ensemble_view(OBS_EN)
+        surviving = t.get_ensemble_row_names(OBS_EN)
+        for i, name in enumerate(surviving):
+            assert np.allclose(oe[i], reference[name]), (
+                "da realization '{0}' did not get its own results back after the resize - "
+                "runs are being mapped by position, not by name".format(name))
+
+
+def capi_tool_ensemble_availability_test():
+    """Each tool reports only the ensembles it actually has, rather than inventing them.
+
+    ies and da carry a noise ensemble and a weights ensemble; mou and sqp do not. Asking for
+    one that does not exist must say so, not hand back an empty array that reads as real.
+    """
+    cases = [
+        (TOOL_MOU, _setup_mou("capi_avail_mou"), "constr.pst", "mou"),
+        (TOOL_SQP, _setup_sqp("capi_avail_sqp"), "pest.pst", "sqp"),
+    ]
+    for tool, wd, pst_name, tag in cases:
+        with PestppLib(_find_library(), tool, pst_name, wd) as t:
+            t.initialize()
+            # the two it does have
+            assert t.get_ensemble_view(PAR_EN).shape[0] > 0, tag
+            assert t.get_ensemble_view(OBS_EN).shape[0] > 0, tag
+            for missing in (NOISE_EN, WEIGHTS_EN):
+                try:
+                    t.get_ensemble_view(missing)
+                    raise AssertionError(
+                        "{0} should not report an ensemble id {1}".format(tag, missing))
+                except PestppError as e:
+                    assert "has no ensemble" in str(e), str(e)
+
+
+# ---- panther ------------------------------------------------------------------------------
+
 def capi_panther_control_test():
     """Watch and cancel runs mid-batch against a real PANTHER master.
 
@@ -285,8 +568,11 @@ def capi_panther_control_test():
         with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=port) as ies:
             assert ies.supports_live_control(), "panther master denied live control"
 
-            # workers must be up before initialize(): it evaluates the prior ensemble, and
-            # with no workers the master waits for them forever
+            # Workers are started here only because this driver is single-threaded. The
+            # master accepts connections at any time - run_slice() calls init_agents() on
+            # every slice, so workers may join mid-batch just as they do for the executables.
+            # But initialize() blocks while it evaluates the prior ensemble, so a start call
+            # placed after it would never be reached.
             for i in range(n_workers):
                 d = os.path.join(worker_root, "worker_{0}".format(i))
                 shutil.copytree(wd, d)
@@ -355,5 +641,13 @@ if __name__ == "__main__":
     capi_snapshot_roundtrip_test()
     capi_resize_between_queue_and_harvest_test()
     capi_error_reporting_test()
+    capi_caller_owned_initial_batch_test()
+    capi_initialize_split_guardrails_test()
+    capi_initialize_prepare_reports_zero_test()
+    capi_da_test()
+    capi_sqp_test()
+    capi_mou_test()
+    capi_da_resize_between_queue_and_harvest_test()
+    capi_tool_ensemble_availability_test()
     capi_panther_control_test()
     print("all capi tests passed")

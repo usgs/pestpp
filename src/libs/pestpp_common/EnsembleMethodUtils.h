@@ -548,6 +548,11 @@ public:
 	FileManager& get_file_manager() { return file_manager; }
 	Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	
+	// initialize() splits at the prior-ensemble evaluation so a caller can own that batch -
+	// and, more usefully, substitute its own prior ensemble before it is ever run.
+	// initialize() is the in-tree composition of the two halves.
+	int  initialize_prepare(int cycle = NetPackage::NULL_DA_CYCLE, bool run = true, bool use_existing=false);
+	void initialize_finish(int cycle = NetPackage::NULL_DA_CYCLE);
 	void initialize(int cycle = NetPackage::NULL_DA_CYCLE, bool run = true, bool use_existing=false);
 
 	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
@@ -650,6 +655,9 @@ protected:
 	int warn_min_reals, error_min_reals;
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
+	// carried from initialize_prepare() to initialize_finish(); meaningless outside that window
+	vector<string> init_pnames, init_onames;
+	bool init_needs_finish = false;
 	vector<string> violation_obs;
 	ParameterEnsemble pe, pe_base;
 	ObservationEnsemble oe, oe_base, weights, weights_base;

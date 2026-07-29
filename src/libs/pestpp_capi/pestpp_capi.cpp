@@ -19,6 +19,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <algorithm>
 #include <iostream>
 #include <filesystem>
 
@@ -29,6 +30,9 @@
 #include "RunManagerSerial.h"
 #include "RunManagerPanther.h"
 #include "EnsembleSmoother.h"
+#include "DataAssimilator.h"
+#include "MOEA.h"
+#include "SQP.h"
 #include "utilities.h"
 #include "system_variables.h"
 
@@ -37,6 +41,40 @@ using namespace std;
 const int PESTPP_NAME_LEN = 200;
 
 namespace {
+
+/** What the C ABI needs from a tool, independent of which tool it is.
+ *
+ * The four tools do not share a base class - ies and da derive from EnsembleMethod, mou and
+ * sqp are their own - and their iteration shapes genuinely differ: ies solves lambdas, mou
+ * runs a generation, sqp may issue several run batches per iteration while it line-searches.
+ * Rather than force a common base onto the algorithms, the integration layer adapts them.
+ * Anything a tool cannot do throws with a message saying so.
+ */
+struct ToolAdapter
+{
+    virtual ~ToolAdapter() {}
+
+    virtual void initialize() = 0;
+    /// First half of initialize(), returning how many runs the caller must service before
+    /// initialize_finish(). 0 means none - either the tool supplies results instead of
+    /// computing them, or this tool initializes atomically and has no batch to hand over.
+    virtual int  initialize_prepare() = 0;
+    virtual void initialize_finish() = 0;
+    /// One iteration/generation. Returns PESTPP_RETRY when the step was rejected and the
+    /// algorithm wants another attempt - an outcome, not a fault.
+    virtual pestpp_status advance() = 0;
+    virtual void finalize() = 0;
+    virtual int  iteration() = 0;   // not const: EnsembleMethod::get_iter() is not const
+    virtual bool should_terminate() = 0;
+
+    /// The live ensemble for a pestpp_ensemble_id, or null if this tool has no such thing.
+    virtual Ensemble* ensemble(int id) = 0;
+    /// The parameter-side ensemble, used for queue/harvest and the CTL snapshot.
+    virtual ParameterEnsemble* par_ensemble() = 0;
+    virtual ObservationEnsemble* obs_ensemble() = 0;
+
+    virtual const char* name() const = 0;
+};
 
 /** One PEST++ session: scenario, io, run manager and tool, with a stable lifetime. */
 struct PestppSession
@@ -51,15 +89,181 @@ struct PestppSession
     unique_ptr<ofstream>          rmr_stream;   // panther master log; unused when serial
     unique_ptr<PerformanceLog>    performance_log;
     unique_ptr<Pest>              pest_scenario;
+    // da only: the per-cycle scenario. da's parameter and observation sets are cycle
+    // dependent, so the tool must be built against the child, not the parent.
+    unique_ptr<Pest>              child_scenario;
     unique_ptr<OutputFileWriter>  output_file_writer;
     unique_ptr<RunManagerAbstract> run_manager;
-    unique_ptr<IterEnsembleSmoother> ies;
+    unique_ptr<ToolAdapter>       adapter;
 
     bool initialized = false;
+    // set between initialize_prepare() and initialize_finish(): the tool is half-initialized,
+    // its ensembles drawn but the prior results not yet processed
+    bool init_pending = false;
     // runs queued by pestpp_queue_ensemble(), awaiting pestpp_harvest_ensemble(). keyed by
     // realization name, which is what lets membership change while they are in flight.
     map<string,int> pending_runs;
     bool pending_runs_valid = false;
+};
+
+/** ies: begin_iteration -> solve (glm or mda) -> end_iteration. */
+struct IesAdapter : public ToolAdapter
+{
+    IterEnsembleSmoother tool;
+    Pest& scen;
+    IesAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
+               RunManagerAbstract* rm)
+        : tool(p, fm, ofw, pl, rm), scen(p) {}
+
+    void initialize() override { tool.initialize(); }
+    int  initialize_prepare() override { return tool.initialize_prepare(); }
+    void initialize_finish() override { tool.initialize_finish(); }
+    pestpp_status advance() override
+    {
+        bool use_mda = scen.get_pestpp_options().get_ies_use_mda();
+        tool.begin_iteration();
+        UpgradeStatus st = use_mda ? tool.solve_mda(false) : tool.solve_glm();
+        tool.end_iteration();
+        return (st == UpgradeStatus::REJECTED_RETRY) ? PESTPP_RETRY : PESTPP_OK;
+    }
+    void finalize() override { tool.finalize(); }
+    int  iteration() override { return tool.get_iter(); }
+    bool should_terminate() override { return tool.should_terminate(); }
+    Ensemble* ensemble(int id) override
+    {
+        switch (id)
+        {
+        case PESTPP_PAR_EN:     return tool.get_pe_ptr();
+        case PESTPP_OBS_EN:     return tool.get_oe_ptr();
+        case PESTPP_NOISE_EN:   return tool.get_noise_oe_ptr();
+        case PESTPP_WEIGHTS_EN: return tool.get_weights_ptr();
+        default: return nullptr;
+        }
+    }
+    ParameterEnsemble* par_ensemble() override { return tool.get_pe_ptr(); }
+    ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    const char* name() const override { return "ies"; }
+};
+
+/** da, single cycle.
+ *
+ * pestpp-da.cpp drives a sequence of cycles, building a fresh child scenario and a fresh
+ * DataAssimilator for each one. That cycle machinery is not exposed here: this adapter runs
+ * one cycle, which is what a caller experimenting with the update itself wants. Driving the
+ * whole cycle sequence through the API needs child-scenario construction and per-cycle run
+ * manager re-initialization, and is deliberately left out rather than half-done.
+ */
+struct DaAdapter : public ToolAdapter
+{
+    DataAssimilator tool;
+    int cycle;
+    DaAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
+              RunManagerAbstract* rm, int _cycle)
+        : tool(p, fm, ofw, pl, rm), cycle(_cycle) {}
+
+    void initialize() override { tool.initialize(cycle, true, false); }
+    int  initialize_prepare() override { return tool.initialize_prepare(cycle, true, false); }
+    void initialize_finish() override { tool.initialize_finish(cycle); }
+    pestpp_status advance() override { tool.da_update(cycle); return PESTPP_OK; }
+    void finalize() override { tool.finalize(); }
+    int  iteration() override { return tool.get_iter(); }
+    bool should_terminate() override { return tool.should_terminate(); }
+    Ensemble* ensemble(int id) override
+    {
+        switch (id)
+        {
+        case PESTPP_PAR_EN:     return tool.get_pe_ptr();
+        case PESTPP_OBS_EN:     return tool.get_oe_ptr();
+        case PESTPP_NOISE_EN:   return tool.get_noise_oe_ptr();
+        case PESTPP_WEIGHTS_EN: return tool.get_weights_ptr();
+        default: return nullptr;
+        }
+    }
+    ParameterEnsemble* par_ensemble() override { return tool.get_pe_ptr(); }
+    ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    const char* name() const override { return "da"; }
+};
+
+/** mou: one generation is generate -> run -> evaluate -> report over a GenerationContext. */
+struct MouAdapter : public ToolAdapter
+{
+    MOEA tool;
+    Pest& scen;
+    int iter = 0;
+    MouAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
+               RunManagerAbstract* rm)
+        : tool(p, fm, ofw, pl, rm), scen(p) {}
+
+    void initialize() override { tool.initialize(); }
+    // mou's initialize() issues several population evaluations rather than one, so there is
+    // no single batch to hand to a caller; it initializes atomically.
+    int  initialize_prepare() override { tool.initialize(); return 0; }
+    void initialize_finish() override {}
+    pestpp_status advance() override
+    {
+        // one generation, phase by phase - the same four calls, on the same generator, that
+        // iterate_to_solution() makes. the context is per-generation and non-copyable.
+        GenerationContext ctx(&scen, tool.get_rand_gen_ptr());
+        tool.generate_generation(ctx);
+        tool.run_generation(ctx);
+        tool.evaluate_generation(ctx);
+        tool.report_generation(ctx);
+        iter++;
+        return PESTPP_OK;
+    }
+    void finalize() override { tool.finalize(); }
+    int  iteration() override { return iter; }
+    // mou has no convergence test - it runs the generations it was asked for
+    bool should_terminate() override { return iter >= scen.get_control_info().noptmax; }
+    Ensemble* ensemble(int id) override
+    {
+        switch (id)
+        {
+        case PESTPP_PAR_EN: return tool.get_dp_ptr();
+        case PESTPP_OBS_EN: return tool.get_op_ptr();
+        default: return nullptr;   // mou has no noise/weights ensembles
+        }
+    }
+    ParameterEnsemble* par_ensemble() override { return tool.get_dp_ptr(); }
+    ObservationEnsemble* obs_ensemble() override { return tool.get_op_ptr(); }
+    const char* name() const override { return "mou"; }
+};
+
+/** sqp: one iteration is solve_new_ensemble(), which may issue several run batches. */
+struct SqpAdapter : public ToolAdapter
+{
+    SeqQuadProgram tool;
+    int iter = 0;
+    SqpAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
+               RunManagerAbstract* rm)
+        : tool(p, fm, ofw, pl, rm) {}
+
+    void initialize() override { tool.initialize(); }
+    // sqp's only batch inside initialize() is a single control-file-values run, not an
+    // ensemble draw, so there is nothing worth handing over; it initializes atomically.
+    int  initialize_prepare() override { tool.initialize(); return 0; }
+    void initialize_finish() override {}
+    pestpp_status advance() override
+    {
+        iter++;
+        // false means the step was not accepted - an outcome, like ies REJECTED_RETRY
+        return tool.solve_new_ensemble() ? PESTPP_OK : PESTPP_RETRY;
+    }
+    void finalize() override { tool.finalize(); }
+    int  iteration() override { return iter; }
+    bool should_terminate() override { return tool.should_terminate(); }
+    Ensemble* ensemble(int id) override
+    {
+        switch (id)
+        {
+        case PESTPP_PAR_EN: return tool.get_dv_ptr();
+        case PESTPP_OBS_EN: return tool.get_oe_ptr();
+        default: return nullptr;   // sqp has no noise/weights ensembles
+        }
+    }
+    ParameterEnsemble* par_ensemble() override { return tool.get_dv_ptr(); }
+    ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    const char* name() const override { return "sqp"; }
 };
 
 string g_create_error;
@@ -147,8 +351,15 @@ static pestpp_status create_session(int tool, const char* ctl_file, const char* 
         s->working_dir = (working_dir == nullptr) ? string() : string(working_dir);
         ScopedWorkingDir swd(s->working_dir);
 
-        if (s->tool != PESTPP_IES)
-            throw runtime_error("only PESTPP_IES is wired up in this skeleton");
+        PestppOptions::ToolType tool_type;
+        switch (s->tool)
+        {
+        case PESTPP_IES: tool_type = PestppOptions::ToolType::IES; break;
+        case PESTPP_DA:  tool_type = PestppOptions::ToolType::DA;  break;
+        case PESTPP_MOU: tool_type = PestppOptions::ToolType::MOU; break;
+        case PESTPP_SQP: tool_type = PestppOptions::ToolType::SQP; break;
+        default: throw runtime_error("unknown tool id");
+        }
 
         string ctl(ctl_file);
         string base = pest_utils::get_filename_without_ext(ctl);
@@ -168,14 +379,18 @@ static pestpp_status create_session(int tool, const char* ctl_file, const char* 
         // follow pestpp-ies.cpp's order exactly: closing the pst stream and running the
         // scenario report are part of how the scenario gets fully realized
         s->file_manager->close_file("pst");
+        // da assigns per-cycle metadata to parameters/observations/interface files straight
+        // after parsing (pestpp-da.cpp does this before anything else). Without it every
+        // cycle filter is empty and get_child_pest() yields a scenario with no tpl files.
+        if (s->tool == PESTPP_DA)
+            s->pest_scenario->assign_da_cycles(fout_rec);
         s->pest_scenario->check_inputs(fout_rec);
         s->pest_scenario->get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
         s->output_file_writer.reset(new OutputFileWriter(*s->file_manager, *s->pest_scenario, false));
         s->output_file_writer->scenario_report(fout_rec, false);
 
-        s->pest_scenario->get_pestpp_options_ptr()->apply_tool_defaults(
-            PestppOptions::ToolType::IES, fout_rec);
+        s->pest_scenario->get_pestpp_options_ptr()->apply_tool_defaults(tool_type, fout_rec);
 
         s->pest_scenario->check_io(fout_rec);
         const ModelExecInfo& exi = s->pest_scenario->get_model_exec_info();
@@ -213,9 +428,32 @@ static pestpp_status create_session(int tool, const char* ctl_file, const char* 
                                        s->pest_scenario->get_ctl_observations());
         }
 
-        s->ies.reset(new IterEnsembleSmoother(*s->pest_scenario, *s->file_manager,
-                                              *s->output_file_writer, s->performance_log.get(),
-                                              s->run_manager.get()));
+        Pest& scen = *s->pest_scenario;
+        FileManager& fm = *s->file_manager;
+        OutputFileWriter& ofw = *s->output_file_writer;
+        PerformanceLog* pl = s->performance_log.get();
+        RunManagerAbstract* rm = s->run_manager.get();
+        switch (s->tool)
+        {
+        case PESTPP_IES: s->adapter.reset(new IesAdapter(scen, fm, ofw, pl, rm)); break;
+        case PESTPP_DA:
+        {
+            // da's parameter/observation sets are cycle dependent, so the tool has to be
+            // built against the child scenario for the cycle, exactly as pestpp-da.cpp does.
+            // Cycle 0 only - see DaAdapter for why the cycle sequence is not exposed.
+            vector<int> cycles_in_tables;
+            vector<int> cycles = scen.get_assim_dci_cycles(fout_rec, cycles_in_tables);
+            int cycle = cycles.empty() ? 0 : *min_element(cycles.begin(), cycles.end());
+            s->child_scenario.reset(new Pest(scen.get_child_pest(cycle)));
+            s->child_scenario->check_inputs(fout_rec, false, true, cycle);
+            s->child_scenario->check_io(fout_rec);
+            s->adapter.reset(new DaAdapter(*s->child_scenario, fm, ofw, pl, rm, cycle));
+            break;
+        }
+        case PESTPP_MOU: s->adapter.reset(new MouAdapter(scen, fm, ofw, pl, rm)); break;
+        case PESTPP_SQP: s->adapter.reset(new SqpAdapter(scen, fm, ofw, pl, rm)); break;
+        default: throw runtime_error("unknown tool id");
+        }
     }
     catch (const std::exception& e) { g_create_error = e.what(); return PESTPP_ERROR; }
     catch (...) { g_create_error = "unknown error in pestpp_create"; return PESTPP_ERROR; }
@@ -262,7 +500,34 @@ const char* pestpp_last_create_error(void) { return g_create_error.c_str(); }
 pestpp_status pestpp_initialize(pestpp_handle h)
 {
     CAPI_BEGIN(h)
-        s->ies->initialize();
+        s->adapter->initialize();
+        s->initialized = true;
+        s->init_pending = false;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_initialize_prepare(pestpp_handle h, int* n_runs)
+{
+    CAPI_BEGIN(h)
+        if (s->init_pending)
+            throw runtime_error("initialization is already in progress; call "
+                                "pestpp_initialize_finish() before preparing again");
+        int n = s->adapter->initialize_prepare();
+        s->init_pending = true;
+        if (n_runs != nullptr)
+            *n_runs = n;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_initialize_finish(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        if (!s->init_pending)
+            throw runtime_error("nothing to finish; call pestpp_initialize_prepare() first");
+        s->adapter->initialize_finish();
+        s->init_pending = false;
         s->initialized = true;
         return PESTPP_OK;
     CAPI_END()
@@ -271,21 +536,20 @@ pestpp_status pestpp_initialize(pestpp_handle h)
 pestpp_status pestpp_solve_iteration(pestpp_handle h)
 {
     CAPI_BEGIN(h)
+        if (s->init_pending)
+            throw runtime_error("initialization is incomplete: pestpp_initialize_finish() has "
+                                "not been called since pestpp_initialize_prepare()");
         if (!s->initialized)
             throw runtime_error("pestpp_initialize() must be called before pestpp_solve_iteration()");
-        bool use_mda = s->pest_scenario->get_pestpp_options().get_ies_use_mda();
-        s->ies->begin_iteration();
-        UpgradeStatus st = use_mda ? s->ies->solve_mda(false) : s->ies->solve_glm();
-        s->ies->end_iteration();
-        // REJECTED_RETRY is an algorithmic outcome, not a fault - surface it as its own code
-        return (st == UpgradeStatus::REJECTED_RETRY) ? PESTPP_RETRY : PESTPP_OK;
+        // each tool's own notion of one step; RETRY is an algorithmic outcome, not a fault
+        return s->adapter->advance();
     CAPI_END()
 }
 
 pestpp_status pestpp_finalize(pestpp_handle h)
 {
     CAPI_BEGIN(h)
-        s->ies->finalize();
+        s->adapter->finalize();
         return PESTPP_OK;
     CAPI_END()
 }
@@ -294,7 +558,7 @@ pestpp_status pestpp_get_iteration(pestpp_handle h, int* iter)
 {
     CAPI_BEGIN(h)
         if (iter == nullptr) throw runtime_error("null out-param");
-        *iter = s->ies->get_iter();
+        *iter = s->adapter->iteration();
         return PESTPP_OK;
     CAPI_END()
 }
@@ -303,7 +567,7 @@ pestpp_status pestpp_should_terminate(pestpp_handle h, int* out)
 {
     CAPI_BEGIN(h)
         if (out == nullptr) throw runtime_error("null out-param");
-        *out = s->ies->should_terminate() ? 1 : 0;
+        *out = s->adapter->should_terminate() ? 1 : 0;
         return PESTPP_OK;
     CAPI_END()
 }
@@ -313,14 +577,13 @@ namespace {
 /** Resolve an ensemble id to the live object on the tool. */
 Ensemble* pick_ensemble(PestppSession* s, int id)
 {
-    switch (id)
-    {
-    case PESTPP_PAR_EN:     return s->ies->get_pe_ptr();
-    case PESTPP_OBS_EN:     return s->ies->get_oe_ptr();
-    case PESTPP_NOISE_EN:   return s->ies->get_noise_oe_ptr();
-    case PESTPP_WEIGHTS_EN: return s->ies->get_weights_ptr();
-    default: throw runtime_error("unknown ensemble id");
-    }
+    if ((id < PESTPP_PAR_EN) || (id > PESTPP_WEIGHTS_EN))
+        throw runtime_error("unknown ensemble id");
+    Ensemble* e = s->adapter->ensemble(id);
+    if (e == nullptr)
+        throw runtime_error(string("tool '") + s->adapter->name() +
+                            "' has no ensemble with that id");
+    return e;
 }
 
 /** Pack names as fixed-width space-padded blocks, MODFLOW-6 style. */
@@ -382,7 +645,7 @@ pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* tstat)
 {
     CAPI_BEGIN(h)
         if (tstat == nullptr) throw runtime_error("null out-param");
-        *tstat = (int)s->ies->get_pe_ptr()->get_trans_status();
+        *tstat = (int)s->adapter->par_ensemble()->get_trans_status();
         return PESTPP_OK;
     CAPI_END()
 }
@@ -659,7 +922,7 @@ pestpp_status pestpp_queue_ensemble(pestpp_handle h, int* n_queued)
             throw runtime_error("runs are already queued; harvest them before queueing again");
         s->pending_runs = queue_ensemble_util(s->performance_log.get(),
                                               s->file_manager->rec_ofstream(),
-                                              *s->ies->get_pe_ptr(), s->run_manager.get());
+                                              *s->adapter->par_ensemble(), s->run_manager.get());
         s->pending_runs_valid = true;
         if (n_queued != nullptr)
             *n_queued = (int)s->pending_runs.size();
@@ -674,7 +937,7 @@ pestpp_status pestpp_harvest_ensemble(pestpp_handle h, int* n_failed)
             throw runtime_error("no queued runs to harvest; call pestpp_queue_ensemble first");
         vector<int> failed = harvest_ensemble_util(s->performance_log.get(),
                                                    s->file_manager->rec_ofstream(),
-                                                   *s->ies->get_pe_ptr(), *s->ies->get_oe_ptr(),
+                                                   *s->adapter->par_ensemble(), *s->adapter->obs_ensemble(),
                                                    s->run_manager.get(), false, vector<int>(),
                                                    s->pending_runs);
         // clear even on the way out, so a failed harvest cannot leave a stale map behind
@@ -693,8 +956,8 @@ namespace {
 /** Apply a keep-list to every coupled ensemble at once, pairing obs rows by position. */
 void keep_across_coupled(PestppSession* s, const vector<string>& par_keep)
 {
-    ParameterEnsemble* pe = s->ies->get_pe_ptr();
-    ObservationEnsemble* oe = s->ies->get_oe_ptr();
+    ParameterEnsemble* pe = s->adapter->par_ensemble();
+    ObservationEnsemble* oe = s->adapter->obs_ensemble();
     vector<string> pnames = pe->get_real_names(), onames = oe->get_real_names();
 
     map<string,int> pos;
@@ -718,10 +981,11 @@ void keep_across_coupled(PestppSession* s, const vector<string>& par_keep)
     pe->keep_rows(keep_p, true);
     oe->keep_rows(keep_o);
     // noise and weights are obs-side and may legitimately be absent (ies_no_noise)
-    ObservationEnsemble* noise = s->ies->get_noise_oe_ptr();
-    ObservationEnsemble* wts = s->ies->get_weights_ptr();
-    if (noise->shape().first > 0) noise->keep_rows(keep_o);
-    if (wts->shape().first > 0)   wts->keep_rows(keep_o);
+    // mou and sqp have neither; ies/da may legitimately have them empty (ies_no_noise)
+    Ensemble* noise = s->adapter->ensemble(PESTPP_NOISE_EN);
+    Ensemble* wts = s->adapter->ensemble(PESTPP_WEIGHTS_EN);
+    if ((noise != nullptr) && (noise->shape().first > 0)) noise->keep_rows(keep_o);
+    if ((wts != nullptr) && (wts->shape().first > 0))     wts->keep_rows(keep_o);
 }
 
 } // namespace
@@ -742,7 +1006,7 @@ pestpp_status pestpp_drop_realizations(pestpp_handle h, const char* names, int n
         if ((names == nullptr) || (n <= 0))
             throw runtime_error("pestpp_drop_realizations needs at least one name");
         vector<string> drop = unpack_names(names, n);
-        vector<string> current = s->ies->get_pe_ptr()->get_real_names();
+        vector<string> current = s->adapter->par_ensemble()->get_real_names();
         set<string> present(current.begin(), current.end());
         // name a bad request rather than silently dropping fewer than asked
         for (auto& nm : drop)
@@ -765,7 +1029,7 @@ pestpp_status pestpp_get_par_snapshot(pestpp_handle h, double* data, int max_nro
                                       int* nrow, int* ncol, char* row_names, char* col_names)
 {
     CAPI_BEGIN(h)
-        ParameterSnapshot snap = s->ies->get_pe_ptr()->get_ctl_snapshot();
+        ParameterSnapshot snap = s->adapter->par_ensemble()->get_ctl_snapshot();
         int nr = (int)snap.values.rows(), nc = (int)snap.values.cols();
         if (nrow != nullptr) *nrow = nr;
         if (ncol != nullptr) *ncol = nc;
@@ -802,7 +1066,7 @@ pestpp_status pestpp_set_par_snapshot(pestpp_handle h, const double* data, int n
         for (int j = 0; j < ncol; j++)
             for (int i = 0; i < nrow; i++)
                 snap.values(i, j) = data[i + (j * nrow)];
-        s->ies->get_pe_ptr()->set_from_ctl_snapshot(snap);
+        s->adapter->par_ensemble()->set_from_ctl_snapshot(snap);
         return PESTPP_OK;
     CAPI_END()
 }

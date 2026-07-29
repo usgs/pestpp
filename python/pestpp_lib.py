@@ -105,6 +105,11 @@ class PestppLib:
         lib.pestpp_last_create_error.argtypes = ()
         lib.pestpp_last_create_error.restype = c_char_p
 
+        lib.pestpp_initialize_prepare.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_initialize_prepare.restype = c_int
+        lib.pestpp_initialize_finish.argtypes = (c_void_p,)
+        lib.pestpp_initialize_finish.restype = c_int
+
         for name in ("pestpp_initialize", "pestpp_solve_iteration", "pestpp_finalize"):
             getattr(lib, name).argtypes = (c_void_p,)
             getattr(lib, name).restype = c_int
@@ -202,6 +207,24 @@ class PestppLib:
 
     def initialize(self) -> None:
         self._check(self.lib.pestpp_initialize(self.handle), "pestpp_initialize")
+
+    def initialize_prepare(self) -> int:
+        """Draw the ensembles without running them.
+
+        Returns how many runs the caller must service before initialize_finish(). 0 means
+        none -- a restart supplies results instead, or the tool initializes atomically.
+
+        Between this call and queue_ensemble() is the only point at which the prior ensemble
+        can be replaced with your own; see set_par_snapshot().
+        """
+        n = c_int()
+        self._check(self.lib.pestpp_initialize_prepare(self.handle, byref(n)),
+                    "pestpp_initialize_prepare")
+        return n.value
+
+    def initialize_finish(self) -> None:
+        """Process the prior-ensemble results: phi, drop failures, write the .0. files."""
+        self._check(self.lib.pestpp_initialize_finish(self.handle), "pestpp_initialize_finish")
 
     def solve_iteration(self) -> int:
         """Run one iteration. Returns PESTPP_OK or PESTPP_RETRY."""

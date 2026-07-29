@@ -5052,8 +5052,26 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 }
 
 
-void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
+/**
+ * @brief First half of initialize(): everything up to evaluating the prior ensemble.
+ *
+ * Paired with initialize_finish(). Splitting here is what lets a caller own the initial
+ * batch - drive it in slices, watch it, cancel it - and, more usefully, replace the drawn
+ * prior ensemble with its own before it is ever run. initialize() below is the in-tree
+ * composition of the two, so the shipped loop exercises the same seam an api caller does.
+ *
+ * @return how many model runs the caller must service before calling initialize_finish().
+ *         0 means there are none: a restart or use_existing supplies results instead of
+ *         computing them, or one of the early-exit paths (noptmax=0, `ies_run_realname`,
+ *         run=false, debug_parse_only) already finished the job.
+ */
+int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
 {
+	// reset the state that crosses into initialize_finish(); it is meaningless outside the
+	// prepare -> finish window
+	init_needs_finish = false;
+	init_pnames.clear();
+	init_onames.clear();
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
@@ -5070,7 +5088,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
         if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
-            return;
+            return 0;
         }
 
         ParamTransformSeq pts = pe.get_par_transform();
@@ -5236,7 +5254,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 
 
-		return;
+		return 0;
 	}
 
 	//set some defaults
@@ -5737,7 +5755,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     if (pest_scenario.get_control_info().noptmax == -2)
     {
         if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
-            return;
+            return 0;
         }
         string rname = ppo->get_ies_run_realname();
         string org_rname = rname;
@@ -5872,11 +5890,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         //transfer_dynamic_state_from_oe_to_initial_pe(_pe, _oe);
         pe = _pe;
         oe = _oe;
-        return;
+        return 0;
     }
 
 	if (!run)
-		return;
+		return 0;
 
 	//check for center on 
 	if (center_on.size() > 0)
@@ -5903,7 +5921,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	else
 		message(1, "centering on ensemble mean vector");
     if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
-        return;
+        return 0;
     }
 
 	int reinflate_num_reals = pest_scenario.get_pestpp_options().get_ies_reinflate_num_reals()[0];
@@ -5975,14 +5993,48 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 
 
+
     //ok, now run the prior ensemble - after checking for center_on
 	//in case something is wrong with center_on
+	init_needs_finish = true;
 	if ((obs_restart_csv.size() == 0) && (!use_existing)) {
         performance_log->log_event("running initial ensemble");
         message(1, "running initial ensemble of size", oe.shape().first);
         //get these here so we can use them later for reporting since pe and oe have fails dropped...
-        vector<string> pnames = pe.get_real_names(),onames = oe.get_real_names();
-        vector<int> failed = run_ensemble(pe, oe, vector<int>(), cycle);
+        init_pnames = pe.get_real_names();
+        init_onames = oe.get_real_names();
+        return (int)pe.shape().first;
+	}
+	return 0;
+}
+
+/**
+ * @brief Second half of initialize(): make sense of the prior-ensemble results.
+ *
+ * Assumes the runs counted by initialize_prepare() have been made, by whatever means. A
+ * no-op when prepare() reported nothing to finish.
+ */
+void EnsembleMethod::initialize_finish(int cycle)
+{
+	if (!init_needs_finish)
+		return;
+	init_needs_finish = false;
+	stringstream ss;
+	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+
+	if (init_pnames.size() > 0)
+	{
+		// Which realizations are gone is recomputed here rather than being handed in, so that
+		// finish() does not care whether the runs were made by run_ensemble() or by an api
+		// caller driving queue/harvest itself. Walking init_pnames in order yields ascending
+		// indices, matching what run_ensemble() used to return.
+		vector<string> cur_pnames = pe.get_real_names();
+		set<string> cur_set(cur_pnames.begin(), cur_pnames.end());
+		vector<int> failed;
+		vector<string> pnames = init_pnames, onames = init_onames;
+		for (int i = 0; i < (int)pnames.size(); i++)
+			if (cur_set.find(pnames[i]) == cur_set.end())
+				failed.push_back(i);
         if (pe.shape().first == 0)
             throw_em_error("all realizations failed during initial evaluation");
         if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
@@ -6032,6 +6084,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
+
 
 	ss.str("");
     if (pest_scenario.get_pestpp_options().get_save_dense())
@@ -6390,6 +6443,17 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	pcs.summarize(pe);
 
     message(0, "initialization complete");
+}
+
+/**
+ * @brief Prepare, evaluate the prior ensemble, and process the results.
+ */
+void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
+{
+	int n_runs = initialize_prepare(cycle, run, use_existing);
+	if (n_runs > 0)
+		run_ensemble(pe, oe, vector<int>(), cycle);
+	initialize_finish(cycle);
 }
 
 double EnsembleMethod::get_lambda()

@@ -212,6 +212,14 @@ public:
 	ObservationEnsemble harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<string, int>& real_run_ids);
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
 
+	/// Pointer accessors for the live ensembles, matching EnsembleMethod::get_pe_ptr()/
+	/// get_oe_ptr(). dv holds the decision variables, oe their model results. Returned by
+	/// pointer rather than by value because a copy is exactly what an API caller reading or
+	/// writing the ensemble does not want. Only meaningful when an ensemble gradient is in
+	/// use - see get_use_ensemble_grad(); otherwise sqp carries a single point.
+	ParameterEnsemble* get_dv_ptr() { return &dv; }
+	ObservationEnsemble* get_oe_ptr() { return &oe; }
+
 protected:
 	// Derived live from the options.  Protected rather than private only so the selftest
 	// harness can subclass and assert they track a post-initialize() option change; this is

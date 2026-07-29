@@ -213,6 +213,21 @@ public:
 	template<typename T>
 	void message(int level, const string& _message, T extra);
 	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string(), bool force_save=false);
+
+	/// Pointer accessors for the live populations, matching EnsembleMethod::get_pe_ptr()/
+	/// get_oe_ptr(). dp holds the decision variables, op their model results. Returned by
+	/// pointer rather than by value because a copy of a population is exactly what an API
+	/// caller reading or writing it does not want.
+	ParameterEnsemble* get_dp_ptr() { return &dp; }
+	ObservationEnsemble* get_op_ptr() { return &op; }
+	ParameterEnsemble* get_dp_archive_ptr() { return &dp_archive; }
+	ObservationEnsemble* get_op_archive_ptr() { return &op_archive; }
+
+	/// The generator a GenerationContext must be built with, so a caller driving its own
+	/// generation loop draws from the same stream iterate_to_solution() would - otherwise
+	/// the run is not reproducible from the seed.
+	std::mt19937* get_rand_gen_ptr() { return &rand_gen; }
+
 	typedef pair<vector<string>, vector<string>> DomPair;
 protected:
 	// Derived live from the options so they can be swapped between generations - each was a

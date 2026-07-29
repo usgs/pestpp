@@ -177,22 +177,51 @@ jobs:
         run: |
           python3 scripts/check_public_surface.py
 
-      - name: aux bin path hackery
+      # Put the model binaries (mfnwt, mf6, ...) on PATH for the forward runs.
+      #
+      # These entries are ABSOLUTE on purpose. This step used to add "../../test_bin/<plat>",
+      # which is relative and so resolves against whatever directory the *model* process runs
+      # in - meaning it only worked for case directories exactly two levels below the test
+      # directory. That happened to be true of every benchmark script, so the constraint was
+      # invisible until a test used a different depth and got "execv() failed for command:
+      # mfnwt" on linux only (macOS masked it via $HOME/bin, windows via CreateProcess also
+      # searching the current directory). Absolute entries make depth irrelevant.
+      #
+      # Two directories are needed, because they hold different things:
+      #   <test_dir>/test_bin/<plat>  - each cloned benchmark repo ships its own binaries
+      #   benchmarks/test_bin/<plat>  - this repo's, and the ONLY source of macOS binaries
+      #                                 (the benchmark repos ship linux and win only)
+      - name: model binary path
         shell: bash -l {0}
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-              cp -r benchmarks/test_bin/win $HOME/bin
-              echo "../../test_bin/win" >> $GITHUB_PATH
+              plat=win
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-              cp -r benchmarks/test_bin/mac $HOME/bin
-              echo "../../test_bin/mac" >> $GITHUB_PATH
+              plat=mac
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
-              cp -r benchmarks/test_bin/linux $HOME/bin
-              echo "../../test_bin/linux" >> $GITHUB_PATH
+              plat=linux
           else
               echo "::error::Unrecognized RUNNER_OS '$RUNNER_OS' - no test_bin available for this runner"
               exit 1
           fi
+
+          # Strict fallback, not both: when a benchmark repo ships its own binaries they must
+          # be the ones used, exactly as before. benchmarks/test_bin is consulted only when
+          # the test directory has nothing for this platform, which is every macOS job except
+          # the one whose test_dir is benchmarks itself.
+          own="$GITHUB_WORKSPACE/${test_dir}/test_bin/$plat"
+          fallback="$GITHUB_WORKSPACE/benchmarks/test_bin/$plat"
+          if [[ -d "$own" ]]; then
+              model_bin="$own"
+          elif [[ -d "$fallback" ]]; then
+              model_bin="$fallback"
+          else
+              echo "::error::no test_bin/$plat found for test_dir '${test_dir}' (looked in $own and $fallback)"
+              exit 1
+          fi
+          echo "model binary path: $model_bin"
+          ls "$model_bin"
+          echo "$model_bin" >> $GITHUB_PATH
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
