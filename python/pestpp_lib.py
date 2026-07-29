@@ -133,6 +133,10 @@ class PestppLib:
         lib.pestpp_last_create_error.restype = c_char_p
         lib.pestpp_flush_output.argtypes = ()
         lib.pestpp_flush_output.restype = c_int
+        lib.pestpp_redirect_output.argtypes = (c_char_p, POINTER(c_int))
+        lib.pestpp_redirect_output.restype = c_int
+        lib.pestpp_restore_output.argtypes = (c_int,)
+        lib.pestpp_restore_output.restype = c_int
 
         lib.pestpp_initialize_prepare.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_initialize_prepare.restype = c_int
@@ -251,6 +255,17 @@ class PestppLib:
         library itself printed.
         """
         self.lib.pestpp_flush_output()
+
+    def redirect_output(self, path: str) -> int:
+        """Send the library's console output to a file. Returns the fd to restore with."""
+        saved = c_int()
+        if self.lib.pestpp_redirect_output(str(path).encode(), byref(saved)) != PESTPP_OK:
+            raise PestppError("could not redirect output to {0}".format(path))
+        return saved.value
+
+    def restore_output(self, saved_fd: int) -> None:
+        """Undo redirect_output()."""
+        self.lib.pestpp_restore_output(c_int(saved_fd))
 
     def destroy(self) -> None:
         if getattr(self, "handle", None) is not None and self.handle:

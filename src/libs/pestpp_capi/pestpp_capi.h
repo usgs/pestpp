@@ -123,6 +123,20 @@ PESTPP_API const char* pestpp_last_create_error(void);
  * buffer lands where it was meant to. Harmless everywhere else. */
 PESTPP_API pestpp_status pestpp_flush_output(void);
 
+/* Send the library's console output to a file, and put it back.
+ *
+ * This has to happen INSIDE the library. On windows it links the static CRT (/MT), so it owns
+ * a private copy of the C runtime with its own file descriptor table: a host program that
+ * redirects its own descriptor 1 moves the process std handle - so child processes such as
+ * the model land in the file - while the library's descriptor 1 still refers to the original
+ * console. Flushing does not help; the descriptor itself is the wrong one. Doing the dup2 in
+ * here operates on the table that actually matters, and catches the child processes too.
+ *
+ * redirect() writes the descriptor to restore into `saved_fd`; hand that back to restore().
+ * Appends, so repeated redirects to one path accumulate rather than truncating. */
+PESTPP_API pestpp_status pestpp_redirect_output(const char* path, int* saved_fd);
+PESTPP_API pestpp_status pestpp_restore_output(int saved_fd);
+
 /* ---- driving the algorithm --------------------------------------------------------- */
 
 PESTPP_API pestpp_status pestpp_initialize(pestpp_handle h);

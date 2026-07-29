@@ -116,38 +116,27 @@ def _maybe_lower(df, lower: bool, axis="both"):
 # ---- keeping the library's console output out of the way ----------------------------------
 
 @contextmanager
-def _redirect_c_stdout(path, flush=None):
-    """Send the library's stdout to a file while this block runs.
+def _capture_output(lib, path):
+    """Send the library's console output to a file while this block runs.
 
-    PEST++ writes to C++ ``cout``, which goes to file descriptor 1 directly -- Python's
-    ``contextlib.redirect_stdout`` only rebinds ``sys.stdout`` and does nothing about it. So
-    this redirects at the fd level, which is the only thing that works.
+    The redirect is performed by the LIBRARY, not here. Python's own
+    ``contextlib.redirect_stdout`` rebinds ``sys.stdout`` and does nothing to C++ ``cout``;
+    even redirecting file descriptor 1 from python is not enough, because on windows the
+    library links the static CRT and so has its own descriptor table -- moving python's
+    descriptor 1 relocates the process std handle (so child processes like the model do land
+    in the file) while the library's own descriptor 1 still points at the console. Asking the
+    library to redirect its own descriptor is the only thing that captures both.
 
     Captured to a file rather than discarded: the .rec file does not carry everything the
     console does, and swallowing a run manager's complaints outright would be worse than the
-    noise. Only fd 1 is touched -- fd 2 is left alone so python tracebacks still surface.
-
-    ``flush`` is called before the descriptor is restored. On windows the library links the
-    static CRT and so buffers its output privately; without flushing it, the file gets the
-    model's output (child processes inherit the descriptor) but not the library's own, which
-    escapes to the console afterwards instead.
+    noise.
     """
     sys.stdout.flush()
-    saved = os.dup(1)
-    sink = open(path, "a")
+    saved = lib.redirect_output(path)
     try:
-        os.dup2(sink.fileno(), 1)
         yield
     finally:
-        if flush is not None:
-            try:
-                flush()
-            except Exception:
-                pass          # a failed flush must not mask whatever the block raised
-        sys.stdout.flush()
-        os.dup2(saved, 1)
-        os.close(saved)
-        sink.close()
+        lib.restore_output(saved)
 
 
 # ---- what an iteration reports ------------------------------------------------------------
@@ -194,8 +183,7 @@ class _Tool:
 
     def _q(self):
         """Capture the library's console output for the duration of a call."""
-        return (_redirect_c_stdout(self._log, flush=self._lib.flush_output)
-                if self._quiet else nullcontext())
+        return _capture_output(self._lib, self._log) if self._quiet else nullcontext()
 
     @property
     def log_file(self) -> str:
@@ -226,13 +214,11 @@ class _Tool:
         parallel = workers > 0
         if run_manager is None:
             run_manager = RM_PANTHER if parallel else RM_SERIAL
-        log = os.path.join(workdir, "pestpp.stdout.log")
-        with (_redirect_c_stdout(log) if quiet else nullcontext()):
-            lib = PestppLib(find_library(lib_path), cls._tool_id, pst_file, workdir,
-                            port=str(port) if run_manager == RM_PANTHER else None,
-                            run_manager=run_manager)
-            if quiet:
-                lib.flush_output()          # before the redirect unwinds
+        # the library has to exist before it can redirect itself, so create is not captured;
+        # everything after it is
+        lib = PestppLib(find_library(lib_path), cls._tool_id, pst_file, workdir,
+                        port=str(port) if run_manager == RM_PANTHER else None,
+                        run_manager=run_manager)
         for key, value in options.items():
             lib.set_option(key, value)
 

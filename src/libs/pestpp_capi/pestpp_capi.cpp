@@ -22,6 +22,26 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdio>
+#if defined(_WIN32)
+#  include <io.h>
+#  include <fcntl.h>
+#  define PESTPP_DUP    _dup
+#  define PESTPP_DUP2   _dup2
+#  define PESTPP_CLOSE  _close
+#  define PESTPP_OPEN   _open
+#  define PESTPP_O_FLAGS (_O_WRONLY | _O_CREAT | _O_APPEND | _O_TEXT)
+#  define PESTPP_O_MODE  (_S_IREAD | _S_IWRITE)
+#  include <sys/stat.h>
+#else
+#  include <unistd.h>
+#  include <fcntl.h>
+#  define PESTPP_DUP    dup
+#  define PESTPP_DUP2   dup2
+#  define PESTPP_CLOSE  close
+#  define PESTPP_OPEN   open
+#  define PESTPP_O_FLAGS (O_WRONLY | O_CREAT | O_APPEND)
+#  define PESTPP_O_MODE  0644
+#endif
 #include <filesystem>
 
 #include "Pest.h"
@@ -693,6 +713,54 @@ const char* pestpp_last_error(pestpp_handle h)
 }
 
 const char* pestpp_last_create_error(void) { return g_create_error.c_str(); }
+
+pestpp_status pestpp_redirect_output(const char* path, int* saved_fd)
+{
+    if ((path == nullptr) || (saved_fd == nullptr))
+    {
+        g_create_error = "pestpp_redirect_output needs a path and a place to save the fd";
+        return PESTPP_ERROR;
+    }
+    *saved_fd = -1;
+    try
+    {
+        cout.flush();
+        fflush(stdout);
+        int sink = PESTPP_OPEN(path, PESTPP_O_FLAGS, PESTPP_O_MODE);
+        if (sink < 0)
+        {
+            g_create_error = string("could not open '") + path + "' for output capture";
+            return PESTPP_ERROR;
+        }
+        int saved = PESTPP_DUP(1);
+        if ((saved < 0) || (PESTPP_DUP2(sink, 1) < 0))
+        {
+            PESTPP_CLOSE(sink);
+            if (saved >= 0) PESTPP_CLOSE(saved);
+            g_create_error = "could not redirect the library's output";
+            return PESTPP_ERROR;
+        }
+        PESTPP_CLOSE(sink);
+        *saved_fd = saved;
+        return PESTPP_OK;
+    }
+    catch (...) { return PESTPP_ERROR; }
+}
+
+pestpp_status pestpp_restore_output(int saved_fd)
+{
+    if (saved_fd < 0)
+        return PESTPP_OK;                 /* nothing was redirected */
+    try
+    {
+        cout.flush();
+        fflush(stdout);
+        PESTPP_DUP2(saved_fd, 1);
+        PESTPP_CLOSE(saved_fd);
+        return PESTPP_OK;
+    }
+    catch (...) { return PESTPP_ERROR; }
+}
 
 pestpp_status pestpp_flush_output(void)
 {
