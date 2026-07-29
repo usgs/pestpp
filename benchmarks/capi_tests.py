@@ -199,7 +199,7 @@ def _setup_mou(test_d, noptmax=1, pop_size=10):
 
 def _drive_batch(ies):
     """Queue, run and harvest, with the caller owning the run loop."""
-    n_queued = ies.queue_ensemble()
+    n_queued = ies.queue_runs()
     ies.begin_batch()
     while not ies.run_slice(0.05):
         pass
@@ -281,7 +281,7 @@ def capi_resize_between_queue_and_harvest_test():
 
         # -- reference pass: no membership change --
         assert _drive_batch(ies) == len(names)
-        assert ies.harvest_ensemble() == 0, "reference pass had failed runs"
+        assert ies.process_runs() == 0, "reference pass had failed runs"
         oe_names = ies.get_ensemble_row_names(OBS_EN)
         ref_oe = ies.get_ensemble_view(OBS_EN)
         reference = {n: ref_oe[i].copy() for i, n in enumerate(oe_names)}
@@ -308,7 +308,7 @@ def capi_resize_between_queue_and_harvest_test():
         assert len(ies.get_ensemble_row_names(OBS_EN)) == len(left), \
             "obs ensemble was not dropped in step with the par ensemble"
 
-        n_failed = ies.harvest_ensemble()
+        n_failed = ies.process_runs()
         assert n_failed == 0, "{0} runs failed unexpectedly".format(n_failed)
 
         oe = ies.get_ensemble_view(OBS_EN)
@@ -329,7 +329,7 @@ def capi_error_reporting_test():
         ies.initialize()
 
         try:
-            ies.harvest_ensemble()
+            ies.process_runs()
             raise AssertionError("harvesting with nothing queued should raise")
         except PestppError as e:
             assert "no queued runs" in str(e), str(e)
@@ -355,9 +355,9 @@ def capi_error_reporting_test():
             assert "unknown option" in str(e), str(e)
 
         # queueing twice without harvesting is a caller bug, not a silent overwrite
-        ies.queue_ensemble()
+        ies.queue_runs()
         try:
-            ies.queue_ensemble()
+            ies.queue_runs()
             raise AssertionError("double queue should raise")
         except PestppError as e:
             assert "already queued" in str(e), str(e)
@@ -388,12 +388,12 @@ def capi_caller_owned_initial_batch_test():
         mine[:, :] = vals[0, :]          # every realization identical to the first
         ies.set_par_snapshot(mine, rows, cols)
 
-        assert ies.queue_ensemble() == n
+        assert ies.queue_runs() == n
         ies.begin_batch()
         while not ies.run_slice(0.05):
             pass
         ies.end_batch()
-        assert ies.harvest_ensemble() == 0, "runs failed on the substituted ensemble"
+        assert ies.process_runs() == 0, "runs failed on the substituted ensemble"
         ies.initialize_finish()
 
         # our values are what survived
@@ -480,13 +480,13 @@ def _drive_tool(tool, wd, pst_name, tag):
             "{0}: par/obs ensembles disagree on size ({1} vs {2})".format(tag, pe.shape, oe.shape)
 
         # the caller owns the run loop
-        n_queued = t.queue_ensemble()
+        n_queued = t.queue_runs()
         assert n_queued == pe.shape[0], (tag, n_queued, pe.shape[0])
         t.begin_batch()
         while not t.run_slice(0.05):
             pass
         t.end_batch()
-        n_failed = t.harvest_ensemble()
+        n_failed = t.process_runs()
         assert n_failed == 0, "{0}: {1} runs failed".format(tag, n_failed)
 
         oe = t.get_ensemble_view(OBS_EN)
@@ -529,7 +529,7 @@ def capi_da_resize_between_queue_and_harvest_test():
         assert len(names) >= 4, "need a few realizations for this to mean anything"
 
         assert _drive_batch(t) == len(names)
-        assert t.harvest_ensemble() == 0, "da reference pass had failed runs"
+        assert t.process_runs() == 0, "da reference pass had failed runs"
         oe_names = t.get_ensemble_row_names(OBS_EN)
         ref_oe = t.get_ensemble_view(OBS_EN)
         reference = {n: ref_oe[i].copy() for i, n in enumerate(oe_names)}
@@ -542,7 +542,7 @@ def capi_da_resize_between_queue_and_harvest_test():
         victim = names[1]
         t.drop_realizations([victim])
         assert victim not in t.get_ensemble_row_names(PAR_EN)
-        assert t.harvest_ensemble() == 0
+        assert t.process_runs() == 0
 
         oe = t.get_ensemble_view(OBS_EN)
         surviving = t.get_ensemble_row_names(OBS_EN)
@@ -673,7 +673,7 @@ def capi_panther_control_test():
 
             ies.initialize()
             names = ies.get_ensemble_row_names(PAR_EN)
-            n_queued = ies.queue_ensemble()
+            n_queued = ies.queue_runs()
             assert n_queued == len(names), (n_queued, len(names))
 
             ies.begin_batch()
@@ -715,7 +715,7 @@ def capi_panther_control_test():
                 total_done += len(ies.get_worker_run_history(i, WORKER_COMPLETED))
             assert total_done > 0, "per-worker history accounted for no completed runs"
 
-            ies.harvest_ensemble()
+            ies.process_runs()
             oe = ies.get_ensemble_view(OBS_EN)
             assert oe.shape[0] == len(names), (oe.shape, len(names))
     finally:

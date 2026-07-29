@@ -143,6 +143,87 @@ PESTPP_API pestpp_status pestpp_solve_iteration(pestpp_handle h);
 
 PESTPP_API pestpp_status pestpp_finalize(pestpp_handle h);
 PESTPP_API pestpp_status pestpp_get_iteration(pestpp_handle h, int* iter);
+
+/* Which phi. MEAS is the measurement objective function most people mean by "phi"; ACTUAL
+   drops the noise realizations. ies and da only - mou has objectives rather than a phi, and
+   sqp has an objective function, so both report an error. */
+typedef enum {
+    PESTPP_PHI_MEAS      = 0,
+    PESTPP_PHI_COMPOSITE = 1,
+    PESTPP_PHI_REGUL     = 2,
+    PESTPP_PHI_ACTUAL    = 3,
+    PESTPP_PHI_NOISE     = 4
+} pestpp_phi_type;
+
+/* Summary of phi across the realizations. Any out-param may be NULL. Only meaningful once
+   the ensemble has been evaluated. */
+PESTPP_API pestpp_status pestpp_get_phi_summary(pestpp_handle h, int phi_type,
+                                                double* mean, double* std,
+                                                double* min, double* max);
+
+/* Phi for every realization, not just the summary. `names` are packed PESTPP_NAME_LEN wide,
+   the same shape as the ensemble name buffers, and are the realizations phi is defined for -
+   which need not be every row of the parameter ensemble, so pair the two rather than assuming
+   the order. Pass phi=NULL, names=NULL, max_n=0 to learn the count first.
+
+   A phi type that is not in play (REGUL outside a regularized run, NOISE with ies_no_noise)
+   reports a count of 0 rather than failing: it is absent, not an error. */
+PESTPP_API pestpp_status pestpp_get_phi_vector(pestpp_handle h, int phi_type,
+                                               double* phi, char* names,
+                                               int max_n, int* n_out);
+
+/* The individual terms phi is the sum of: the squared weighted residual for every
+   (realization, observation) pair. Summing a row gives that realization's phi; summing the
+   columns belonging to an observation group gives that group's contribution, which is what
+   the tools' "observation group phi summary" reports.
+
+   Column-major like the ensemble views: element (i,j) is data[i + j*(*nrow)]. Rows are
+   realizations, columns observations, and both name lists are returned so a caller never has
+   to assume an order. Pass data=NULL to learn the shape first.
+
+   PESTPP_PHI_MEAS and PESTPP_PHI_ACTUAL only - the residual is not defined for the others. */
+PESTPP_API pestpp_status pestpp_get_phi_residuals(pestpp_handle h, int phi_type,
+                                                  double* data, int max_nrow, int max_ncol,
+                                                  int* nrow, int* ncol,
+                                                  char* row_names, char* col_names);
+
+/* The observation group each observation belongs to, in the same order as
+   pestpp_get_ensemble_col_names(PESTPP_OBS_EN). Packed PESTPP_NAME_LEN wide. */
+PESTPP_API pestpp_status pestpp_get_obs_groups(pestpp_handle h, char* buf, int buf_len,
+                                               int* count);
+
+/* ---- weights --------------------------------------------------------------------------
+ *
+ * There are two of them and they are not the same thing:
+ *
+ *   the WEIGHT VECTOR   - one weight per observation, from the control file
+ *   the WEIGHTS ENSEMBLE - one weight per observation PER REALIZATION, reachable as
+ *                          PESTPP_WEIGHTS_EN through the zero-copy ensemble view
+ *
+ * initialize() reads the vector once and broadcasts it into every row of the ensemble, and
+ * from then on phi is computed from the ENSEMBLE. So setting the vector after initialization
+ * changes nothing on its own - call pestpp_broadcast_weights() to push it through, or write
+ * the ensemble directly when you want weights to differ between realizations. */
+
+/* Weights in the same order as pestpp_get_ensemble_col_names(PESTPP_OBS_EN). */
+PESTPP_API pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights,
+                                                int max_n, int* n_out);
+
+/* Set weights by name, so a caller can change a few without restating the rest. */
+PESTPP_API pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
+                                                const double* weights, int n);
+
+/* Push the current weight vector into every row of the weights ensemble, so a vector change
+   takes effect. Overwrites per-realization weights - do not use it if you have been writing
+   PESTPP_WEIGHTS_EN yourself. No-op before the ensemble exists. */
+PESTPP_API pestpp_status pestpp_broadcast_weights(pestpp_handle h);
+
+/* Recompute phi from the current ensembles and weights.
+ *
+ * Phi is CACHED - the values pestpp_get_phi_* report are whatever the last update computed,
+ * which the algorithm does at its own points. Change weights or write an ensemble and the
+ * cached phi is stale until this is called. */
+PESTPP_API pestpp_status pestpp_update_phi(pestpp_handle h);
 PESTPP_API pestpp_status pestpp_should_terminate(pestpp_handle h, int* out);
 
 /* ---- reading ensembles ------------------------------------------------------------- */
@@ -251,8 +332,8 @@ PESTPP_API pestpp_status pestpp_get_worker_run_history(pestpp_handle h, int idx,
  * Runs are tracked by realization NAME, so membership may change between the two calls.
  * A realization dropped after queueing has its run discarded rather than misattributed; one
  * added after queueing simply has no result yet. */
-PESTPP_API pestpp_status pestpp_queue_ensemble(pestpp_handle h, int* n_queued);
-PESTPP_API pestpp_status pestpp_harvest_ensemble(pestpp_handle h, int* n_failed);
+PESTPP_API pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued);
+PESTPP_API pestpp_status pestpp_process_runs(pestpp_handle h, int* n_failed);
 
 /* ---- membership ----------------------------------------------------------------------
  *

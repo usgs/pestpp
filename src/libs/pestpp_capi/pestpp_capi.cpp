@@ -74,8 +74,93 @@ struct ToolAdapter
     virtual ParameterEnsemble* par_ensemble() = 0;
     virtual ObservationEnsemble* obs_ensemble() = 0;
 
+    /// mean/std/min/max of phi. Tools without a phi throw.
+    virtual void phi_summary(int phi_type, double& mean, double& sd, double& mn, double& mx) = 0;
+    /// phi per realization, paired with the realization names it is defined for.
+    virtual void phi_vector(int phi_type, vector<string>& names, vector<double>& vals) = 0;
+    /// squared weighted residual per (realization, observation), column-major.
+    virtual void phi_residuals(int phi_type, vector<string>& rnames, vector<string>& cnames,
+                               vector<double>& data) = 0;
+    /// recompute the cached phi from the current ensembles and weights.
+    virtual void update_phi() = 0;
+
     virtual const char* name() const = 0;
 };
+
+/// Map a pestpp_phi_type onto the handler's enum.
+static L2PhiHandler::phiType to_phi_type(int phi_type)
+{
+    switch (phi_type)
+    {
+    case PESTPP_PHI_MEAS:      return L2PhiHandler::phiType::MEAS;
+    case PESTPP_PHI_COMPOSITE: return L2PhiHandler::phiType::COMPOSITE;
+    case PESTPP_PHI_REGUL:     return L2PhiHandler::phiType::REGUL;
+    case PESTPP_PHI_ACTUAL:    return L2PhiHandler::phiType::ACTUAL;
+    case PESTPP_PHI_NOISE:     return L2PhiHandler::phiType::NOISE;
+    default: throw runtime_error("unknown phi type");
+    }
+}
+
+/// Shared by the two EnsembleMethod tools.
+static void ensemble_phi_vector(EnsembleMethod& tool, int phi_type,
+                                vector<string>& names, vector<double>& vals)
+{
+    names.clear();
+    vals.clear();
+    map<string, double> m = tool.get_phi_handler().get_phi_map(to_phi_type(phi_type));
+    for (auto& kv : m)
+    {
+        names.push_back(kv.first);
+        vals.push_back(kv.second);
+    }
+}
+
+/// Shared by the two EnsembleMethod tools.
+static void ensemble_phi_residuals(EnsembleMethod& tool, int phi_type,
+                                   vector<string>& rnames, vector<string>& cnames,
+                                   vector<double>& data)
+{
+    if ((phi_type != PESTPP_PHI_MEAS) && (phi_type != PESTPP_PHI_ACTUAL))
+        throw runtime_error("phi residuals are only defined for PESTPP_PHI_MEAS and "
+                            "PESTPP_PHI_ACTUAL");
+    map<string, map<string, double>> swr = tool.get_phi_handler().get_swr_real_map(
+        *tool.get_oe_ptr(), *tool.get_weights_ptr(), to_phi_type(phi_type));
+
+    rnames.clear();
+    cnames.clear();
+    data.clear();
+    if (swr.empty())
+        return;
+    for (auto& kv : swr)
+        rnames.push_back(kv.first);
+    for (auto& kv : swr.begin()->second)
+        cnames.push_back(kv.first);
+
+    // column-major, matching the ensemble views
+    data.assign(rnames.size() * cnames.size(), 0.0);
+    for (size_t i = 0; i < rnames.size(); i++)
+    {
+        const map<string, double>& row = swr[rnames[i]];
+        for (size_t j = 0; j < cnames.size(); j++)
+        {
+            map<string, double>::const_iterator it = row.find(cnames[j]);
+            if (it != row.end())
+                data[i + (j * rnames.size())] = it->second;
+        }
+    }
+}
+
+/// Shared by the two EnsembleMethod tools.
+static void ensemble_phi_summary(EnsembleMethod& tool, int phi_type,
+                                 double& mean, double& sd, double& mn, double& mx)
+{
+    L2PhiHandler::phiType pt = to_phi_type(phi_type);
+    L2PhiHandler& ph = tool.get_phi_handler();
+    mean = ph.get_mean(pt);
+    sd   = ph.get_std(pt);
+    mn   = ph.get_min(pt);
+    mx   = ph.get_max(pt);
+}
 
 /** One PEST++ session: scenario, io, run manager and tool, with a stable lifetime. */
 struct PestppSession
@@ -105,7 +190,7 @@ struct PestppSession
     // set between initialize_prepare() and initialize_finish(): the tool is half-initialized,
     // its ensembles drawn but the prior results not yet processed
     bool init_pending = false;
-    // runs queued by pestpp_queue_ensemble(), awaiting pestpp_harvest_ensemble(). keyed by
+    // runs queued by pestpp_queue_runs(), awaiting pestpp_process_runs(). keyed by
     // realization name, which is what lets membership change while they are in flight.
     map<string,int> pending_runs;
     bool pending_runs_valid = false;
@@ -147,6 +232,14 @@ struct IesAdapter : public ToolAdapter
     }
     ParameterEnsemble* par_ensemble() override { return tool.get_pe_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    void phi_summary(int t, double& mean, double& sd, double& mn, double& mx) override
+    { ensemble_phi_summary(tool, t, mean, sd, mn, mx); }
+    void phi_vector(int t, vector<string>& names, vector<double>& vals) override
+    { ensemble_phi_vector(tool, t, names, vals); }
+    void phi_residuals(int t, vector<string>& rn, vector<string>& cn, vector<double>& d) override
+    { ensemble_phi_residuals(tool, t, rn, cn, d); }
+    void update_phi() override
+    { tool.get_phi_handler().update(*tool.get_oe_ptr(), *tool.get_pe_ptr(), *tool.get_weights_ptr()); }
     const char* name() const override { return "ies"; }
 };
 
@@ -186,6 +279,14 @@ struct DaAdapter : public ToolAdapter
     }
     ParameterEnsemble* par_ensemble() override { return tool.get_pe_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    void phi_summary(int t, double& mean, double& sd, double& mn, double& mx) override
+    { ensemble_phi_summary(tool, t, mean, sd, mn, mx); }
+    void phi_vector(int t, vector<string>& names, vector<double>& vals) override
+    { ensemble_phi_vector(tool, t, names, vals); }
+    void phi_residuals(int t, vector<string>& rn, vector<string>& cn, vector<double>& d) override
+    { ensemble_phi_residuals(tool, t, rn, cn, d); }
+    void update_phi() override
+    { tool.get_phi_handler().update(*tool.get_oe_ptr(), *tool.get_pe_ptr(), *tool.get_weights_ptr()); }
     const char* name() const override { return "da"; }
 };
 
@@ -231,6 +332,13 @@ struct MouAdapter : public ToolAdapter
     }
     ParameterEnsemble* par_ensemble() override { return tool.get_dp_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_op_ptr(); }
+    void phi_summary(int, double&, double&, double&, double&) override
+    { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
+    void phi_vector(int, vector<string>&, vector<double>&) override
+    { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
+    void phi_residuals(int, vector<string>&, vector<string>&, vector<double>&) override
+    { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
+    void update_phi() override { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
     const char* name() const override { return "mou"; }
 };
 
@@ -268,6 +376,13 @@ struct SqpAdapter : public ToolAdapter
     }
     ParameterEnsemble* par_ensemble() override { return tool.get_dv_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    void phi_summary(int, double&, double&, double&, double&) override
+    { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
+    void phi_vector(int, vector<string>&, vector<double>&) override
+    { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
+    void phi_residuals(int, vector<string>&, vector<string>&, vector<double>&) override
+    { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
+    void update_phi() override { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
     const char* name() const override { return "sqp"; }
 };
 
@@ -277,6 +392,9 @@ PestppSession* as_session(pestpp_handle h)
 {
     return static_cast<PestppSession*>(h);
 }
+
+/// Set when a working-directory restore failed; makes the next entry point refuse.
+string g_cwd_restore_error;
 
 /** Run with the session's working directory current, then restore it.
  *
@@ -307,10 +425,39 @@ struct ScopedWorkingDir
     }
     ~ScopedWorkingDir()
     {
-        if (changed)
+        if (!changed)
+            return;
+        std::error_code ec;
+        std::filesystem::current_path(prev, ec);
+        if (ec)
         {
-            std::error_code ec;
-            std::filesystem::current_path(prev, ec);   // never throw from a dtor
+            // one retry: on windows a transient holder (indexer, antivirus, a virus scanner
+            // walking files the model just wrote) is the usual reason this fails
+            ec.clear();
+            std::filesystem::current_path(prev, ec);
+        }
+        if (ec)
+        {
+            // A destructor cannot throw, but neither can this be swallowed: the process is now
+            // sitting in a directory nobody expects, and every relative path afterwards - in
+            // this library and in the host program - silently resolves somewhere else. Record
+            // it so the next entry point refuses rather than continuing in an unknown state.
+            try
+            {
+                g_cwd_restore_error =
+                    "failed to restore the working directory to '" + prev.string() + "': " +
+                    ec.message() + ". The process is in an unknown directory and further "
+                    "calls are unsafe.";
+            }
+            catch (...)
+            {
+                // prev.string() can itself throw on windows for a path the active code page
+                // cannot represent; a message without the path still beats silence
+                try { g_cwd_restore_error = "failed to restore the working directory; the "
+                                            "process is in an unknown directory and further "
+                                            "calls are unsafe."; }
+                catch (...) { /* nothing left to do */ }
+            }
         }
     }
 };
@@ -324,6 +471,8 @@ struct ScopedWorkingDir
     if (s == nullptr) return PESTPP_INVALID_HANDLE;                            \
     try {                                                                      \
         s->last_error.clear();                                                 \
+        if (!g_cwd_restore_error.empty())                                      \
+            throw std::runtime_error(g_cwd_restore_error);                     \
         ScopedWorkingDir _swd(s->working_dir);
 
 #define CAPI_END()                                                             \
@@ -377,6 +526,11 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
     if ((rm_type < PESTPP_RM_SERIAL) || (rm_type > PESTPP_RM_EXTERNAL))
     {
         g_create_error = "unknown run manager id";
+        return PESTPP_ERROR;
+    }
+    if (!g_cwd_restore_error.empty())
+    {
+        g_create_error = g_cwd_restore_error;
         return PESTPP_ERROR;
     }
     unique_ptr<PestppSession> s(new PestppSession());
@@ -605,6 +759,20 @@ pestpp_status pestpp_finalize(pestpp_handle h)
     CAPI_END()
 }
 
+pestpp_status pestpp_get_phi_summary(pestpp_handle h, int phi_type,
+                                     double* mean, double* std, double* min, double* max)
+{
+    CAPI_BEGIN(h)
+        double m = 0.0, sd = 0.0, mn = 0.0, mx = 0.0;
+        s->adapter->phi_summary(phi_type, m, sd, mn, mx);
+        if (mean != nullptr) *mean = m;
+        if (std  != nullptr) *std  = sd;
+        if (min  != nullptr) *min  = mn;
+        if (max  != nullptr) *max  = mx;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_get_iteration(pestpp_handle h, int* iter)
 {
     CAPI_BEGIN(h)
@@ -707,6 +875,11 @@ pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* va
         if ((key == nullptr) || (value == nullptr)) throw runtime_error("null argument");
         PestppOptions::ARG_STATUS st =
             s->pest_scenario->get_pestpp_options_ptr()->set_option(key, value);
+        // fall through to the control data section, which exposes the same interface. noptmax
+        // is the most-set quantity in pest and it lives there, not in PestppOptions, so a
+        // caller that could not reach it would be missing the obvious thing.
+        if (st == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+            st = s->pest_scenario->get_control_info_4_mod().set_option(key, value);
         if (st == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
             throw runtime_error(string("unknown option '") + key + "'");
         if (st == PestppOptions::ARG_STATUS::ARG_INVALID)
@@ -721,6 +894,8 @@ pestpp_status pestpp_get_option(pestpp_handle h, const char* key,
     CAPI_BEGIN(h)
         if (key == nullptr) throw runtime_error("null argument");
         string v = s->pest_scenario->get_pestpp_options().get_option(key);
+        if (v.empty())
+            v = s->pest_scenario->get_control_info().get_option(key);   // e.g. NOPTMAX
         if (needed != nullptr)
             *needed = (int)v.size() + 1;
         if (buf == nullptr)
@@ -799,6 +974,69 @@ pestpp_status emit_ids(const vector<int>& ids, int* run_ids, int max_n, int* n_o
 }
 
 } // namespace
+
+pestpp_status pestpp_get_phi_vector(pestpp_handle h, int phi_type,
+                                    double* phi, char* names, int max_n, int* n_out)
+{
+    CAPI_BEGIN(h)
+        vector<string> rnames;
+        vector<double> vals;
+        s->adapter->phi_vector(phi_type, rnames, vals);
+        if (n_out != nullptr)
+            *n_out = (int)vals.size();
+        if ((phi == nullptr) && (names == nullptr))
+            return PESTPP_OK;                 /* count-only call */
+        if (max_n < (int)vals.size())
+            throw runtime_error("phi buffers too small; call with NULL arrays to size first");
+        for (size_t i = 0; i < vals.size(); i++)
+        {
+            if (phi != nullptr)   phi[i] = vals[i];
+            if (names != nullptr) pack_one_name(rnames[i], names + (i * PESTPP_NAME_LEN));
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_phi_residuals(pestpp_handle h, int phi_type,
+                                       double* data, int max_nrow, int max_ncol,
+                                       int* nrow, int* ncol,
+                                       char* row_names, char* col_names)
+{
+    CAPI_BEGIN(h)
+        vector<string> rnames, cnames;
+        vector<double> vals;
+        s->adapter->phi_residuals(phi_type, rnames, cnames, vals);
+        int nr = (int)rnames.size(), nc = (int)cnames.size();
+        if (nrow != nullptr) *nrow = nr;
+        if (ncol != nullptr) *ncol = nc;
+        if (row_names != nullptr)
+            for (int i = 0; i < nr; i++)
+                pack_one_name(rnames[i], row_names + (i * PESTPP_NAME_LEN));
+        if (col_names != nullptr)
+            for (int j = 0; j < nc; j++)
+                pack_one_name(cnames[j], col_names + (j * PESTPP_NAME_LEN));
+        if (data == nullptr)
+            return PESTPP_OK;                  /* shape-only call */
+        if ((max_nrow < nr) || (max_ncol < nc))
+            throw runtime_error("phi residual buffer too small; call with data=NULL to size it");
+        for (size_t k = 0; k < vals.size(); k++)
+            data[k] = vals[k];
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_obs_groups(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        // aligned with the observation ensemble's columns, so a caller can zip the two
+        vector<string> onames = s->adapter->obs_ensemble()->get_var_names();
+        const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
+        vector<string> groups;
+        for (auto& n : onames)
+            groups.push_back(oi->get_group(n));
+        return pack_names(groups, buf, buf_len, count);
+    CAPI_END()
+}
 
 pestpp_status pestpp_supports_live_control(pestpp_handle h, int* out)
 {
@@ -966,7 +1204,77 @@ vector<string> unpack_names(const char* buf, int n)
 
 } // namespace
 
-pestpp_status pestpp_queue_ensemble(pestpp_handle h, int* n_queued)
+pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights, int max_n, int* n_out)
+{
+    CAPI_BEGIN(h)
+        vector<string> onames = s->adapter->obs_ensemble()->get_var_names();
+        if (n_out != nullptr)
+            *n_out = (int)onames.size();
+        if (weights == nullptr)
+            return PESTPP_OK;
+        if (max_n < (int)onames.size())
+            throw runtime_error("weight buffer too small; call with weights=NULL to size it");
+        const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
+        for (size_t i = 0; i < onames.size(); i++)
+            weights[i] = oi->get_weight(onames[i]);
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
+                                     const double* weights, int n)
+{
+    CAPI_BEGIN(h)
+        if ((names == nullptr) || (weights == nullptr) || (n <= 0))
+            throw runtime_error("pestpp_set_obs_weights needs names and values");
+        ObservationInfo& oi = s->pest_scenario->get_ctl_observation_info_4_mod();
+        vector<string> want = unpack_names(names, n);
+        // validate everything before changing anything, so a bad name cannot leave the
+        // weights half-updated
+        const Observations& obs = s->pest_scenario->get_ctl_observations();
+        for (auto& nm : want)
+            if (obs.find(nm) == obs.end())
+                throw runtime_error("no such observation: '" + nm + "'");
+        for (int i = 0; i < n; i++)
+        {
+            if (weights[i] < 0.0)
+                throw runtime_error("negative weight for '" + want[i] + "'");
+            oi.set_weight(want[i], weights[i]);
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_broadcast_weights(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        Ensemble* w = s->adapter->ensemble(PESTPP_WEIGHTS_EN);
+        if (w == nullptr)
+            throw runtime_error(string("tool '") + s->adapter->name() +
+                                "' has no weights ensemble");
+        if (w->shape().first == 0)
+            return PESTPP_OK;                 /* not built yet; initialize will read the vector */
+        const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
+        vector<string> wnames = w->get_var_names();
+        Eigen::VectorXd wvec(wnames.size());
+        for (size_t j = 0; j < wnames.size(); j++)
+            wvec[j] = oi->get_weight(wnames[j]);
+        Eigen::MatrixXd* m = w->get_eigen_ptr_4_mod();
+        for (int i = 0; i < m->rows(); i++)
+            m->row(i) = wvec;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_update_phi(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        s->adapter->update_phi();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued)
 {
     CAPI_BEGIN(h)
         if (s->pending_runs_valid)
@@ -981,11 +1289,11 @@ pestpp_status pestpp_queue_ensemble(pestpp_handle h, int* n_queued)
     CAPI_END()
 }
 
-pestpp_status pestpp_harvest_ensemble(pestpp_handle h, int* n_failed)
+pestpp_status pestpp_process_runs(pestpp_handle h, int* n_failed)
 {
     CAPI_BEGIN(h)
         if (!s->pending_runs_valid)
-            throw runtime_error("no queued runs to harvest; call pestpp_queue_ensemble first");
+            throw runtime_error("no queued runs to harvest; call pestpp_queue_runs first");
         vector<int> failed = harvest_ensemble_util(s->performance_log.get(),
                                                    s->file_manager->rec_ofstream(),
                                                    *s->adapter->par_ensemble(), *s->adapter->obs_ensemble(),

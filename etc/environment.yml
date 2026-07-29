@@ -17,6 +17,10 @@ dependencies:
   - nose-timer
   - pytest-xdist
   - nbmake
+  # imported directly by benchmarks/pestpp_api_tests.py to execute the example
+  # notebook; nbmake pulls them in too, but depending on that transitively is fragile
+  - nbclient
+  - nbformat
   - shapely
   - flopy
   - mfpymake

@@ -34,6 +34,9 @@ jobs:
           # drives the shared library through the C ABI - the only tests that exercise the
           # api, rather than the executables running the built-in loop
           - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "capi_tests.py"}
+          # the ergonomic layer on top of it, plus executing the example notebook so a stale
+          # cell fails here rather than in front of a new user
+          - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "pestpp_api_tests.py"}
           - { test_dir: "pestpp-opt_benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "../benchmarks/opt_test.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_base.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part1.py"}
@@ -60,6 +63,8 @@ jobs:
             # linked and loaded differs per platform, and these tests are quick
             - os: macos-latest
               env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "capi_tests.py"}
+            - os: macos-latest
+              env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "pestpp_api_tests.py"}
     env: ${{ matrix.env }}
 
     steps:

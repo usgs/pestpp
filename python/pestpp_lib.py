@@ -44,6 +44,7 @@ RUN_STATUS = {
     RUN_FAILED: "failed", RUN_TIMED_OUT: "timed_out", RUN_CANCELLED: "cancelled",
 }
 WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT = 0, 1, 2
+PHI_MEAS, PHI_COMPOSITE, PHI_REGUL, PHI_ACTUAL, PHI_NOISE = range(5)
 
 RM_SERIAL, RM_PANTHER, RM_EXTERNAL = 0, 1, 2
 RUN_MANAGER = {RM_SERIAL: "serial", RM_PANTHER: "panther", RM_EXTERNAL: "external"}
@@ -188,13 +189,35 @@ class PestppLib:
         lib.pestpp_get_worker_run_history.restype = c_int
 
         # -- queue/harvest, membership, snapshot --
-        lib.pestpp_queue_ensemble.argtypes = (c_void_p, POINTER(c_int))
-        lib.pestpp_queue_ensemble.restype = c_int
-        lib.pestpp_harvest_ensemble.argtypes = (c_void_p, POINTER(c_int))
-        lib.pestpp_harvest_ensemble.restype = c_int
+        lib.pestpp_queue_runs.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_queue_runs.restype = c_int
+        lib.pestpp_process_runs.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_process_runs.restype = c_int
         for name in ("pestpp_drop_realizations", "pestpp_keep_realizations"):
             getattr(lib, name).argtypes = (c_void_p, c_char_p, c_int)
             getattr(lib, name).restype = c_int
+        lib.pestpp_get_phi_summary.argtypes = (
+            c_void_p, c_int, POINTER(c_double), POINTER(c_double), POINTER(c_double),
+            POINTER(c_double))
+        lib.pestpp_get_phi_summary.restype = c_int
+        lib.pestpp_get_phi_vector.argtypes = (
+            c_void_p, c_int, POINTER(c_double), c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_phi_vector.restype = c_int
+        lib.pestpp_get_phi_residuals.argtypes = (
+            c_void_p, c_int, POINTER(c_double), c_int, c_int, POINTER(c_int), POINTER(c_int),
+            c_char_p, c_char_p)
+        lib.pestpp_get_phi_residuals.restype = c_int
+        lib.pestpp_get_obs_groups.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_obs_groups.restype = c_int
+        lib.pestpp_get_obs_weights.argtypes = (c_void_p, POINTER(c_double), c_int,
+                                               POINTER(c_int))
+        lib.pestpp_get_obs_weights.restype = c_int
+        lib.pestpp_set_obs_weights.argtypes = (c_void_p, c_char_p, POINTER(c_double), c_int)
+        lib.pestpp_set_obs_weights.restype = c_int
+        lib.pestpp_broadcast_weights.argtypes = (c_void_p,)
+        lib.pestpp_broadcast_weights.restype = c_int
+        lib.pestpp_update_phi.argtypes = (c_void_p,)
+        lib.pestpp_update_phi.restype = c_int
         lib.pestpp_get_par_snapshot.argtypes = (
             c_void_p, POINTER(c_double), c_int, c_int, POINTER(c_int), POINTER(c_int),
             c_char_p, c_char_p)
@@ -240,7 +263,7 @@ class PestppLib:
         Returns how many runs the caller must service before initialize_finish(). 0 means
         none -- a restart supplies results instead, or the tool initializes atomically.
 
-        Between this call and queue_ensemble() is the only point at which the prior ensemble
+        Between this call and queue_runs() is the only point at which the prior ensemble
         can be replaced with your own; see set_par_snapshot().
         """
         n = c_int()
@@ -438,17 +461,17 @@ class PestppLib:
 
     # -- queue / harvest ---------------------------------------------------------------
 
-    def queue_ensemble(self) -> int:
+    def queue_runs(self) -> int:
         """Queue the current parameter ensemble. Returns the number of runs queued."""
         n = c_int()
-        self._check(self.lib.pestpp_queue_ensemble(self.handle, byref(n)), "pestpp_queue_ensemble")
+        self._check(self.lib.pestpp_queue_runs(self.handle, byref(n)), "pestpp_queue_runs")
         return n.value
 
-    def harvest_ensemble(self) -> int:
+    def process_runs(self) -> int:
         """Collect the queued runs into the obs ensemble. Returns the number that failed."""
         n = c_int()
-        self._check(self.lib.pestpp_harvest_ensemble(self.handle, byref(n)),
-                    "pestpp_harvest_ensemble")
+        self._check(self.lib.pestpp_process_runs(self.handle, byref(n)),
+                    "pestpp_process_runs")
         return n.value
 
     # -- membership --------------------------------------------------------------------
@@ -471,6 +494,88 @@ class PestppLib:
             self.handle, self._pack_names(names), len(names)), "pestpp_keep_realizations")
 
     # -- parameter snapshot ------------------------------------------------------------
+
+    def get_phi_summary(self, phi_type: int = 0) -> dict:
+        """mean/std/min/max of phi across realizations. ies and da only."""
+        vals = [c_double() for _ in range(4)]
+        self._check(self.lib.pestpp_get_phi_summary(
+            self.handle, c_int(phi_type), *[byref(v) for v in vals]), "pestpp_get_phi_summary")
+        return dict(zip(("mean", "std", "min", "max"), [v.value for v in vals]))
+
+    def get_phi_vector(self, phi_type: int = 0):
+        """Phi per realization: (values, names). Empty when that phi type is not in play."""
+        n = c_int()
+        self._check(self.lib.pestpp_get_phi_vector(
+            self.handle, c_int(phi_type), None, None, 0, byref(n)), "pestpp_get_phi_vector")
+        if n.value == 0:
+            return np.empty(0), []
+        vals = (c_double * n.value)()
+        names = create_string_buffer(n.value * self.name_len)
+        self._check(self.lib.pestpp_get_phi_vector(
+            self.handle, c_int(phi_type), vals, names, n.value, byref(n)),
+            "pestpp_get_phi_vector")
+        return np.array(vals), self._unpack_names(names.raw, n.value)
+
+    def get_phi_residuals(self, phi_type: int = 0):
+        """Squared weighted residuals: (array, row_names, col_names). MEAS and ACTUAL only."""
+        nrow, ncol = c_int(), c_int()
+        self._check(self.lib.pestpp_get_phi_residuals(
+            self.handle, c_int(phi_type), None, 0, 0, byref(nrow), byref(ncol), None, None),
+            "pestpp_get_phi_residuals")
+        nr, nc = nrow.value, ncol.value
+        if nr == 0 or nc == 0:
+            return np.empty((0, 0)), [], []
+        data = (c_double * (nr * nc))()
+        rows = create_string_buffer(nr * self.name_len)
+        cols = create_string_buffer(nc * self.name_len)
+        self._check(self.lib.pestpp_get_phi_residuals(
+            self.handle, c_int(phi_type), data, nr, nc, byref(nrow), byref(ncol), rows, cols),
+            "pestpp_get_phi_residuals")
+        arr = np.ctypeslib.as_array(data, shape=(nr * nc,)).reshape((nr, nc), order="F").copy()
+        return arr, self._unpack_names(rows.raw, nr), self._unpack_names(cols.raw, nc)
+
+    def get_obs_groups(self) -> list:
+        """The group each observation belongs to, aligned with the obs ensemble columns."""
+        n = c_int()
+        self._check(self.lib.pestpp_get_obs_groups(self.handle, None, 0, byref(n)),
+                    "pestpp_get_obs_groups")
+        if n.value == 0:
+            return []
+        buf = create_string_buffer(n.value * self.name_len)
+        self._check(self.lib.pestpp_get_obs_groups(
+            self.handle, buf, n.value * self.name_len, byref(n)), "pestpp_get_obs_groups")
+        return self._unpack_names(buf.raw, n.value)
+
+    def get_obs_weights(self) -> np.ndarray:
+        """The control-file weight for each observation, in obs-ensemble column order."""
+        n = c_int()
+        self._check(self.lib.pestpp_get_obs_weights(self.handle, None, 0, byref(n)),
+                    "pestpp_get_obs_weights")
+        if n.value == 0:
+            return np.empty(0)
+        w = (c_double * n.value)()
+        self._check(self.lib.pestpp_get_obs_weights(self.handle, w, n.value, byref(n)),
+                    "pestpp_get_obs_weights")
+        return np.array(w)
+
+    def set_obs_weights(self, names, weights) -> None:
+        """Set control-file weights by name. See broadcast_weights()."""
+        names = list(names)
+        arr = (c_double * len(names))(*[float(x) for x in weights])
+        buf = create_string_buffer(len(names) * self.name_len)
+        for i, nm in enumerate(names):
+            buf[i * self.name_len:(i + 1) * self.name_len] = \
+                nm.encode().ljust(self.name_len)[:self.name_len]
+        self._check(self.lib.pestpp_set_obs_weights(self.handle, buf, arr, len(names)),
+                    "pestpp_set_obs_weights")
+
+    def broadcast_weights(self) -> None:
+        """Push the weight vector into every row of the weights ensemble."""
+        self._check(self.lib.pestpp_broadcast_weights(self.handle), "pestpp_broadcast_weights")
+
+    def update_phi(self) -> None:
+        """Recompute the cached phi from the current ensembles and weights."""
+        self._check(self.lib.pestpp_update_phi(self.handle), "pestpp_update_phi")
 
     def get_par_snapshot(self):
         """CTL-space copy of every control-file parameter: (values, row_names, col_names).
