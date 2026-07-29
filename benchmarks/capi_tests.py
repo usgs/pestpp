@@ -97,6 +97,14 @@ def _find_library():
 # ---- case setup ---------------------------------------------------------------------------
 
 def _copy_base(test_d, base_d=os.path.join("ies_10par_xsec", "template")):
+    # Only ever copy from a directory that is CHECKED IN. Several case directories under
+    # benchmarks/ are created dynamically by other benchmark scripts, so they exist in a
+    # working tree that has run those scripts and not in a fresh CI checkout. Fail with a
+    # readable message rather than a FileNotFoundError from inside shutil.
+    if not os.path.isdir(base_d):
+        raise RuntimeError(
+            "base case '{0}' not found. It must be a checked-in directory - directories "
+            "created dynamically by other benchmark scripts are not available here.".format(base_d))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     shutil.copytree(base_d, test_d)
@@ -157,13 +165,23 @@ def _setup_sqp(test_d, noptmax=1, num_reals=8):
 
 
 def _setup_mou(test_d, noptmax=1, pop_size=10):
-    """A small mou case from the constr benchmark."""
-    _copy_base(test_d, os.path.join("mou_tests", "constr_template"))
-    pst = pyemu.Pst(os.path.join(test_d, "constr.pst"))
-    pst.control_data.noptmax = noptmax
+    """A small mou case built from g07.
+
+    g07 rather than the mou benchmarks' constr case, because constr_template is created
+    dynamically by mou_tests.py and so does not exist in this job's checkout. g07 is checked
+    in, already carries obj_fn and l_constraint groups, and its forward run is pure python -
+    which also makes this the one tool test that needs no model binary at all.
+    """
+    _copy_base(test_d, os.path.join("g07", "template"))
+    pst = pyemu.Pst(os.path.join(test_d, "g07.pst"))
+    # g07 ships configured for sqp; drop those so the options in play are mou's
+    for k in [k for k in pst.pestpp_options if k.startswith("sqp_")]:
+        pst.pestpp_options.pop(k)
     pst.pestpp_options["mou_population_size"] = pop_size
+    pst.pestpp_options["mou_generator"] = "de"
     pst.pestpp_options["random_seed"] = 11
-    pst.write(os.path.join(test_d, "constr.pst"), version=2)
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(test_d, "g07.pst"), version=2)
     return os.path.abspath(test_d)
 
 
@@ -417,7 +435,7 @@ def capi_initialize_prepare_reports_zero_test():
     0 rather than leaving a caller to discover it.
     """
     for tool, wd, pst_name, tag in (
-            (TOOL_MOU, _setup_mou("capi_init_mou"), "constr.pst", "mou"),
+            (TOOL_MOU, _setup_mou("capi_init_mou"), "g07.pst", "mou"),
             (TOOL_SQP, _setup_sqp("capi_init_sqp"), "pest.pst", "sqp")):
         with PestppLib(_find_library(), tool, pst_name, wd) as t:
             assert t.initialize_prepare() == 0, "{0} should report no caller-owned batch".format(tag)
@@ -483,7 +501,7 @@ def capi_sqp_test():
 
 def capi_mou_test():
     """mou, driven through the caller-owned loop - a generation rather than an iteration."""
-    _drive_tool(TOOL_MOU, _setup_mou("capi_mou"), "constr.pst", "mou")
+    _drive_tool(TOOL_MOU, _setup_mou("capi_mou"), "g07.pst", "mou")
 
 
 def capi_da_resize_between_queue_and_harvest_test():
@@ -529,7 +547,7 @@ def capi_tool_ensemble_availability_test():
     one that does not exist must say so, not hand back an empty array that reads as real.
     """
     cases = [
-        (TOOL_MOU, _setup_mou("capi_avail_mou"), "constr.pst", "mou"),
+        (TOOL_MOU, _setup_mou("capi_avail_mou"), "g07.pst", "mou"),
         (TOOL_SQP, _setup_sqp("capi_avail_sqp"), "pest.pst", "sqp"),
     ]
     for tool, wd, pst_name, tag in cases:
