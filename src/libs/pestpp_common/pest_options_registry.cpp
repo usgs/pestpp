@@ -1055,6 +1055,31 @@ static const map<string, const OptionSpec*>& registry_index()
     return idx;
 }
 
+// Resolve a user-supplied option name to its registry entry, honouring the DA_* -> IES_*
+// rewrite that assign_registry_impl() performs below.
+//
+// Without this the same name means different things depending on direction:
+// set_option("da_num_reals") is accepted, because the assign path rewrites it, while
+// get_option("da_num_reals") returns "" and is_valid_arg() says it does not exist, because
+// they looked the name up raw. A caller that sets an option and reads it back - which is
+// exactly what a programmatic api does - got silence.
+static const OptionSpec* lookup_spec(const string& name)
+{
+    const auto& idx = registry_index();
+    string k = upper_cp(name);
+    auto it = idx.find(k);
+    if (it != idx.end())
+        return it->second;
+    // same test the assign path uses, deliberately, so the two cannot drift apart
+    if (k.substr(0, 2) == "DA")
+    {
+        auto it2 = idx.find("IES" + k.substr(2, k.size()));
+        if (it2 != idx.end())
+            return it2->second;
+    }
+    return nullptr;
+}
+
 void PestppOptions::set_defaults_registry()
 {
     for (const auto& s : get_option_registry()) s.apply_default(*this);
@@ -1069,8 +1094,7 @@ void PestppOptions::summary_registry(ostream& os) const
 
 bool PestppOptions::is_valid_arg(const string& key) const
 {
-    string k = upper_cp(key);
-    return registry_index().count(k) > 0;
+    return lookup_spec(key) != nullptr;
 }
 
 set<string> PestppOptions::get_registered_args() const
@@ -1156,9 +1180,8 @@ PestppOptions::ARG_STATUS PestppOptions::set_option(const string& name, const st
 // if the name is not a registered option.
 string PestppOptions::get_option(const string& name) const
 {
-    const auto& idx = registry_index();
-    auto it = idx.find(upper_cp(name));
-    return (it == idx.end()) ? string() : it->second->to_str(*this);
+    const OptionSpec* spec = lookup_spec(name);
+    return (spec == nullptr) ? string() : spec->to_str(*this);
 }
 
 // Was this option explicitly supplied (by the user in the .pst OR via set_option)? Resolves
@@ -1166,27 +1189,28 @@ string PestppOptions::get_option(const string& name) const
 bool PestppOptions::is_user_set(const string& name) const
 {
     string key = upper_cp(name);
-    const auto& idx = registry_index();
-    auto it = idx.find(key);
-    if (it == idx.end()) return passed_args.count(key) > 0;
-    if (passed_args.count(it->second->name)) return true;
-    for (const auto& a : it->second->aliases) if (passed_args.count(a)) return true;
+    const OptionSpec* spec = lookup_spec(name);
+    if (spec == nullptr) return passed_args.count(key) > 0;
+    // the da spelling is recorded under its own name by the assign path, so check it too
+    if (passed_args.count(key)) return true;
+    if (passed_args.count(spec->name)) return true;
+    for (const auto& a : spec->aliases) if (passed_args.count(a)) return true;
     return false;
 }
 
 // Is this option consumed once at setup (irreversible after initialization)?
 bool PestppOptions::is_init_only(const string& name) const
 {
-    auto it = registry_index().find(upper_cp(name));
-    return (it != registry_index().end()) && it->second->init_only;
+    const OptionSpec* spec = lookup_spec(name);
+    return (spec != nullptr) && spec->init_only;
 }
 
 // Which tool the option belongs to (ies, mou, sqp, opt, glm, da, gsa, panther, sweep,
 // general); useful for grouping/introspection.
 string PestppOptions::get_option_scope(const string& name) const
 {
-    auto it = registry_index().find(upper_cp(name));
-    return (it == registry_index().end()) ? string() : it->second->scope;
+    const OptionSpec* spec = lookup_spec(name);
+    return (spec == nullptr) ? string() : spec->scope;
 }
 
 // ---- public entry points: parsing + defaults route through the registry ----

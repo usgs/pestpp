@@ -1,0 +1,28 @@
+/*
+ * Linker version script: the definitive statement of what this library exports.
+ *
+ * Visibility attributes are not enough on elf, and the reason is not obvious. libstdc++
+ * declares `namespace std _GLIBCXX_VISIBILITY(default)`, which sets default visibility for
+ * everything in namespace std and OVERRIDES -fvisibility=hidden. So template instantiations
+ * the C ABI happens to use - std::vector<double>::_M_realloc_insert, std::_Hashtable::clear
+ * and friends - are emitted as weak symbols with default visibility and land in the dynamic
+ * symbol table. They come from this target's own object file, so --exclude-libs (which only
+ * governs static archives) cannot reach them either.
+ *
+ * A version script is decided at link time and applies to everything, so it does not care
+ * where a symbol came from or what the compiler thought about its visibility. Anything not
+ * named here is local, full stop.
+ *
+ * Wildcards rather than a list of ~50 names deliberately: a hand-maintained list silently
+ * goes out of date, which is exactly what the survey found had happened to pypestutils'
+ * pestutils.def. Every entry point is already named pestpp_*, and capi_export_surface_test
+ * fails the build's tests if anything outside that convention ever becomes visible.
+ */
+{
+  global:
+    pestpp_*;
+    PESTPP_NAME_LEN;
+    PESTPP_MESSAGE_LEN;
+  local:
+    *;
+};

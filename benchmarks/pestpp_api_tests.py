@@ -546,6 +546,147 @@ def api_notebook_runs_test():
         shutil.rmtree(os.path.join(nb_dir, name), ignore_errors=True)
 
 
+def api_pyemu_objects_test():
+    """The pyemu surface hands back real pyemu objects, not lookalikes.
+
+    The test is not that the types are right - it is that the objects WORK: the Pst carries
+    live weights, the ensembles compute phi, and the phi they compute agrees with the phi the
+    tool reports. A DataFrame dressed up as a ParameterEnsemble would pass a type check and
+    fail every one of these.
+    """
+    wd = _case("api_pyemu", noptmax=1)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+
+        pst = ies.pst
+        assert isinstance(pst, pyemu.Pst)
+        assert pst is ies.pst, "the Pst should be parsed once and cached"
+
+        pe, oe = ies.pe, ies.oe
+        assert isinstance(pe, pyemu.ParameterEnsemble), type(pe)
+        assert isinstance(oe, pyemu.ObservationEnsemble), type(oe)
+        assert pe.shape[0] == ies.n_reals and oe.shape[0] == ies.n_reals
+
+        # lowercase and pyemu-shaped, so these line up with the Pst without any renaming
+        assert set(oe.columns) >= set(pst.nnz_obs_names), \
+            "obs ensemble columns do not match the Pst's observation names"
+        assert set(pe.columns) >= set(pst.adj_par_names), \
+            "par ensemble columns do not match the Pst's parameter names"
+
+        # the cross-check that makes the integration worth anything: pyemu computes phi from
+        # the ensemble and the Pst's weights, the library computes it internally, and they
+        # are the same quantity
+        theirs = oe.phi_vector
+        mine = ies.phi_df(PHI_ACTUAL, lower=True)["actual"]
+        common = [n for n in theirs.index if n in mine.index]
+        assert len(common) == ies.n_reals, (len(common), ies.n_reals)
+        assert np.allclose(theirs.loc[common].values, mine.loc[common].values, rtol=1e-6), \
+            "pyemu's phi_vector disagrees with the library's PHI_ACTUAL:\n{0}".format(
+                pd.DataFrame({"pyemu": theirs.loc[common], "api": mine.loc[common]}))
+
+        # axis names, so a merge or reset_index produces something a pyemu user recognises
+        assert ies.par_df().index.name == "realization"
+        assert ies.obs_df().columns.name == "obsnme"
+        ies.finalize()
+
+
+def api_pyemu_weights_stay_live_test():
+    """pst.observation_data.weight tracks weights changed through the API.
+
+    A cached Pst read off disk would go stale the moment a weight changed, and everything
+    derived from it - phi_vector most of all - would quietly disagree with the tool.
+    """
+    wd = _case("api_pyemu_w", noptmax=1)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        target = ies.pst.nnz_obs_names[0]
+        before = float(ies.pst.observation_data.loc[target, "weight"])
+
+        ies.set_obs_weights({target: before * 3.0}, broadcast=True)
+        after = float(ies.pst.observation_data.loc[target, "weight"])
+        assert abs(after - before * 3.0) < 1.0e-9, \
+            "the Pst still reports the old weight ({0} vs {1}) - it is a stale copy".format(
+                after, before * 3.0)
+
+        # and the ensembles built from it agree with the tool's own recomputed phi
+        ies.update_phi()
+        theirs = ies.oe.phi_vector
+        mine = ies.phi_df(PHI_ACTUAL, lower=True)["actual"]
+        common = [n for n in theirs.index if n in mine.index]
+        assert np.allclose(theirs.loc[common].values, mine.loc[common].values, rtol=1e-6), \
+            "after reweighting, pyemu and the library disagree on phi"
+        ies.finalize()
+
+
+def api_pyemu_bounds_enforced_test():
+    """An out-of-bounds parameter is refused rather than silently turned into NaN.
+
+    This is the sharpest consequence of the helper layer not knowing the Pst: pest++ maps a
+    control value into the tool's transform space, and out-of-bounds on a LOG parameter
+    becomes NaN, which then gets run through the model. pyemu draws go out of bounds
+    routinely, so this is a live path.
+    """
+    wd = _case("api_pyemu_bounds", noptmax=1)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        pst = ies.pst
+        adj = pst.adj_par_names[0]
+        ub = float(pst.parameter_data.loc[adj, "parubnd"])
+
+        bad = ies.par_df(lower=True)
+        bad.loc[:, adj] = ub * 1000.0
+
+        try:
+            ies.set_par_df(bad)
+            raise AssertionError("an out-of-bounds parameter was accepted silently")
+        except PestppError as e:
+            assert adj in str(e), str(e)
+
+        # reset clips instead, which is what pyemu's ParameterEnsemble.enforce() does
+        ies.set_par_df(bad, enforce="reset")
+        back = ies.par_df(lower=True)
+        assert np.allclose(back.loc[:, adj].values, ub), \
+            "enforce='reset' did not clip to the upper bound"
+
+        # and opting out is still possible, for a caller who means it
+        ies.set_par_df(back, enforce=False)
+        ies.finalize()
+
+
+def api_pyemu_from_pst_object_test():
+    """from_pst accepts a pyemu.Pst, matching pyemu's own from_* convention."""
+    wd = _case("api_pyemu_obj", noptmax=1)
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.pestpp_options["ies_num_reals"] = 5
+    # the object is renamed so the file it lands in is unmistakably the one this wrote, not
+    # the pest.pst already sitting in the directory
+    pst.filename = os.path.join(wd, "handed_over.pst")
+
+    with Ies.from_pst(pst, workdir=wd) as ies:
+        ies.initialize()
+        assert ies.n_reals == 5, ies.n_reals
+        assert os.path.exists(os.path.join(wd, "handed_over.pst")), \
+            "the Pst object was not written to the working directory"
+        ies.finalize()
+
+
+def api_pyemu_results_test():
+    """`.results` is a pyemu.Results over the working directory, with pyemu's vocabulary."""
+    wd = _case("api_pyemu_res", noptmax=1)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        for _ in ies.iterations():
+            pass
+        ies.finalize()
+        r = ies.results
+        assert isinstance(r, pyemu.Results), type(r)
+        paren0 = r.ies.paren0
+        assert paren0 is not None and paren0.shape[0] == ies.n_reals, paren0.shape
+        # the on-disk iteration-0 ensemble and the live one agree on their realizations
+        assert set(str(i).lower() for i in paren0.index) == \
+            set(str(i).lower() for i in ies.real_names)
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -564,4 +705,9 @@ if __name__ == "__main__":
     api_run_ies_one_call_test()
     api_find_library_test()
     api_notebook_runs_test()
+    api_pyemu_objects_test()
+    api_pyemu_weights_stay_live_test()
+    api_pyemu_bounds_enforced_test()
+    api_pyemu_from_pst_object_test()
+    api_pyemu_results_test()
     print("all helper tests passed")

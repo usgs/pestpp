@@ -65,6 +65,25 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   if(PESTPP_LD_HAS_EXCLUDE_LIBS)
     target_link_options(pestpp_capi PRIVATE "LINKER:--exclude-libs,ALL")
   endif()
+
+  # ...and a version script, which is the part that actually settles it.
+  #
+  # --exclude-libs governs static archives; the visibility preset governs how this target's
+  # objects are compiled. Neither covers the case that turned up in CI: libstdc++ declares
+  # `namespace std _GLIBCXX_VISIBILITY(default)`, so template instantiations this file uses
+  # are emitted weak-and-visible out of our OWN object regardless of -fvisibility=hidden.
+  # A version script is applied at link time to everything, so it does not care.
+  set(_pestpp_api_version_script "${CMAKE_CURRENT_SOURCE_DIR}/pestpp-api.version")
+  set(CMAKE_REQUIRED_LINK_OPTIONS "-Wl,--version-script=${_pestpp_api_version_script}")
+  check_cxx_source_compiles("int main(){return 0;}" PESTPP_LD_HAS_VERSION_SCRIPT)
+  unset(CMAKE_REQUIRED_LINK_OPTIONS)
+  if(PESTPP_LD_HAS_VERSION_SCRIPT)
+    target_link_options(pestpp_capi PRIVATE
+      "LINKER:--version-script=${_pestpp_api_version_script}")
+    # relink when the script changes, which cmake would not otherwise notice
+    set_property(TARGET pestpp_capi APPEND PROPERTY
+      LINK_DEPENDS "${_pestpp_api_version_script}")
+  endif()
 endif()
 
 target_link_libraries(pestpp_capi

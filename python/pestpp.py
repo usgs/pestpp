@@ -33,6 +33,21 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+# pyemu is a REQUIRED dependency of this module, deliberately.
+#
+# The thin binding (pestpp_lib) stays free of it - ctypes and numpy only - so anyone writing a
+# binding in another language has a reference implementation with no python ecosystem in it.
+# This layer is the opposite: its whole job is to be comfortable for someone who already
+# thinks in pyemu, which means handing back real Pst and Ensemble objects rather than frames
+# that merely resemble them. Half-integrating would be worse than not integrating - a
+# DataFrame that looks like a ParameterEnsemble but cannot enforce() is a trap.
+try:
+    import pyemu
+except ImportError as e:                                     # pragma: no cover
+    raise ImportError(
+        "pestpp.py requires pyemu (the thin layer, pestpp_lib.py, does not). "
+        "Install it with `pip install pyemu`.") from e
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, _UNSET,
@@ -116,6 +131,21 @@ def _up(name) -> str:
 
 def _up_all(names):
     return [_up(n) for n in names]
+
+
+def _named(df, index_name=None, columns_name=None):
+    """Give a frame the axis names pyemu uses, so merges and reset_index just work.
+
+    pyemu names its axes (`parnme`, `obsnme`) and pest++'s own ensemble csv header is
+    `real_name`; pyemu's result handler calls the ensemble index `realization`. Matching that
+    is free and it is the difference between `df.reset_index()` producing a column a pyemu
+    user recognises and producing one called "index".
+    """
+    if index_name is not None:
+        df.index.name = index_name
+    if columns_name is not None:
+        df.columns.name = columns_name
+    return df
 
 
 def _maybe_lower(df, lower: bool, axis="both"):
@@ -299,7 +329,8 @@ class _Tool:
     _tool_id = None
     _has_phi = True
 
-    def __init__(self, lib: PestppLib, workdir: str, workers=None, quiet: bool = True):
+    def __init__(self, lib: PestppLib, workdir: str, workers=None, quiet: bool = True,
+                 pst_file: str = "pest.pst"):
         self._lib = lib
         self._workdir = workdir
         self._workers = workers or []
@@ -307,6 +338,8 @@ class _Tool:
         self._queued = 0
         self._quiet = quiet
         self._log = os.path.join(workdir, "pestpp.stdout.log")
+        self._pst_file = pst_file
+        self._pst = None            # lazily parsed by the .pst property
 
     def _q(self):
         """Capture the library's console output for the duration of a call."""
@@ -336,8 +369,22 @@ class _Tool:
         ``quiet`` (the default) captures the library's console output to
         ``<workdir>/pestpp.stdout.log`` instead of letting it flood the session. Pass
         ``quiet=False`` to watch it live.
+
+        ``pst_file`` may be a path OR a :class:`pyemu.Pst`. Passing the object matches
+        pyemu's own ``from_*`` convention and is the natural end of a PstFrom workflow -
+        build it, hand it over, never write it out yourself. It IS written to ``workdir``,
+        because pest++ reads a file and the workers need one too; ``pst.filename`` names it
+        if it has one, otherwise it becomes ``pest.pst``.
         """
         workdir = os.path.abspath(workdir)
+        if hasattr(pst_file, "write") and hasattr(pst_file, "parameter_data"):
+            pst_obj = pst_file
+            name = os.path.basename(getattr(pst_obj, "filename", None) or "pest.pst")
+            if not name.lower().endswith(".pst"):
+                name += ".pst"
+            os.makedirs(workdir, exist_ok=True)
+            pst_obj.write(os.path.join(workdir, name), version=2)
+            pst_file = name
         parallel = workers > 0
         if run_manager is None:
             run_manager = RM_PANTHER if parallel else RM_SERIAL
@@ -356,7 +403,7 @@ class _Tool:
             # be reached
             procs = _start_workers(workdir, workers, port, worker_root, exe_path,
                                    cls._agent_exe(), pst_file)
-        return cls(lib, workdir, procs, quiet=quiet)
+        return cls(lib, workdir, procs, quiet=quiet, pst_file=pst_file)
 
     @staticmethod
     def _agent_exe():
@@ -662,10 +709,11 @@ class _Tool:
         """The weights ENSEMBLE - one weight per observation per realization, as a copy."""
         arr, token = self._lib.get_ensemble_view(WEIGHTS_EN)
         self._lib.release_view(token)          # a copy is taken below; nothing stays borrowed
-        return _maybe_lower(pd.DataFrame(
+        return _named(_maybe_lower(pd.DataFrame(
             arr.copy(),
             index=self._lib.get_ensemble_row_names(WEIGHTS_EN),
-            columns=self._lib.get_ensemble_col_names(WEIGHTS_EN)), lower)
+            columns=self._lib.get_ensemble_col_names(WEIGHTS_EN)), lower),
+            "realization", "obsnme")
 
     @contextmanager
     def weights_view(self):
@@ -719,20 +767,147 @@ class _Tool:
     def par_df(self, lower: bool = False) -> pd.DataFrame:
         """Every control-file parameter in CTL space, as a copy. Ready for pyemu."""
         vals, rows, cols = self._lib.get_par_snapshot()
-        return _maybe_lower(pd.DataFrame(vals, index=rows, columns=cols), lower)
+        return _named(_maybe_lower(pd.DataFrame(vals, index=rows, columns=cols), lower),
+                      "realization", "parnme")
 
-    def set_par_df(self, df: pd.DataFrame) -> None:
-        """Push a parameter DataFrame back. Matched by name, so order does not matter."""
+    def set_par_df(self, df, enforce: str = "raise") -> None:
+        """Push parameter values back. Matched by NAME, so order does not matter.
+
+        Accepts a DataFrame or a :class:`pyemu.ParameterEnsemble`.
+
+        ``enforce`` decides what happens to values outside a parameter's bounds, and the
+        default is to refuse rather than to proceed. That is not fussiness: pest++ maps a
+        control-file value into the tool's transform space, and an out-of-bounds value on a
+        LOG parameter becomes **NaN**, which is then run through the model. pyemu draws go
+        out of bounds routinely - that is what ``ParameterEnsemble.enforce()`` exists for -
+        so this is a live path, not a hypothetical one.
+
+            "raise"  refuse, naming the offenders          (default)
+            "reset"  clip to the bound, pyemu's how="reset"
+            False    send exactly what you passed
+        """
+        if hasattr(df, "to_dataframe"):        # a pyemu Ensemble
+            df = df.to_dataframe()
+        df = df.copy()
+        if enforce:
+            df = self._enforce_bounds(df, how=enforce)
         self._lib.set_par_snapshot(df.values, _up_all(df.index), _up_all(df.columns))
+
+    def _enforce_bounds(self, df, how="raise"):
+        """Bounds check/clip against the control file, in the frame's own case."""
+        par = self.pst.parameter_data
+        lb = par.parlbnd.copy()
+        ub = par.parubnd.copy()
+        # the frame may be in either case; the Pst is lowercase, so meet it there
+        cols = [str(c) for c in df.columns]
+        lower_cols = [c.lower() for c in cols]
+        known = [i for i, c in enumerate(lower_cols) if c in lb.index]
+        if not known:
+            return df
+        idx = [lower_cols[i] for i in known]
+        sub = df.iloc[:, known]
+        lo = lb.loc[idx].values.astype(float)
+        hi = ub.loc[idx].values.astype(float)
+        below = sub.values < lo
+        above = sub.values > hi
+        n_bad = int(below.sum() + above.sum())
+        if n_bad == 0:
+            return df
+        if str(how).lower() == "reset":
+            vals = np.clip(sub.values, lo, hi)
+            df.iloc[:, known] = vals
+            return df
+        bad_cols = sorted({idx[j] for j in np.where(below.any(axis=0) | above.any(axis=0))[0]})
+        raise PestppError(
+            "{0} value(s) across {1} parameter(s) are outside their control-file bounds, e.g. "
+            "{2}. pest++ would transform an out-of-bounds LOG parameter to NaN and run it. "
+            "Pass enforce='reset' to clip (pyemu's ParameterEnsemble.enforce() does the same), "
+            "or enforce=False to send them anyway.".format(n_bad, len(bad_cols), bad_cols[:5]))
+
+    # -- pyemu ------------------------------------------------------------------------------
+    #
+    # The point of this block is that someone who already knows pyemu should not have to learn
+    # a second vocabulary. `pst`, `pe`, `oe` and `results` mean here exactly what they mean
+    # there, the frames carry the axis names pyemu's own result handler gives them, and
+    # everything is lowercase because that is what pest++ writes to its ensemble csvs and
+    # therefore what `pyemu.Results` hands back.
+
+    @property
+    def pst(self) -> "pyemu.Pst":
+        """The control file as a :class:`pyemu.Pst` - bounds, transforms, obsvals, groups.
+
+        Parsed once and cached, because the static metadata cannot change mid-run. The one
+        thing that CAN change is the weights, and those are re-synced from the library on
+        every access, so ``pst.observation_data.weight`` is never stale and
+        ``oe.phi_vector`` agrees with the phi the tool reports.
+
+        Note this is the WEIGHT VECTOR, not the weights ensemble - see :meth:`weights_df` for
+        the per-realization form, which a Pst has no way to represent.
+        """
+        if self._pst is None:
+            self._pst = pyemu.Pst(os.path.join(self._workdir, self._pst_file))
+        try:
+            live = dict(zip([n.lower() for n in self.obs_names], self.obs_weights))
+            obs = self._pst.observation_data
+            hit = [n for n in obs.index if n in live]
+            if hit:
+                obs.loc[hit, "weight"] = [live[n] for n in hit]
+        except PestppError:
+            # before initialize() there may be no observation ensemble to read weights from;
+            # the control-file values already in the Pst are the right answer then
+            pass
+        return self._pst
+
+    @property
+    def pe(self) -> "pyemu.ParameterEnsemble":
+        """The parameter ensemble as a :class:`pyemu.ParameterEnsemble`, in CTL space.
+
+        Untransformed (``istransformed=False``), which is what CTL space is - so
+        ``.enforce()``, ``.to_binary()``, ``.covariance_matrix()`` and the plotting helpers
+        all behave the way they do on an ensemble read off disk.
+        """
+        return pyemu.ParameterEnsemble(pst=self.pst, df=self.par_df(lower=True),
+                                       istransformed=False)
+
+    @property
+    def oe(self) -> "pyemu.ObservationEnsemble":
+        """The observation ensemble as a :class:`pyemu.ObservationEnsemble`.
+
+        ``oe.phi_vector`` is then computable in pyemu and comparable with :attr:`phi_actual`.
+        They are the same quantity by different routes, which makes it a useful cross-check.
+        """
+        return pyemu.ObservationEnsemble(pst=self.pst, df=self.obs_df(lower=True))
+
+    def set_pe(self, pe, enforce: str = "reset") -> None:
+        """Push a :class:`pyemu.ParameterEnsemble` (or DataFrame) back into the tool.
+
+        Defaults to ``enforce="reset"`` rather than "raise", because the thing a caller most
+        often hands this is a fresh pyemu draw - and a draw being out of bounds is expected,
+        not exceptional. This is the API-side equivalent of ``pe.enforce()``.
+        """
+        self.set_par_df(pe, enforce=enforce)
+
+    @property
+    def results(self):
+        """A :class:`pyemu.Results` over this session's working directory.
+
+        The on-disk history, with the vocabulary a pyemu user already has: ``.ies.paren0``,
+        ``.ies.phiactual``, ``.mou.dvpop``, and so on. The live in-memory state is what
+        :attr:`pe`, :attr:`oe` and :meth:`par_df` give you; this is everything the tool has
+        written so far, including the iterations already behind you.
+        """
+        case = self._pst_file[:-4] if self._pst_file.lower().endswith(".pst") else self._pst_file
+        return pyemu.Results(self._workdir, case=case)
 
     def obs_df(self, lower: bool = False) -> pd.DataFrame:
         """The observation ensemble, as a copy."""
         arr, token = self._lib.get_ensemble_view(OBS_EN)
         self._lib.release_view(token)          # a copy is taken below; nothing stays borrowed
-        return _maybe_lower(pd.DataFrame(
+        return _named(_maybe_lower(pd.DataFrame(
             arr.copy(),
             index=self._lib.get_ensemble_row_names(OBS_EN),
-            columns=self._lib.get_ensemble_col_names(OBS_EN)), lower)
+            columns=self._lib.get_ensemble_col_names(OBS_EN)), lower),
+            "realization", "obsnme")
 
     @contextmanager
     def par_view(self):

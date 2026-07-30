@@ -917,6 +917,71 @@ def capi_export_surface_test():
     print("  export surface: {0} symbols, all pestpp_*".format(len(exported)))
 
 
+def capi_da_options_reach_the_tool_test():
+    """A `* control data` value set through the API must reach the scenario da actually reads.
+
+    da is the only tool whose adapter is built on something other than the session's parent
+    scenario: its parameter and observation sets are cycle dependent, so DaAdapter is
+    constructed against a per-cycle CHILD deep-copied out of the parent. What is and is not
+    shared between the two turns out to matter a great deal:
+
+      - Pest holds pestpp_options as a shared_ptr, so the ++ options ARE shared with the child.
+        Setting those on the parent always worked, by accident rather than design.
+      - control_info and observation_info are VALUE members, so the child gets its own copy.
+        Writing noptmax to the parent left the child - and therefore the tool - on the control
+        file's value, while get_option() read the parent straight back and reported the number
+        that was not in effect.
+
+    noptmax is the observable, and da_use_mda is what makes it one: the inflation schedule is
+    derived from noptmax, so a tool running on the wrong value produces a different ensemble.
+    Two runs that must agree - one whose control file already says 2, one whose control file
+    says 1 and is told 2 through the API.
+    """
+    def _case(name, ctl_noptmax):
+        d = _copy_base(name)
+        pst = pyemu.Pst(os.path.join(d, "pest.pst"))
+        for df in (pst.parameter_data, pst.observation_data,
+                   pst.model_input_data, pst.model_output_data):
+            df.loc[:, "cycle"] = -1
+        pst.control_data.noptmax = ctl_noptmax
+        pst.pestpp_options["ies_num_reals"] = 6
+        pst.pestpp_options["da_num_reals"] = 6
+        pst.pestpp_options["random_seed"] = 11
+        pst.pestpp_options["da_use_mda"] = True      # makes noptmax drive the schedule
+        pst.write(os.path.join(d, "pest.pst"), version=2)
+        return d
+
+    def _run(d, set_noptmax=None, iters=2):
+        with PestppLib(_find_library(), TOOL_DA, "pest.pst", d) as t:
+            if set_noptmax is not None:
+                t.set_option("noptmax", str(set_noptmax))
+            assert t.get_option("NOPTMAX") == "2", \
+                "get_option reports {0}, not 2".format(t.get_option("NOPTMAX"))
+            t.initialize()
+            for _ in range(iters):
+                t.solve_iteration()
+            arr, _ = t.get_ensemble_view(PAR_EN)
+            return arr.copy()
+
+    from_file = _run(_case("capi_da_opt_ref", 2))
+    from_api = _run(_case("capi_da_opt_set", 1), set_noptmax=2)
+    assert from_file.shape == from_api.shape, (from_file.shape, from_api.shape)
+    assert np.allclose(from_file, from_api), (
+        "setting noptmax through the API did not reach the da tool: the same two iterations "
+        "give a different ensemble (max difference {0:.4g}) from a control file that carries "
+        "the value directly. get_option() reported it correctly the whole time, which is what "
+        "makes this the bad kind of wrong.".format(float(np.abs(from_file - from_api).max())))
+
+    # ++ options are shared with the child, so they reach the tool either way - assert it
+    # rather than leave it to chance, since the sharing is not obvious from the call site
+    d = _case("capi_da_opt_ppo", 1)
+    with PestppLib(_find_library(), TOOL_DA, "pest.pst", d) as t:
+        t.set_option("da_num_reals", "12")
+        t.initialize()
+        n = len(t.get_ensemble_row_names(PAR_EN))
+        assert n == 12, "da drew {0} realizations, not the 12 the API asked for".format(n)
+
+
 def capi_da_cycle_is_tagged_test():
     """Caller-driven queue_runs tags da runs with the cycle, like the in-tree da loop does.
 
@@ -1168,6 +1233,7 @@ if __name__ == "__main__":
     capi_version_test()
     capi_nm_parsing_test()
     capi_export_surface_test()
+    capi_da_options_reach_the_tool_test()
     capi_da_cycle_is_tagged_test()
     capi_output_redirect_is_lifo_test()
     capi_unknown_option_is_reported_test()

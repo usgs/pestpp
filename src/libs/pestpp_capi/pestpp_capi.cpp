@@ -170,6 +170,16 @@ struct ToolAdapter
     /// untagged, which is what NULL_DA_CYCLE means.
     virtual int da_cycle() const { return NetPackage::NULL_DA_CYCLE; }
 
+    /// The scenario THIS TOOL WAS BUILT ON, which is not always the one the session parsed.
+    ///
+    /// da is the reason this exists. Its parameter and observation sets are cycle dependent,
+    /// so DaAdapter is constructed against a per-cycle child scenario deep-copied out of the
+    /// parent. Anything that reads or writes options, weights or observation metadata has to
+    /// go through here: routing it to the parent instead means the write lands on a Pest
+    /// object the tool never consults, and the matching read hands back a value that is not
+    /// in effect - silently, and only for da.
+    virtual Pest& scenario() = 0;
+
     virtual const char* name() const = 0;
 };
 
@@ -319,6 +329,8 @@ struct IesAdapter : public ToolAdapter
                RunManagerAbstract* rm)
         : tool(p, fm, ofw, pl, rm), scen(p) {}
 
+    Pest& scenario() override { return scen; }
+
     void initialize() override { tool.initialize(); }
     int  initialize_prepare() override { return tool.initialize_prepare(); }
     void initialize_finish() override { tool.initialize_finish(); }
@@ -368,10 +380,14 @@ struct IesAdapter : public ToolAdapter
 struct DaAdapter : public ToolAdapter
 {
     DataAssimilator tool;
+    // the per-cycle CHILD scenario, not the session's parent - see ToolAdapter::scenario()
+    Pest& scen;
     int cycle;
     DaAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
               RunManagerAbstract* rm, int _cycle)
-        : tool(p, fm, ofw, pl, rm), cycle(_cycle) {}
+        : tool(p, fm, ofw, pl, rm), scen(p), cycle(_cycle) {}
+
+    Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(cycle, true, false); }
     int  initialize_prepare() override { return tool.initialize_prepare(cycle, true, false); }
@@ -414,6 +430,8 @@ struct MouAdapter : public ToolAdapter
     MouAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
                RunManagerAbstract* rm)
         : tool(p, fm, ofw, pl, rm), scen(p) {}
+
+    Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(); }
     // mou's initialize() issues several population evaluations rather than one, so there is
@@ -458,10 +476,13 @@ struct MouAdapter : public ToolAdapter
 struct SqpAdapter : public ToolAdapter
 {
     SeqQuadProgram tool;
+    Pest& scen;
     int iter = 0;
     SqpAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
                RunManagerAbstract* rm)
-        : tool(p, fm, ofw, pl, rm) {}
+        : tool(p, fm, ofw, pl, rm), scen(p) {}
+
+    Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(); }
     // sqp's only batch inside initialize() is a single control-file-values run, not an
@@ -1250,12 +1271,12 @@ pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* va
     CAPI_BEGIN(h)
         if ((key == nullptr) || (value == nullptr)) bad_arg("null argument");
         PestppOptions::ARG_STATUS st =
-            s->pest_scenario->get_pestpp_options_ptr()->set_option(key, value);
+            s->adapter->scenario().get_pestpp_options_ptr()->set_option(key, value);
         // fall through to the control data section, which exposes the same interface. noptmax
         // is the most-set quantity in pest and it lives there, not in PestppOptions, so a
         // caller that could not reach it would be missing the obvious thing.
         if (st == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
-            st = s->pest_scenario->get_control_info_4_mod().set_option(key, value);
+            st = s->adapter->scenario().get_control_info_4_mod().set_option(key, value);
         if (st == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
             bad_arg(string("unknown option '") + key + "'");
         if (st == PestppOptions::ARG_STATUS::ARG_INVALID)
@@ -1272,7 +1293,7 @@ pestpp_status pestpp_get_option(pestpp_handle h, const char* key,
         // "" is a legitimate value for a ++ option, so an empty string cannot be the signal
         // for "no such option" - ask the registry whether the key exists at all, separately
         // from what it holds.
-        const PestppOptions& ppo = s->pest_scenario->get_pestpp_options();
+        const PestppOptions& ppo = s->adapter->scenario().get_pestpp_options();
         bool known = ppo.is_valid_arg(key);
         string v = known ? ppo.get_option(key) : string();
         if (!known)
@@ -1281,7 +1302,7 @@ pestpp_status pestpp_get_option(pestpp_handle h, const char* key,
             // Its get_option() is an if-chain returning "" for anything it does not recognise,
             // and every key it DOES recognise formats to at least one character (a number, or
             // a pestmode word), so non-empty is a sound test for "known" here.
-            v = s->pest_scenario->get_control_info().get_option(key);    // e.g. NOPTMAX
+            v = s->adapter->scenario().get_control_info().get_option(key);    // e.g. NOPTMAX
             known = !v.empty();
         }
         if (found != nullptr)
@@ -1434,8 +1455,8 @@ pestpp_status pestpp_get_obs_groups(pestpp_handle h, char* buf, int buf_len, int
     CAPI_BEGIN(h)
         // aligned with the observation ensemble's columns, so a caller can zip the two
         vector<string> onames = s->adapter->obs_ensemble()->get_var_names();
-        const Observations& ctl_obs = s->pest_scenario->get_ctl_observations();
-        const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
+        const Observations& ctl_obs = s->adapter->scenario().get_ctl_observations();
+        const ObservationInfo* oi = s->adapter->scenario().get_ctl_observation_info_ptr();
         vector<string> groups;
         for (auto& n : onames)
         {
@@ -1628,8 +1649,8 @@ pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights, int max_n
         // ObservationInfo::get_weight/get_group deref find() without checking end(), which
         // is a segfault rather than an exception - and these names come from an ENSEMBLE, so
         // a weights csv whose columns do not match the scenario would crash the host process
-        const Observations& ctl_obs = s->pest_scenario->get_ctl_observations();
-        const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
+        const Observations& ctl_obs = s->adapter->scenario().get_ctl_observations();
+        const ObservationInfo* oi = s->adapter->scenario().get_ctl_observation_info_ptr();
         for (size_t i = 0; i < onames.size(); i++)
         {
             if (ctl_obs.find(onames[i]) == ctl_obs.end())
@@ -1647,11 +1668,11 @@ pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
     CAPI_BEGIN(h)
         if ((names == nullptr) || (weights == nullptr) || (n <= 0))
             bad_arg("pestpp_set_obs_weights needs names and values");
-        ObservationInfo& oi = s->pest_scenario->get_ctl_observation_info_4_mod();
+        ObservationInfo& oi = s->adapter->scenario().get_ctl_observation_info_4_mod();
         vector<string> want = unpack_names(names, n);
         // validate everything before changing anything, so a bad name cannot leave the
         // weights half-updated
-        const Observations& obs = s->pest_scenario->get_ctl_observations();
+        const Observations& obs = s->adapter->scenario().get_ctl_observations();
         for (auto& nm : want)
             if (obs.find(nm) == obs.end())
                 bad_arg("no such observation: '" + nm + "'");
@@ -1674,9 +1695,9 @@ pestpp_status pestpp_broadcast_weights(pestpp_handle h)
                                 "' has no weights ensemble");
         if (w->shape().first == 0)
             return PESTPP_OK;                 /* not built yet; initialize will read the vector */
-        const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
+        const ObservationInfo* oi = s->adapter->scenario().get_ctl_observation_info_ptr();
         vector<string> wnames = w->get_var_names();
-        const Observations& ctl_obs = s->pest_scenario->get_ctl_observations();
+        const Observations& ctl_obs = s->adapter->scenario().get_ctl_observations();
         Eigen::VectorXd wvec(wnames.size());
         for (size_t j = 0; j < wnames.size(); j++)
         {
