@@ -37,6 +37,10 @@ jobs:
           # the ergonomic layer on top of it, plus executing the example notebook so a stale
           # cell fails here rather than in front of a new user
           - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "pestpp_api_tests.py"}
+          # runs each tool BOTH ways - executable and api - on one control file and diffs the
+          # output. The only tests that can catch an adapter quietly taking a different path
+          # through a tool; everything else judges the api against itself
+          - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "api_vs_exe_tests.py"}
           - { test_dir: "pestpp-opt_benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "../benchmarks/opt_test.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_base.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part1.py"}
@@ -65,6 +69,8 @@ jobs:
               env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "capi_tests.py"}
             - os: macos-latest
               env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "pestpp_api_tests.py"}
+            - os: macos-latest
+              env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "api_vs_exe_tests.py"}
     env: ${{ matrix.env }}
 
     steps:

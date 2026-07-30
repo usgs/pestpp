@@ -2651,7 +2651,29 @@ void SeqQuadProgram::iterate_2_solution()
 	bool accept = false;
 	n_consec_infeas = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
-	{ 		
+	{
+		if (!solve_iteration(accept))
+			break;
+	}
+}
+
+/**
+ * @brief One pass of iterate_2_solution()'s loop body.
+ *
+ * Split out so a caller running its own loop - the C ABI - takes the SAME steps in the same
+ * order rather than an approximation of them. Calling solve_new_ensemble() alone is not an
+ * sqp iteration: it skips advancing `iter` (which names every .N. output file), the gradient
+ * runs, the CMA update, the hessian update, the constraint report and the pcs summary.
+ *
+ * `accept` reports whether the step was taken. The return value is whether the loop should
+ * continue - false where the built-in loop would have broken out.
+ */
+bool SeqQuadProgram::solve_iteration(bool& accept)
+{
+	stringstream ss;
+	ofstream &frec = file_manager.rec_ofstream();
+	{
+		{
 		iter++;
 		if (get_use_ensemble_grad())
 			accept = solve_new_ensemble();
@@ -2737,7 +2759,7 @@ void SeqQuadProgram::iterate_2_solution()
         }
 
 		if (should_terminate() && last_viol < 1E-10)
-			break;
+			return false;
 
 		if (pest_scenario.get_pestpp_options().get_sqp_update_hessian())
 		{
@@ -2767,7 +2789,9 @@ void SeqQuadProgram::iterate_2_solution()
 				frec << ss.str() << endl;
 			}
 		}
+		}
 	}
+	return true;
 }
 
 /**

@@ -195,6 +195,10 @@ public:
 		PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr);
 	void initialize();
     void iterate_to_solution();
+	/// One generation: the loop body of iterate_to_solution(), including advancing the
+	/// generation counter. Available on its own so a caller driving its own loop - the C ABI -
+	/// runs the same steps in the same order rather than an approximation of them.
+	void solve_generation();
 	void finalize();
 
 	// One generation, as separately callable phases: generate -> run -> evaluate -> report.

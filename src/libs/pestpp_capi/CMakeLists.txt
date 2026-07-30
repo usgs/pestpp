@@ -43,6 +43,30 @@ set_target_properties(pestpp_capi PROPERTIES
   VISIBILITY_INLINES_HIDDEN ON
   WINDOWS_EXPORT_ALL_SYMBOLS OFF)
 
+# On elf, also refuse to re-export anything that came in from a static archive.
+#
+# The visibility preset above governs how THIS target's objects are compiled; it says nothing
+# about the archives linked into it. Those are compiled with the project-wide preset, so today
+# they are hidden too - but that makes the export surface depend on how the rest of the
+# project happened to be configured, which is exactly the coupling this target is trying to
+# get away from. --exclude-libs states it locally instead: whatever the archives contain, none
+# of it is re-exported from here. Safe because this library is a leaf loaded by ctypes with
+# all its dependencies linked in statically, so nothing outside it needs those symbols.
+#
+# GNU ld and lld only; apple's ld64 has no equivalent and does not need one, since mach-o does
+# not re-export archive members by default. Probed rather than assumed: this is hardening on
+# top of a guarantee the visibility preset already provides, so a linker that does not take the
+# option should skip it, not fail to build.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  include(CheckCXXSourceCompiles)
+  set(CMAKE_REQUIRED_LINK_OPTIONS "-Wl,--exclude-libs,ALL")
+  check_cxx_source_compiles("int main(){return 0;}" PESTPP_LD_HAS_EXCLUDE_LIBS)
+  unset(CMAKE_REQUIRED_LINK_OPTIONS)
+  if(PESTPP_LD_HAS_EXCLUDE_LIBS)
+    target_link_options(pestpp_capi PRIVATE "LINKER:--exclude-libs,ALL")
+  endif()
+endif()
+
 target_link_libraries(pestpp_capi
   pestpp_com
   rm_abstract

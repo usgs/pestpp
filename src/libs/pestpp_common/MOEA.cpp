@@ -4429,19 +4429,27 @@ void MOEA::report_generation(GenerationContext& ctx)
  * generate -> run -> evaluate -> report is exactly the sequence an API caller writes; this
  * is the in-tree client of that surface.
  */
+void MOEA::solve_generation()
+{
+	// iter is advanced HERE, before the generation runs, so that a caller driving its own
+	// loop gets the same numbering the built-in one does - the generation number is not
+	// cosmetic, it names the .N. population files and is read by the reporting and chance
+	// machinery. initialize() leaves iter at 0, so the first pass through here is generation 1.
+	iter++;
+	GenerationContext ctx(&pest_scenario, &rand_gen);
+	generate_generation(ctx);
+	run_generation(ctx);
+	evaluate_generation(ctx);
+	report_generation(ctx);
+}
+
 void MOEA::iterate_to_solution()
 {
-	iter = 1;
 	// read noptmax live in the loop condition (was hoisted to a local), matching the other
 	// tools, so a runtime change to noptmax extends/ends the run
-	while(iter <= pest_scenario.get_control_info().noptmax)
+	while(iter < pest_scenario.get_control_info().noptmax)
 	{
-		GenerationContext ctx(&pest_scenario, &rand_gen);
-		generate_generation(ctx);
-		run_generation(ctx);
-		evaluate_generation(ctx);
-		report_generation(ctx);
-		iter++;
+		solve_generation();
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2))
         {

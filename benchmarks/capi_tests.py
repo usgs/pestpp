@@ -806,6 +806,82 @@ def capi_version_test():
             (want, (major, minor, patch))
 
 
+def _parse_nm(out):
+    """(exported, leaked) from nm output. Leaked are exports that are not part of the C ABI.
+
+    Split out from the test so the parsing can be checked against known-good input on any
+    platform - which matters, because the parsing is where this went wrong: reading GNU nm's
+    dynamic symbol table without filtering to defined symbols counted every libstdc++ and
+    libgcc symbol pest++ merely CALLS as a symbol it exports.
+    """
+    exported, leaked = [], []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 3:
+            kind, sym = parts[-2], parts[-1]
+        elif len(parts) == 2:
+            kind, sym = parts[0], parts[1]     # no address: undefined, or absolute
+        else:
+            continue
+        # undefined (U), weak-undefined (v/w) and debug (N) entries are imports or noise, not
+        # exports. --defined-only should already have removed them; this is belt and braces
+        # in case a future nm, or a future flag, starts including them again.
+        if kind in ("U", "v", "w", "N"):
+            continue
+        bare = sym.lstrip("_")          # mach-o prefixes every C symbol with an underscore
+        exported.append(sym)
+        if not (bare.startswith("pestpp_") or bare.startswith("PESTPP_")):
+            leaked.append("{0} {1}".format(kind, sym))
+    return exported, leaked
+
+
+def capi_nm_parsing_test():
+    """The export-surface parser, against real nm output from both platforms.
+
+    Worth its own test because the export-surface check can only actually RUN on the platform
+    it is executing on, so the elf half of it would otherwise be exercised nowhere until CI
+    turns red. Every symbol below is copied from real output, including the five that a
+    too-loose parser reported as leaks on linux.
+    """
+    # GNU nm -D --defined-only: what the elf check should see
+    gnu_good = (
+        "0000000000006938 T pestpp_release_view\n"
+        "00000000000037b0 T pestpp_clear_fatal_error\n"
+        "00000000003dc940 R PESTPP_NAME_LEN\n"
+    )
+    exported, leaked = _parse_nm(gnu_good)
+    assert len(exported) == 3 and not leaked, (exported, leaked)
+
+    # GNU nm -gD: the same table WITH imports, which is what was being asked for. These five
+    # names are verbatim from the CI failure - they are libgcc/libstdc++ symbols pest++ calls,
+    # and every one of them is undefined here.
+    gnu_with_imports = gnu_good + (
+        "                 w _ITM_deregisterTMCloneTable\n"
+        "                 w _ITM_registerTMCloneTable\n"
+        "                 U _Unwind_Resume@GCC_3.0\n"
+        "                 U _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_"
+        "traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z\n"
+        "                 U _ZN9__gnu_cxx6__stoaIddcJEEET0_PFT_PKT1_PPS3_DpT2_EPKcS5_PmS9_\n"
+    )
+    exported, leaked = _parse_nm(gnu_with_imports)
+    assert not leaked, "imports are being counted as exports again: {0}".format(leaked)
+    assert len(exported) == 3, exported
+
+    # mach-o nm -gU: leading underscore on every C symbol, and a section type for the constants
+    macho = (
+        "00000000000061a8 T _pestpp_get_ensemble_view\n"
+        "00000000003dc944 S _PESTPP_MESSAGE_LEN\n"
+    )
+    exported, leaked = _parse_nm(macho)
+    assert len(exported) == 2 and not leaked, (exported, leaked)
+
+    # and a real leak is still caught, on either platform's spelling
+    _, leaked = _parse_nm("0000000000001234 T _ZN4Pest20get_ctl_ordered_parsEv\n")
+    assert len(leaked) == 1, leaked
+    _, leaked = _parse_nm("0000000000001234 T some_other_c_function\n")
+    assert len(leaked) == 1, leaked
+
+
 def capi_export_surface_test():
     """The shared library exports the C ABI and nothing else.
 
@@ -818,24 +894,27 @@ def capi_export_surface_test():
         print("  (skipping export-surface check: needs nm)")
         return
     lib_path = _find_library()
-    flag = "-gU" if plat == "apple" else "-gD"
+    # DEFINED symbols only, on both platforms. This is the whole subtlety: a shared library's
+    # dynamic symbol table lists what it EXPORTS and what it IMPORTS, and only the first is
+    # this test's business. Asking GNU nm for "-gD" returns both, so every libstdc++ and libgcc
+    # symbol pest++ merely calls - _Unwind_Resume, __gnu_cxx::__to_xstring - reads as a leak.
+    # Apple's "-U" already means defined-only; GNU's spelling is --defined-only, and GNU's -U
+    # means the opposite. Hence two different flag sets for one question.
+    argv = (["nm", "-gU", lib_path] if plat == "apple"
+            else ["nm", "-D", "--defined-only", lib_path])
     try:
-        out = subprocess.check_output(["nm", flag, lib_path], text=True)
+        out = subprocess.check_output(argv, text=True)
     except (OSError, subprocess.CalledProcessError) as e:
         print("  (skipping export-surface check: {0})".format(e))
         return
-    leaked = []
-    for line in out.splitlines():
-        parts = line.split()
-        if not parts:
-            continue
-        sym = parts[-1].lstrip("_")
-        if not (sym.startswith("pestpp_") or sym.startswith("PESTPP_")):
-            leaked.append(sym)
+
+    exported, leaked = _parse_nm(out)
+    assert exported, "nm reported no exported symbols at all, which cannot be right"
     assert not leaked, (
-        "{0} non-ABI symbols are exported, e.g. {1}. Check CXX_VISIBILITY_PRESET and "
-        "WINDOWS_EXPORT_ALL_SYMBOLS on the pestpp_capi target.".format(
+        "{0} non-ABI symbols are exported, e.g. {1}. Check CXX_VISIBILITY_PRESET and, on elf, "
+        "the --exclude-libs link option on the pestpp_capi target.".format(
             len(leaked), leaked[:5]))
+    print("  export surface: {0} symbols, all pestpp_*".format(len(exported)))
 
 
 def capi_da_cycle_is_tagged_test():
@@ -1087,6 +1166,7 @@ if __name__ == "__main__":
     capi_status_codes_test()
     capi_view_token_test()
     capi_version_test()
+    capi_nm_parsing_test()
     capi_export_surface_test()
     capi_da_cycle_is_tagged_test()
     capi_output_redirect_is_lifo_test()

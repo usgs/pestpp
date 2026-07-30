@@ -422,13 +422,10 @@ struct MouAdapter : public ToolAdapter
     void initialize_finish() override {}
     pestpp_status advance() override
     {
-        // one generation, phase by phase - the same four calls, on the same generator, that
-        // iterate_to_solution() makes. the context is per-generation and non-copyable.
-        GenerationContext ctx(&scen, tool.get_rand_gen_ptr());
-        tool.generate_generation(ctx);
-        tool.run_generation(ctx);
-        tool.evaluate_generation(ctx);
-        tool.report_generation(ctx);
+        // ONE call into the tool, not a re-implementation of its loop body. Doing the four
+        // phase calls here instead left MOEA's own generation counter untouched, so every
+        // generation reported itself as the same number and wrote over the same .N. files.
+        tool.solve_generation();
         iter++;
         return PESTPP_OK;
     }
@@ -474,8 +471,14 @@ struct SqpAdapter : public ToolAdapter
     pestpp_status advance() override
     {
         iter++;
-        // false means the step was not accepted - an outcome, like ies REJECTED_RETRY
-        return tool.solve_new_ensemble() ? PESTPP_OK : PESTPP_RETRY;
+        // ONE call into the tool. solve_new_ensemble() on its own is not an sqp iteration -
+        // it is the first statement of one, and skips advancing the tool's own `iter` (which
+        // names every .N. output file), the gradient runs, the CMA and hessian updates, the
+        // constraint report and the pcs summary.
+        bool accept = false;
+        tool.solve_iteration(accept);
+        // not accepted means the step was rejected - an outcome, like ies REJECTED_RETRY
+        return accept ? PESTPP_OK : PESTPP_RETRY;
     }
     void finalize() override { tool.finalize(); }
     int  iteration() override { return iter; }

@@ -154,6 +154,11 @@ public:
 
 	void initialize();
 	void iterate_2_solution();
+	/// One iteration: the loop body of iterate_2_solution(), including advancing `iter`.
+	/// Available on its own so a caller driving its own loop - the C ABI - runs the same
+	/// steps in the same order. `accept` reports whether the step was taken; the return
+	/// value is whether the loop should continue.
+	bool solve_iteration(bool& accept);
 	void finalize();
 	void throw_sqp_error(string message);
 	bool should_terminate();
