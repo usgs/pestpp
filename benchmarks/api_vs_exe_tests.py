@@ -98,8 +98,45 @@ def _compare_csvs(d_exe, d_api, tag):
     return sorted(names_e & names_a), differing, sorted(names_e - names_a), sorted(names_a - names_e)
 
 
+def _first_difference(d_exe, d_api, fname, max_lines=3):
+    """The first few differing lines of one file, exe against api.
+
+    "these files differ" is not a diagnosis, and on a platform you cannot reproduce locally it
+    is the difference between fixing something and guessing at it. A last-digit wobble in one
+    column and a structurally different run look identical in the file list and nothing alike
+    here.
+    """
+    out = []
+    with open(os.path.join(d_exe, fname)) as fp:
+        a = fp.read().splitlines()
+    with open(os.path.join(d_api, fname)) as fp:
+        b = fp.read().splitlines()
+    if len(a) != len(b):
+        out.append("      line count differs: exe {0}, api {1}".format(len(a), len(b)))
+    for i, (x, y) in enumerate(zip(a, b)):
+        if x == y:
+            continue
+        out.append("      line {0}:".format(i))
+        out.append("        exe: {0}".format(x[:300]))
+        out.append("        api: {0}".format(y[:300]))
+        # name the columns that actually moved, so a one-column wobble is obvious
+        xs, ys = x.split(","), y.split(",")
+        if len(xs) == len(ys):
+            moved = [j for j in range(len(xs)) if xs[j] != ys[j]]
+            head = a[0].split(",") if a else []
+            named = [(head[j] if j < len(head) else str(j)) for j in moved]
+            out.append("        columns differing: {0}".format(named[:12]))
+        if len(out) >= max_lines * 4:
+            break
+    return out
+
+
 def _assert_identical(d_exe, d_api, tag):
     shared, differing, only_e, only_a = _compare_csvs(d_exe, d_api, tag)
+    detail = []
+    for f in differing[:3]:
+        detail.append("    {0}:".format(f))
+        detail.extend(_first_difference(d_exe, d_api, f))
     assert shared, "{0}: the two runs share no csv output at all".format(tag)
     assert not only_e, (
         "{0}: the executable wrote {1} file(s) the API did not: {2}. The API is skipping part "
@@ -110,7 +147,8 @@ def _assert_identical(d_exe, d_api, tag):
     assert not differing, (
         "{0}: {1} of {2} output files differ between the executable and the API: {3}. Same "
         "control file, same options, same seed - so the API is taking a different path "
-        "through the algorithm.".format(tag, len(differing), len(shared), differing[:6]))
+        "through the algorithm.\n{4}".format(
+            tag, len(differing), len(shared), differing[:6], "\n".join(detail)))
     return len(shared)
 
 
