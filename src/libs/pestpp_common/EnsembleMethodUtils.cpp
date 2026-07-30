@@ -9724,6 +9724,142 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 }
 
 
+vector<string> EnsembleMethod::activate_obs(const map<string, double>& obs_to_activate)
+{
+	stringstream ss;
+	vector<string> activated;
+	if (obs_to_activate.size() == 0)
+		return activated;
+
+	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+
+	// which of these are genuinely going from off to on. Everything else is an ordinary
+	// weight change and needs none of the machinery below - and doing the machinery anyway
+	// would redraw noise for observations that already have some, which is exactly what
+	// must NOT happen: weights and noise are not tied together in general, and reweighting
+	// an already-active observation deliberately leaves its noise realizations alone.
+	for (auto& kv : obs_to_activate)
+	{
+		if (kv.second <= 0.0)
+			continue;
+		if (oi->get_weight(kv.first) == 0.0)
+			activated.push_back(kv.first);
+	}
+
+	// Set the weights FIRST. Everything below re-derives the active set from the scenario
+	// rather than being handed one, which is what makes this follow the same ordering rule
+	// initialize() follows - get_ctl_ordered_nz_obs_names(), i.e. control-file order.
+	for (auto& kv : obs_to_activate)
+		oi->set_weight(kv.first, kv.second);
+
+	if (activated.size() == 0)
+		return activated;
+
+	int org_nnz_obs = (int)act_obs_names.size();
+	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+
+	// the noise covariance has to span the new active set before anything is drawn from it
+	initialize_obscov();
+
+	// Nothing further to do if the ensembles have not been built yet: initialize() will pick
+	// the new weights up on its own, through this same path.
+	if (oe_base.shape().first == 0)
+	{
+		ss.str("");
+		ss << "activated " << activated.size() << " observation(s) before initialization; "
+		   << "noise will be drawn for them with the rest";
+		message(1, ss.str());
+		return activated;
+	}
+
+	int num_reals = oe_base.shape().first;
+	vector<string> real_names = oe_base.get_real_names();
+
+	// Draw through the SAME call initialize_oe() uses. ObservationEnsemble::draw() takes its
+	// variables from the scenario's non-zero-weighted names and honours ies_group_draws, so
+	// having set the weights above, this reproduces the initialization draw over the new
+	// active set - same order, same grouping, same generator.
+	bool no_noise = pest_scenario.get_pestpp_options().get_ies_no_noise();
+	ObservationEnsemble fresh(&pest_scenario, &rand_gen);
+	if (no_noise)
+	{
+		message(1, "initializing noise-free values for activated observations: ", (int)activated.size());
+		fresh.initialize_without_noise(num_reals);
+	}
+	else
+	{
+		message(1, "drawing observation noise realizations for activated observations: ", (int)activated.size());
+		fresh.draw(num_reals, obscov, performance_log,
+			pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+	}
+	fresh.set_real_names(real_names, true);
+	// var_map is a CACHE, and the two initializers above set var_names directly without
+	// refreshing it - so get_var_map() would come back empty and the splice below would
+	// silently find nothing to add
+	fresh.update_var_map();
+
+	// Splice: keep every existing column exactly as it is - existing noise must not be
+	// disturbed by activating something else - and take only the new columns from the draw.
+	map<string, int> fresh_map = fresh.get_var_map();
+	vector<string> old_names = oe_base.get_var_names();
+	set<string> have(old_names.begin(), old_names.end());
+	vector<string> add;
+	for (auto& n : activated)
+		if ((have.find(n) == have.end()) && (fresh_map.find(n) != fresh_map.end()))
+			add.push_back(n);
+
+	if (add.size() > 0)
+	{
+		Eigen::MatrixXd merged(num_reals, old_names.size() + add.size());
+		merged.leftCols(old_names.size()) = *oe_base.get_eigen_ptr();
+		for (int j = 0; j < (int)add.size(); j++)
+			merged.col(old_names.size() + j) = fresh.get_eigen_ptr()->col(fresh_map.at(add[j]));
+		vector<string> merged_names = old_names;
+		merged_names.insert(merged_names.end(), add.begin(), add.end());
+		oe_base = ObservationEnsemble(&pest_scenario, &rand_gen, merged, real_names, merged_names);
+		oe_base.update_var_map();
+		// back into control-file order, so the ensemble reads the way every other one does
+		oe_base.reorder(vector<string>(), act_obs_names);
+	}
+
+	// the weights ensemble spans the active set too, so it gains the same columns - filled
+	// with the vector weight, which is the same thing initialize() broadcasts
+	if (weights.shape().first > 0)
+	{
+		vector<string> wnames = weights.get_var_names();
+		set<string> whave(wnames.begin(), wnames.end());
+		vector<string> wadd;
+		for (auto& n : activated)
+			if (whave.find(n) == whave.end())
+				wadd.push_back(n);
+		if (wadd.size() > 0)
+		{
+			int wr = weights.shape().first;
+			Eigen::MatrixXd wmerged(wr, wnames.size() + wadd.size());
+			wmerged.leftCols(wnames.size()) = *weights.get_eigen_ptr();
+			for (int j = 0; j < (int)wadd.size(); j++)
+				wmerged.col(wnames.size() + j).setConstant(oi->get_weight(wadd[j]));
+			vector<string> wmerged_names = wnames;
+			wmerged_names.insert(wmerged_names.end(), wadd.begin(), wadd.end());
+			vector<string> wreals = weights.get_real_names();
+			weights = ObservationEnsemble(&pest_scenario, &rand_gen, wmerged, wreals, wmerged_names);
+			weights.update_var_map();
+			weights.reorder(vector<string>(), act_obs_names);
+			weights_base = weights;
+		}
+	}
+
+	// the phi handler was built against oe_base and holds the observed values and groups it
+	// needs; rebuild it so the newly active observations contribute
+	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+
+	ss.str("");
+	ss << "number of non-zero weighted observations increased from " << org_nnz_obs
+	   << " to " << act_obs_names.size();
+	message(1, ss.str());
+	return activated;
+}
+
 Eigen::MatrixXd EnsembleMethod::get_Am(const vector<string>& real_names, const vector<string>& par_names)
 {
 

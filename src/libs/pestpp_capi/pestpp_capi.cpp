@@ -170,6 +170,13 @@ struct ToolAdapter
     /// untagged, which is what NULL_DA_CYCLE means.
     virtual int da_cycle() const { return NetPackage::NULL_DA_CYCLE; }
 
+    /// The EnsembleMethod behind this tool, or null for the two that are not one.
+    ///
+    /// Needed for the operations that are structural rather than cosmetic - activating a
+    /// zero-weighted observation has to reach into the active set, the noise ensemble and
+    /// the weights ensemble together, and only the tool can do that coherently.
+    virtual EnsembleMethod* ensemble_method() { return nullptr; }
+
     /// The scenario THIS TOOL WAS BUILT ON, which is not always the one the session parsed.
     ///
     /// da is the reason this exists. Its parameter and observation sets are cycle dependent,
@@ -313,6 +320,8 @@ struct PestppSession
     // realization name, which is what lets membership change while they are in flight.
     map<string,int> pending_runs;
     bool pending_runs_valid = false;
+    // set between begin_batch() and end_batch(); see those functions for why it matters
+    bool batch_open = false;
 
     // outstanding zero-copy views, by token. tokens never repeat within a session, so a
     // released token answers "not valid" rather than aliasing a later view.
@@ -329,6 +338,7 @@ struct IesAdapter : public ToolAdapter
                RunManagerAbstract* rm)
         : tool(p, fm, ofw, pl, rm), scen(p) {}
 
+    EnsembleMethod* ensemble_method() override { return &tool; }
     Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(); }
@@ -387,6 +397,7 @@ struct DaAdapter : public ToolAdapter
               RunManagerAbstract* rm, int _cycle)
         : tool(p, fm, ofw, pl, rm), scen(p), cycle(_cycle) {}
 
+    EnsembleMethod* ensemble_method() override { return &tool; }
     Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(cycle, true, false); }
@@ -1176,6 +1187,41 @@ Ensemble* pick_ensemble(PestppSession* s, int id)
     return e;
 }
 
+/** Put a snapshot's rows into `want` order, dropping nothing and inventing nothing.
+ *
+ * Any realization in the snapshot that is not in `want` (or the other way round) means the
+ * two views of membership have diverged, which is a bug rather than something to paper over -
+ * so this leaves the snapshot untouched in that case and lets the caller see the original
+ * order rather than a silently half-permuted one.
+ */
+void reorder_snapshot_rows(ParameterSnapshot& snap, const vector<string>& want)
+{
+    if ((int)want.size() != (int)snap.values.rows())
+        return;
+    map<string,int> at;
+    for (int i = 0; i < (int)snap.row_names.size(); i++)
+        at[snap.row_names[i]] = i;
+    vector<int> order;
+    order.reserve(want.size());
+    for (size_t i = 0; i < want.size(); i++)
+    {
+        map<string,int>::const_iterator it = at.find(want[i]);
+        if (it == at.end())
+            return;                       // membership disagrees; do not guess
+        order.push_back(it->second);
+    }
+    bool already = true;
+    for (size_t i = 0; i < order.size(); i++)
+        if (order[i] != (int)i) { already = false; break; }
+    if (already)
+        return;
+    Eigen::MatrixXd permuted(snap.values.rows(), snap.values.cols());
+    for (int i = 0; i < (int)order.size(); i++)
+        permuted.row(i) = snap.values.row(order[i]);
+    snap.values = permuted;
+    snap.row_names = want;
+}
+
 /** Pack names as fixed-width space-padded blocks, MODFLOW-6 style. */
 pestpp_status pack_names(const vector<string>& names, char* buf, int buf_len, int* count)
 {
@@ -1479,10 +1525,23 @@ pestpp_status pestpp_supports_live_control(pestpp_handle h, int* out)
     CAPI_END()
 }
 
+/* begin/slice/end is a sequence, and until now nothing checked that a caller followed it.
+ *
+ * The three ways to get it wrong are not equally forgiving. run_slice() before begin_batch()
+ * is the dangerous one: on PANTHER the master has not started its listener bookkeeping, and
+ * the slice races the idle-ping thread - a crash inside the library, not an error a caller
+ * can catch. A second begin_batch() resets the run counters with runs already in flight, so
+ * every subsequent stat is wrong without being obviously wrong. end_batch() without a batch
+ * is merely pointless. All three are now refused. */
 pestpp_status pestpp_begin_batch(pestpp_handle h)
 {
     CAPI_BEGIN(h)
+        if (s->batch_open)
+            bad_state("a batch is already open; call pestpp_end_batch() before starting "
+                      "another. Starting a second batch would reset the run counters with "
+                      "runs still in flight.");
         s->run_manager->begin_batch();
+        s->batch_open = true;
         return PESTPP_OK;
     CAPI_END()
 }
@@ -1491,6 +1550,9 @@ pestpp_status pestpp_run_slice(pestpp_handle h, double max_seconds, int* all_don
 {
     CAPI_BEGIN(h)
         if (all_done == nullptr) bad_arg("null out-param");
+        if (!s->batch_open)
+            bad_state("no batch is open; call pestpp_begin_batch() first. Slicing without it "
+                      "races the run manager's own bookkeeping.");
         RunManagerAbstract::RUN_SLICE_STATUS st = s->run_manager->run_slice(max_seconds);
         *all_done = (st == RunManagerAbstract::RUN_SLICE_STATUS::ALL_DONE) ? 1 : 0;
         return PESTPP_OK;
@@ -1500,7 +1562,20 @@ pestpp_status pestpp_run_slice(pestpp_handle h, double max_seconds, int* all_don
 pestpp_status pestpp_end_batch(pestpp_handle h)
 {
     CAPI_BEGIN(h)
+        if (!s->batch_open)
+            bad_state("no batch is open; pestpp_end_batch() without a matching "
+                      "pestpp_begin_batch() does nothing.");
         s->run_manager->end_batch();
+        s->batch_open = false;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_is_batch_open(pestpp_handle h, int* out)
+{
+    CAPI_BEGIN(h)
+        if (out == nullptr) bad_arg("null out-param");
+        *out = s->batch_open ? 1 : 0;
         return PESTPP_OK;
     CAPI_END()
 }
@@ -1677,10 +1752,30 @@ pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
             if (obs.find(nm) == obs.end())
                 bad_arg("no such observation: '" + nm + "'");
         for (int i = 0; i < n; i++)
-        {
             if (weights[i] < 0.0)
                 bad_arg("negative weight for '" + want[i] + "'");
-            oi.set_weight(want[i], weights[i]);
+
+        // Activation is the structural case and it goes through the tool, not through the
+        // scenario. An observation that starts at zero weight is not in the active set, has
+        // no column in the weights ensemble, and - the part that matters - has no NOISE
+        // realizations, because none were drawn for it at initialize. Setting its weight
+        // here and stopping would leave it looking active while contributing nothing.
+        //
+        // Reweighting an already-active observation is deliberately NOT coupled to noise:
+        // weights and noise are independent in general, and redrawing noise every time a
+        // weight moved would destroy the comparability of phi across iterations.
+        EnsembleMethod* em = s->adapter->ensemble_method();
+        if (em != nullptr)
+        {
+            map<string, double> w;
+            for (int i = 0; i < n; i++)
+                w[want[i]] = weights[i];
+            em->activate_obs(w);
+        }
+        else
+        {
+            for (int i = 0; i < n; i++)
+                oi.set_weight(want[i], weights[i]);
         }
         return PESTPP_OK;
     CAPI_END()
@@ -1770,6 +1865,20 @@ void keep_across_coupled(PestppSession* s, const vector<string>& par_keep)
     ObservationEnsemble* oe = s->adapter->obs_ensemble();
     vector<string> pnames = pe->get_real_names(), onames = oe->get_real_names();
 
+    // par and obs realizations are paired BY POSITION throughout pest++, so a length mismatch
+    // means the pairing is already meaningless - and quietly keeping whichever obs rows happen
+    // to sit at the surviving par positions would hand back somebody else's results under the
+    // right-looking name. An empty obs ensemble is the one benign case: it just has not been
+    // evaluated yet.
+    if ((onames.size() > 0) && (onames.size() != pnames.size()))
+    {
+        stringstream ss;
+        ss << "the parameter and observation ensembles disagree on size (" << pnames.size()
+           << " vs " << onames.size() << "), so they cannot be paired by position; refusing "
+              "to change membership rather than mis-attribute results";
+        bad_state(ss.str());
+    }
+
     map<string,int> pos;
     for (int i = 0; i < (int)pnames.size(); i++)
         pos[pnames[i]] = i;
@@ -1783,6 +1892,8 @@ void keep_across_coupled(PestppSession* s, const vector<string>& par_keep)
         keep_p.push_back(pnames[it->second]);
         if (it->second < (int)onames.size())
             keep_o.push_back(onames[it->second]);
+        else if (onames.size() > 0)
+            bad_state("realization '" + n + "' has no observation counterpart");
     }
     if (keep_p.empty())
         bad_arg("refusing to leave the ensemble empty");
@@ -1839,7 +1950,16 @@ pestpp_status pestpp_get_par_snapshot(pestpp_handle h, double* data, int max_nro
                                       int* nrow, int* ncol, char* row_names, char* col_names)
 {
     CAPI_BEGIN(h)
-        ParameterSnapshot snap = s->adapter->par_ensemble()->get_ctl_snapshot();
+        ParameterEnsemble* pe = s->adapter->par_ensemble();
+        ParameterSnapshot snap = pe->get_ctl_snapshot();
+        // get_ctl_snapshot() emits rows in the ensemble's ORIGINAL order, which is what the
+        // tools want for stable csv output but is not what this API should hand back: after a
+        // keep_realizations() the ensemble's current order is the caller's, and the zero-copy
+        // view, the observation ensemble and get_ensemble_row_names() all follow it. Leaving
+        // the snapshot on the original order meant par_df() and par_view() disagreed about
+        // which row was which realization, silently. Permute here rather than changing
+        // get_ctl_snapshot(), which would change what every tool writes to disk.
+        reorder_snapshot_rows(snap, pe->get_real_names());
         int nr = (int)snap.values.rows(), nc = (int)snap.values.cols();
         if (nrow != nullptr) *nrow = nr;
         if (ncol != nullptr) *ncol = nc;

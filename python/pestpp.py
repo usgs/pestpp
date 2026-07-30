@@ -555,8 +555,25 @@ class _Tool:
         return np.array(self._lib.get_ensemble_row_names(PAR_EN))
 
     @property
-    def par_names(self) -> list:
+    def adj_par_names(self) -> list:
+        """The ADJUSTABLE parameters - the raw ensemble's columns.
+
+        Named to match pyemu, where ``Pst.adj_par_names`` is the adjustable subset and
+        ``Pst.par_names`` is everything. This used to be called ``par_names``, which meant
+        the opposite of what a pyemu user would read it as - and once ``.pst`` appeared on
+        this object, ``ies.par_names`` and ``ies.pst.par_names`` sat one dot apart giving
+        different answers. Same word, two lists, no warning.
+        """
         return self._lib.get_ensemble_col_names(PAR_EN)
+
+    @property
+    def par_names(self) -> list:
+        """EVERY control-file parameter, including fixed and tied - like ``Pst.par_names``.
+
+        This is the snapshot's column set, so it pairs with :meth:`par_df`.
+        See :attr:`adj_par_names` for the adjustable subset the raw ensemble holds.
+        """
+        return list(self.par_df().columns)
 
     @property
     def obs_names(self) -> list:

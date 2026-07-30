@@ -534,6 +534,14 @@ PESTPP_API pestpp_status pestpp_begin_batch(pestpp_handle h);
 PESTPP_API pestpp_status pestpp_run_slice(pestpp_handle h, double max_seconds, int* all_done);
 PESTPP_API pestpp_status pestpp_end_batch(pestpp_handle h);
 
+/* Nonzero between begin_batch() and end_batch().
+ *
+ * The three calls above are a sequence and it is now enforced: slicing without a batch open
+ * is refused rather than performed, because on PANTHER it races the master's own bookkeeping
+ * and takes the process down rather than returning an error. Starting a second batch while
+ * one is open is refused too - it would reset the run counters with runs in flight. */
+PESTPP_API pestpp_status pestpp_is_batch_open(pestpp_handle h, int* out);
+
 /* Aggregate counts for the batch in flight. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
                                                    int* n_completed, int* n_failed,

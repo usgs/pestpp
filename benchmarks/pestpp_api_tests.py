@@ -20,6 +20,7 @@ import pyemu
 _BENCH = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
+from pestpp_lib import NOISE_EN  # noqa: E402
 from pestpp import (  # noqa: E402
     Ies, Mou, Sqp, IterationStep, PestppError, ExpiredViewError, find_library,
     run_ies, PHI_ACTUAL,
@@ -687,6 +688,93 @@ def api_pyemu_results_test():
             set(str(i).lower() for i in ies.real_names)
 
 
+def api_activate_zero_weighted_obs_test():
+    """An observation that starts at zero weight can be switched ON, and actually contributes.
+
+    This used to return cleanly and do nothing. The active observation set is fixed at
+    initialize from the non-zero-weighted names, and everything downstream is sized from it:
+    the weights ensemble has no column for a zero-weighted observation, and - the part that
+    is easy to miss - neither does the NOISE ensemble, because no noise was ever drawn for it.
+    Setting a weight and stopping there left the observation looking active while contributing
+    nothing to phi. Staged history matching (heads first, then fluxes) needs this to work.
+
+    Note what is deliberately NOT coupled: reweighting an already-active observation does not
+    touch its noise. Weights and noise are independent in general, and redrawing noise on every
+    weight change would make phi incomparable across iterations. Only the zero-to-nonzero
+    transition is structural, because only then is there no noise to preserve.
+    """
+    for no_noise in (True, False):
+        tag = "nonoise" if no_noise else "noise"
+        wd = _case("api_activate_" + tag, noptmax=1, ies_no_noise=no_noise)
+        pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+        nz = pst.nnz_obs_names
+        assert len(nz) > 1, "need at least two weighted observations to switch one off"
+        victim = nz[-1]
+        pst.observation_data.loc[victim, "weight"] = 0.0
+        pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+        with Ies.from_pst("pest.pst", workdir=wd) as ies:
+            ies.initialize()
+            before_cols = list(ies.weights_df(lower=True).columns)
+            assert victim not in before_cols, \
+                "{0}: a zero-weighted observation should not be in the weights ensemble".format(tag)
+            phi_before = ies.phi
+
+            ies.set_obs_weights({victim: 5.0})
+
+            after_cols = list(ies.weights_df(lower=True).columns)
+            assert victim in after_cols, \
+                "{0}: activating did not add the observation to the weights ensemble".format(tag)
+
+            # the noise ensemble has to gain a column too, or phi is computed against nothing
+            noise_cols = [c.lower() for c in ies._lib.get_ensemble_col_names(NOISE_EN)]
+            assert victim in noise_cols, \
+                "{0}: no noise realizations were generated for the activated observation - "\
+                "it would contribute a residual against a value that does not exist".format(tag)
+
+            # and it actually contributes
+            ies.update_phi()
+            contrib = ies.phi_obs_df(lower=True)
+            assert victim in contrib.columns, \
+                "{0}: the activated observation contributes no phi term".format(tag)
+            assert ies.phi != phi_before, \
+                "{0}: phi did not change after activating an observation".format(tag)
+            ies.finalize()
+
+
+def api_reweight_leaves_noise_alone_test():
+    """Changing the weight of an ALREADY-active observation must not disturb its noise.
+
+    The counterpart to the test above, and the reason activation is special-cased rather than
+    every weight change triggering a redraw: noise realizations are what phi is measured
+    against, so regenerating them mid-run would make this iteration's phi incomparable with
+    the last one's. GMDSI workflows reweight repeatedly and rely on that.
+    """
+    wd = _case("api_reweight_noise", noptmax=1, ies_no_noise=False)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        target = ies.pst.nnz_obs_names[0]
+        noise_before = ies.noise_df(lower=True) if hasattr(ies, "noise_df") else None
+        if noise_before is None:
+            import pandas as _pd
+            arr, tok = ies._lib.get_ensemble_view(NOISE_EN)
+            noise_before = _pd.DataFrame(
+                arr.copy(),
+                index=ies._lib.get_ensemble_row_names(NOISE_EN),
+                columns=[c.lower() for c in ies._lib.get_ensemble_col_names(NOISE_EN)])
+            ies._lib.release_view(tok)
+
+        ies.set_obs_weights({target: 99.0})
+
+        arr, tok = ies._lib.get_ensemble_view(NOISE_EN)
+        after = arr.copy()
+        ies._lib.release_view(tok)
+        assert np.allclose(noise_before.values, after), \
+            "reweighting an active observation redrew its noise; phi is no longer comparable "\
+            "with the previous iteration"
+        ies.finalize()
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -710,4 +798,6 @@ if __name__ == "__main__":
     api_pyemu_bounds_enforced_test()
     api_pyemu_from_pst_object_test()
     api_pyemu_results_test()
+    api_activate_zero_weighted_obs_test()
+    api_reweight_leaves_noise_alone_test()
     print("all helper tests passed")

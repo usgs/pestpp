@@ -689,6 +689,14 @@ protected:
 
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
+public:
+	/// The mirror of zero_weight_obs(): bring observations that are currently zero-weighted
+	/// back into the active set, generating the noise realizations they never had. Returns
+	/// the names actually activated (those whose weight really was zero and is now not).
+	/// Observations already carrying a weight are reweighted and nothing structural happens,
+	/// which is the common case and deliberately cheap.
+	vector<string> activate_obs(const map<string, double>& obs_to_activate);
+protected:
 
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
