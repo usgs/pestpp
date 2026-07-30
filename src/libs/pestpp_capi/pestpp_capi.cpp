@@ -10,7 +10,7 @@
  * undefined behavior, so this is mandatory rather than stylistic - and it is only possible
  * because the library's exit() calls are now throws.
  */
-#include "pestpp_capi.h"
+#include "pestpp-api.h"
 
 #include <exception>
 #include <fstream>
@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdio>
+#include <cstddef>
 #if defined(_WIN32)
 #  include <io.h>
 #  include <fcntl.h>
@@ -44,6 +45,7 @@
 #endif
 #include <filesystem>
 
+#include "config_os.h"
 #include "Pest.h"
 #include "FileManager.h"
 #include "OutputFileWriter.h"
@@ -51,6 +53,7 @@
 #include "RunManagerSerial.h"
 #include "RunManagerPanther.h"
 #include "RunManagerExternal.h"
+#include "EnsembleView.h"
 #include "EnsembleSmoother.h"
 #include "DataAssimilator.h"
 #include "MOEA.h"
@@ -61,8 +64,66 @@
 using namespace std;
 
 const int PESTPP_NAME_LEN = 200;
+const int PESTPP_MESSAGE_LEN = 4096;
 
 namespace {
+
+/** An exception that carries the status code it should become at the boundary.
+ *
+ * Everything in here reports failure by throwing, which is right - the alternative is
+ * threading a status through every helper - but a bare runtime_error can only ever come out
+ * as PESTPP_ERROR. This lets a throw site say "this one is a too-small buffer" and have that
+ * survive the trip to the caller, which is what makes PESTPP_BUFFER_TOO_SMALL usable as a
+ * retry signal rather than as prose.
+ */
+struct capi_error : public std::runtime_error
+{
+    pestpp_status status;
+    capi_error(pestpp_status st, const string& what)
+        : std::runtime_error(what), status(st) {}
+};
+
+/// Shorthand for the four that come up constantly.
+[[noreturn]] void bad_arg(const string& what)   { throw capi_error(PESTPP_INVALID_ARGUMENT, what); }
+[[noreturn]] void bad_state(const string& what) { throw capi_error(PESTPP_INVALID_STATE, what); }
+[[noreturn]] void unsupported(const string& what) { throw capi_error(PESTPP_NOT_SUPPORTED, what); }
+[[noreturn]] void too_small(const string& what)
+{
+    throw capi_error(PESTPP_BUFFER_TOO_SMALL, what);
+}
+
+/// Keep the promise PESTPP_MESSAGE_LEN makes. Truncation marked, so nobody hunts a missing tail.
+string clamp_message(const string& msg)
+{
+    const size_t cap = (size_t)PESTPP_MESSAGE_LEN - 1;
+    if (msg.size() <= cap)
+        return msg;
+    return msg.substr(0, cap - 3) + "...";
+}
+
+/** A name too long for a packed slot is an error, not something to shorten.
+ *
+ * Truncating would hand back a name that is not the name - and the caller would then send it
+ * in again through set_par_snapshot() or set_obs_weights(), where it matches nothing, or
+ * worse matches a DIFFERENT parameter that happens to share the first PESTPP_NAME_LEN
+ * characters. Nothing in pest++ enforces the limit, so this is where it gets enforced. */
+void check_name_fits(const string& n)
+{
+    if (n.size() > (size_t)PESTPP_NAME_LEN)
+        bad_arg("the name '" + n.substr(0, 40) + "...' is " + to_string(n.size()) +
+                " characters, longer than PESTPP_NAME_LEN (" + to_string(PESTPP_NAME_LEN) +
+                "); it cannot be packed without becoming a different name");
+}
+
+/** Copy one name into a fixed-width space-padded slot. Refuses to shorten. */
+void pack_one_name(const string& n, char* dst)
+{
+    check_name_fits(n);
+    for (int j = 0; j < PESTPP_NAME_LEN; j++)
+        dst[j] = ' ';
+    for (size_t j = 0; j < n.size(); j++)
+        dst[j] = n[j];
+}
 
 /** What the C ABI needs from a tool, independent of which tool it is.
  *
@@ -105,6 +166,10 @@ struct ToolAdapter
     /// recompute the cached phi from the current ensembles and weights.
     virtual void update_phi() = 0;
 
+    /// The da cycle runs should be tagged with. Only da has one; everything else runs
+    /// untagged, which is what NULL_DA_CYCLE means.
+    virtual int da_cycle() const { return NetPackage::NULL_DA_CYCLE; }
+
     virtual const char* name() const = 0;
 };
 
@@ -118,7 +183,7 @@ static L2PhiHandler::phiType to_phi_type(int phi_type)
     case PESTPP_PHI_REGUL:     return L2PhiHandler::phiType::REGUL;
     case PESTPP_PHI_ACTUAL:    return L2PhiHandler::phiType::ACTUAL;
     case PESTPP_PHI_NOISE:     return L2PhiHandler::phiType::NOISE;
-    default: throw runtime_error("unknown phi type");
+    default: bad_arg("unknown phi type");
     }
 }
 
@@ -142,7 +207,7 @@ static void ensemble_phi_residuals(EnsembleMethod& tool, int phi_type,
                                    vector<double>& data)
 {
     if ((phi_type != PESTPP_PHI_MEAS) && (phi_type != PESTPP_PHI_ACTUAL))
-        throw runtime_error("phi residuals are only defined for PESTPP_PHI_MEAS and "
+        unsupported("phi residuals are only defined for PESTPP_PHI_MEAS and "
                             "PESTPP_PHI_ACTUAL");
     map<string, map<string, double>> swr = tool.get_phi_handler().get_swr_real_map(
         *tool.get_oe_ptr(), *tool.get_weights_ptr(), to_phi_type(phi_type));
@@ -184,8 +249,31 @@ static void ensemble_phi_summary(EnsembleMethod& tool, int phi_type,
 }
 
 /** One PEST++ session: scenario, io, run manager and tool, with a stable lifetime. */
+/** Stamped at the head of every live session and zeroed on destroy.
+ *
+ * The point is that pestpp_handle is a void*, so a caller can hand us anything at all - a
+ * stale pointer, a destroyed handle, an int that was never a pointer. Without a marker the
+ * only bad handle we can detect is NULL and everything else is undefined behavior, with
+ * double-destroy being a double-free. Reading four bytes through a wild pointer can still
+ * fault, so this is not a proof of validity; it catches the two mistakes that actually
+ * happen - use-after-destroy and destroy-twice - and turns them into an error code. */
+const unsigned int PESTPP_SESSION_MAGIC = 0x50455354u;   // 'PEST'
+
+/** A handed-out zero-copy view, kept so pestpp_view_is_valid() can answer honestly.
+ *
+ * EnsembleView already does the hard part - it holds a weak guard token from the ensemble and
+ * re-checks the buffer address and dimensions on every access, which is how it notices a
+ * reallocation that no bookkeeping saw. All this adds is an integer name for one, so the same
+ * question can be asked from C. */
+struct ViewRecord
+{
+    unique_ptr<EnsembleView> view;
+    int ensemble_id = -1;
+};
+
 struct PestppSession
 {
+    unsigned int magic = PESTPP_SESSION_MAGIC;   // must stay the first member
     pestpp_tool tool;
     int run_manager_type = 0;      // pestpp_run_manager
     string working_dir;
@@ -215,6 +303,11 @@ struct PestppSession
     // realization name, which is what lets membership change while they are in flight.
     map<string,int> pending_runs;
     bool pending_runs_valid = false;
+
+    // outstanding zero-copy views, by token. tokens never repeat within a session, so a
+    // released token answers "not valid" rather than aliasing a later view.
+    map<int, ViewRecord> views;
+    int next_view_token = 1;
 };
 
 /** ies: begin_iteration -> solve (glm or mda) -> end_iteration. */
@@ -284,6 +377,7 @@ struct DaAdapter : public ToolAdapter
     int  initialize_prepare() override { return tool.initialize_prepare(cycle, true, false); }
     void initialize_finish() override { tool.initialize_finish(cycle); }
     pestpp_status advance() override { tool.da_update(cycle); return PESTPP_OK; }
+    int  da_cycle() const override { return cycle; }
     void finalize() override { tool.finalize(); }
     int  iteration() override { return tool.get_iter(); }
     bool should_terminate() override { return tool.should_terminate(); }
@@ -354,12 +448,12 @@ struct MouAdapter : public ToolAdapter
     ParameterEnsemble* par_ensemble() override { return tool.get_dp_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_op_ptr(); }
     void phi_summary(int, double&, double&, double&, double&) override
-    { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
+    { unsupported("mou optimizes objectives rather than minimizing a phi"); }
     void phi_vector(int, vector<string>&, vector<double>&) override
-    { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
+    { unsupported("mou optimizes objectives rather than minimizing a phi"); }
     void phi_residuals(int, vector<string>&, vector<string>&, vector<double>&) override
-    { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
-    void update_phi() override { throw runtime_error("mou optimizes objectives rather than minimizing a phi"); }
+    { unsupported("mou optimizes objectives rather than minimizing a phi"); }
+    void update_phi() override { unsupported("mou optimizes objectives rather than minimizing a phi"); }
     const char* name() const override { return "mou"; }
 };
 
@@ -398,20 +492,52 @@ struct SqpAdapter : public ToolAdapter
     ParameterEnsemble* par_ensemble() override { return tool.get_dv_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
     void phi_summary(int, double&, double&, double&, double&) override
-    { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
+    { unsupported("sqp has an objective function, not a phi over realizations"); }
     void phi_vector(int, vector<string>&, vector<double>&) override
-    { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
+    { unsupported("sqp has an objective function, not a phi over realizations"); }
     void phi_residuals(int, vector<string>&, vector<string>&, vector<double>&) override
-    { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
-    void update_phi() override { throw runtime_error("sqp has an objective function, not a phi over realizations"); }
+    { unsupported("sqp has an objective function, not a phi over realizations"); }
+    void update_phi() override { unsupported("sqp has an objective function, not a phi over realizations"); }
     const char* name() const override { return "sqp"; }
 };
 
+/// The message for the handle-less entry points, which have nowhere else to put one.
 string g_create_error;
 
+/** Outstanding output redirects, innermost last.
+ *
+ * There is exactly one file descriptor 1 in the process, so redirecting it is not a per-handle
+ * operation however much it looks like one. Nesting works - each redirect saves what stdout
+ * was, so unwinding in the reverse order puts every layer back - but UNWINDING OUT OF ORDER
+ * does not, and it fails silently and permanently:
+ *
+ *     A redirects -> saved_a = the console
+ *     B redirects -> saved_b = A's log file
+ *     A restores  -> stdout = the console        (B is still "redirected", to nothing)
+ *     B restores  -> stdout = A's log file       <- and stays there forever
+ *
+ * The old signature handed the caller the raw saved descriptor, so there was nothing to check
+ * against: any int was as plausible as any other. Now the caller gets an opaque TOKEN, the
+ * descriptor stays in here, and restoring anything but the innermost redirect is refused.
+ * Enforcing the order beats guessing at a repair - silently unwinding somebody else's redirect
+ * is the corruption, not the fix. */
+struct RedirectRecord
+{
+    int token;
+    int saved_fd;
+};
+vector<RedirectRecord> g_redirect_stack;
+int g_next_redirect_token = 1;
+
+/** A session pointer, or null if this handle is not one we handed out and still own. */
 PestppSession* as_session(pestpp_handle h)
 {
-    return static_cast<PestppSession*>(h);
+    if (h == nullptr)
+        return nullptr;
+    PestppSession* s = static_cast<PestppSession*>(h);
+    if (s->magic != PESTPP_SESSION_MAGIC)
+        return nullptr;
+    return s;
 }
 
 /// Set when a working-directory restore failed; makes the next entry point refuse.
@@ -493,12 +619,19 @@ struct ScopedWorkingDir
     try {                                                                      \
         s->last_error.clear();                                                 \
         if (!g_cwd_restore_error.empty())                                      \
-            throw std::runtime_error(g_cwd_restore_error);                     \
+            bad_state(g_cwd_restore_error);                                    \
         ScopedWorkingDir _swd(s->working_dir);
 
+/* capi_error is caught first so a throw site's chosen status survives; everything else is a
+   plain failure. Both bands clamp the message to PESTPP_MESSAGE_LEN, because that constant is
+   exported as "big enough for anything this writes" and a run-on what() must not make a liar
+   of it. */
 #define CAPI_END()                                                             \
+    } catch (const capi_error& e) {                                            \
+        s->last_error = clamp_message(e.what());                               \
+        return e.status;                                                       \
     } catch (const std::exception& e) {                                        \
-        s->last_error = e.what();                                              \
+        s->last_error = clamp_message(e.what());                               \
         return PESTPP_ERROR;                                                   \
     } catch (...) {                                                            \
         s->last_error = "unknown error";                                       \
@@ -517,28 +650,35 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
     }
     *out = nullptr;
     // struct_size is how a caller built against an older header stays workable: anything past
-    // the size it declares is a field it never knew about, and must default rather than be read
-    if (opts->struct_size < (int)sizeof(int) * 2)
+    // the size it declares is a field it never knew about, so it is NOT READ - reading it
+    // would run off the end of the caller's allocation - and takes its documented default
+    // instead. HAVE() is that test, one field at a time.
+    const size_t declared = (opts->struct_size < 0) ? 0u : (size_t)opts->struct_size;
+#define HAVE(field) \
+    (declared >= offsetof(pestpp_create_options, field) + sizeof(opts->field))
+    if (!HAVE(tool))
     {
         g_create_error = "pestpp_create_options.struct_size not set; it must be "
                          "sizeof(pestpp_create_options)";
         return PESTPP_ERROR;
     }
-    if (opts->struct_size > (int)sizeof(pestpp_create_options))
+    if (declared > sizeof(pestpp_create_options))
     {
         g_create_error = "pestpp_create_options.struct_size is larger than this library "
                          "understands; the caller was built against a newer header";
         return PESTPP_ERROR;
     }
-    if (opts->ctl_file == nullptr)
+    if ((!HAVE(ctl_file)) || (opts->ctl_file == nullptr))
     {
         g_create_error = "pestpp_create_options.ctl_file is required";
         return PESTPP_ERROR;
     }
-    const char* ctl_file = opts->ctl_file;
-    const char* working_dir = opts->working_dir;
-    int rm_type = opts->run_manager;
-    string panther_port = (opts->panther_port == nullptr) ? string() : string(opts->panther_port);
+    const char* ctl_file    = opts->ctl_file;
+    const char* working_dir = HAVE(working_dir) ? opts->working_dir : nullptr;
+    int rm_type             = HAVE(run_manager) ? opts->run_manager : PESTPP_RM_SERIAL;
+    string panther_port     = (HAVE(panther_port) && (opts->panther_port != nullptr))
+                              ? string(opts->panther_port) : string();
+#undef HAVE
     if ((rm_type == PESTPP_RM_PANTHER) && panther_port.empty())
     {
         g_create_error = "PESTPP_RM_PANTHER requires panther_port";
@@ -569,7 +709,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         case PESTPP_DA:  tool_type = PestppOptions::ToolType::DA;  break;
         case PESTPP_MOU: tool_type = PestppOptions::ToolType::MOU; break;
         case PESTPP_SQP: tool_type = PestppOptions::ToolType::SQP; break;
-        default: throw runtime_error("unknown tool id");
+        default: bad_arg("unknown tool id");
         }
 
         string ctl(ctl_file);
@@ -647,7 +787,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
             break;
 
         default:
-            throw runtime_error("unknown run manager id");
+            bad_arg("unknown run manager id");
         }
         s->run_manager->set_save_all_runs(
             s->pest_scenario->get_pestpp_options().get_save_all_runs());
@@ -686,7 +826,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         }
         case PESTPP_MOU: s->adapter.reset(new MouAdapter(scen, fm, ofw, pl, rm)); break;
         case PESTPP_SQP: s->adapter.reset(new SqpAdapter(scen, fm, ofw, pl, rm)); break;
-        default: throw runtime_error("unknown tool id");
+        default: bad_arg("unknown tool id");
         }
     }
     catch (const std::exception& e) { g_create_error = e.what(); return PESTPP_ERROR; }
@@ -701,9 +841,21 @@ pestpp_status pestpp_destroy(pestpp_handle h)
     PestppSession* s = as_session(h);
     if (s == nullptr)
         return PESTPP_INVALID_HANDLE;
+    // Stamp it dead FIRST. A second pestpp_destroy() on the same pointer then answers
+    // PESTPP_INVALID_HANDLE instead of double-freeing, and so does any other call that races
+    // in behind it.
+    s->magic = 0;
+    pestpp_status rc = PESTPP_OK;
+    // The chdir is a convenience - some destructors write files relative to the working
+    // directory - but it must never decide WHETHER we free. Failing to enter the directory
+    // used to leak the whole session, including the panther socket, which then held its port.
     try { ScopedWorkingDir swd(s->working_dir); delete s; }
-    catch (...) { return PESTPP_ERROR; }
-    return PESTPP_OK;
+    catch (...)
+    {
+        try { delete s; } catch (...) { }
+        rc = PESTPP_ERROR;
+    }
+    return rc;
 }
 
 const char* pestpp_last_error(pestpp_handle h)
@@ -712,16 +864,49 @@ const char* pestpp_last_error(pestpp_handle h)
     return (s == nullptr) ? "invalid handle" : s->last_error.c_str();
 }
 
+pestpp_status pestpp_get_last_error(pestpp_handle h, char* buf, int buf_len, int* needed)
+{
+    PestppSession* s = as_session(h);
+    // deliberately NOT CAPI_BEGIN: this is the call you make after a failure, and clearing
+    // the message on the way in would empty the very thing being asked for
+    const string& msg = (s == nullptr) ? string() : s->last_error;
+    if (needed != nullptr)
+        *needed = (int)msg.size() + 1;
+    if (s == nullptr)
+        return PESTPP_INVALID_HANDLE;
+    if (buf == nullptr)
+        return PESTPP_OK;
+    if (buf_len < (int)msg.size() + 1)
+        return PESTPP_BUFFER_TOO_SMALL;
+    for (size_t i = 0; i < msg.size(); i++)
+        buf[i] = msg[i];
+    buf[msg.size()] = '\0';
+    return PESTPP_OK;
+}
+
+const char* pestpp_last_global_error(void) { return g_create_error.c_str(); }
 const char* pestpp_last_create_error(void) { return g_create_error.c_str(); }
 
-pestpp_status pestpp_redirect_output(const char* path, int* saved_fd)
+const char* pestpp_get_fatal_error(void) { return g_cwd_restore_error.c_str(); }
+
+pestpp_status pestpp_clear_fatal_error(void)
 {
-    if ((path == nullptr) || (saved_fd == nullptr))
+    // The caller is asserting they have put the working directory back. We cannot verify that
+    // - we no longer know where "back" was - so this is an acknowledgement, not a repair.
+    try { g_cwd_restore_error.clear(); }
+    catch (...) { return PESTPP_ERROR; }
+    return PESTPP_OK;
+}
+
+pestpp_status pestpp_redirect_output(const char* path, int* redirect_token)
+{
+    g_create_error.clear();
+    if ((path == nullptr) || (redirect_token == nullptr))
     {
-        g_create_error = "pestpp_redirect_output needs a path and a place to save the fd";
-        return PESTPP_ERROR;
+        g_create_error = "pestpp_redirect_output needs a path and a place to put the token";
+        return PESTPP_INVALID_ARGUMENT;
     }
-    *saved_fd = -1;
+    *redirect_token = 0;
     try
     {
         cout.flush();
@@ -741,29 +926,76 @@ pestpp_status pestpp_redirect_output(const char* path, int* saved_fd)
             return PESTPP_ERROR;
         }
         PESTPP_CLOSE(sink);
-        *saved_fd = saved;
+        RedirectRecord rec;
+        rec.token = g_next_redirect_token++;
+        rec.saved_fd = saved;
+        g_redirect_stack.push_back(rec);
+        *redirect_token = rec.token;
         return PESTPP_OK;
     }
-    catch (...) { return PESTPP_ERROR; }
+    catch (const std::exception& e) { g_create_error = clamp_message(e.what()); return PESTPP_ERROR; }
+    catch (...) { g_create_error = "unknown error in pestpp_redirect_output"; return PESTPP_ERROR; }
 }
 
-pestpp_status pestpp_restore_output(int saved_fd)
+pestpp_status pestpp_restore_output(int redirect_token)
 {
-    if (saved_fd < 0)
+    g_create_error.clear();
+    if (redirect_token <= 0)
         return PESTPP_OK;                 /* nothing was redirected */
     try
     {
+        // Not on the stack at all: never issued, or already restored. Either way there is no
+        // descriptor to put back and nothing safe to do with the number.
+        bool known = false;
+        for (size_t i = 0; i < g_redirect_stack.size(); i++)
+            if (g_redirect_stack[i].token == redirect_token) { known = true; break; }
+        if (!known)
+        {
+            g_create_error = "pestpp_restore_output was given a token this library never "
+                             "handed out, or one that has already been restored";
+            return PESTPP_INVALID_ARGUMENT;
+        }
+        if (g_redirect_stack.back().token != redirect_token)
+        {
+            stringstream ss;
+            ss << "output redirects must be undone innermost first: token " << redirect_token
+               << " is still covered by " << (g_redirect_stack.size() - 1)
+               << " later redirect(s). Restoring it now would leave stdout pointing at "
+                  "another session's log file permanently.";
+            g_create_error = ss.str();
+            return PESTPP_INVALID_STATE;
+        }
+        int saved = g_redirect_stack.back().saved_fd;
+        g_redirect_stack.pop_back();
         cout.flush();
         fflush(stdout);
-        PESTPP_DUP2(saved_fd, 1);
-        PESTPP_CLOSE(saved_fd);
+        if (PESTPP_DUP2(saved, 1) < 0)
+        {
+            // stdout is now whatever the redirect pointed at, and the caller has no way to
+            // recover it. Say so loudly rather than returning a bare status.
+            PESTPP_CLOSE(saved);
+            g_create_error = "could not restore the library's output; stdout is still "
+                             "redirected and the saved descriptor has been closed";
+            return PESTPP_ERROR;
+        }
+        PESTPP_CLOSE(saved);
         return PESTPP_OK;
     }
-    catch (...) { return PESTPP_ERROR; }
+    catch (const std::exception& e) { g_create_error = clamp_message(e.what()); return PESTPP_ERROR; }
+    catch (...) { g_create_error = "unknown error in pestpp_restore_output"; return PESTPP_ERROR; }
+}
+
+pestpp_status pestpp_get_redirect_depth(int* depth)
+{
+    if (depth == nullptr)
+        return PESTPP_INVALID_ARGUMENT;
+    *depth = (int)g_redirect_stack.size();
+    return PESTPP_OK;
 }
 
 pestpp_status pestpp_flush_output(void)
 {
+    g_create_error.clear();
     try
     {
         cout.flush();     // C++ stream -> the CRT's stdout
@@ -771,13 +1003,47 @@ pestpp_status pestpp_flush_output(void)
         fflush(stdout);   // the CRT's buffer -> the OS handle
         return PESTPP_OK;
     }
-    catch (...) { return PESTPP_ERROR; }
+    catch (const std::exception& e) { g_create_error = clamp_message(e.what()); return PESTPP_ERROR; }
+    catch (...) { g_create_error = "unknown error in pestpp_flush_output"; return PESTPP_ERROR; }
+}
+
+pestpp_status pestpp_get_version(char* buf, int buf_len, int* needed)
+{
+    g_create_error.clear();
+    try
+    {
+        // NB: the PESTPP_VERSION macro carries a trailing semicolon, so it only works as a
+        // bare initializer - string(PESTPP_VERSION) does not compile
+        string v = PESTPP_VERSION;
+        if (needed != nullptr)
+            *needed = (int)v.size() + 1;
+        if (buf == nullptr)
+            return PESTPP_OK;
+        if (buf_len < (int)v.size() + 1)
+        {
+            g_create_error = "version buffer too small; call with buf=NULL to size it first";
+            return PESTPP_BUFFER_TOO_SMALL;
+        }
+        for (size_t i = 0; i < v.size(); i++)
+            buf[i] = v[i];
+        buf[v.size()] = '\0';
+        return PESTPP_OK;
+    }
+    catch (...) { g_create_error = "unknown error in pestpp_get_version"; return PESTPP_ERROR; }
+}
+
+pestpp_status pestpp_get_api_version(int* major, int* minor, int* patch)
+{
+    if (major != nullptr) *major = PESTPP_API_VERSION_MAJOR;
+    if (minor != nullptr) *minor = PESTPP_API_VERSION_MINOR;
+    if (patch != nullptr) *patch = PESTPP_API_VERSION_PATCH;
+    return PESTPP_OK;
 }
 
 pestpp_status pestpp_get_run_manager(pestpp_handle h, int* run_manager)
 {
     CAPI_BEGIN(h)
-        if (run_manager == nullptr) throw runtime_error("null out-param");
+        if (run_manager == nullptr) bad_arg("null out-param");
         *run_manager = s->run_manager_type;
         return PESTPP_OK;
     CAPI_END()
@@ -797,7 +1063,7 @@ pestpp_status pestpp_initialize_prepare(pestpp_handle h, int* n_runs)
 {
     CAPI_BEGIN(h)
         if (s->init_pending)
-            throw runtime_error("initialization is already in progress; call "
+            bad_state("initialization is already in progress; call "
                                 "pestpp_initialize_finish() before preparing again");
         int n = s->adapter->initialize_prepare();
         s->init_pending = true;
@@ -811,7 +1077,7 @@ pestpp_status pestpp_initialize_finish(pestpp_handle h)
 {
     CAPI_BEGIN(h)
         if (!s->init_pending)
-            throw runtime_error("nothing to finish; call pestpp_initialize_prepare() first");
+            bad_state("nothing to finish; call pestpp_initialize_prepare() first");
         s->adapter->initialize_finish();
         s->init_pending = false;
         s->initialized = true;
@@ -823,10 +1089,10 @@ pestpp_status pestpp_solve_iteration(pestpp_handle h)
 {
     CAPI_BEGIN(h)
         if (s->init_pending)
-            throw runtime_error("initialization is incomplete: pestpp_initialize_finish() has "
+            bad_state("initialization is incomplete: pestpp_initialize_finish() has "
                                 "not been called since pestpp_initialize_prepare()");
         if (!s->initialized)
-            throw runtime_error("pestpp_initialize() must be called before pestpp_solve_iteration()");
+            bad_state("pestpp_initialize() must be called before pestpp_solve_iteration()");
         // each tool's own notion of one step; RETRY is an algorithmic outcome, not a fault
         return s->adapter->advance();
     CAPI_END()
@@ -857,7 +1123,7 @@ pestpp_status pestpp_get_phi_summary(pestpp_handle h, int phi_type,
 pestpp_status pestpp_get_iteration(pestpp_handle h, int* iter)
 {
     CAPI_BEGIN(h)
-        if (iter == nullptr) throw runtime_error("null out-param");
+        if (iter == nullptr) bad_arg("null out-param");
         *iter = s->adapter->iteration();
         return PESTPP_OK;
     CAPI_END()
@@ -866,7 +1132,7 @@ pestpp_status pestpp_get_iteration(pestpp_handle h, int* iter)
 pestpp_status pestpp_should_terminate(pestpp_handle h, int* out)
 {
     CAPI_BEGIN(h)
-        if (out == nullptr) throw runtime_error("null out-param");
+        if (out == nullptr) bad_arg("null out-param");
         *out = s->adapter->should_terminate() ? 1 : 0;
         return PESTPP_OK;
     CAPI_END()
@@ -878,10 +1144,10 @@ namespace {
 Ensemble* pick_ensemble(PestppSession* s, int id)
 {
     if ((id < PESTPP_PAR_EN) || (id > PESTPP_WEIGHTS_EN))
-        throw runtime_error("unknown ensemble id");
+        bad_arg("unknown ensemble id");
     Ensemble* e = s->adapter->ensemble(id);
     if (e == nullptr)
-        throw runtime_error(string("tool '") + s->adapter->name() +
+        unsupported(string("tool '") + s->adapter->name() +
                             "' has no ensemble with that id");
     return e;
 }
@@ -894,33 +1160,59 @@ pestpp_status pack_names(const vector<string>& names, char* buf, int buf_len, in
     if (buf == nullptr)
         return PESTPP_OK;               /* query-only call */
     if (buf_len < (int)names.size() * PESTPP_NAME_LEN)
-        throw runtime_error("name buffer too small; call with buf=NULL to size it first");
+        too_small("name buffer too small; call with buf=NULL to size it first");
     for (size_t i = 0; i < names.size(); i++)
-    {
-        char* dst = buf + (i * PESTPP_NAME_LEN);
-        for (int j = 0; j < PESTPP_NAME_LEN; j++)
-            dst[j] = ' ';
-        const string& n = names[i];
-        size_t len = n.size() < (size_t)PESTPP_NAME_LEN ? n.size() : (size_t)PESTPP_NAME_LEN;
-        for (size_t j = 0; j < len; j++)
-            dst[j] = n[j];
-    }
+        pack_one_name(names[i], buf + (i * PESTPP_NAME_LEN));
     return PESTPP_OK;
 }
 
 } // namespace
 
 pestpp_status pestpp_get_ensemble_view(pestpp_handle h, int ensemble_id,
-                                       double** data, int* nrow, int* ncol)
+                                       double** data, int* nrow, int* ncol,
+                                       int* view_token)
 {
     CAPI_BEGIN(h)
         if ((data == nullptr) || (nrow == nullptr) || (ncol == nullptr))
-            throw runtime_error("null out-param");
+            bad_arg("null out-param");
         Ensemble* ens = pick_ensemble(s, ensemble_id);
         Eigen::MatrixXd* m = ens->get_eigen_ptr_4_mod();
         *data = m->data();
         *nrow = (int)m->rows();
         *ncol = (int)m->cols();
+        if (view_token != nullptr)
+        {
+            // Record the buffer identity so pestpp_view_is_valid() can answer from evidence -
+            // EnsembleView re-checks the address and the dimensions, which is what catches a
+            // reallocation nobody told us about.
+            int tok = s->next_view_token++;
+            ViewRecord rec;
+            rec.view.reset(new EnsembleView(*ens));
+            rec.ensemble_id = ensemble_id;
+            s->views[tok] = std::move(rec);
+            *view_token = tok;
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_view_is_valid(pestpp_handle h, int view_token, int* out)
+{
+    CAPI_BEGIN(h)
+        if (out == nullptr)
+            bad_arg("null out-param");
+        map<int, ViewRecord>::const_iterator it = s->views.find(view_token);
+        // An unknown token is not an error: released and never-issued both mean "that pointer
+        // is not something you may use", which is exactly what 0 says.
+        *out = ((it == s->views.end()) || (!it->second.view->valid())) ? 0 : 1;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_release_view(pestpp_handle h, int view_token)
+{
+    CAPI_BEGIN(h)
+        s->views.erase(view_token);       // idempotent by construction
         return PESTPP_OK;
     CAPI_END()
 }
@@ -944,7 +1236,7 @@ pestpp_status pestpp_get_ensemble_col_names(pestpp_handle h, int ensemble_id,
 pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* tstat)
 {
     CAPI_BEGIN(h)
-        if (tstat == nullptr) throw runtime_error("null out-param");
+        if (tstat == nullptr) bad_arg("null out-param");
         *tstat = (int)s->adapter->par_ensemble()->get_trans_status();
         return PESTPP_OK;
     CAPI_END()
@@ -953,7 +1245,7 @@ pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* tstat)
 pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* value)
 {
     CAPI_BEGIN(h)
-        if ((key == nullptr) || (value == nullptr)) throw runtime_error("null argument");
+        if ((key == nullptr) || (value == nullptr)) bad_arg("null argument");
         PestppOptions::ARG_STATUS st =
             s->pest_scenario->get_pestpp_options_ptr()->set_option(key, value);
         // fall through to the control data section, which exposes the same interface. noptmax
@@ -962,27 +1254,55 @@ pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* va
         if (st == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
             st = s->pest_scenario->get_control_info_4_mod().set_option(key, value);
         if (st == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
-            throw runtime_error(string("unknown option '") + key + "'");
+            bad_arg(string("unknown option '") + key + "'");
         if (st == PestppOptions::ARG_STATUS::ARG_INVALID)
-            throw runtime_error(string("invalid value for option '") + key + "': " + value);
+            bad_arg(string("invalid value for option '") + key + "': " + value);
         return PESTPP_OK;
     CAPI_END()
 }
 
 pestpp_status pestpp_get_option(pestpp_handle h, const char* key,
-                                char* buf, int buf_len, int* needed)
+                                char* buf, int buf_len, int* needed, int* found)
 {
     CAPI_BEGIN(h)
-        if (key == nullptr) throw runtime_error("null argument");
-        string v = s->pest_scenario->get_pestpp_options().get_option(key);
-        if (v.empty())
-            v = s->pest_scenario->get_control_info().get_option(key);   // e.g. NOPTMAX
+        if (key == nullptr) bad_arg("null argument");
+        // "" is a legitimate value for a ++ option, so an empty string cannot be the signal
+        // for "no such option" - ask the registry whether the key exists at all, separately
+        // from what it holds.
+        const PestppOptions& ppo = s->pest_scenario->get_pestpp_options();
+        bool known = ppo.is_valid_arg(key);
+        string v = known ? ppo.get_option(key) : string();
+        if (!known)
+        {
+            // fall through to the * control data section, which exposes the same interface.
+            // Its get_option() is an if-chain returning "" for anything it does not recognise,
+            // and every key it DOES recognise formats to at least one character (a number, or
+            // a pestmode word), so non-empty is a sound test for "known" here.
+            v = s->pest_scenario->get_control_info().get_option(key);    // e.g. NOPTMAX
+            known = !v.empty();
+        }
+        if (found != nullptr)
+            *found = known ? 1 : 0;
+        if (!known)
+        {
+            if (needed != nullptr)
+                *needed = 1;                     // just the NUL
+            if (buf != nullptr && buf_len > 0)
+                buf[0] = '\0';
+            // A caller that passed `found` is probing on purpose, so absence is an answer.
+            // One that did not gets an error rather than an empty string it would read as a
+            // value - which is also what pestpp_set_option does with an unknown key.
+            if (found != nullptr)
+                return PESTPP_OK;
+            bad_arg(string("unknown option '") + key + "'; pass a non-NULL `found` if you "
+                    "meant to test whether it exists");
+        }
         if (needed != nullptr)
             *needed = (int)v.size() + 1;
         if (buf == nullptr)
             return PESTPP_OK;
         if (buf_len < (int)v.size() + 1)
-            throw runtime_error("option buffer too small; call with buf=NULL to size it first");
+            too_small("option buffer too small; call with buf=NULL to size it first");
         for (size_t i = 0; i < v.size(); i++)
             buf[i] = v[i];
         buf[v.size()] = '\0';
@@ -999,7 +1319,7 @@ RunManagerPanther* panther(PestppSession* s)
 {
     RunManagerPanther* p = dynamic_cast<RunManagerPanther*>(s->run_manager.get());
     if (p == nullptr)
-        throw runtime_error("this call needs a PANTHER run manager - the serial manager has no "
+        unsupported("this call needs a PANTHER run manager - the serial manager has no "
                             "workers and cannot yield mid-batch. Create the handle with "
                             "pestpp_create_panther(), or check pestpp_supports_live_control()");
     return p;
@@ -1016,17 +1336,7 @@ int status_to_c(PantherRunStatus st)
     case PantherRunStatus::TIMED_OUT: return PESTPP_RUN_TIMED_OUT;
     case PantherRunStatus::CANCELLED: return PESTPP_RUN_CANCELLED;
     }
-    throw runtime_error("unknown run status");
-}
-
-/** Copy one name into a fixed-width space-padded slot. */
-void pack_one_name(const string& n, char* dst)
-{
-    for (int j = 0; j < PESTPP_NAME_LEN; j++)
-        dst[j] = ' ';
-    size_t len = n.size() < (size_t)PESTPP_NAME_LEN ? n.size() : (size_t)PESTPP_NAME_LEN;
-    for (size_t j = 0; j < len; j++)
-        dst[j] = n[j];
+    bad_arg("unknown run status");
 }
 
 /** NUL-terminated copy into a caller buffer, truncating rather than overrunning. */
@@ -1048,7 +1358,7 @@ pestpp_status emit_ids(const vector<int>& ids, int* run_ids, int max_n, int* n_o
     if (run_ids == nullptr)
         return PESTPP_OK;                 /* count-only call */
     if (max_n < (int)ids.size())
-        throw runtime_error("run id buffer too small; call with run_ids=NULL to size it first");
+        too_small("run id buffer too small; call with run_ids=NULL to size it first");
     for (size_t i = 0; i < ids.size(); i++)
         run_ids[i] = ids[i];
     return PESTPP_OK;
@@ -1068,7 +1378,7 @@ pestpp_status pestpp_get_phi_vector(pestpp_handle h, int phi_type,
         if ((phi == nullptr) && (names == nullptr))
             return PESTPP_OK;                 /* count-only call */
         if (max_n < (int)vals.size())
-            throw runtime_error("phi buffers too small; call with NULL arrays to size first");
+            too_small("phi buffers too small; call with NULL arrays to size first");
         for (size_t i = 0; i < vals.size(); i++)
         {
             if (phi != nullptr)   phi[i] = vals[i];
@@ -1090,18 +1400,28 @@ pestpp_status pestpp_get_phi_residuals(pestpp_handle h, int phi_type,
         int nr = (int)rnames.size(), nc = (int)cnames.size();
         if (nrow != nullptr) *nrow = nr;
         if (ncol != nullptr) *ncol = nc;
+        // Size-only call: report the shape and touch nothing. The name buffers are sized from
+        // nrow/ncol by the caller, so writing them here - before the caller knows how big to
+        // make them - would overflow.
+        if ((data == nullptr) && (row_names == nullptr) && (col_names == nullptr))
+            return PESTPP_OK;
+        // Everything is bounds-checked BEFORE the first write. max_nrow/max_ncol describe the
+        // caller's allocation for the names as well as the data.
+        if ((max_nrow < nr) || (max_ncol < nc))
+            too_small("phi residual buffers too small; call with all pointers NULL "
+                                "to size them first");
         if (row_names != nullptr)
             for (int i = 0; i < nr; i++)
                 pack_one_name(rnames[i], row_names + (i * PESTPP_NAME_LEN));
         if (col_names != nullptr)
             for (int j = 0; j < nc; j++)
                 pack_one_name(cnames[j], col_names + (j * PESTPP_NAME_LEN));
-        if (data == nullptr)
-            return PESTPP_OK;                  /* shape-only call */
-        if ((max_nrow < nr) || (max_ncol < nc))
-            throw runtime_error("phi residual buffer too small; call with data=NULL to size it");
-        for (size_t k = 0; k < vals.size(); k++)
-            data[k] = vals[k];
+        if (data != nullptr)
+            // stride is the CALLER's row count, not ours: an over-allocated buffer is read
+            // back at max_nrow, so writing at nr would silently transpose the block
+            for (int j = 0; j < nc; j++)
+                for (int i = 0; i < nr; i++)
+                    data[i + (j * max_nrow)] = vals[i + ((size_t)j * nr)];
         return PESTPP_OK;
     CAPI_END()
 }
@@ -1111,10 +1431,17 @@ pestpp_status pestpp_get_obs_groups(pestpp_handle h, char* buf, int buf_len, int
     CAPI_BEGIN(h)
         // aligned with the observation ensemble's columns, so a caller can zip the two
         vector<string> onames = s->adapter->obs_ensemble()->get_var_names();
+        const Observations& ctl_obs = s->pest_scenario->get_ctl_observations();
         const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
         vector<string> groups;
         for (auto& n : onames)
+        {
+            // see pestpp_get_obs_weights: an unchecked find() here is a crash, not an error
+            if (ctl_obs.find(n) == ctl_obs.end())
+                throw runtime_error("observation '" + n + "' is in the ensemble but not in "
+                                    "the control file");
             groups.push_back(oi->get_group(n));
+        }
         return pack_names(groups, buf, buf_len, count);
     CAPI_END()
 }
@@ -1122,7 +1449,7 @@ pestpp_status pestpp_get_obs_groups(pestpp_handle h, char* buf, int buf_len, int
 pestpp_status pestpp_supports_live_control(pestpp_handle h, int* out)
 {
     CAPI_BEGIN(h)
-        if (out == nullptr) throw runtime_error("null out-param");
+        if (out == nullptr) bad_arg("null out-param");
         *out = (dynamic_cast<RunManagerPanther*>(s->run_manager.get()) != nullptr) ? 1 : 0;
         return PESTPP_OK;
     CAPI_END()
@@ -1139,7 +1466,7 @@ pestpp_status pestpp_begin_batch(pestpp_handle h)
 pestpp_status pestpp_run_slice(pestpp_handle h, double max_seconds, int* all_done)
 {
     CAPI_BEGIN(h)
-        if (all_done == nullptr) throw runtime_error("null out-param");
+        if (all_done == nullptr) bad_arg("null out-param");
         RunManagerAbstract::RUN_SLICE_STATUS st = s->run_manager->run_slice(max_seconds);
         *all_done = (st == RunManagerAbstract::RUN_SLICE_STATUS::ALL_DONE) ? 1 : 0;
         return PESTPP_OK;
@@ -1191,7 +1518,7 @@ pestpp_status pestpp_get_run_states(pestpp_handle h, const int* want_ids, int n_
         if (!want_any)
             return PESTPP_OK;
         if (max_n < (int)states.size())
-            throw runtime_error("run state buffers too small; call with NULL arrays to size first");
+            too_small("run state buffers too small; call with NULL arrays to size first");
         for (size_t i = 0; i < states.size(); i++)
         {
             if (run_ids     != nullptr) run_ids[i]     = states[i].run_id;
@@ -1208,7 +1535,7 @@ pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids, int n, int
 {
     CAPI_BEGIN(h)
         if ((run_ids == nullptr) || (n <= 0))
-            throw runtime_error("pestpp_cancel_runs needs at least one run id");
+            bad_arg("pestpp_cancel_runs needs at least one run id");
         int c = panther(s)->cancel_runs(vector<int>(run_ids, run_ids + n));
         if (n_cancelled != nullptr)
             *n_cancelled = c;
@@ -1219,7 +1546,7 @@ pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids, int n, int
 pestpp_status pestpp_get_worker_count(pestpp_handle h, int* n)
 {
     CAPI_BEGIN(h)
-        if (n == nullptr) throw runtime_error("null out-param");
+        if (n == nullptr) bad_arg("null out-param");
         *n = (int)panther(s)->get_worker_states().size();
         return PESTPP_OK;
     CAPI_END()
@@ -1234,7 +1561,7 @@ pestpp_status pestpp_get_worker_state(pestpp_handle h, int idx,
     CAPI_BEGIN(h)
         vector<PantherWorkerState> ws = panther(s)->get_worker_states();
         if ((idx < 0) || (idx >= (int)ws.size()))
-            throw runtime_error("worker index out of range");
+            bad_arg("worker index out of range");
         const PantherWorkerState& w = ws[idx];
         copy_to_buf(w.hostname, host_buf, host_buf_len);
         copy_to_buf(w.state, state_buf, state_buf_len);
@@ -1252,14 +1579,14 @@ pestpp_status pestpp_get_worker_run_history(pestpp_handle h, int idx, int which,
     CAPI_BEGIN(h)
         vector<PantherWorkerState> ws = panther(s)->get_worker_states();
         if ((idx < 0) || (idx >= (int)ws.size()))
-            throw runtime_error("worker index out of range");
+            bad_arg("worker index out of range");
         const PantherWorkerState& w = ws[idx];
         switch (which)
         {
         case PESTPP_WORKER_COMPLETED: return emit_ids(w.completed_runs, run_ids, max_n, n_out);
         case PESTPP_WORKER_FAILED:    return emit_ids(w.failed_runs,    run_ids, max_n, n_out);
         case PESTPP_WORKER_TIMED_OUT: return emit_ids(w.timed_out_runs, run_ids, max_n, n_out);
-        default: throw runtime_error("unknown worker history selector");
+        default: bad_arg("unknown worker history selector");
         }
     CAPI_END()
 }
@@ -1294,10 +1621,19 @@ pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights, int max_n
         if (weights == nullptr)
             return PESTPP_OK;
         if (max_n < (int)onames.size())
-            throw runtime_error("weight buffer too small; call with weights=NULL to size it");
+            too_small("weight buffer too small; call with weights=NULL to size it");
+        // ObservationInfo::get_weight/get_group deref find() without checking end(), which
+        // is a segfault rather than an exception - and these names come from an ENSEMBLE, so
+        // a weights csv whose columns do not match the scenario would crash the host process
+        const Observations& ctl_obs = s->pest_scenario->get_ctl_observations();
         const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
         for (size_t i = 0; i < onames.size(); i++)
+        {
+            if (ctl_obs.find(onames[i]) == ctl_obs.end())
+                throw runtime_error("observation '" + onames[i] + "' is in the ensemble but "
+                                    "not in the control file");
             weights[i] = oi->get_weight(onames[i]);
+        }
         return PESTPP_OK;
     CAPI_END()
 }
@@ -1307,7 +1643,7 @@ pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
 {
     CAPI_BEGIN(h)
         if ((names == nullptr) || (weights == nullptr) || (n <= 0))
-            throw runtime_error("pestpp_set_obs_weights needs names and values");
+            bad_arg("pestpp_set_obs_weights needs names and values");
         ObservationInfo& oi = s->pest_scenario->get_ctl_observation_info_4_mod();
         vector<string> want = unpack_names(names, n);
         // validate everything before changing anything, so a bad name cannot leave the
@@ -1315,11 +1651,11 @@ pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
         const Observations& obs = s->pest_scenario->get_ctl_observations();
         for (auto& nm : want)
             if (obs.find(nm) == obs.end())
-                throw runtime_error("no such observation: '" + nm + "'");
+                bad_arg("no such observation: '" + nm + "'");
         for (int i = 0; i < n; i++)
         {
             if (weights[i] < 0.0)
-                throw runtime_error("negative weight for '" + want[i] + "'");
+                bad_arg("negative weight for '" + want[i] + "'");
             oi.set_weight(want[i], weights[i]);
         }
         return PESTPP_OK;
@@ -1331,15 +1667,21 @@ pestpp_status pestpp_broadcast_weights(pestpp_handle h)
     CAPI_BEGIN(h)
         Ensemble* w = s->adapter->ensemble(PESTPP_WEIGHTS_EN);
         if (w == nullptr)
-            throw runtime_error(string("tool '") + s->adapter->name() +
+            unsupported(string("tool '") + s->adapter->name() +
                                 "' has no weights ensemble");
         if (w->shape().first == 0)
             return PESTPP_OK;                 /* not built yet; initialize will read the vector */
         const ObservationInfo* oi = s->pest_scenario->get_ctl_observation_info_ptr();
         vector<string> wnames = w->get_var_names();
+        const Observations& ctl_obs = s->pest_scenario->get_ctl_observations();
         Eigen::VectorXd wvec(wnames.size());
         for (size_t j = 0; j < wnames.size(); j++)
+        {
+            if (ctl_obs.find(wnames[j]) == ctl_obs.end())
+                throw runtime_error("weights ensemble column '" + wnames[j] + "' is not an "
+                                    "observation in the control file");
             wvec[j] = oi->get_weight(wnames[j]);
+        }
         Eigen::MatrixXd* m = w->get_eigen_ptr_4_mod();
         for (int i = 0; i < m->rows(); i++)
             m->row(i) = wvec;
@@ -1359,10 +1701,14 @@ pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued)
 {
     CAPI_BEGIN(h)
         if (s->pending_runs_valid)
-            throw runtime_error("runs are already queued; harvest them before queueing again");
+            bad_state("runs are already queued; harvest them before queueing again");
+        // The cycle has to be passed explicitly: it defaults to NULL_DA_CYCLE, so a da handle
+        // driving its own queue/harvest would tag runs with no cycle at all while the in-tree
+        // da path tagged them correctly. Invisible on a control file whose first cycle is 0.
         s->pending_runs = queue_ensemble_util(s->performance_log.get(),
                                               s->file_manager->rec_ofstream(),
-                                              *s->adapter->par_ensemble(), s->run_manager.get());
+                                              *s->adapter->par_ensemble(), s->run_manager.get(),
+                                              false, vector<int>(), s->adapter->da_cycle());
         s->pending_runs_valid = true;
         if (n_queued != nullptr)
             *n_queued = (int)s->pending_runs.size();
@@ -1374,7 +1720,7 @@ pestpp_status pestpp_process_runs(pestpp_handle h, int* n_failed)
 {
     CAPI_BEGIN(h)
         if (!s->pending_runs_valid)
-            throw runtime_error("no queued runs to harvest; call pestpp_queue_runs first");
+            bad_state("no queued runs to harvest; call pestpp_queue_runs first");
         vector<int> failed = harvest_ensemble_util(s->performance_log.get(),
                                                    s->file_manager->rec_ofstream(),
                                                    *s->adapter->par_ensemble(), *s->adapter->obs_ensemble(),
@@ -1409,13 +1755,13 @@ void keep_across_coupled(PestppSession* s, const vector<string>& par_keep)
     {
         map<string,int>::iterator it = pos.find(n);
         if (it == pos.end())
-            throw runtime_error("no such realization: '" + n + "'");
+            bad_arg("no such realization: '" + n + "'");
         keep_p.push_back(pnames[it->second]);
         if (it->second < (int)onames.size())
             keep_o.push_back(onames[it->second]);
     }
     if (keep_p.empty())
-        throw runtime_error("refusing to leave the ensemble empty");
+        bad_arg("refusing to leave the ensemble empty");
 
     // true -> the fixed-parameter store is culled along with the rows
     pe->keep_rows(keep_p, true);
@@ -1434,7 +1780,7 @@ pestpp_status pestpp_keep_realizations(pestpp_handle h, const char* names, int n
 {
     CAPI_BEGIN(h)
         if ((names == nullptr) || (n <= 0))
-            throw runtime_error("pestpp_keep_realizations needs at least one name");
+            bad_arg("pestpp_keep_realizations needs at least one name");
         keep_across_coupled(s, unpack_names(names, n));
         return PESTPP_OK;
     CAPI_END()
@@ -1444,14 +1790,14 @@ pestpp_status pestpp_drop_realizations(pestpp_handle h, const char* names, int n
 {
     CAPI_BEGIN(h)
         if ((names == nullptr) || (n <= 0))
-            throw runtime_error("pestpp_drop_realizations needs at least one name");
+            bad_arg("pestpp_drop_realizations needs at least one name");
         vector<string> drop = unpack_names(names, n);
         vector<string> current = s->adapter->par_ensemble()->get_real_names();
         set<string> present(current.begin(), current.end());
         // name a bad request rather than silently dropping fewer than asked
         for (auto& nm : drop)
             if (present.find(nm) == present.end())
-                throw runtime_error("no such realization: '" + nm + "'");
+                bad_arg("no such realization: '" + nm + "'");
         // express drop as keep, so both go through one code path
         set<string> dset(drop.begin(), drop.end());
         vector<string> keep;
@@ -1473,20 +1819,23 @@ pestpp_status pestpp_get_par_snapshot(pestpp_handle h, double* data, int max_nro
         int nr = (int)snap.values.rows(), nc = (int)snap.values.cols();
         if (nrow != nullptr) *nrow = nr;
         if (ncol != nullptr) *ncol = nc;
+        // size-only: report the shape without writing into buffers the caller has not sized
+        if ((data == nullptr) && (row_names == nullptr) && (col_names == nullptr))
+            return PESTPP_OK;
+        if ((max_nrow < nr) || (max_ncol < nc))
+            too_small("snapshot buffers too small; call with all pointers NULL to "
+                                "size them first");
         if (row_names != nullptr)
             for (int i = 0; i < nr; i++)
                 pack_one_name(snap.row_names[i], row_names + (i * PESTPP_NAME_LEN));
         if (col_names != nullptr)
             for (int j = 0; j < nc; j++)
                 pack_one_name(snap.col_names[j], col_names + (j * PESTPP_NAME_LEN));
-        if (data == nullptr)
-            return PESTPP_OK;                  /* size-only call */
-        if ((max_nrow < nr) || (max_ncol < nc))
-            throw runtime_error("snapshot buffer too small; call with data=NULL to size it first");
-        // column-major, matching the zero-copy view and numpy order="F"
-        for (int j = 0; j < nc; j++)
-            for (int i = 0; i < nr; i++)
-                data[i + (j * nr)] = snap.values(i, j);
+        // column-major at the CALLER's stride, matching the zero-copy view and numpy order="F"
+        if (data != nullptr)
+            for (int j = 0; j < nc; j++)
+                for (int i = 0; i < nr; i++)
+                    data[i + (j * max_nrow)] = snap.values(i, j);
         return PESTPP_OK;
     CAPI_END()
 }
@@ -1496,9 +1845,9 @@ pestpp_status pestpp_set_par_snapshot(pestpp_handle h, const double* data, int n
 {
     CAPI_BEGIN(h)
         if ((data == nullptr) || (row_names == nullptr) || (col_names == nullptr))
-            throw runtime_error("pestpp_set_par_snapshot needs data plus row and column names");
+            bad_arg("pestpp_set_par_snapshot needs data plus row and column names");
         if ((nrow <= 0) || (ncol <= 0))
-            throw runtime_error("snapshot must have at least one row and one column");
+            bad_arg("snapshot must have at least one row and one column");
         ParameterSnapshot snap;
         snap.row_names = unpack_names(row_names, nrow);
         snap.col_names = unpack_names(col_names, ncol);

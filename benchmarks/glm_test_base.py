@@ -97,6 +97,52 @@ def tenpar_superpar_restart_test():
     assert diff.apply(np.abs).sum().sum() == 0.0
 
 
+def tenpar_user_lambdas_unchanged_test():
+    """A user-supplied lambda vector is used as given, not walked between iterations.
+
+    pestpp-glm adapts its lambda window when the best lambda lands on an edge: it appends a
+    value an order of magnitude further out and drops the one at the other end. Reasonable for
+    the default window; wrong when the control file names the lambdas, and actively
+    destructive for a single value - there first == last == best by construction, so the
+    "best is at the top edge" branch fires every time and multiplies the lambda by ten each
+    iteration.
+
+    Two iterations is the minimum that can catch it. The walk happens at the END of an
+    iteration, so with noptmax=1 the rewritten vector is never used and nothing looks wrong.
+    """
+    import re
+
+    model_d = "glm_10par_xsec"
+    template_d = os.path.join(model_d, "template")
+    test_d = os.path.join(model_d, "master_user_lambdas")
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    shutil.copytree(template_d, test_d)
+
+    the_lambda = 5.0
+    pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
+    pst.pestpp_options = {}
+    pst.pestpp_options["lambdas"] = the_lambda
+    pst.control_data.noptmax = 2
+    pst.write(os.path.join(test_d, "pest_lam.pst"))
+    pyemu.os_utils.run("{0} pest_lam.pst".format(exe_path), cwd=test_d)
+
+    rec = open(os.path.join(test_d, "pest_lam.rec")).read()
+
+    offenders = [l.strip() for l in rec.split("\n") if "Extending lambda_vec" in l]
+    assert not offenders, \
+        "pestpp-glm rewrote a user-supplied lambda vector:\n  " + "\n  ".join(offenders)
+
+    used = {float(v) for v in re.findall(r"lambda\s*=\s*([0-9.eE+-]+)", rec, re.I)}
+    used |= {float(v) for v in re.findall(r"current lambda:\s*([0-9.eE+-]+)", rec, re.I)}
+    assert used, "no lambda values found in the rec file - has the reporting changed?"
+    assert all(abs(v - the_lambda) < 1.0e-8 for v in used), \
+        "expected only lambda {0} across both iterations, found {1}".format(
+            the_lambda, sorted(used))
+
+
 def tenpar_base_test():
     """tenpar basic test"""
 

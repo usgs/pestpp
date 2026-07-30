@@ -1,6 +1,6 @@
 """Thin ctypes layer over the PEST++ C ABI.
 
-This mirrors ``pestpp_capi.h`` one-to-one on purpose. Method names match the C symbols so
+This mirrors ``pestpp-api.h`` one-to-one on purpose. Method names match the C symbols so
 the two can be read side by side, and nothing here is made Pythonic -- no properties, no
 DataFrames, no cleverness. That is the same split MODFLOW 6 uses (``xmipy`` thin,
 ``modflowapi`` opinionated) and pypestutils uses (``pestutilslib.py`` thin, ``helpers.py``
@@ -29,10 +29,19 @@ import numpy as np
 
 # ---- enums, mirroring the header ----------------------------------------------------
 
+# Banded by sign, exactly as the header defines them: negative is a successful call that has
+# an algorithmic outcome worth reporting, zero is plain success, positive is failure. Codes
+# get added inside the bands, so _check tests the sign rather than listing values.
+PESTPP_RETRY = -1
+
 PESTPP_OK = 0
+
 PESTPP_ERROR = 1
 PESTPP_INVALID_HANDLE = 2
-PESTPP_RETRY = 3
+PESTPP_INVALID_ARGUMENT = 4
+PESTPP_BUFFER_TOO_SMALL = 5
+PESTPP_NOT_SUPPORTED = 6
+PESTPP_INVALID_STATE = 7
 
 TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP = 0, 1, 2, 3
 PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN = 0, 1, 2, 3
@@ -64,7 +73,20 @@ class CreateOptions(Structure):
         ("working_dir", c_char_p),
         ("run_manager", c_int),
         ("panther_port", c_char_p),
+        # reserved must match the header exactly: it is what keeps a future field from hiding
+        # in tail padding, where sizeof() would not change and struct_size would stop
+        # distinguishing versions. ctypes zeroes it for us.
+        ("reserved", _vp * 4),
     ]
+
+
+class _Unset:
+    """Sentinel for "no default given", since None is a legitimate default."""
+    def __repr__(self):
+        return "<unset>"
+
+
+_UNSET = _Unset()
 
 
 class PestppError(Exception):
@@ -108,7 +130,7 @@ class PestppLib:
         self._opts = opts
         status = self.lib.pestpp_create(byref(opts), byref(self.handle))
         if status != PESTPP_OK:
-            raise PestppError(self.lib.pestpp_last_create_error().decode())
+            raise PestppError(self.last_global_error())
 
     # -- plumbing ---------------------------------------------------------------------
 
@@ -129,14 +151,28 @@ class PestppLib:
         lib.pestpp_destroy.restype = c_int
         lib.pestpp_last_error.argtypes = (c_void_p,)
         lib.pestpp_last_error.restype = c_char_p
+        lib.pestpp_get_last_error.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_last_error.restype = c_int
+        lib.pestpp_last_global_error.argtypes = ()
+        lib.pestpp_last_global_error.restype = c_char_p
         lib.pestpp_last_create_error.argtypes = ()
         lib.pestpp_last_create_error.restype = c_char_p
+        lib.pestpp_get_fatal_error.argtypes = ()
+        lib.pestpp_get_fatal_error.restype = c_char_p
+        lib.pestpp_clear_fatal_error.argtypes = ()
+        lib.pestpp_clear_fatal_error.restype = c_int
+        lib.pestpp_get_version.argtypes = (c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_version.restype = c_int
+        lib.pestpp_get_api_version.argtypes = (POINTER(c_int), POINTER(c_int), POINTER(c_int))
+        lib.pestpp_get_api_version.restype = c_int
         lib.pestpp_flush_output.argtypes = ()
         lib.pestpp_flush_output.restype = c_int
         lib.pestpp_redirect_output.argtypes = (c_char_p, POINTER(c_int))
         lib.pestpp_redirect_output.restype = c_int
         lib.pestpp_restore_output.argtypes = (c_int,)
         lib.pestpp_restore_output.restype = c_int
+        lib.pestpp_get_redirect_depth.argtypes = (POINTER(c_int),)
+        lib.pestpp_get_redirect_depth.restype = c_int
 
         lib.pestpp_initialize_prepare.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_initialize_prepare.restype = c_int
@@ -153,8 +189,13 @@ class PestppLib:
             getattr(lib, name).restype = c_int
 
         lib.pestpp_get_ensemble_view.argtypes = (
-            c_void_p, c_int, POINTER(POINTER(c_double)), POINTER(c_int), POINTER(c_int))
+            c_void_p, c_int, POINTER(POINTER(c_double)), POINTER(c_int), POINTER(c_int),
+            POINTER(c_int))
         lib.pestpp_get_ensemble_view.restype = c_int
+        lib.pestpp_view_is_valid.argtypes = (c_void_p, c_int, POINTER(c_int))
+        lib.pestpp_view_is_valid.restype = c_int
+        lib.pestpp_release_view.argtypes = (c_void_p, c_int)
+        lib.pestpp_release_view.restype = c_int
 
         for name in ("pestpp_get_ensemble_row_names", "pestpp_get_ensemble_col_names"):
             getattr(lib, name).argtypes = (c_void_p, c_int, c_char_p, c_int, POINTER(c_int))
@@ -162,7 +203,8 @@ class PestppLib:
 
         lib.pestpp_set_option.argtypes = (c_void_p, c_char_p, c_char_p)
         lib.pestpp_set_option.restype = c_int
-        lib.pestpp_get_option.argtypes = (c_void_p, c_char_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_option.argtypes = (
+            c_void_p, c_char_p, c_char_p, c_int, POINTER(c_int), POINTER(c_int))
         lib.pestpp_get_option.restype = c_int
 
         # -- run management --
@@ -233,11 +275,34 @@ class PestppLib:
         lib.pestpp_set_par_snapshot.restype = c_int
 
     def _check(self, status: int, what: str) -> int:
-        """Raise on error; pass RETRY through, since it is an outcome and not a fault."""
-        if status in (PESTPP_OK, PESTPP_RETRY):
+        """Raise on failure; pass the negative band through, since it is an outcome.
+
+        Tests the sign rather than enumerating codes: the header reserves the bands and will
+        add to them, and a wrapper that listed values would mis-handle the first new one.
+        """
+        if status <= PESTPP_OK:
             return status
-        msg = self.lib.pestpp_last_error(self.handle)
-        raise PestppError(f"{what}: {msg.decode() if msg else 'unknown error'}")
+        # read the message before anything else touches the handle -- every entry point
+        # clears it on the way in, so even a getter here would erase what we are reporting
+        msg = self.get_last_error()
+        raise PestppError("{0}: {1} (status {2})".format(what, msg or "unknown error", status))
+
+    def get_last_error(self) -> str:
+        """Why the most recent call on this handle failed; "" if it did not.
+
+        Uses the copying form so the result is a python string the caller owns, rather than a
+        pointer into storage the next call overwrites.
+        """
+        needed = c_int()
+        if self.lib.pestpp_get_last_error(self.handle, None, 0, byref(needed)) != PESTPP_OK:
+            return ""
+        if needed.value <= 1:
+            return ""
+        buf = create_string_buffer(needed.value)
+        if self.lib.pestpp_get_last_error(
+                self.handle, buf, c_int(needed.value), byref(needed)) != PESTPP_OK:
+            return ""
+        return buf.value.decode(errors="replace")
 
     def _unpack_names(self, raw: bytes, count: int) -> list[str]:
         return [
@@ -257,15 +322,67 @@ class PestppLib:
         self.lib.pestpp_flush_output()
 
     def redirect_output(self, path: str) -> int:
-        """Send the library's console output to a file. Returns the fd to restore with."""
-        saved = c_int()
-        if self.lib.pestpp_redirect_output(str(path).encode(), byref(saved)) != PESTPP_OK:
-            raise PestppError("could not redirect output to {0}".format(path))
-        return saved.value
+        """Send the library's console output to a file. Returns a token to restore with.
 
-    def restore_output(self, saved_fd: int) -> None:
-        """Undo redirect_output()."""
-        self.lib.pestpp_restore_output(c_int(saved_fd))
+        The token is not a file descriptor -- the saved descriptor stays inside the library,
+        so there is nothing here to close or to pass to the wrong call.
+        """
+        token = c_int()
+        if self.lib.pestpp_redirect_output(str(path).encode(), byref(token)) != PESTPP_OK:
+            raise PestppError("could not redirect output to {0}: {1}".format(
+                path, self.last_global_error()))
+        return token.value
+
+    def restore_output(self, redirect_token: int) -> None:
+        """Undo redirect_output(). Strictly innermost-first.
+
+        Raises on failure rather than returning quietly: if this does not work the process's
+        stdout is gone, and swallowing the status means nobody ever finds out why. Restoring
+        out of order is a failure too -- see the header for why doing it anyway would leave
+        stdout pointing somewhere permanently wrong.
+        """
+        if self.lib.pestpp_restore_output(c_int(redirect_token)) != PESTPP_OK:
+            raise PestppError("could not restore output: {0}".format(self.last_global_error()))
+
+    def get_redirect_depth(self) -> int:
+        """How many output redirects are outstanding process-wide. 0 when not capturing."""
+        depth = c_int()
+        self.lib.pestpp_get_redirect_depth(byref(depth))
+        return depth.value
+
+    def last_global_error(self) -> str:
+        """Why the most recent handle-less call failed -- create, redirect, restore, flush."""
+        msg = self.lib.pestpp_last_global_error()
+        return msg.decode(errors="replace") if msg else ""
+
+    def get_fatal_error(self) -> str:
+        """The process-wide latched failure, or "" when healthy. See clear_fatal_error()."""
+        msg = self.lib.pestpp_get_fatal_error()
+        return msg.decode(errors="replace") if msg else ""
+
+    def clear_fatal_error(self) -> None:
+        """Acknowledge the latched failure and resume.
+
+        Only meaningful once the working directory has actually been put back -- the library
+        cannot check that, so this is an assertion by the caller, not a repair.
+        """
+        self.lib.pestpp_clear_fatal_error()
+
+    def get_version(self) -> str:
+        """The pest++ release this library was built from, e.g. "5.2.28"."""
+        needed = c_int()
+        if self.lib.pestpp_get_version(None, 0, byref(needed)) != PESTPP_OK:
+            return ""
+        buf = create_string_buffer(needed.value)
+        if self.lib.pestpp_get_version(buf, c_int(needed.value), byref(needed)) != PESTPP_OK:
+            return ""
+        return buf.value.decode(errors="replace")
+
+    def get_api_version(self) -> tuple[int, int, int]:
+        """The C ABI's own (major, minor, patch), which moves apart from the release above."""
+        major, minor, patch = c_int(), c_int(), c_int()
+        self.lib.pestpp_get_api_version(byref(major), byref(minor), byref(patch))
+        return major.value, minor.value, patch.value
 
     def destroy(self) -> None:
         if getattr(self, "handle", None) is not None and self.handle:
@@ -321,23 +438,41 @@ class PestppLib:
 
     # -- ensembles --------------------------------------------------------------------
 
-    def get_ensemble_view(self, ensemble_id: int) -> np.ndarray:
-        """A numpy view onto the live buffer -- no copy.
+    def get_ensemble_view(self, ensemble_id: int) -> tuple[np.ndarray, int]:
+        """A numpy view onto the live buffer -- no copy. Returns (array, view_token).
 
         Eigen is column-major, hence order="F". The array is only valid while that
-        ensemble's storage is unchanged; re-fetch after anything that could mutate it.
+        ensemble's storage is unchanged; ask view_is_valid(token) rather than guessing, and
+        release_view(token) when done.
         """
         ptr = POINTER(c_double)()
-        nrow, ncol = c_int(), c_int()
+        nrow, ncol, token = c_int(), c_int(), c_int()
         self._check(
             self.lib.pestpp_get_ensemble_view(
-                self.handle, c_int(ensemble_id), byref(ptr), byref(nrow), byref(ncol)),
+                self.handle, c_int(ensemble_id), byref(ptr), byref(nrow), byref(ncol),
+                byref(token)),
             "pestpp_get_ensemble_view")
         n = nrow.value * ncol.value
         if n == 0:
-            return np.empty((nrow.value, ncol.value), order="F")
+            # An empty ensemble has no buffer to borrow. Return a READ-ONLY array: a writable
+            # empty one is a trap, because writes to it go nowhere and report no error.
+            empty = np.empty((nrow.value, ncol.value), order="F")
+            empty.flags.writeable = False
+            return empty, token.value
         buf = np.ctypeslib.as_array(ptr, shape=(n,))
-        return buf.reshape((nrow.value, ncol.value), order="F")
+        return buf.reshape((nrow.value, ncol.value), order="F"), token.value
+
+    def view_is_valid(self, view_token: int) -> bool:
+        """Is the buffer that token was issued for still the ensemble's live storage?"""
+        out = c_int()
+        self._check(
+            self.lib.pestpp_view_is_valid(self.handle, c_int(view_token), byref(out)),
+            "pestpp_view_is_valid")
+        return bool(out.value)
+
+    def release_view(self, view_token: int) -> None:
+        self._check(self.lib.pestpp_release_view(self.handle, c_int(view_token)),
+                    "pestpp_release_view")
 
     def get_ensemble_row_names(self, ensemble_id: int) -> list[str]:
         return self._get_names(self.lib.pestpp_get_ensemble_row_names, ensemble_id)
@@ -368,14 +503,34 @@ class PestppLib:
         self._check(self.lib.pestpp_set_option(self.handle, key.encode(), str(value).encode()),
                     f"pestpp_set_option({key})")
 
-    def get_option(self, key: str) -> str:
-        needed = c_int()
-        self._check(self.lib.pestpp_get_option(self.handle, key.encode(), None, 0, byref(needed)),
-                    f"pestpp_get_option({key})")
+    def get_option(self, key: str, default=_UNSET):
+        """One option's value.
+
+        An unknown key raises, matching set_option -- unless a `default` is supplied, which is
+        how you ask "does this library know about X?" without an exception. Note the two are
+        genuinely different questions: an option set to the empty string returns "", while an
+        option that does not exist returns the default.
+        """
+        needed, found = c_int(), c_int()
+        probing = default is not _UNSET
+        fp = byref(found) if probing else None
+        self._check(
+            self.lib.pestpp_get_option(self.handle, key.encode(), None, 0, byref(needed), fp),
+            f"pestpp_get_option({key})")
+        if probing and not found.value:
+            return default
         buf = create_string_buffer(needed.value)
         self._check(self.lib.pestpp_get_option(self.handle, key.encode(), buf, needed.value,
-                                               byref(needed)), f"pestpp_get_option({key})")
+                                               byref(needed), fp), f"pestpp_get_option({key})")
         return buf.value.decode()
+
+    def has_option(self, key: str) -> bool:
+        """Whether this library knows the option at all, regardless of its value."""
+        found = c_int()
+        self._check(
+            self.lib.pestpp_get_option(self.handle, key.encode(), None, 0, None, byref(found)),
+            f"pestpp_get_option({key})")
+        return bool(found.value)
 
     # -- run management ----------------------------------------------------------------
 

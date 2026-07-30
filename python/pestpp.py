@@ -35,7 +35,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pestpp_lib import (  # noqa: E402
-    PestppLib, PestppError,
+    PestppLib, PestppError, _UNSET,
     PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
     TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP,
     RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
@@ -44,7 +44,7 @@ from pestpp_lib import (  # noqa: E402
 )
 
 __all__ = [
-    "Ies", "Da", "Mou", "Sqp", "IterationStep", "PestppError",
+    "Ies", "Da", "Mou", "Sqp", "IterationStep", "PestppError", "ExpiredViewError",
     "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
     "PHI_MEAS", "PHI_COMPOSITE", "PHI_REGUL", "PHI_ACTUAL", "PHI_NOISE",
 ]
@@ -69,17 +69,35 @@ def find_library(lib_path: str | None = None) -> str:
         return env
 
     plat = platform.platform().lower()
-    name = ("pestpp_capi.dll" if ("windows" in plat or os.name == "nt")
-            else "libpestpp_capi.dylib" if "darwin" in plat or "macos" in plat
-            else "libpestpp_capi.so")
+    # pestpp-api.<so|dll|dylib> - no "lib" prefix, matching the pestpp-* executables
+    name = ("pestpp-api.dll" if ("windows" in plat or os.name == "nt")
+            else "pestpp-api.dylib" if "darwin" in plat or "macos" in plat
+            else "pestpp-api.so")
     here = os.path.dirname(os.path.abspath(__file__))
     roots = [os.path.join(os.path.dirname(here), "build"), os.path.join(here, "..", "..", "build")]
+
+    # An installed copy next to the executables COMPETES on mtime; it does not win outright.
+    # Short-circuiting to it meant a stale install silently shadowed a fresh build - the
+    # symptom is an AttributeError from ctypes about a symbol that plainly exists in the
+    # source, which sends you looking in exactly the wrong place.
+    found = []
+    for cand in (os.path.join(os.path.dirname(here), "bin", name),):
+        if os.path.exists(cand):
+            found.append(os.path.abspath(cand))
     for root in roots:
         if not os.path.isdir(root):
             continue
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            # Never a packaging staging area. CPack leaves a full copy of the install tree
+            # under _CPack_Packages, so a stale one from an earlier build sits there looking
+            # exactly like the real thing - and being picked would mean silently testing a
+            # library that is not the one just compiled.
+            dirnames[:] = [d for d in dirnames if d != "_CPack_Packages"]
             if name in filenames:
-                return os.path.abspath(os.path.join(dirpath, name))
+                found.append(os.path.abspath(os.path.join(dirpath, name)))
+    if found:
+        # newest wins, so a fresh build beats anything left over
+        return max(found, key=os.path.getmtime)
     raise FileNotFoundError(
         "could not find {0} under {1}. Build pest++ first, or set PESTPP_LIB.".format(name, roots))
 
@@ -132,11 +150,14 @@ def _capture_output(lib, path):
     noise.
     """
     sys.stdout.flush()
-    saved = lib.redirect_output(path)
+    token = lib.redirect_output(path)
     try:
         yield
     finally:
-        lib.restore_output(saved)
+        # try/finally makes this strictly LIFO, which is what the library now requires: fd 1
+        # is process-global, so restoring out of order would leave stdout pointing at another
+        # session's log permanently. Nested `with` blocks unwind correctly by construction.
+        lib.restore_output(token)
 
 
 # ---- what an iteration reports ------------------------------------------------------------
@@ -155,6 +176,112 @@ class IterationStep:
     def __repr__(self):
         return ("IterationStep(iter={0}, n_reals={1}, phi_mean={2:.6g}{3})"
                 .format(self.iter, self.n_reals, self.phi_mean, ", RETRY" if self.retried else ""))
+
+
+# ---- borrowed views -------------------------------------------------------------------------
+
+class ExpiredViewError(PestppError):
+    """Raised when a zero-copy view is used after its ``with`` block, or after a resize."""
+
+
+class EnsembleViewProxy:
+    """An ndarray you may only use while the view is live.
+
+    The array itself is the tool's Eigen buffer. Two things can make it stop being yours:
+    leaving the ``with`` block, and the ensemble reallocating underneath you (a resize, a
+    membership change, an algorithm step). Neither is visible in the array - it keeps its
+    shape and returns numbers either way, and those numbers are read from freed memory.
+
+    So this stands in front of it. Every operation asks two questions first - has the block
+    ended, and does the library still recognise the buffer - and raises
+    :class:`ExpiredViewError` rather than reading. That is a real guard, not a convention:
+    the array is never handed out, so a caller cannot keep a reference past the block by
+    assigning it elsewhere.
+
+    Work in BULK. Each operation costs a call into the library, so ``a[:, 3] = x`` is one
+    check and a python loop over elements is one per element. That is the natural numpy
+    style anyway.
+
+    The one deliberate escape is ``np.asarray(proxy)`` (and ``.copy()``, which is the safe
+    version): it hands back the underlying array while the view is live, because that is what
+    makes the proxy work with the rest of numpy. Copy it if you want to keep it.
+    """
+
+    __slots__ = ("_arr", "_lib", "_token", "_live")
+
+    def __init__(self, arr, lib, token):
+        object.__setattr__(self, "_arr", arr)
+        object.__setattr__(self, "_lib", lib)
+        object.__setattr__(self, "_token", token)
+        object.__setattr__(self, "_live", True)
+
+    # -- the guard --
+    def _live_array(self):
+        if not self._live:
+            raise ExpiredViewError(
+                "this ensemble view has expired: it is only valid inside the 'with' block "
+                "that produced it. Use .copy() inside the block to keep the values, or "
+                "par_df()/obs_df() for a labelled copy.")
+        if not self._lib.view_is_valid(self._token):
+            raise ExpiredViewError(
+                "this ensemble view is no longer valid: the ensemble's storage was replaced "
+                "or resized (a membership change or an algorithm step will do it). Take a "
+                "fresh view.")
+        return self._arr
+
+    def _expire(self):
+        object.__setattr__(self, "_live", False)
+        try:
+            self._lib.release_view(self._token)
+        except Exception:
+            # the handle may already be gone; expiry still stands
+            pass
+
+    @property
+    def valid(self) -> bool:
+        """True while this view may still be used. Never raises."""
+        if not self._live:
+            return False
+        try:
+            return self._lib.view_is_valid(self._token)
+        except Exception:
+            return False
+
+    # -- ndarray surface --
+    def __array__(self, dtype=None, copy=None):
+        arr = self._live_array()
+        if copy is False:
+            return arr if dtype is None else arr.astype(dtype, copy=False)
+        if dtype is None and not copy:
+            return arr
+        return arr.astype(dtype) if dtype is not None else arr.copy()
+
+    def __getitem__(self, key):
+        return self._live_array()[key]
+
+    def __setitem__(self, key, value):
+        self._live_array()[key] = value
+
+    def __len__(self):
+        return len(self._live_array())
+
+    def __iter__(self):
+        return iter(self._live_array())
+
+    def __repr__(self):
+        if not self._live:
+            return "<EnsembleViewProxy (expired)>"
+        return "<EnsembleViewProxy shape={0}>".format(self._arr.shape)
+
+    def copy(self):
+        """A normal ndarray you own. The way to keep values past the block."""
+        return self._live_array().copy()
+
+    def __getattr__(self, name):
+        # shape, dtype, ndim, size, T, mean, sum, ... all forward, guarded
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(self._live_array(), name)
 
 
 # ---- the tools ----------------------------------------------------------------------------
@@ -227,7 +354,8 @@ class _Tool:
             # started before any blocking call: the master accepts workers whenever, but this
             # process is single-threaded, so anything started after initialize() would never
             # be reached
-            procs = _start_workers(workdir, workers, port, worker_root, exe_path, cls._agent_exe())
+            procs = _start_workers(workdir, workers, port, worker_root, exe_path,
+                                   cls._agent_exe(), pst_file)
         return cls(lib, workdir, procs, quiet=quiet)
 
     @staticmethod
@@ -265,13 +393,43 @@ class _Tool:
             status = self._lib.solve_iteration()
         return self._step(retried=(status == PESTPP_RETRY))
 
+    def set_option(self, key: str, value) -> None:
+        """Set a ++ option or a * control data value. An unknown key raises.
+
+        Some options are consumed once during initialize() and cannot change the current run
+        afterwards; setting one of those late is accepted but has no effect.
+        """
+        self._lib.set_option(key, value)
+
+    def get_option(self, key: str, default=_UNSET):
+        """One option's value, as a string. An unknown key raises unless a default is given.
+
+        The default is what separates the two questions a caller might be asking. An option
+        set to the empty string returns ``""``; an option that does not exist returns the
+        default, or raises if none was supplied.
+        """
+        return (self._lib.get_option(key) if default is _UNSET
+                else self._lib.get_option(key, default))
+
+    def has_option(self, key: str) -> bool:
+        """Whether this build knows the option at all, whatever its value.
+
+        The way to feature-detect against a library you did not build -- ``set_option`` on an
+        unknown key raises, so probing with it is not an option.
+        """
+        return self._lib.has_option(key)
+
     @property
     def noptmax(self) -> int:
-        """Maximum iterations from the control data. -1 and 0 have their usual pest meanings."""
-        try:
-            return int(self._lib.get_option("NOPTMAX"))
-        except (ValueError, PestppError):
-            return -1
+        """Maximum iterations from the control data.
+
+        Negative values are the usual pest special cases (-1 prior evaluation only, -2 a
+        single base-realization run) and mean ZERO solution iterations -- the tools loop
+        ``for (i = 0; i < noptmax; i++)``, which does not execute for a negative bound.
+        """
+        # deliberately not swallowed: a value we cannot read must not silently become a
+        # loop bound, which is how "no iterations" turns into "iterate forever"
+        return int(self._lib.get_option("NOPTMAX"))
 
     def iterations(self, max_iter: int | None = None):
         """Yield an :class:`IterationStep` per iteration.
@@ -281,13 +439,19 @@ class _Tool:
         driven by it alone would ignore noptmax entirely and run until phi stopped improving -
         which is not what a control file saying noptmax=3 asked for.
 
+        A NEGATIVE noptmax yields nothing at all, matching the tools: they loop
+        ``for (i = 0; i < noptmax; i++)``, which does not execute. noptmax=-1 (evaluate the
+        prior and stop) is the standard way to run prior monte carlo with pestpp-ies, so
+        treating negative as "unlimited" would turn the most common invocation into an
+        endless loop.
+
         ``max_iter`` overrides noptmax, for a caller that wants a few steps and a look around.
         """
         limit = max_iter if max_iter is not None else self.noptmax
+        if limit < 0:
+            limit = 0
         n = 0
-        while not self.should_terminate:
-            if limit is not None and limit >= 0 and n >= limit:
-                break
+        while n < limit and not self.should_terminate:
             yield self.solve()
             n += 1
 
@@ -496,7 +660,8 @@ class _Tool:
 
     def weights_df(self, lower: bool = False) -> pd.DataFrame:
         """The weights ENSEMBLE - one weight per observation per realization, as a copy."""
-        arr = self._lib.get_ensemble_view(WEIGHTS_EN)
+        arr, token = self._lib.get_ensemble_view(WEIGHTS_EN)
+        self._lib.release_view(token)          # a copy is taken below; nothing stays borrowed
         return _maybe_lower(pd.DataFrame(
             arr.copy(),
             index=self._lib.get_ensemble_row_names(WEIGHTS_EN),
@@ -562,7 +727,8 @@ class _Tool:
 
     def obs_df(self, lower: bool = False) -> pd.DataFrame:
         """The observation ensemble, as a copy."""
-        arr = self._lib.get_ensemble_view(OBS_EN)
+        arr, token = self._lib.get_ensemble_view(OBS_EN)
+        self._lib.release_view(token)          # a copy is taken below; nothing stays borrowed
         return _maybe_lower(pd.DataFrame(
             arr.copy(),
             index=self._lib.get_ensemble_row_names(OBS_EN),
@@ -588,13 +754,12 @@ class _Tool:
         yield from self._view(OBS_EN)
 
     def _view(self, which):
-        arr = self._lib.get_ensemble_view(which)
+        arr, token = self._lib.get_ensemble_view(which)
+        proxy = EnsembleViewProxy(arr, self._lib, token)
         try:
-            yield arr
+            yield proxy
         finally:
-            # drop our reference so the caller's name is the only one left; a caller who
-            # stashed it elsewhere is on their own, which is what the docstring says
-            del arr
+            proxy._expire()
 
     # -- membership ------------------------------------------------------------------------
 
@@ -711,13 +876,16 @@ def _find_exe(name: str, explicit: str | None = None) -> str:
         "could not find {0}; pass exe_path= or put it on PATH".format(exe))
 
 
-def _start_workers(workdir, n, port, worker_root, exe_path, exe_name):
+def _start_workers(workdir, n, port, worker_root, exe_path, exe_name, pst_file):
     worker_root = os.path.abspath(worker_root or (workdir + "_workers"))
     if os.path.exists(worker_root):
         shutil.rmtree(worker_root)
     os.makedirs(worker_root)
     exe = _find_exe(exe_name, exe_path)
-    pst = [f for f in os.listdir(workdir) if f.lower().endswith(".pst")][0]
+    # the control file this session was opened with, NOT whichever .pst happens to sort
+    # first - a working directory with more than one is normal after a restart, and picking
+    # the wrong one starts every worker on a different problem than the master
+    pst = os.path.basename(pst_file)
     procs = []
     for i in range(n):
         d = os.path.join(worker_root, "worker_{0}".format(i))

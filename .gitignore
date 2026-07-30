@@ -83,3 +83,14 @@ docs/_build/
 docs/_doxygen/
 docs/_manual_assets/
 docs/users_manual_processed.md
+
+# Jupyter autosaves - these hold a full copy of the notebook, outputs and local paths included
+.ipynb_checkpoints/
+
+# Scratch directories the api test suites create beside the cases they copy from
+benchmarks/capi_*/
+benchmarks/api_*/
+examples/nb_*/
+pestpp-glm_benchmarks/*/master_user_lambdas/
+
+__pycache__/

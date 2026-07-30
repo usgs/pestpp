@@ -184,6 +184,11 @@ add_custom_target(local_install
     -D CMAKE_INSTALL_PREFIX=${PESTPP_SOURCE_DIR}
     -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_install.cmake"
   COMMAND ${_local_install_COMMAND_to_be_removed}
+  # The copy above globs pestpp-* and so misses the shared library, whose name is
+  # libpestpp_capi.* or pestpp_capi.dll depending on the platform. Copy it by target rather
+  # than by pattern, which also avoids guessing the prefix and suffix.
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "$<TARGET_FILE:pestpp_capi>" "${PESTPP_SOURCE_DIR}/bin/${_ostag}/"
   DEPENDS
     pestpp-glm
     pestpp-ies
@@ -193,7 +198,8 @@ add_custom_target(local_install
     pestpp-mou
     pestpp-sqp
     pestpp-da
-  COMMENT "Installing local executables to ${PESTPP_SOURCE_DIR}/bin"
+    pestpp_capi
+  COMMENT "Installing local executables and the shared library to ${PESTPP_SOURCE_DIR}/bin"
 )
 
 # Packaging

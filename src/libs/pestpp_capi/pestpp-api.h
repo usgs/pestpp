@@ -12,30 +12,105 @@
  *     are caught at every entry point and turned into a status plus a per-handle message.
  *   - Strings out are written into caller-allocated buffers, with a `needed` out-param so a
  *     caller can size then fill. The library never allocates something the caller must free.
- *   - The working directory is an argument, never process-global state.
+ *   - Everything is __cdecl, on every platform. There is no __stdcall entry point, so python
+ *     callers want ctypes.CDLL on windows as well as posix, not WinDLL.
+ *
+ * WHAT THIS LIBRARY DOES TO YOUR PROCESS
+ *
+ * It is loaded into your address space and it is not inert. Before coupling it to anything
+ * else, know all five:
+ *
+ *   1. IT CHANGES THE PROCESS WORKING DIRECTORY. Every entry point chdir's into the session's
+ *      working_dir on the way in and restores it on the way out. This is process-global for
+ *      the duration of the call - if another thread performs relative-path io while a pestpp
+ *      call is in flight, that io lands in the wrong directory. See "threading" below.
+ *   2. It can redirect file descriptor 1, if you ask it to (pestpp_redirect_output).
+ *   3. It writes .rec / .log / .rns / .rmr files next to the control file.
+ *   4. It binds a TCP port, for a PANTHER session.
+ *   5. It spawns child processes, whenever the run manager runs the forward model.
+ *
+ * THREADING
+ *
+ * Two handles in one process are supported, but SERIALIZE THE CALLS - the chdir above is
+ * process-global, so two handles with different working directories cannot be driven
+ * concurrently. Distinct handles otherwise share no mutable state; the fatal-error flag
+ * (pestpp_get_fatal_error) and the fd-1 redirect are the two exceptions and both are
+ * documented where they are declared. One handle is not safe to use from two threads at once.
+ *
+ * ERROR HANDLING
+ *
+ * Every call reports through pestpp_status, and the bands are what a wrapper should switch on:
+ * negative is a non-fault algorithmic outcome, zero is success, positive is failure. Codes may
+ * be added inside those bands, so test the SIGN rather than enumerating values.
  */
-#ifndef PESTPP_CAPI_H_
-#define PESTPP_CAPI_H_
+#ifndef PESTPP_API_H_
+#define PESTPP_API_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* Exported when building the library, imported when including the installed header.
+ * PESTPP_API_BUILD is defined only on the pestpp_capi target. Getting this wrong is not
+ * cosmetic on windows: a consumer that compiles with dllexport re-exports these symbols from
+ * its own binary, and for the data symbol PESTPP_NAME_LEN below it is a hard link error. */
 #if defined(_WIN32)
-#  define PESTPP_API __declspec(dllexport)
+#  if defined(PESTPP_API_BUILD)
+#    define PESTPP_API __declspec(dllexport)
+#  else
+#    define PESTPP_API __declspec(dllimport)
+#  endif
 #else
 #  define PESTPP_API __attribute__((visibility("default")))
 #endif
 
+/* The header's own version, so a caller can compile-time compare against what it loads at
+ * runtime with pestpp_get_api_version(). Bumped by hand: MINOR for additions that leave the
+ * existing surface alone, MAJOR for anything that does not. */
+#define PESTPP_API_VERSION_MAJOR 0
+#define PESTPP_API_VERSION_MINOR 3
+#define PESTPP_API_VERSION_PATCH 0
+
 /* Opaque session handle. Owns the scenario, file manager, run manager and tool object. */
 typedef void* pestpp_handle;
 
+/* Banded by sign, so a wrapper can classify a code it has never seen:
+ *
+ *      < 0   the call worked; this is an ALGORITHMIC OUTCOME worth reporting
+ *      = 0   the call worked
+ *      > 0   the call FAILED; pestpp_last_error() says why
+ *
+ * Test the sign. New codes will be added inside the bands, and an `if (rc) goto fail` that
+ * treats every nonzero as a failure will mis-handle the negative ones. */
 typedef enum {
+    PESTPP_RETRY = -1,         /* algorithmic "no upgrade taken, try again" - not a fault */
+
     PESTPP_OK = 0,
+
     PESTPP_ERROR = 1,          /* something failed; see pestpp_last_error()          */
-    PESTPP_INVALID_HANDLE = 2,
-    PESTPP_RETRY = 3           /* algorithmic "no upgrade taken, try again" - not a fault */
+    PESTPP_INVALID_HANDLE = 2, /* the handle is NULL, destroyed, or not a pestpp handle */
+    PESTPP_INVALID_ARGUMENT = 4,   /* a NULL out-param, an unknown enum value, a bad shape */
+    PESTPP_BUFFER_TOO_SMALL = 5,   /* re-query the size and try again - see below           */
+    PESTPP_NOT_SUPPORTED    = 6,   /* right call, wrong tool or wrong run manager           */
+    PESTPP_INVALID_STATE    = 7    /* right call, wrong moment (not initialized, and so on) */
+    /* 3 is retired: it was PESTPP_RETRY before the bands existed. Left unused deliberately,
+       so a stale caller comparing against the old value cannot silently match something. */
 } pestpp_status;
+
+/* PESTPP_BUFFER_TOO_SMALL is the one worth handling rather than merely reporting. The
+   query-then-fill calls below tell you a count and then expect a buffer that big - but the
+   count can CHANGE between the two calls, because dropping failed realizations changes the
+   ensemble. A robust caller loops:
+
+       for (;;) {
+           rc = pestpp_get_phi_vector(h, t, NULL, NULL, 0, &n);   if (rc) break;
+           buf = realloc(buf, n * sizeof(double));
+           rc = pestpp_get_phi_vector(h, t, buf, NULL, n, &n);
+           if (rc != PESTPP_BUFFER_TOO_SMALL) break;
+       }
+
+   n_out / count / needed is always written before the size check, so it is valid to read
+   after a PESTPP_BUFFER_TOO_SMALL return and tells you what to allocate next. */
 
 /* All four are driveable. What one "iteration" means differs by tool - ies solves lambdas,
    mou runs a generation, sqp may issue several run batches while it line-searches - but the
@@ -65,9 +140,29 @@ typedef enum {
     PESTPP_WEIGHTS_EN = 3
 } pestpp_ensemble_id;
 
-/* Length of a single name in the packed name buffers used below. Read this from the library
-   rather than hard-coding it, the way xmipy and pypestutils do. */
+/* Buffer sizes the library owns. Read these from the library rather than hard-coding them,
+   the way xmipy and pypestutils do - and note they are DATA exports, which is why the
+   dllimport half of PESTPP_API above matters.
+
+   NAME_LEN is the width of one block in the packed name buffers used throughout. A name
+   longer than this is an ERROR, not a truncation: a silently shortened name is a different
+   name, and would fail to match on the way back in.
+   MESSAGE_LEN is enough for anything pestpp_get_last_error() will write. */
 PESTPP_API extern const int PESTPP_NAME_LEN;
+PESTPP_API extern const int PESTPP_MESSAGE_LEN;
+
+/* ---- version ------------------------------------------------------------------------
+ *
+ * Ask the LOADED library what it is, and compare against the PESTPP_API_VERSION_* macros the
+ * caller compiled against. A caller that skips this and calls a symbol the library does not
+ * export gets a loader error with no explanation, which is a bad first experience. */
+
+/* Human readable, e.g. "5.2.28". Pass buf=NULL to learn `needed` (including the NUL). */
+PESTPP_API pestpp_status pestpp_get_version(char* buf, int buf_len, int* needed);
+
+/* The C ABI's own version, which moves independently of the pest++ release above. Any
+   out-param may be NULL. */
+PESTPP_API pestpp_status pestpp_get_api_version(int* major, int* minor, int* patch);
 
 /* ---- lifecycle -------------------------------------------------------------------- */
 
@@ -86,9 +181,24 @@ typedef enum {
  *
  * A struct rather than a parameter list because this will grow - da multi-cycle wants a start
  * cycle, a restart/hotstart file is an obvious next ask - and every addition to a flat
- * signature is either a new symbol or a break. `struct_size` is how the library knows which
- * version of the struct it was handed: set it to sizeof(pestpp_create_options) and zero the
- * rest, and fields added later default sensibly.
+ * signature is either a new symbol or a break.
+ *
+ * HOW TO FILL IT IN, exactly:
+ *
+ *     pestpp_create_options opts;
+ *     memset(&opts, 0, sizeof(opts));            // zero FIRST - every field defaults to 0
+ *     opts.struct_size = (int)sizeof(opts);      // then declare which version you compiled
+ *     opts.ctl_file = "pest.pst";
+ *
+ * struct_size is how the library knows which version of the struct it was handed, and it is
+ * honoured rather than merely checked: a field that lies past the size you declare is one
+ * your build did not have, so the library never reads it and uses the documented default
+ * instead. That is what lets a binary built against this header keep working against a later
+ * library that added fields.
+ *
+ * `reserved` exists so those later fields cannot hide in tail padding. Without it, adding an
+ * int to the end of this struct would not change sizeof() on LP64 - the padding would absorb
+ * it - and struct_size would silently stop distinguishing the two versions. Leave it zeroed.
  *
  * Everything else a run manager needs is already a regular option, so set it with
  * pestpp_set_option() rather than looking for it here. */
@@ -99,19 +209,64 @@ typedef struct {
     const char* working_dir;     /* NULL or "" means the current directory                */
     int         run_manager;     /* pestpp_run_manager; 0 (serial) if left zeroed         */
     const char* panther_port;    /* PANTHER only; NULL otherwise                          */
+    void*       reserved[4];     /* must be zero; room for growth outside the padding     */
 } pestpp_create_options;
 
 PESTPP_API pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* out);
+
+/* Tears the session down: the tool, the run manager, the open files, and a PANTHER master's
+   listening socket. The handle is dead afterwards and passing it anywhere - including to
+   pestpp_destroy() again - returns PESTPP_INVALID_HANDLE rather than crashing. Destroying
+   with runs in flight abandons them. */
 PESTPP_API pestpp_status pestpp_destroy(pestpp_handle h);
 
 /* Which run manager this handle actually got. */
 PESTPP_API pestpp_status pestpp_get_run_manager(pestpp_handle h, int* run_manager);
 
-/* Message from the most recent failed call on this handle; "" if none. Valid until the
-   next call on the same handle. Never returns NULL. */
+/* Why the MOST RECENT call on this handle failed; "" if it succeeded. Never returns NULL.
+ *
+ * READ IT IMMEDIATELY. Every entry point clears this on the way in, so the message does not
+ * survive one intervening call - not even a getter:
+ *
+ *     if (pestpp_solve_iteration(h) > 0) {
+ *         pestpp_get_iteration(h, &i);       // clears it
+ *         puts(pestpp_last_error(h));        // ""
+ *     }
+ *
+ * The returned pointer aims into storage the next call on this handle overwrites and may
+ * reallocate, so copy it if you need to keep it. pestpp_get_last_error() is the copying form
+ * and is the better choice for a binding; this one stays for convenience in C.
+ *
+ * pestpp_last_error(NULL) returns a static string and is always safe to call. */
 PESTPP_API const char* pestpp_last_error(pestpp_handle h);
-/* For pestpp_create() failures, where there is no handle to ask. */
+
+/* Same message, copied into a caller buffer that the caller controls the lifetime of.
+   PESTPP_MESSAGE_LEN is always large enough. Pass buf=NULL to learn `needed` (with the NUL). */
+PESTPP_API pestpp_status pestpp_get_last_error(pestpp_handle h, char* buf, int buf_len,
+                                               int* needed);
+
+/* Why the most recent HANDLE-LESS call failed - pestpp_create(), pestpp_redirect_output(),
+   pestpp_restore_output(), pestpp_flush_output(). There is no handle to hang the message on,
+   so they share one process-global slot, which the next handle-less call overwrites. */
+PESTPP_API const char* pestpp_last_global_error(void);
+/* Deprecated spelling of pestpp_last_global_error(); it was never create-only. */
 PESTPP_API const char* pestpp_last_create_error(void);
+
+/* ---- the fatal flag -------------------------------------------------------------------
+ *
+ * One failure is not confined to a handle: if the library cannot restore the working
+ * directory after a call, the PROCESS is left somewhere nobody expects and every relative
+ * path afterwards - in this library and in the host program - resolves to the wrong place.
+ * Continuing would corrupt data quietly, so the library latches a fatal flag and every
+ * subsequent call on every handle refuses with PESTPP_INVALID_STATE.
+ *
+ * It is process-global and it is sticky. Once you have put the working directory back
+ * yourself, clear it to resume; there is no other way out. */
+
+/* "" when healthy. Never returns NULL. */
+PESTPP_API const char* pestpp_get_fatal_error(void);
+/* Acknowledge and resume. Returns PESTPP_OK whether or not anything was set. */
+PESTPP_API pestpp_status pestpp_clear_fatal_error(void);
 
 /* Flush the library's console output.
  *
@@ -132,10 +287,28 @@ PESTPP_API pestpp_status pestpp_flush_output(void);
  * console. Flushing does not help; the descriptor itself is the wrong one. Doing the dup2 in
  * here operates on the table that actually matters, and catches the child processes too.
  *
- * redirect() writes the descriptor to restore into `saved_fd`; hand that back to restore().
- * Appends, so repeated redirects to one path accumulate rather than truncating. */
-PESTPP_API pestpp_status pestpp_redirect_output(const char* path, int* saved_fd);
-PESTPP_API pestpp_status pestpp_restore_output(int saved_fd);
+ * redirect() writes an opaque TOKEN into `redirect_token`; hand that back to restore().
+ * Appends, so repeated redirects to one path accumulate rather than truncating.
+ *
+ * PROCESS-GLOBAL, and strictly LIFO. There is one file descriptor 1, so this is not really a
+ * per-session operation however much it looks like one. Nesting is fine - each redirect
+ * remembers what stdout was - but they must be undone INNERMOST FIRST, and restoring out of
+ * order is refused with PESTPP_INVALID_STATE rather than performed. That refusal is the
+ * feature: unwinding out of order used to leave stdout pointing at another session's log file
+ * permanently, with nothing reported.
+ *
+ * The token is NOT a file descriptor - the saved descriptor stays inside the library, so a
+ * caller cannot close it, dup2 it, or pass a stray int that happens to be a live descriptor.
+ * A token that was never issued, or has already been restored, is rejected.
+ *
+ * restore(0) is a no-op, so a caller can use 0 as "nothing redirected" without branching.
+ * Failures report through pestpp_last_global_error(). */
+PESTPP_API pestpp_status pestpp_redirect_output(const char* path, int* redirect_token);
+PESTPP_API pestpp_status pestpp_restore_output(int redirect_token);
+
+/* How many redirects are outstanding. 0 means the library is not capturing anything. Mostly
+   for tests and for a host program checking it unwound everything it opened. */
+PESTPP_API pestpp_status pestpp_get_redirect_depth(int* depth);
 
 /* ---- driving the algorithm --------------------------------------------------------- */
 
@@ -161,8 +334,9 @@ PESTPP_API pestpp_status pestpp_initialize(pestpp_handle h);
 PESTPP_API pestpp_status pestpp_initialize_prepare(pestpp_handle h, int* n_runs);
 PESTPP_API pestpp_status pestpp_initialize_finish(pestpp_handle h);
 
-/* One iteration. Returns PESTPP_RETRY where the algorithm rejected the upgrade and wants
-   another attempt with a new lambda - a distinct outcome from failure. */
+/* One iteration. Returns PESTPP_RETRY (negative - the call SUCCEEDED) where the algorithm
+   rejected the upgrade and wants another attempt with a new lambda. That is an outcome, not a
+   fault, which is why it is in the negative band: `if (rc) goto fail` would get it wrong. */
 PESTPP_API pestpp_status pestpp_solve_iteration(pestpp_handle h);
 
 PESTPP_API pestpp_status pestpp_finalize(pestpp_handle h);
@@ -203,7 +377,15 @@ PESTPP_API pestpp_status pestpp_get_phi_vector(pestpp_handle h, int phi_type,
 
    Column-major like the ensemble views: element (i,j) is data[i + j*(*nrow)]. Rows are
    realizations, columns observations, and both name lists are returned so a caller never has
-   to assume an order. Pass data=NULL to learn the shape first.
+   to assume an order.
+
+   Pass data=NULL, row_names=NULL, col_names=NULL to learn the shape and touch nothing.
+
+   max_nrow and max_ncol DESCRIBE THE NAME BUFFERS TOO - there is deliberately no separate
+   capacity for them. row_names must hold max_nrow * PESTPP_NAME_LEN bytes and col_names
+   max_ncol * PESTPP_NAME_LEN, whether or not you also pass `data`. Everything is checked
+   before the first byte is written, and an undersized buffer returns
+   PESTPP_BUFFER_TOO_SMALL with *nrow and *ncol telling you what to allocate.
 
    PESTPP_PHI_MEAS and PESTPP_PHI_ACTUAL only - the residual is not defined for the others. */
 PESTPP_API pestpp_status pestpp_get_phi_residuals(pestpp_handle h, int phi_type,
@@ -253,11 +435,38 @@ PESTPP_API pestpp_status pestpp_should_terminate(pestpp_handle h, int* out);
 /* ---- reading ensembles ------------------------------------------------------------- */
 
 /* Zero-copy. `data` points at the tool's live Eigen buffer, which is COLUMN-major:
-   element (i,j) is data[i + j*(*nrow)]. It stays valid only until something changes that
-   ensemble's storage, so treat it as borrowed for the current step and re-fetch after any
-   call that could mutate. */
+   element (i,j) is data[i + j*(*nrow)].
+ *
+ * IT IS BORROWED. The pointer stops being yours the moment anything changes that ensemble's
+ * storage - dropping or keeping realizations, an algorithm step that reallocates, destroying
+ * the handle. Reading or writing through a stale pointer is a use-after-free, and the numbers
+ * that come back from one look exactly like data.
+ *
+ * `view_token` is how you find out rather than guess. Pass a non-NULL int and the library
+ * records what the view was made from; pestpp_view_is_valid() then answers whether the buffer
+ * is still the ensemble's current storage - checking the address and the dimensions, not
+ * merely whether the handle is alive. Pass NULL if you do not want a token, and the view is
+ * untracked and entirely your problem.
+ *
+ * The recommended shape, and what the python layer does:
+ *
+ *     pestpp_get_ensemble_view(h, PESTPP_PAR_EN, &p, &nr, &nc, &tok);
+ *     ... read and write p ...
+ *     pestpp_release_view(h, tok);       // and stop using p
+ *
+ * Tokens are small and cheap, but they are held until released or until the handle is
+ * destroyed, so release them. */
 PESTPP_API pestpp_status pestpp_get_ensemble_view(pestpp_handle h, int ensemble_id,
-                                                  double** data, int* nrow, int* ncol);
+                                                  double** data, int* nrow, int* ncol,
+                                                  int* view_token);
+
+/* Nonzero when the buffer that token was issued for is still the ensemble's live storage.
+   An unknown or released token is not an error - it answers 0, because it is certainly not
+   valid. */
+PESTPP_API pestpp_status pestpp_view_is_valid(pestpp_handle h, int view_token, int* out);
+
+/* Give the token back. Idempotent, and harmless on a token that was never issued. */
+PESTPP_API pestpp_status pestpp_release_view(pestpp_handle h, int view_token);
 
 /* Names packed as fixed-width PESTPP_NAME_LEN blocks, space padded, not NUL terminated -
    the same shape MODFLOW 6 uses for its variable-name blocks. Pass buf=NULL to query
@@ -272,9 +481,21 @@ PESTPP_API pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* t
 
 /* ---- options ----------------------------------------------------------------------- */
 
+/* Set a ++ option or a * control data value by name. An unknown key is an ERROR: a set that
+   quietly does nothing is the worst outcome here, because the caller goes on believing the
+   option took. */
 PESTPP_API pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* value);
+
+/* Read one back. Pass buf=NULL to learn `needed` (including the NUL).
+ *
+ * `found` is how you tell "this option is set to the empty string" from "there is no such
+ * option" - both used to come back as "" with PESTPP_OK, so a typo'd key read as a value.
+ * It also doubles as the probe: pass a non-NULL `found` and an unknown key is answered with
+ * *found = 0 and PESTPP_OK, which is what you want when asking whether this library supports
+ * something. Pass NULL and an unknown key is PESTPP_INVALID_ARGUMENT instead, matching
+ * pestpp_set_option - so the DEFAULT is to be told, and silence has to be asked for. */
 PESTPP_API pestpp_status pestpp_get_option(pestpp_handle h, const char* key,
-                                           char* buf, int buf_len, int* needed);
+                                           char* buf, int buf_len, int* needed, int* found);
 
 /* ---- run management ------------------------------------------------------------------
  *
@@ -376,7 +597,10 @@ PESTPP_API pestpp_status pestpp_keep_realizations(pestpp_handle h, const char* n
  * values to_csv() writes. This is the round-trippable form; the zero-copy view above is the
  * raw (usually NUM-space, adjustable-only) buffer. Data is column-major, like the view.
  *
- * Call with data=NULL to learn nrow/ncol, then size and refill. */
+ * Call with data=NULL, row_names=NULL, col_names=NULL to learn nrow/ncol, then size and
+ * refill. As with pestpp_get_phi_residuals(), max_nrow and max_ncol bound the NAME buffers as
+ * well as `data` - row_names needs max_nrow * PESTPP_NAME_LEN bytes and col_names
+ * max_ncol * PESTPP_NAME_LEN. Undersized returns PESTPP_BUFFER_TOO_SMALL before writing. */
 PESTPP_API pestpp_status pestpp_get_par_snapshot(pestpp_handle h, double* data,
                                                  int max_nrow, int max_ncol,
                                                  int* nrow, int* ncol,
@@ -394,4 +618,4 @@ PESTPP_API pestpp_status pestpp_set_par_snapshot(pestpp_handle h, const double* 
 }
 #endif
 
-#endif /* PESTPP_CAPI_H_ */
+#endif /* PESTPP_API_H_ */

@@ -21,7 +21,8 @@ _BENCH = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp import (  # noqa: E402
-    Ies, Mou, Sqp, IterationStep, PestppError, find_library, run_ies, PHI_ACTUAL,
+    Ies, Mou, Sqp, IterationStep, PestppError, ExpiredViewError, find_library,
+    run_ies, PHI_ACTUAL,
 )
 
 plat = platform.platform().lower()
@@ -130,9 +131,49 @@ def api_par_view_is_live_test():
             before = arr[0, 0]
             arr[0, 0] = before + 321.0
 
+        # the title of this test claims "only inside the block", so prove it. The array is the
+        # tool's live Eigen buffer; using it afterwards is a use-after-free that reads as data.
+        assert not arr.valid, "the view still reports valid after its block ended"
+        for attempt in (lambda: arr[0, 0],
+                        lambda: arr.__setitem__((0, 0), 1.0),
+                        lambda: arr.shape,
+                        lambda: np.asarray(arr)):
+            try:
+                attempt()
+                raise AssertionError(
+                    "an expired view was still usable - the context manager is decorative")
+            except ExpiredViewError:
+                pass
+
         with ies.par_view() as arr:
             assert np.isclose(arr[0, 0], before + 321.0), "write through the view did not stick"
             arr[0, 0] = before
+        ies.finalize()
+
+
+def api_view_invalidated_by_resize_test():
+    """A view goes invalid when the ensemble reallocates, not just when the block ends.
+
+    This is the harder half: the block is still open, the array still has its shape, and the
+    numbers it returns come from memory the tool has moved on from. Nothing about the array
+    itself can tell the caller that, which is why the library is asked instead.
+    """
+    wd = _case("api_view_resize", noptmax=1)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        names = ies.real_names
+        assert len(names) > 2, "need enough realizations to drop one"
+
+        with ies.par_view() as arr:
+            assert arr.valid
+            ies.drop_realizations([names[0]])       # reallocates the ensemble underneath
+            assert not arr.valid, \
+                "the view claims to be valid after a resize; it is pointing at freed memory"
+            try:
+                arr[0, 0]
+                raise AssertionError("a stale view was readable after a resize")
+            except ExpiredViewError:
+                pass
         ies.finalize()
 
 
@@ -510,6 +551,7 @@ if __name__ == "__main__":
     api_iterations_respect_noptmax_test()
     api_par_df_roundtrip_test()
     api_par_view_is_live_test()
+    api_view_invalidated_by_resize_test()
     api_own_the_initial_batch_test()
     api_phi_across_realizations_test()
     api_phi_by_obs_group_test()

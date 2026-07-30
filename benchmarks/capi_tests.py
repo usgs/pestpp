@@ -79,18 +79,24 @@ def _find_library():
     Searched rather than hardcoded because the path depends on the generator: single-config
     builds drop it beside the sources, MSVC adds a per-config subdirectory.
     """
-    names = {"windows": "pestpp_capi.dll",
-             "apple": "libpestpp_capi.dylib",
-             "linux": "libpestpp_capi.so"}
+    names = {"windows": "pestpp-api.dll",
+             "apple": "pestpp-api.dylib",
+             "linux": "pestpp-api.so"}
     want = names[plat]
     roots = [os.path.join(_REPO, "build"), os.path.join("..", "..", "pestpp", "build"),
              os.path.join("..", "..", "..", "..", "pestpp", "build")]
+    found = []
     for root in roots:
         if not os.path.isdir(root):
             continue
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            # skip CPack staging: it holds a full copy of the install tree, so a stale one
+            # from an earlier build looks exactly like the freshly compiled library
+            dirnames[:] = [d for d in dirnames if d != "_CPack_Packages"]
             if want in filenames:
-                return os.path.abspath(os.path.join(dirpath, want))
+                found.append(os.path.abspath(os.path.join(dirpath, want)))
+    if found:
+        return max(found, key=os.path.getmtime)      # newest wins
     raise RuntimeError(
         "could not find {0} under any of {1}. The C ABI is built by the normal cmake build "
         "(always SHARED); if this fires, the build did not produce it.".format(want, roots))
@@ -218,7 +224,7 @@ def capi_smoke_test():
         ies.initialize()
         assert ies.get_iteration() == 0, ies.get_iteration()
 
-        pe = ies.get_ensemble_view(PAR_EN)
+        pe, pe_tok = ies.get_ensemble_view(PAR_EN)
         rnames = ies.get_ensemble_row_names(PAR_EN)
         cnames = ies.get_ensemble_col_names(PAR_EN)
         assert pe.shape == (len(rnames), len(cnames)), (pe.shape, len(rnames), len(cnames))
@@ -229,13 +235,13 @@ def capi_smoke_test():
         # it is a window, not a copy: a write through numpy must be visible to C++
         before = pe[0, 0]
         pe[0, 0] = before + 1234.5
-        assert ies.get_ensemble_view(PAR_EN)[0, 0] == before + 1234.5, "view is a copy, not a view"
+        assert ies.get_ensemble_view(PAR_EN)[0][0, 0] == before + 1234.5, "view is a copy, not a view"
         pe[0, 0] = before
 
         for _ in range(2):
             ies.solve_iteration()
         assert ies.get_iteration() == 2, ies.get_iteration()
-        oe = ies.get_ensemble_view(OBS_EN)
+        oe, _ = ies.get_ensemble_view(OBS_EN)
         assert oe.shape[0] > 0 and np.isfinite(oe).all(), oe.shape
         ies.finalize()
 
@@ -283,7 +289,7 @@ def capi_resize_between_queue_and_harvest_test():
         assert _drive_batch(ies) == len(names)
         assert ies.process_runs() == 0, "reference pass had failed runs"
         oe_names = ies.get_ensemble_row_names(OBS_EN)
-        ref_oe = ies.get_ensemble_view(OBS_EN)
+        ref_oe, _ = ies.get_ensemble_view(OBS_EN)
         reference = {n: ref_oe[i].copy() for i, n in enumerate(oe_names)}
 
         # the comparison below is only meaningful if realizations are actually distinguishable
@@ -311,7 +317,7 @@ def capi_resize_between_queue_and_harvest_test():
         n_failed = ies.process_runs()
         assert n_failed == 0, "{0} runs failed unexpectedly".format(n_failed)
 
-        oe = ies.get_ensemble_view(OBS_EN)
+        oe, _ = ies.get_ensemble_view(OBS_EN)
         surviving = ies.get_ensemble_row_names(OBS_EN)
         assert oe.shape[0] == len(left), (oe.shape, len(left))
         assert victim_obs not in surviving, "dropped realization survived in the obs ensemble"
@@ -401,7 +407,7 @@ def capi_caller_owned_initial_batch_test():
         assert np.allclose(after, mine), "the substituted parameter values were not kept"
 
         # and they are what the model saw
-        oe = ies.get_ensemble_view(OBS_EN)
+        oe, _ = ies.get_ensemble_view(OBS_EN)
         assert oe.shape[0] == n, (oe.shape, n)
         spread = np.abs(oe - oe[0]).max()
         assert spread < 1.0e-8, (
@@ -469,8 +475,8 @@ def _drive_tool(tool, wd, pst_name, tag):
     with PestppLib(_find_library(), tool, pst_name, wd) as t:
         t.initialize()
 
-        pe = t.get_ensemble_view(PAR_EN)
-        oe = t.get_ensemble_view(OBS_EN)
+        pe, _ = t.get_ensemble_view(PAR_EN)
+        oe, _ = t.get_ensemble_view(OBS_EN)
         pnames = t.get_ensemble_row_names(PAR_EN)
         assert pe.shape[0] > 0, "{0}: empty parameter ensemble".format(tag)
         assert pe.shape == (len(pnames), len(t.get_ensemble_col_names(PAR_EN))), \
@@ -489,7 +495,7 @@ def _drive_tool(tool, wd, pst_name, tag):
         n_failed = t.process_runs()
         assert n_failed == 0, "{0}: {1} runs failed".format(tag, n_failed)
 
-        oe = t.get_ensemble_view(OBS_EN)
+        oe, _ = t.get_ensemble_view(OBS_EN)
         assert np.isfinite(oe).all(), "{0}: harvested obs ensemble has non-finite values".format(tag)
 
         # and one algorithm step through the same entry point every tool uses
@@ -531,7 +537,7 @@ def capi_da_resize_between_queue_and_harvest_test():
         assert _drive_batch(t) == len(names)
         assert t.process_runs() == 0, "da reference pass had failed runs"
         oe_names = t.get_ensemble_row_names(OBS_EN)
-        ref_oe = t.get_ensemble_view(OBS_EN)
+        ref_oe, _ = t.get_ensemble_view(OBS_EN)
         reference = {n: ref_oe[i].copy() for i, n in enumerate(oe_names)}
         closest = min(np.abs(ref_oe[i] - ref_oe[j]).max()
                       for i in range(len(oe_names)) for j in range(i + 1, len(oe_names)))
@@ -544,7 +550,7 @@ def capi_da_resize_between_queue_and_harvest_test():
         assert victim not in t.get_ensemble_row_names(PAR_EN)
         assert t.process_runs() == 0
 
-        oe = t.get_ensemble_view(OBS_EN)
+        oe, _ = t.get_ensemble_view(OBS_EN)
         surviving = t.get_ensemble_row_names(OBS_EN)
         for i, name in enumerate(surviving):
             assert np.allclose(oe[i], reference[name]), (
@@ -566,8 +572,8 @@ def capi_tool_ensemble_availability_test():
         with PestppLib(_find_library(), tool, pst_name, wd) as t:
             t.initialize()
             # the two it does have
-            assert t.get_ensemble_view(PAR_EN).shape[0] > 0, tag
-            assert t.get_ensemble_view(OBS_EN).shape[0] > 0, tag
+            assert t.get_ensemble_view(PAR_EN)[0].shape[0] > 0, tag
+            assert t.get_ensemble_view(OBS_EN)[0].shape[0] > 0, tag
             for missing in (NOISE_EN, WEIGHTS_EN):
                 try:
                     t.get_ensemble_view(missing)
@@ -635,6 +641,347 @@ def capi_create_options_validation_test():
 
     st, msg = attempt(run_manager=99)
     assert st != PESTPP_OK and "run manager" in msg, (st, msg)
+
+
+def capi_struct_size_honoured_test():
+    """A caller built against a SHORTER version of the options struct still works.
+
+    This is the whole point of struct_size, and until recently it was only validated, never
+    honoured -- every field was read regardless, so a caller declaring the two-field version
+    had 32 bytes past the end of its own allocation read as pointers. Here the struct really
+    is short: anything the library reads past `ctl_file` is memory this test does not own.
+    """
+    import ctypes
+    from pestpp_lib import CreateOptions
+
+    class ShortCreateOptions(ctypes.Structure):
+        """pestpp_create_options as it looked before working_dir/run_manager/panther_port."""
+        _fields_ = [
+            ("struct_size", ctypes.c_int),
+            ("tool", ctypes.c_int),
+            ("ctl_file", ctypes.c_char_p),
+        ]
+
+    # the truncated struct must genuinely be shorter, or this proves nothing
+    assert ctypes.sizeof(ShortCreateOptions) < ctypes.sizeof(CreateOptions), \
+        "the short struct is not shorter, so this test cannot detect an over-read"
+
+    wd = _setup("capi_struct_size")
+    lib = ctypes.CDLL(_find_library())
+    lib.pestpp_create.argtypes = (ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+    lib.pestpp_create.restype = ctypes.c_int
+    lib.pestpp_destroy.argtypes = (ctypes.c_void_p,)
+    lib.pestpp_destroy.restype = ctypes.c_int
+    lib.pestpp_last_global_error.restype = ctypes.c_char_p
+
+    o = ShortCreateOptions()
+    o.struct_size = ctypes.sizeof(ShortCreateOptions)
+    o.tool = TOOL_IES
+    o.ctl_file = b"pest.pst"
+
+    # working_dir is past the declared size, so the library must not read it -- which means
+    # the session runs in the CURRENT directory. Being there is the point: it is how we can
+    # tell the default was taken rather than a garbage pointer being dereferenced.
+    handle = ctypes.c_void_p()
+    prev = os.getcwd()
+    os.chdir(wd)
+    try:
+        st = lib.pestpp_create(ctypes.byref(o), ctypes.byref(handle))
+        assert st == PESTPP_OK, (st, lib.pestpp_last_global_error().decode())
+        assert handle.value, "create reported success but handed back a null handle"
+        # run_manager and panther_port were not read either, so it is a serial session
+        lib.pestpp_destroy(handle)
+    finally:
+        os.chdir(prev)
+
+
+def capi_status_codes_test():
+    """Failures report WHICH kind of failure, not a single catch-all code.
+
+    The codes are what a wrapper switches on -- a too-small buffer in particular has to be
+    distinguishable, because the query-then-fill idiom needs to know when to re-query rather
+    than give up. Sign is the contract: negative is a successful call with an outcome,
+    positive is a failure.
+    """
+    import ctypes
+    from pestpp_lib import (PESTPP_BUFFER_TOO_SMALL, PESTPP_INVALID_ARGUMENT,
+                            PESTPP_INVALID_STATE, PESTPP_NOT_SUPPORTED, PESTPP_INVALID_HANDLE)
+
+    wd = _setup("capi_status_codes")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        h, raw = ies.handle, ies.lib
+
+        # wrong moment: solving before initialize
+        assert raw.pestpp_solve_iteration(h) == PESTPP_INVALID_STATE, \
+            "solve before initialize should report INVALID_STATE"
+
+        ies.initialize()
+
+        # wrong value: an ensemble id that is not one
+        ptr, nr, nc, tok = (ctypes.POINTER(ctypes.c_double)(), ctypes.c_int(),
+                            ctypes.c_int(), ctypes.c_int())
+        st = raw.pestpp_get_ensemble_view(h, ctypes.c_int(99), ctypes.byref(ptr),
+                                          ctypes.byref(nr), ctypes.byref(nc),
+                                          ctypes.byref(tok))
+        assert st == PESTPP_INVALID_ARGUMENT, ("bad ensemble id", st)
+
+        # a null out-param is an argument problem, not a generic error
+        st = raw.pestpp_get_iteration(h, None)
+        assert st == PESTPP_INVALID_ARGUMENT, ("null out-param", st)
+
+        # too small: ask for the names with a buffer one block short
+        count = ctypes.c_int()
+        raw.pestpp_get_ensemble_row_names(h, ctypes.c_int(PAR_EN), None, 0,
+                                          ctypes.byref(count))
+        assert count.value > 1, "need more than one realization for this to be a real test"
+        short = ctypes.create_string_buffer((count.value - 1) * ies.name_len)
+        st = raw.pestpp_get_ensemble_row_names(
+            h, ctypes.c_int(PAR_EN), short, ctypes.c_int(len(short)), ctypes.byref(count))
+        assert st == PESTPP_BUFFER_TOO_SMALL, ("undersized name buffer", st)
+        # and the count survives the failure, so a caller knows what to allocate next
+        assert count.value > 0, "count was not written on the too-small path"
+
+    # wrong tool: mou has objectives, not a phi
+    wd = _setup_mou("capi_status_codes_mou")
+    with PestppLib(_find_library(), TOOL_MOU, "g07.pst", wd) as mou:
+        mou.initialize()
+        st = mou.lib.pestpp_update_phi(mou.handle)
+        assert st == PESTPP_NOT_SUPPORTED, ("mou phi", st)
+
+    # a destroyed handle is caught rather than dereferenced
+    lib = PestppLib(_find_library(), TOOL_IES, "pest.pst", _setup("capi_status_codes_dead"))
+    dead = lib.handle
+    assert lib.lib.pestpp_destroy(dead) == PESTPP_OK
+    assert lib.lib.pestpp_destroy(dead) == PESTPP_INVALID_HANDLE, \
+        "destroying twice should be refused, not a double free"
+    assert lib.lib.pestpp_get_iteration(dead, None) == PESTPP_INVALID_HANDLE, \
+        "a call on a destroyed handle should be refused"
+    lib.handle = None                            # so __del__/destroy does not try again
+
+
+def capi_view_token_test():
+    """A view token reports honestly when the borrowed buffer stops being the live one."""
+    wd = _setup("capi_view_token")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        ies.initialize()
+        arr, token = ies.get_ensemble_view(PAR_EN)
+        assert ies.view_is_valid(token), "a freshly taken view should be valid"
+        assert arr.shape[0] > 1, "need at least two realizations to resize"
+
+        # a membership change reallocates the ensemble, so the borrowed pointer is stale.
+        # Nothing about `arr` changes to say so - that is exactly why the token exists.
+        names = ies.get_ensemble_row_names(PAR_EN)
+        ies.drop_realizations([names[0]])
+        assert not ies.view_is_valid(token), \
+            "the view survived a resize; the token is not actually checking the buffer"
+
+        # a fresh one is valid again, and releasing it makes the token stop answering yes
+        _, token2 = ies.get_ensemble_view(PAR_EN)
+        assert ies.view_is_valid(token2)
+        ies.release_view(token2)
+        assert not ies.view_is_valid(token2), "a released token should not report valid"
+        # releasing twice, or releasing something never issued, is not an error
+        ies.release_view(token2)
+        ies.release_view(987654)
+
+
+def capi_version_test():
+    """The loaded library says what it is, so a caller can check before calling."""
+    wd = _setup("capi_version")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        v = ies.get_version()
+        assert v and v[0].isdigit(), "version string looks wrong: {0!r}".format(v)
+        major, minor, patch = ies.get_api_version()
+        assert (major, minor, patch) >= (0, 2, 0), (major, minor, patch)
+        # and it matches what the header this checkout ships declares, which is the whole
+        # point - a mismatch here means the built library is not from this source tree
+        hdr = os.path.join(_REPO, "src", "libs", "pestpp_capi", "pestpp-api.h")
+        want = {}
+        for line in open(hdr):
+            for part in ("MAJOR", "MINOR", "PATCH"):
+                tag = "#define PESTPP_API_VERSION_" + part
+                if line.startswith(tag):
+                    want[part] = int(line[len(tag):].strip())
+        assert (want["MAJOR"], want["MINOR"], want["PATCH"]) == (major, minor, patch), \
+            (want, (major, minor, patch))
+
+
+def capi_export_surface_test():
+    """The shared library exports the C ABI and nothing else.
+
+    A wide export table is not untidiness -- this library exists to be loaded alongside other
+    native libraries (libmf6 for one), and every extra symbol is a chance for the loader to
+    bind someone else's call to our copy of it. The export surface used to depend on
+    BUILD_SHARED_LIBS, which is how a build of the rest of the project could quietly widen it.
+    """
+    if plat == "windows":
+        print("  (skipping export-surface check: needs nm)")
+        return
+    lib_path = _find_library()
+    flag = "-gU" if plat == "apple" else "-gD"
+    try:
+        out = subprocess.check_output(["nm", flag, lib_path], text=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        print("  (skipping export-surface check: {0})".format(e))
+        return
+    leaked = []
+    for line in out.splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        sym = parts[-1].lstrip("_")
+        if not (sym.startswith("pestpp_") or sym.startswith("PESTPP_")):
+            leaked.append(sym)
+    assert not leaked, (
+        "{0} non-ABI symbols are exported, e.g. {1}. Check CXX_VISIBILITY_PRESET and "
+        "WINDOWS_EXPORT_ALL_SYMBOLS on the pestpp_capi target.".format(
+            len(leaked), leaked[:5]))
+
+
+def capi_da_cycle_is_tagged_test():
+    """Caller-driven queue_runs tags da runs with the cycle, like the in-tree da loop does.
+
+    pestpp_queue_runs called queue_ensemble_util with four arguments, so da_cycle took its
+    NULL_DA_CYCLE default and every run a caller queued was tagged with no cycle at all --
+    while the same runs queued by pestpp-da carried the right one. Invisible on a control
+    file whose first cycle is 0, which is why this one deliberately starts at 3.
+
+    The tag lands in the run's info_txt, which RunStorage writes into the .rns file, so that
+    is where it is checked from: the run-storage read API is designed but not built yet.
+    """
+    cycle = 3
+    test_d = _copy_base("capi_da_cycle")
+    pst = pyemu.Pst(os.path.join(test_d, "pest.pst"))
+    for df in (pst.parameter_data, pst.observation_data,
+               pst.model_input_data, pst.model_output_data):
+        df.loc[:, "cycle"] = cycle
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["ies_num_reals"] = 4
+    pst.pestpp_options["da_num_reals"] = 4
+    pst.pestpp_options["random_seed"] = 11
+    pst.write(os.path.join(test_d, "pest.pst"), version=2)
+
+    with PestppLib(_find_library(), TOOL_DA, "pest.pst", test_d) as t:
+        t.initialize()
+        assert t.queue_runs() > 0, "nothing was queued, so nothing can be tagged"
+
+    rns = os.path.join(test_d, "pest.rns")
+    assert os.path.exists(rns), rns
+    blob = open(rns, "rb").read()
+    assert b"da_cycle:%d" % cycle in blob, \
+        ("queued da runs are not tagged with cycle {0}; the run storage has {1}".format(
+            cycle, sorted(set(__import__("re").findall(rb"da_cycle:-?\d+", blob)))))
+
+
+def capi_output_redirect_is_lifo_test():
+    """Output redirects nest, and unwinding out of order is refused rather than performed.
+
+    There is one file descriptor 1 in a process, so this is not per-session however much it
+    looks like one. Two sessions capturing at once and restoring in the wrong order used to
+    hand each other's descriptors back and leave stdout pointing at the wrong file for the
+    rest of the process, with nothing reported. The token is not a descriptor, so a stray int
+    cannot be dup2'd over stdout either.
+    """
+    import ctypes
+    from pestpp_lib import PESTPP_INVALID_ARGUMENT, PESTPP_INVALID_STATE
+
+    lib = ctypes.CDLL(_find_library())
+    lib.pestpp_redirect_output.argtypes = (ctypes.c_char_p, ctypes.POINTER(ctypes.c_int))
+    lib.pestpp_redirect_output.restype = ctypes.c_int
+    lib.pestpp_restore_output.argtypes = (ctypes.c_int,)
+    lib.pestpp_restore_output.restype = ctypes.c_int
+    lib.pestpp_get_redirect_depth.argtypes = (ctypes.POINTER(ctypes.c_int),)
+    lib.pestpp_get_redirect_depth.restype = ctypes.c_int
+    lib.pestpp_last_global_error.restype = ctypes.c_char_p
+
+    def depth():
+        d = ctypes.c_int()
+        lib.pestpp_get_redirect_depth(ctypes.byref(d))
+        return d.value
+
+    # fd 2 is real and open, which is what makes a raw-descriptor api dangerous: without the
+    # check the library would dup2 stderr over stdout and the caller never gets a console back
+    assert lib.pestpp_restore_output(ctypes.c_int(2)) == PESTPP_INVALID_ARGUMENT
+    assert b"never handed out" in lib.pestpp_last_global_error(), \
+        lib.pestpp_last_global_error()
+    assert lib.pestpp_restore_output(ctypes.c_int(0)) == PESTPP_OK, "0 should be a no-op"
+
+    d0 = depth()
+    wd = _copy_base("capi_redirect")
+    a_log, b_log = os.path.join(wd, "a.log"), os.path.join(wd, "b.log")
+    tok_a, tok_b = ctypes.c_int(), ctypes.c_int()
+
+    assert lib.pestpp_redirect_output(a_log.encode(), ctypes.byref(tok_a)) == PESTPP_OK
+    assert lib.pestpp_redirect_output(b_log.encode(), ctypes.byref(tok_b)) == PESTPP_OK
+    assert depth() == d0 + 2, depth()
+    assert tok_a.value != tok_b.value and tok_a.value > 0
+
+    try:
+        # the outer one is still covered, so restoring it now is the bug: it would leave
+        # stdout aimed at a.log forever once b unwound
+        st = lib.pestpp_restore_output(tok_a)
+        assert st == PESTPP_INVALID_STATE, ("out-of-order restore was allowed", st)
+        assert b"innermost first" in lib.pestpp_last_global_error(), \
+            lib.pestpp_last_global_error()
+        assert depth() == d0 + 2, "a refused restore should not have popped anything"
+    finally:
+        assert lib.pestpp_restore_output(tok_b) == PESTPP_OK
+        assert lib.pestpp_restore_output(tok_a) == PESTPP_OK
+
+    assert depth() == d0, depth()
+    # and a token cannot be spent twice
+    assert lib.pestpp_restore_output(tok_a) == PESTPP_INVALID_ARGUMENT
+
+
+def capi_unknown_option_is_reported_test():
+    """An unknown option key is distinguishable from one set to the empty string.
+
+    Both used to come back as "" with PESTPP_OK, so a typo read as a value -- while
+    set_option on the same key threw. The read side now defaults to telling you, and probing
+    has to be asked for explicitly by passing `found`.
+    """
+    import ctypes
+    from pestpp_lib import PESTPP_INVALID_ARGUMENT
+
+    wd = _setup("capi_unknown_option")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        h, raw = ies.handle, ies.lib
+        needed, found = ctypes.c_int(), ctypes.c_int()
+        bogus = b"NO_SUCH_OPTION_AT_ALL"
+
+        # no `found` supplied: being told is the default
+        st = raw.pestpp_get_option(h, bogus, None, 0, ctypes.byref(needed), None)
+        assert st == PESTPP_INVALID_ARGUMENT, ("unknown key read as ok", st)
+
+        # `found` supplied: the caller is probing on purpose, so absence is an answer
+        st = raw.pestpp_get_option(h, bogus, None, 0, ctypes.byref(needed),
+                                   ctypes.byref(found))
+        assert st == PESTPP_OK and found.value == 0, (st, found.value)
+
+        # a real ++ option, and a real * control data value, both report found
+        for key in (b"IES_NUM_REALS", b"NOPTMAX"):
+            st = raw.pestpp_get_option(h, key, None, 0, ctypes.byref(needed),
+                                       ctypes.byref(found))
+            assert st == PESTPP_OK and found.value == 1, (key, st, found.value)
+
+        # and an option whose VALUE is empty still reports found -- the case that makes an
+        # empty string useless as the "no such option" signal
+        empty = [o for o in (b"IES_PAR_EN", b"IES_OBS_EN", b"IES_LOC_INV")
+                 if ies.get_option(o.decode(), None) == ""]
+        assert empty, "expected at least one known-but-unset option to test with"
+        st = raw.pestpp_get_option(h, empty[0], None, 0, ctypes.byref(needed),
+                                   ctypes.byref(found))
+        assert st == PESTPP_OK and found.value == 1 and needed.value == 1, \
+            (empty[0], st, found.value, needed.value)
+
+        # the thin layer's two spellings of the same question
+        assert ies.has_option("IES_NUM_REALS") and not ies.has_option("NO_SUCH_OPTION_AT_ALL")
+        assert ies.get_option("NO_SUCH_OPTION_AT_ALL", "fallback") == "fallback"
+        try:
+            ies.get_option("NO_SUCH_OPTION_AT_ALL")
+            raise AssertionError("reading an unknown option should raise without a default")
+        except PestppError:
+            pass
 
 
 # ---- panther ------------------------------------------------------------------------------
@@ -716,7 +1063,7 @@ def capi_panther_control_test():
             assert total_done > 0, "per-worker history accounted for no completed runs"
 
             ies.process_runs()
-            oe = ies.get_ensemble_view(OBS_EN)
+            oe, _ = ies.get_ensemble_view(OBS_EN)
             assert oe.shape[0] == len(names), (oe.shape, len(names))
     finally:
         for p in procs:
@@ -736,6 +1083,14 @@ if __name__ == "__main__":
     capi_initialize_prepare_reports_zero_test()
     capi_run_manager_selection_test()
     capi_create_options_validation_test()
+    capi_struct_size_honoured_test()
+    capi_status_codes_test()
+    capi_view_token_test()
+    capi_version_test()
+    capi_export_surface_test()
+    capi_da_cycle_is_tagged_test()
+    capi_output_redirect_is_lifo_test()
+    capi_unknown_option_is_reported_test()
     capi_da_test()
     capi_sqp_test()
     capi_mou_test()
