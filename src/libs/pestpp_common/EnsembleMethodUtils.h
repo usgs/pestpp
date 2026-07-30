@@ -527,6 +527,10 @@ public:
 	/// not want for a large ensemble.
 	ObservationEnsemble* get_noise_oe_ptr() { return &oe_base; }
 	ObservationEnsemble* get_weights_ptr() { return &weights; }
+	/// The PRIOR parameter ensemble. Reinflation draws its realizations from here, so this is
+	/// also the hard ceiling on how many realizations a reinflation can produce - a caller
+	/// needs to be able to see that number before asking for one.
+	ParameterEnsemble* get_pe_base_ptr() { return &pe_base; }
 	void set_pe(ParameterEnsemble& new_pe) { pe = new_pe; }
 	void set_oe(ObservationEnsemble& new_oe) { oe = new_oe; }
 	void set_noise_oe(ObservationEnsemble& new_noise) { oe_base = new_noise; }
@@ -610,7 +614,21 @@ public:
 	void begin_iteration();
 	void end_iteration(int cycle = NetPackage::NULL_DA_CYCLE);
 	void adjust_weights(bool save=false);
-    void reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals);
+	/// Rebuild the parameter ensemble from the prior's spread, re-centred on where the current
+	/// ensemble has got to.
+	///
+	/// reinflate_num_reals SELECTS realizations from pe_base; it never draws new ones, so
+	/// abs() of it cannot exceed pe_base's row count. Its SIGN picks where the anomalies come
+	/// from: positive uses pe_base's own rows scaled by the factor, negative resamples the
+	/// CURRENT ensemble's anomalies (adding scaled prior anomalies when the factor is < 1).
+	///
+	/// center_on_min_phi is a TRI-STATE: negative means "whatever ies_n_iter_reinflate says",
+	/// which is what the shipped loop passes and leaves its behaviour unchanged; 0 forces the
+	/// ensemble mean; positive forces the min-phi realization. The option version of this is a
+	/// schedule-wide flag derived from the SIGN of an unrelated setting, which a caller driving
+	/// one reinflation at a time has no way to express - hence the argument.
+    void reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals,
+                                int center_on_min_phi = -1);
 
 protected:
 	string alg_tag;

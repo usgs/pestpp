@@ -96,6 +96,54 @@ class PestppError(Exception):
     """
 
 
+def format_option_value(value) -> str:
+    """Render a python value the way the option parser reads it back.
+
+    Options cross the C ABI as strings, but a caller should not have to know the spelling the
+    parser wants - and the failure when they get it wrong is not obvious. This used to be a
+    bare ``str()``, which is right for scalars by luck and wrong for sequences by construction:
+    the VECTOR options (``ies_lambda_mults``, ``ies_n_iter_reinflate``, the reinflation
+    schedule) are tokenized on commas, so ``[0.1, 1.0]`` arrived as the literal text
+    ``"[0.1, 1.0]"`` and came back as "invalid value for option", naming the option rather
+    than the brackets.
+
+    Handled: str (verbatim), bool, int, float, numpy scalars, os.PathLike, and any list, tuple,
+    range or array-like of those, joined with commas. Anything else raises TypeError here
+    rather than being stringified into something the parser will reject later - including sets,
+    because these are ORDERED schedules and a set does not have an order to offer.
+    """
+    if isinstance(value, str):
+        return value
+    # before the int branch: bool is a subclass of int, and "1"/"0" would be accepted but
+    # reads back as a number, which is not what the caller wrote
+    if isinstance(value, (bool, np.bool_)):
+        return "true" if value else "false"
+    if isinstance(value, (int, np.integer)):
+        return str(int(value))
+    if isinstance(value, (float, np.floating)):
+        return str(float(value))
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
+    if isinstance(value, (set, frozenset)):
+        raise TypeError(
+            "option values cannot be given as a {0}: the vector options are ordered "
+            "schedules and a set has no order. Pass a list or tuple instead".format(
+                type(value).__name__))
+    # ndarray and pandas Series both answer tolist(); range and tuple are already sequences.
+    # tolist() on a 0-d array hands back a plain scalar, so route that back through here
+    # rather than falling to the TypeError below
+    seq = value.tolist() if hasattr(value, "tolist") else value
+    if hasattr(value, "tolist") and not isinstance(seq, (list, tuple, range)):
+        return format_option_value(seq)
+    if isinstance(seq, (list, tuple, range)):
+        if len(seq) == 0:
+            raise ValueError("option values cannot be an empty sequence")
+        return ",".join(format_option_value(v) for v in seq)
+    raise TypeError(
+        "cannot use {0} as an option value; pass a str, bool, int, float, path or a "
+        "sequence of those".format(type(value).__name__))
+
+
 class PestppLib:
     """One loaded shared library plus one session handle."""
 
@@ -264,6 +312,8 @@ class PestppLib:
         lib.pestpp_set_obs_weights.restype = c_int
         lib.pestpp_broadcast_weights.argtypes = (c_void_p,)
         lib.pestpp_broadcast_weights.restype = c_int
+        lib.pestpp_reinflate_ensemble.argtypes = (c_void_p, c_double, c_int, c_int)
+        lib.pestpp_reinflate_ensemble.restype = c_int
         lib.pestpp_update_phi.argtypes = (c_void_p,)
         lib.pestpp_update_phi.restype = c_int
         lib.pestpp_get_par_snapshot.argtypes = (
@@ -500,8 +550,10 @@ class PestppLib:
     # -- options ----------------------------------------------------------------------
 
     def set_option(self, key: str, value) -> None:
-        self._check(self.lib.pestpp_set_option(self.handle, key.encode(), str(value).encode()),
-                    f"pestpp_set_option({key})")
+        self._check(
+            self.lib.pestpp_set_option(self.handle, key.encode(),
+                                       format_option_value(value).encode()),
+            f"pestpp_set_option({key})")
 
     def get_option(self, key: str, default=_UNSET):
         """One option's value.
@@ -749,6 +801,14 @@ class PestppLib:
                 nm.encode().ljust(self.name_len)[:self.name_len]
         self._check(self.lib.pestpp_set_obs_weights(self.handle, buf, arr, len(names)),
                     "pestpp_set_obs_weights")
+
+    def reinflate_ensemble(self, factor: float = 1.0, num_reals: int = 0,
+                           center_on_min_phi: int = -1) -> None:
+        """Rebuild the parameter ensemble from the prior's spread, re-centred on the current."""
+        self._check(self.lib.pestpp_reinflate_ensemble(
+            self.handle, c_double(float(factor)), c_int(int(num_reals)),
+            c_int(int(center_on_min_phi))),
+            "pestpp_reinflate_ensemble")
 
     def broadcast_weights(self) -> None:
         """Push the weight vector into every row of the weights ensemble."""

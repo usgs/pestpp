@@ -424,6 +424,43 @@ PESTPP_API pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* nam
    PESTPP_WEIGHTS_EN yourself. No-op before the ensemble exists. */
 PESTPP_API pestpp_status pestpp_broadcast_weights(pestpp_handle h);
 
+/* ---- reinflation ------------------------------------------------------------------------
+ *
+ * Rebuild the current parameter ensemble from the PRIOR's spread, re-centred on where the
+ * ensemble has got to. An ensemble smoother narrows the ensemble every iteration, and after
+ * enough of them the spread can collapse to the point where there is nothing left to learn
+ * from - the realizations agree with each other far more than the data justifies. Reinflation
+ * is the deliberate remedy: keep the location you have fought for, put back some of the
+ * variance you started with.
+ *
+ * The tools do this on a schedule (ies_n_iter_reinflate and friends). This is the same
+ * operation as an explicit call, which is what a caller needs when the decision depends on
+ * something the schedule cannot see - most obviously, reinflating AT THE MOMENT new
+ * observations are brought in, so the ensemble has the spread to respond to them.
+ *
+ * Reinflation SELECTS realizations out of the PRIOR ensemble; it does not generate new ones.
+ * The prior's size is therefore a hard ceiling, and asking for more is an error rather than
+ * something quietly rounded down. To grow the ensemble mid-run, do what the executable does:
+ * start with a prior big enough for the largest size you will ask for ('ies_num_reals', or a
+ * prior ensemble file) and have the run begin on a subset of it - the first entry of
+ * 'ies_reinflate_num_reals' truncates the working ensemble during initialization while the
+ * prior keeps every realization.
+ *
+ *   factor      in (0, 1]. 1.0 restores the full prior spread; smaller keeps it tighter.
+ *   num_reals   0 to keep the current realization count; otherwise how many realizations the
+ *               reinflated ensemble should have, at most the prior's count. The SIGN selects
+ *               where the spread comes from: POSITIVE uses the prior's own anomalies scaled
+ *               by factor, NEGATIVE resamples the CURRENT ensemble's anomalies instead (and,
+ *               when factor < 1, adds prior anomalies scaled by it on top).
+ *   center_on_min_phi
+ *               what the new spread is centred on. -1 follows 'ies_n_iter_reinflate' the way
+ *               the built-in loop does (a negative entry there means min-phi), 0 forces the
+ *               ensemble mean, 1 forces the minimum-phi realization - the aggressive form.
+ *
+ * ies and da only. */
+PESTPP_API pestpp_status pestpp_reinflate_ensemble(pestpp_handle h, double factor,
+                                                   int num_reals, int center_on_min_phi);
+
 /* Recompute phi from the current ensembles and weights.
  *
  * Phi is CACHED - the values pestpp_get_phi_* report are whatever the last update computed,

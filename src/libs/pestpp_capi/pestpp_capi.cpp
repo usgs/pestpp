@@ -1781,6 +1781,46 @@ pestpp_status pestpp_set_obs_weights(pestpp_handle h, const char* names,
     CAPI_END()
 }
 
+pestpp_status pestpp_reinflate_ensemble(pestpp_handle h, double factor, int num_reals,
+                                        int center_on_min_phi)
+{
+    CAPI_BEGIN(h)
+        EnsembleMethod* em = s->adapter->ensemble_method();
+        if (em == nullptr)
+            unsupported(string("tool '") + s->adapter->name() +
+                        "' has no parameter ensemble to reinflate");
+        if (!s->initialized)
+            bad_state("reinflation needs an initialized ensemble; call pestpp_initialize() "
+                      "first");
+        if ((factor <= 0.0) || (factor > 1.0))
+            bad_arg("reinflation factor must be in (0, 1]: 1.0 restores the full prior spread, "
+                    "smaller values keep the ensemble tighter around the current mean");
+        // Reinflation SELECTS realizations out of the prior ensemble - it never draws new
+        // ones - so asking for more than the prior holds cannot be honoured. The underlying
+        // routine deals with that by ignoring the request and reinflating to the prior's size
+        // instead, which is the worst outcome for a caller: the size does not change and
+        // nothing says why. Refuse it here, and say what the way around it is.
+        int want = (num_reals < 0) ? -num_reals : num_reals;
+        int n_prior = em->get_pe_base_ptr()->shape().first;
+        if (want > n_prior)
+        {
+            stringstream ss;
+            ss << "cannot reinflate to " << want << " realizations: the prior ensemble holds "
+               << n_prior << ", and reinflation draws from it rather than generating new "
+               << "realizations. To grow the ensemble mid-run, start with a prior big enough "
+               << "for the largest size you will ask for ('ies_num_reals' or a prior ensemble "
+               << "file) and have the run begin on a subset of it ('ies_reinflate_num_reals', "
+               << "whose first entry truncates the working ensemble during initialization)";
+            bad_arg(ss.str());
+        }
+        if ((center_on_min_phi < -1) || (center_on_min_phi > 1))
+            bad_arg("center_on_min_phi must be -1 (follow 'ies_n_iter_reinflate'), 0 (the "
+                    "ensemble mean) or 1 (the minimum-phi realization)");
+        em->reinflate_par_ensemble(factor, num_reals, center_on_min_phi);
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_broadcast_weights(pestpp_handle h)
 {
     CAPI_BEGIN(h)

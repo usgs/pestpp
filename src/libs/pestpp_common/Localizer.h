@@ -75,6 +75,10 @@ public:
 	LocTyp get_loctyp() { return loctyp; }
 	void report(ofstream &f_rec);
 	bool is_initialized() { return initialized; }
+	/// Force a re-read of the localizer matrix. Needed when the ACTIVE OBSERVATION SET grows
+	/// after initialization - the matrix is resolved against that set once, so a localizer
+	/// built while an observation was zero-weighted has no row for it.
+	void set_initialized(bool val) { initialized = val; }
 	Mat* get_orgmat_ptr() {return &org_mat;}
 private:
 	bool use;

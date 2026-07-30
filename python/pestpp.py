@@ -29,6 +29,7 @@ import subprocess
 import sys
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
+from typing import TypeVar
 
 import numpy as np
 import pandas as pd
@@ -57,6 +58,12 @@ from pestpp_lib import (  # noqa: E402
     PHI_MEAS, PHI_COMPOSITE, PHI_REGUL, PHI_ACTUAL, PHI_NOISE,
     WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT,
 )
+
+# Bound to _Tool so from_pst() reports the SUBCLASS it was called on: Ies.from_pst() infers
+# as Ies, Mou.from_pst() as Mou. Without it a classmethod returning cls() is opaque to jedi
+# and pylance, which is what makes `Ies.from_pst("pest.pst").<TAB>` come back empty in a
+# notebook - the single most useful completion there is.
+_ToolT = TypeVar("_ToolT", bound="_Tool")
 
 __all__ = [
     "Ies", "Da", "Mou", "Sqp", "IterationStep", "PestppError", "ExpiredViewError",
@@ -353,18 +360,20 @@ class _Tool:
     # -- construction ----------------------------------------------------------------------
 
     @classmethod
-    def from_pst(cls, pst_file: str, workdir: str = ".", workers: int = 0,
+    def from_pst(cls: type[_ToolT], pst_file, workdir: str = ".", workers: int = 0,
                  port: int | str = 4004, lib_path: str | None = None,
                  worker_root: str | None = None, exe_path: str | None = None,
-                 run_manager: int | None = None, quiet: bool = True, **options):
+                 run_manager: int | None = None, quiet: bool = True, **options) -> _ToolT:
         """Open a session on a control file.
 
         ``workers`` greater than zero starts a PANTHER master and that many worker processes,
         each in its own copy of ``workdir`` under ``worker_root``. Leave it at zero for the
         serial run manager, which is simpler and right for small problems.
 
-        Extra keyword arguments are set as pest++ options before initialization, so
-        ``Ies.from_pst("pest.pst", ies_num_reals=50)`` does what it looks like.
+        Extra keyword arguments are set as pest++ options before initialization, in their
+        native python types, so ``Ies.from_pst("pest.pst", ies_num_reals=50,
+        ies_lambda_mults=[0.1, 1.0, 10.0], ies_no_noise=True)`` does what it looks like.
+        See :meth:`set_option` for how each type is spelled.
 
         ``quiet`` (the default) captures the library's console output to
         ``<workdir>/pestpp.stdout.log`` instead of letting it flood the session. Pass
@@ -443,6 +452,19 @@ class _Tool:
     def set_option(self, key: str, value) -> None:
         """Set a ++ option or a * control data value. An unknown key raises.
 
+        Values are given in their NATIVE python form and formatted here - bools as
+        ``true``/``false``, ints and floats as themselves, and lists, tuples or arrays as the
+        comma-separated form the vector options are parsed from::
+
+            ies.set_option("ies_num_reals", 50)
+            ies.set_option("ies_no_noise", True)
+            ies.set_option("ies_lambda_mults", [0.1, 1.0, 10.0])
+            ies.set_option("ies_n_iter_reinflate", [3, 999])
+
+        A str is passed through untouched, so anything already in control-file spelling still
+        works. A type with no sensible spelling raises rather than being stringified into
+        something the parser rejects later under the option's name.
+
         Some options are consumed once during initialize() and cannot change the current run
         afterwards; setting one of those late is accepted but has no effect.
         """
@@ -518,7 +540,7 @@ class _Tool:
             self._lib.destroy()
             self._lib = None
 
-    def __enter__(self):
+    def __enter__(self: _ToolT) -> _ToolT:
         return self
 
     def __exit__(self, *exc):
@@ -713,6 +735,48 @@ class _Tool:
             # number back and concludes the weight change did nothing
             self.update_phi()
 
+    def reinflate(self, factor: float = 1.0, num_reals: int = 0,
+                  center_on_min_phi: bool | None = None) -> None:
+        """Rebuild the parameter ensemble from the PRIOR's spread, re-centred on the current one.
+
+        A smoother narrows the ensemble every iteration. After a few, the realizations can
+        agree with each other far more than the data justifies - and an over-tight ensemble
+        cannot respond to anything new, because there is no variance left to move. Reinflation
+        keeps the location the assimilation has found and puts back some of the variance it
+        started with.
+
+        The tool does this on a schedule (``ies_n_iter_reinflate``). Calling it explicitly is
+        for the case the schedule cannot express: reinflating at the moment new observations
+        are brought in, so the ensemble has room to react to them.
+
+        ``factor`` is in (0, 1] - 1.0 restores the full prior spread.
+
+        ``num_reals`` of 0 keeps the current realization count; otherwise it is how many
+        realizations to end up with. Realizations are SELECTED FROM THE PRIOR rather than
+        generated, so the prior's size is a hard ceiling and asking for more raises. To grow
+        the ensemble mid-run, start with a prior big enough for the largest size you will ask
+        for and begin the run on a subset of it::
+
+            ies = Ies.from_pst("pest.pst", ies_num_reals=50,
+                               ies_reinflate_num_reals="10")   # prior 50, working ensemble 10
+            ies.initialize()
+            ...
+            ies.reinflate(num_reals=20)                        # 10 -> 20, out of the 50
+
+        The SIGN of ``num_reals`` chooses where the spread comes from: positive uses the
+        prior's own anomalies scaled by ``factor``, negative resamples the CURRENT ensemble's
+        anomalies instead, adding prior anomalies scaled by ``factor`` when it is below 1.
+
+        ``center_on_min_phi`` is what the new spread is centred on: ``None`` follows
+        ``ies_n_iter_reinflate`` the way the built-in loop does, ``False`` forces the ensemble
+        mean, ``True`` forces the minimum-phi realization - the aggressive form.
+
+        This RUNS the reinflated ensemble, so it costs ``num_reals`` model runs.
+        """
+        center = -1 if center_on_min_phi is None else int(bool(center_on_min_phi))
+        with self._q():
+            self._lib.reinflate_ensemble(factor, num_reals, center)
+
     def update_phi(self) -> None:
         """Recompute phi from the current ensembles and weights.
 
@@ -731,6 +795,30 @@ class _Tool:
             index=self._lib.get_ensemble_row_names(WEIGHTS_EN),
             columns=self._lib.get_ensemble_col_names(WEIGHTS_EN)), lower),
             "realization", "obsnme")
+
+    def noise_df(self, lower: bool = False) -> pd.DataFrame:
+        """The measurement-noise ensemble - one noise realization per observation, as a copy.
+
+        These are what phi is measured AGAINST: `PHI_MEAS` is the residual between the
+        simulated ensemble and this one, rather than against the single observed value. Its
+        columns are the ACTIVE observations, so an observation at zero weight is absent - and
+        activating one generates its noise here, which is the thing worth checking after a
+        staged reweight.
+
+        Empty when the run was configured with ``ies_no_noise``.
+        """
+        arr, token = self._lib.get_ensemble_view(NOISE_EN)
+        self._lib.release_view(token)          # a copy is taken below; nothing stays borrowed
+        return _named(_maybe_lower(pd.DataFrame(
+            arr.copy(),
+            index=self._lib.get_ensemble_row_names(NOISE_EN),
+            columns=self._lib.get_ensemble_col_names(NOISE_EN)), lower),
+            "realization", "obsnme")
+
+    @contextmanager
+    def noise_view(self):
+        """Zero-copy view of the noise ensemble, valid only in this block."""
+        yield from self._view(NOISE_EN)
 
     @contextmanager
     def weights_view(self):

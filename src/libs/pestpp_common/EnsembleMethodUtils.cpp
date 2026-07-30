@@ -8415,8 +8415,12 @@ void EnsembleMethod::end_iteration(int cycle)
 	pcs.summarize(pe, ss.str());
 }
 
-void EnsembleMethod::reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals){
+void EnsembleMethod::reinflate_par_ensemble(double reinflate_factor,int reinflate_num_reals,
+                                            int center_on_min_phi){
 
+    // negative == defer to ies_n_iter_reinflate, which is what the shipped loop passes
+    bool use_min_phi_real = (center_on_min_phi < 0) ? get_reinflate_to_minphi_real()
+                                                    : (center_on_min_phi != 0);
     string min_phi_name = "";
     //find the min phi real...
     map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
@@ -8518,7 +8522,7 @@ void EnsembleMethod::reinflate_par_ensemble(double reinflate_factor,int reinflat
     Eigen::VectorXd offset(mean_vec.size());
     for (int i=0;i<mean_vec.size();i++)
         offset[i] = mean_vec[i];
-    if (get_reinflate_to_minphi_real())
+    if (use_min_phi_real)
     {
         offset = pe.get_real_vector(min_phi_name);
         message(2,"using min-phi realization for offset");
@@ -9752,6 +9756,14 @@ vector<string> EnsembleMethod::activate_obs(const map<string, double>& obs_to_ac
 	for (auto& kv : obs_to_activate)
 		oi->set_weight(kv.first, kv.second);
 
+	// org_obs_info is the weight vector reinflation RESTORES from - it puts the scenario back
+	// after the temporary weight handling around a reinflation cycle. It is captured once at
+	// initialize(), so a caller-set weight was reverted the next time the ensemble reinflated:
+	// activate an observation, reinflate, and it silently went back to zero weight. The weights
+	// the caller just set ARE the canonical ones now, so restate them. Before the early return
+	// below, because a plain reweight of an already-active observation has the same problem.
+	org_obs_info = pest_scenario.get_ctl_observation_info_copy();
+
 	if (activated.size() == 0)
 		return activated;
 
@@ -9822,36 +9834,63 @@ vector<string> EnsembleMethod::activate_obs(const map<string, double>& obs_to_ac
 		oe_base.reorder(vector<string>(), act_obs_names);
 	}
 
-	// the weights ensemble spans the active set too, so it gains the same columns - filled
-	// with the vector weight, which is the same thing initialize() broadcasts
-	if (weights.shape().first > 0)
+	// the weights ensembles span the active set too, so they gain the same columns - filled
+	// with the vector weight, which is the same thing initialize() broadcasts.
+	//
+	// weights and weights_base are spliced INDEPENDENTLY, and the rows are why. They do not
+	// hold the same realizations: the first solve resizes the live `weights` down to whatever
+	// the working ensemble is, while weights_base keeps every realization the prior was drawn
+	// at - which is exactly the spare capacity a later reinflation grows back into, since
+	// reinflation restores the weight ensemble FROM weights_base. Assigning the spliced
+	// `weights` over weights_base threw those spare rows away, and the damage only surfaced
+	// later and somewhere else: reinflating to more realizations than the trimmed base had
+	// rows for came back as Ensemble::get_eigen() complaining about missing REALIZATION names,
+	// with nothing to connect it to weights at all.
+	auto add_activated_columns = [&](ObservationEnsemble& we)
 	{
-		vector<string> wnames = weights.get_var_names();
+		if (we.shape().first == 0)
+			return;
+		vector<string> wnames = we.get_var_names();
 		set<string> whave(wnames.begin(), wnames.end());
 		vector<string> wadd;
 		for (auto& n : activated)
 			if (whave.find(n) == whave.end())
 				wadd.push_back(n);
-		if (wadd.size() > 0)
-		{
-			int wr = weights.shape().first;
-			Eigen::MatrixXd wmerged(wr, wnames.size() + wadd.size());
-			wmerged.leftCols(wnames.size()) = *weights.get_eigen_ptr();
-			for (int j = 0; j < (int)wadd.size(); j++)
-				wmerged.col(wnames.size() + j).setConstant(oi->get_weight(wadd[j]));
-			vector<string> wmerged_names = wnames;
-			wmerged_names.insert(wmerged_names.end(), wadd.begin(), wadd.end());
-			vector<string> wreals = weights.get_real_names();
-			weights = ObservationEnsemble(&pest_scenario, &rand_gen, wmerged, wreals, wmerged_names);
-			weights.update_var_map();
-			weights.reorder(vector<string>(), act_obs_names);
-			weights_base = weights;
-		}
-	}
+		if (wadd.size() == 0)
+			return;
+		int wr = we.shape().first;
+		Eigen::MatrixXd wmerged(wr, wnames.size() + wadd.size());
+		wmerged.leftCols(wnames.size()) = *we.get_eigen_ptr();
+		for (int j = 0; j < (int)wadd.size(); j++)
+			wmerged.col(wnames.size() + j).setConstant(oi->get_weight(wadd[j]));
+		vector<string> wmerged_names = wnames;
+		wmerged_names.insert(wmerged_names.end(), wadd.begin(), wadd.end());
+		vector<string> wreals = we.get_real_names();
+		we = ObservationEnsemble(&pest_scenario, &rand_gen, wmerged, wreals, wmerged_names);
+		we.update_var_map();
+		we.reorder(vector<string>(), act_obs_names);
+	};
+	add_activated_columns(weights);
+	add_activated_columns(weights_base);
 
 	// the phi handler was built against oe_base and holds the observed values and groups it
 	// needs; rebuild it so the newly active observations contribute
 	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+
+	// The localizer resolves its rows against the active observation set ONCE, at
+	// initialization. zero_weight_obs() gets away with leaving it alone - its note says
+	// "shouldn't need to update localizer since we dropping not adding" - but adding is
+	// exactly what this does, and a localizer built when these observations were inactive
+	// has no rows for them. Left stale, the next solve throws from process_mat() complaining
+	// that its rows are not in the non-zero-weight names, which is true and unhelpful.
+	if (localizer.is_initialized())
+	{
+		message(1, "re-initializing localizer for the newly activated observations");
+		bool forgive_missing = pest_scenario.get_pestpp_options().get_ies_localizer_forgive_missing();
+		localizer.set_initialized(false);
+		use_localizer = localizer.initialize(performance_log, file_manager.rec_ofstream(),
+			forgive_missing);
+	}
 
 	ss.str("");
 	ss << "number of non-zero weighted observations increased from " << org_nnz_obs

@@ -775,6 +775,226 @@ def api_reweight_leaves_noise_alone_test():
         ies.finalize()
 
 
+def api_reinflate_size_is_capped_by_prior_test():
+    """Asking to reinflate to more realizations than the prior holds is refused, not ignored.
+
+    Reinflation SELECTS realizations out of pe_base rather than generating new ones, so the
+    prior's row count is a hard ceiling. The underlying routine deals with an over-large
+    request by silently reinflating to the prior's size instead - which from the outside looks
+    exactly like the call having done nothing, with no way to find out why. The error message
+    is the feature here: it has to name the ceiling and the way around it.
+    """
+    wd = _case("api_reinflate_range", noptmax=1, num_reals=6)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        # both signs, because the sign selects the anomaly source, not the size
+        for n in (20, -20):
+            try:
+                ies.reinflate(factor=1.0, num_reals=n)
+            except PestppError as e:
+                assert "prior ensemble holds 6" in str(e), str(e)
+                assert "ies_reinflate_num_reals" in str(e), \
+                    "the error should say how to grow the ensemble: {0}".format(e)
+            else:
+                raise AssertionError("num_reals={0} exceeds the prior and should raise".format(n))
+
+        # within the ceiling it still works, and the size really does change
+        ies.reinflate(factor=1.0, num_reals=4)
+        assert ies.n_reals == 4, ies.n_reals
+        ies.finalize()
+
+
+def api_reinflate_grows_from_bigger_prior_test():
+    """The documented route to a LARGER ensemble mid-run: big prior, start on a subset.
+
+    This is what the executable does with ies_reinflate_num_reals, and the only way to grow
+    without inventing realizations from nowhere: draw the prior at the largest size the run
+    will ever need, truncate the working ensemble during initialize, then reinflate back up
+    into the spare rows. Worth a test because it is the answer to "why did my ensemble not
+    get bigger", and it depends on two options cooperating.
+    """
+    wd = _case("api_reinflate_grow", noptmax=1, num_reals=20, ies_reinflate_num_reals="8")
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        assert ies.n_reals == 8, \
+            "ies_reinflate_num_reals[0] should have truncated the working ensemble: {0}".format(
+                ies.n_reals)
+        ies.reinflate(factor=1.0, num_reals=16)
+        assert ies.n_reals == 16, \
+            "reinflation did not grow the ensemble into the prior's spare rows: {0}".format(
+                ies.n_reals)
+        ies.finalize()
+
+
+def api_reinflate_centring_is_per_call_test():
+    """center_on_min_phi is reachable per call, instead of only through an option's SIGN.
+
+    In the shipped loop, centring on the min-phi realization is derived from a negative entry
+    in ies_n_iter_reinflate - a schedule-wide flag on an unrelated setting, which a caller
+    driving one reinflation at a time cannot express. The argument is checked here against the
+    .rec file, because the choice of offset leaves no other visible trace.
+    """
+    wd = _case("api_reinflate_center", noptmax=1, num_reals=6)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        ies.solve()          # so the phi map has something to pick a minimum from
+        ies.reinflate(factor=1.0, num_reals=6, center_on_min_phi=True)
+        rec = open(os.path.join(wd, "pest.rec")).read()
+        assert "using min-phi realization for offset" in rec, \
+            "center_on_min_phi=True did not reach the min-phi branch"
+        ies.finalize()
+
+    wd = _case("api_reinflate_center_bad", noptmax=1, num_reals=6)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        try:
+            ies._lib.reinflate_ensemble(1.0, 0, 7)      # only -1, 0, 1 are meaningful
+        except PestppError as e:
+            assert "center_on_min_phi must be" in str(e), str(e)
+        else:
+            raise AssertionError("center_on_min_phi=7 should have raised")
+        ies.finalize()
+
+
+def api_reinflate_keeps_caller_weights_test():
+    """Reinflation must not revert a weight the caller set.
+
+    Reinflation restores the scenario's weights from org_obs_info when it is done, and that
+    was captured once at initialize. So the staged workflow - activate observations, then
+    reinflate so the ensemble has the spread to respond to them - silently put the newly
+    activated observations back to zero weight, undoing the switch it was called to support.
+
+    Note what to assert on: the weights ENSEMBLE survived this even before the fix, because
+    it is restored from weights_base, which activation does update. Only the scenario weights
+    reverted, so that is what this checks.
+    """
+    wd = _case("api_reinflate_weights", noptmax=1, num_reals=6)
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    victim = pst.nnz_obs_names[0]
+    pst.observation_data.loc[victim, "weight"] = 0.0
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        ies.set_obs_weights({victim: 5.0})
+
+        def scenario_weight():
+            w = ies.obs_weights
+            w.index = [n.lower() for n in w.index]
+            return w[victim]
+
+        assert scenario_weight() == 5.0, "activation did not take"
+        ies.reinflate(factor=1.0, num_reals=6)
+        assert scenario_weight() == 5.0, \
+            "reinflation reverted the caller-set weight to {0}".format(scenario_weight())
+        assert ies.weights_df(lower=True)[victim].mean() == 5.0, \
+            "the weights ensemble lost the caller-set weight"
+        ies.finalize()
+
+
+def api_reinflate_grows_after_activation_test():
+    """The staged sequence end to end: solve, activate observations, THEN grow the ensemble.
+
+    Each piece worked alone; together they did not. Reinflation restores the weight ensemble
+    from weights_base, and three things have to line up for that to be sound:
+
+      * initialize() builds the weight ensemble at the PRIOR's size, before the working
+        ensemble is truncated to ies_reinflate_num_reals[0], so it starts with spare rows
+      * the first solve resizes the LIVE weight ensemble down to the working ensemble
+      * activation splices new columns into both
+
+    Activation used to do that last step by assigning the trimmed live ensemble over
+    weights_base, which discarded the spare rows. Nothing failed at that point - it failed at
+    the next reinflation that grew the ensemble, as Ensemble::get_eigen() reporting missing
+    REALIZATION names, which points nowhere near weights.
+    """
+    wd = _case("api_reinflate_after_activate", noptmax=3, num_reals=20,
+               ies_reinflate_num_reals="10")
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    victim = pst.nnz_obs_names[0]
+    pst.observation_data.loc[victim, "weight"] = 0.0
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        assert ies.n_reals == 10, ies.n_reals
+        ies.solve()                              # trims the live weight ensemble to 10
+        ies.set_obs_weights({victim: 5.0})       # activation splices a column into both
+        ies.reinflate(factor=0.5, num_reals=20)  # grows into weights_base's spare rows
+
+        assert ies.n_reals == 20, \
+            "reinflation after activation did not grow the ensemble: {0}".format(ies.n_reals)
+        w = ies.weights_df(lower=True)
+        assert w.shape[0] == 20, \
+            "the weight ensemble did not follow the parameter ensemble: {0}".format(w.shape)
+        assert victim in w.columns, "the activated observation fell out of the weight ensemble"
+        assert (w[victim] == 5.0).all(), \
+            "the activated weight did not reach every realization: {0}".format(w[victim].unique())
+        # and the run is still driveable afterwards
+        ies.solve()
+        ies.finalize()
+
+
+def api_option_values_are_native_types_test():
+    """Options take python values, not control-file spellings - lists especially.
+
+    A bare str() is right for scalars by luck and wrong for sequences by construction: the
+    vector options are tokenized on commas, so a list arrived as the literal "[0.1, 1.0]" and
+    was rejected under the OPTION's name, which reads like the option was wrong rather than
+    the brackets. Sequences are the whole point of this - the lambda multipliers and the
+    reinflation schedule are the options a caller most wants to change mid-run.
+    """
+    wd = _case("api_option_types", noptmax=1, num_reals=6)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        for key, value, expect in (
+                ("ies_lambda_mults", [0.1, 1.0, 10.0], "0.1,1,10"),
+                ("ies_reinflate_factor", (1.0, 0.5), "1,0.5"),
+                ("ies_n_iter_reinflate", np.array([3, 999]), "3,999"),
+                ("ies_n_iter_reinflate", range(2, 5), "2,3,4"),
+                ("ies_num_reals", 20, "20"),
+                ("ies_num_reals", np.int64(30), "30"),
+                ("ies_subset_size", -10, "-10"),
+                ("ies_par_en", "prior.jcb", "prior.jcb"),
+        ):
+            ies.set_option(key, value)
+            assert ies.get_option(key) == expect, \
+                "{0}={1!r} read back as {2!r}, expected {3!r}".format(
+                    key, value, ies.get_option(key), expect)
+
+        # bools go in as bools rather than "True", which the parser only accepts by accident
+        ies.set_option("ies_no_noise", True)
+        assert ies.get_option("ies_no_noise") == "1", ies.get_option("ies_no_noise")
+        ies.set_option("ies_no_noise", False)
+        assert ies.get_option("ies_no_noise") == "0", ies.get_option("ies_no_noise")
+
+        # and a value with no sensible spelling is refused HERE, naming the type, rather than
+        # being stringified into something the parser rejects later under the option's name
+        for bad, exc in (({0.1, 1.0}, TypeError), ([], ValueError), (object(), TypeError)):
+            try:
+                ies.set_option("ies_lambda_mults", bad)
+            except exc:
+                pass
+            else:
+                raise AssertionError("{0!r} should have raised {1}".format(bad, exc.__name__))
+        ies.finalize()
+
+
+def api_option_sequence_reaches_the_algorithm_test():
+    """A list option is not just parsed, it takes effect - checked through behaviour.
+
+    get_option() round-tripping proves the string was formed correctly and nothing more. This
+    drives the one sequence option with a visible consequence: the first entry of
+    ies_reinflate_num_reals truncates the working ensemble during initialize.
+    """
+    wd = _case("api_option_seq_effect", noptmax=1, num_reals=20,
+               ies_reinflate_num_reals=[8, 16])
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        assert ies.n_reals == 8, \
+            "the list-valued option did not reach the algorithm: {0} reals".format(ies.n_reals)
+        ies.finalize()
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -800,4 +1020,11 @@ if __name__ == "__main__":
     api_pyemu_results_test()
     api_activate_zero_weighted_obs_test()
     api_reweight_leaves_noise_alone_test()
+    api_reinflate_size_is_capped_by_prior_test()
+    api_reinflate_grows_from_bigger_prior_test()
+    api_reinflate_centring_is_per_call_test()
+    api_reinflate_keeps_caller_weights_test()
+    api_reinflate_grows_after_activation_test()
+    api_option_values_are_native_types_test()
+    api_option_sequence_reaches_the_algorithm_test()
     print("all helper tests passed")
