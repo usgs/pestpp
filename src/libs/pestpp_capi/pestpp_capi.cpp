@@ -170,6 +170,31 @@ struct ToolAdapter
     /// untagged, which is what NULL_DA_CYCLE means.
     virtual int da_cycle() const { return NetPackage::NULL_DA_CYCLE; }
 
+    /// ---- deferred solve ---------------------------------------------------------------
+    ///
+    /// Whether one iteration decomposes into generate -> run -> evaluate. da and sqp do not:
+    /// da's advance() is a whole noptmax loop and sqp's line search issues several run
+    /// batches per iteration, so both refuse rather than approximating the shape.
+    virtual bool supports_deferred_solve() const { return false; }
+    /// Generate the candidates without running them; returns the runs they imply. 0 means the
+    /// iteration finished during preparation and nothing is outstanding.
+    virtual int  solve_prepare(pestpp_status& outcome) { (void)outcome; return 0; }
+    /// Continue after a batch. Sets pending>0 when another batch is needed.
+    virtual pestpp_status solve_finish(bool defer_runs, int& pending) { (void)defer_runs; pending = 0; return PESTPP_OK; }
+    /// Queue the outstanding batch. `only` empty means the algorithm's own choice.
+    virtual int  queue_solve_runs(const vector<string>& only) { (void)only; return 0; }
+    /// Harvest it; returns how many runs failed.
+    virtual int  harvest_solve_runs() { return 0; }
+    /// Is a deferred solve open? Used to keep it and the composed advance() apart.
+    virtual bool solve_is_open() const { return false; }
+    /// Is a batch queued and awaiting harvest?
+    virtual bool solve_batch_queued() const { return false; }
+    /// Candidates awaiting runs, and the factors each was generated with.
+    virtual int  candidate_count() const { return 0; }
+    virtual Ensemble* candidate(int idx) { (void)idx; return nullptr; }
+    virtual void candidate_info(int idx, double& inflation, double& backtrack)
+    { (void)idx; inflation = 0.0; backtrack = 0.0; }
+
     /// The EnsembleMethod behind this tool, or null for the two that are not one.
     ///
     /// Needed for the operations that are structural rather than cosmetic - activating a
@@ -329,17 +354,206 @@ struct PestppSession
     int next_view_token = 1;
 };
 
+/// The deferred-solve state machine for an EnsembleMethod tool.
+///
+/// One iteration is generate -> run candidates -> evaluate -> (run the rest of the ensemble)
+/// -> accept. The tool exposes every one of those; this holds the place in the sequence, the
+/// context they share and the run ids in flight, so the C entry points stay thin and the two
+/// tools that have this shape share one implementation.
+struct EnsembleSolveState
+{
+    enum class Phase
+    {
+        NONE,               ///< nothing outstanding
+        CANDIDATES,         ///< candidates generated, awaiting queue
+        CANDIDATES_QUEUED,  ///< candidate runs in flight
+        CANDIDATES_RUN,     ///< candidate results harvested, awaiting evaluate
+        REMAINING,          ///< a winner was picked; the rest of the ensemble awaits queue
+        REMAINING_QUEUED,
+        REMAINING_RUN
+    };
+
+    EnsembleMethod& tool;
+    Pest& scen;
+    int cycle;
+    Phase phase = Phase::NONE;
+    unique_ptr<UpgradeContext> ctx;
+    vector<map<string, int>> lam_run_ids;
+    map<string, int> remaining_run_ids;
+
+    EnsembleSolveState(EnsembleMethod& t, Pest& p, int c) : tool(t), scen(p), cycle(c) {}
+
+    bool is_open() const { return phase != Phase::NONE; }
+    bool batch_queued() const
+    { return (phase == Phase::CANDIDATES_QUEUED) || (phase == Phase::REMAINING_QUEUED); }
+
+    /// map an UpgradeStatus onto what the C caller sees, and close the solve
+    pestpp_status close(UpgradeStatus st)
+    {
+        tool.end_iteration();
+        ctx.reset();
+        lam_run_ids.clear();
+        remaining_run_ids.clear();
+        phase = Phase::NONE;
+        return (st == UpgradeStatus::REJECTED_RETRY) ? PESTPP_RETRY : PESTPP_OK;
+    }
+
+    int prepare(pestpp_status& outcome)
+    {
+        outcome = PESTPP_OK;
+        tool.begin_iteration();
+        ctx.reset(new UpgradeContext(&scen));
+        bool use_mda = scen.get_pestpp_options().get_ies_use_mda();
+        UpgradeStatus st = tool.solve_prepare(*ctx, use_mda);
+        if (st != UpgradeStatus::CONTINUE)
+        {
+            // the iteration ended without needing any runs - a lambda that could not be
+            // generated, or the non-iterative shortcut. Nothing to hand over.
+            outcome = close(st);
+            return 0;
+        }
+        // the candidates are files on the spill path, so there is nothing in memory to look
+        // at. Refuse here rather than handing back views onto ensembles that were emptied.
+        if (ctx->pe_filenames.size() > 0)
+        {
+            close(UpgradeStatus::CONTINUE);
+            unsupported("a deferred solve needs the candidates in memory, but "
+                        "'ies_upgrades_in_memory' is false, so they were spilled to disk. Set "
+                        "it true to inspect or edit candidates");
+        }
+        phase = Phase::CANDIDATES;
+        return (int)(ctx->pe_lams.size() * ctx->subset_names.size());
+    }
+
+    int queue(const vector<string>& only)
+    {
+        if (phase == Phase::CANDIDATES)
+        {
+            if (only.size() > 0)
+            {
+                // naming realizations REPLACES the subset, which is coherent because
+                // everything downstream - including who counts as 'remaining' - is derived
+                // from subset_names rather than from positions
+                vector<string> have = tool.get_pe_ptr()->get_real_names();
+                set<string> hset(have.begin(), have.end());
+                for (auto& n : only)
+                    if (hset.find(n) == hset.end())
+                        bad_arg("no such realization in the parameter ensemble: '" + n + "'");
+                ctx->subset_names = only;
+            }
+            lam_run_ids = tool.queue_upgrade_ensembles(*ctx, cycle);
+            phase = Phase::CANDIDATES_QUEUED;
+            int n = 0;
+            for (auto& m : lam_run_ids)
+                n += (int)m.size();
+            return n;
+        }
+        if (phase == Phase::REMAINING)
+        {
+            if (only.size() > 0)
+                bad_arg("the remaining-realization batch is already determined - it is every "
+                        "realization the candidate subset did not cover - so it cannot be "
+                        "narrowed further; pass no names");
+            remaining_run_ids = tool.queue_remaining_runs(*ctx, cycle);
+            phase = Phase::REMAINING_QUEUED;
+            return (int)remaining_run_ids.size();
+        }
+        bad_state("no deferred-solve batch is waiting to be queued");
+        return 0;
+    }
+
+    int harvest()
+    {
+        if (phase == Phase::CANDIDATES_QUEUED)
+        {
+            tool.harvest_upgrade_ensembles(*ctx, lam_run_ids);
+            lam_run_ids.clear();
+            phase = Phase::CANDIDATES_RUN;
+            return 0;
+        }
+        if (phase == Phase::REMAINING_QUEUED)
+        {
+            tool.harvest_remaining_runs(*ctx, remaining_run_ids);
+            remaining_run_ids.clear();
+            phase = Phase::REMAINING_RUN;
+            return (int)ctx->failed_remaining.size();
+        }
+        bad_state("no deferred-solve runs are in flight");
+        return 0;
+    }
+
+    pestpp_status finish(bool defer_runs, int& pending)
+    {
+        pending = 0;
+        bool use_mda = ctx->use_mda;
+        if (phase == Phase::CANDIDATES_RUN)
+        {
+            UpgradeStatus st = tool.evaluate_upgrades(*ctx);
+            if (st != UpgradeStatus::CONTINUE)
+                return close(st);
+            st = tool.prepare_subset_completion(*ctx, cycle, use_mda);
+            if (st != UpgradeStatus::CONTINUE)
+                return close(st);
+            if (ctx->needs_remaining_runs)
+            {
+                if (defer_runs)
+                {
+                    phase = Phase::REMAINING;
+                    pending = ctx->remaining_pe.shape().first;
+                    return PESTPP_OK;
+                }
+                ctx->failed_remaining = tool.run_ensemble(ctx->remaining_pe, ctx->remaining_oe,
+                                                          vector<int>(), cycle);
+            }
+            phase = Phase::REMAINING_RUN;
+        }
+        if (phase != Phase::REMAINING_RUN)
+            bad_state("pestpp_solve_finish() has nothing to continue: the candidate runs have "
+                      "not been harvested yet");
+        UpgradeStatus st = tool.finish_subset_completion(*ctx, cycle, use_mda);
+        if (st != UpgradeStatus::CONTINUE)
+            return close(st);
+        return close(tool.accept_or_reject(*ctx, use_mda, cycle));
+    }
+};
+
 /** ies: begin_iteration -> solve (glm or mda) -> end_iteration. */
 struct IesAdapter : public ToolAdapter
 {
     IterEnsembleSmoother tool;
     Pest& scen;
+    EnsembleSolveState deferred;
     IesAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
                RunManagerAbstract* rm)
-        : tool(p, fm, ofw, pl, rm), scen(p) {}
+        : tool(p, fm, ofw, pl, rm), scen(p),
+          deferred(tool, p, NetPackage::NULL_DA_CYCLE) {}
 
     EnsembleMethod* ensemble_method() override { return &tool; }
     Pest& scenario() override { return scen; }
+
+    bool supports_deferred_solve() const override { return true; }
+    int  solve_prepare(pestpp_status& outcome) override { return deferred.prepare(outcome); }
+    pestpp_status solve_finish(bool defer_runs, int& pending) override
+    { return deferred.finish(defer_runs, pending); }
+    int  queue_solve_runs(const vector<string>& only) override { return deferred.queue(only); }
+    int  harvest_solve_runs() override { return deferred.harvest(); }
+    bool solve_is_open() const override { return deferred.is_open(); }
+    bool solve_batch_queued() const override { return deferred.batch_queued(); }
+    int  candidate_count() const override
+    { return deferred.ctx ? (int)deferred.ctx->pe_lams.size() : 0; }
+    Ensemble* candidate(int idx) override
+    {
+        if ((!deferred.ctx) || (idx < 0) || (idx >= (int)deferred.ctx->pe_lams.size()))
+            return nullptr;
+        return &deferred.ctx->pe_lams[idx];
+    }
+    void candidate_info(int idx, double& inflation, double& backtrack) override
+    {
+        if ((!deferred.ctx) || (idx < 0) || (idx >= (int)deferred.ctx->lam_vals.size()))
+            bad_arg("no such candidate");
+        inflation = deferred.ctx->lam_vals[idx];
+        backtrack = deferred.ctx->scale_vals[idx];
+    }
 
     void initialize() override { tool.initialize(); }
     int  initialize_prepare() override { return tool.initialize_prepare(); }
@@ -458,6 +672,67 @@ struct MouAdapter : public ToolAdapter
         iter++;
         return PESTPP_OK;
     }
+
+    // -- deferred solve. mou's generation is generate -> run -> evaluate -> report with one
+    // candidate population, so there is never a second batch and pending is always 0.
+    unique_ptr<GenerationContext> gctx;
+    enum class GPhase { NONE, POP, POP_QUEUED, POP_RUN };
+    GPhase gphase = GPhase::NONE;
+    map<string, int> pop_run_ids;
+
+    bool supports_deferred_solve() const override { return true; }
+    bool solve_is_open() const override { return gphase != GPhase::NONE; }
+    bool solve_batch_queued() const override { return gphase == GPhase::POP_QUEUED; }
+    int  solve_prepare(pestpp_status& outcome) override
+    {
+        outcome = PESTPP_OK;
+        // the generation counter is advanced by the tool, not here: it names the .N.
+        // population files, and incrementing it in the adapter is how every generation once
+        // ended up overwriting the same ones
+        tool.advance_generation();
+        gctx.reset(new GenerationContext(&scen, tool.get_rand_gen_ptr()));
+        tool.generate_generation(*gctx);
+        gphase = GPhase::POP;
+        return gctx->new_dp.shape().first;
+    }
+    int queue_solve_runs(const vector<string>& only) override
+    {
+        if (gphase != GPhase::POP)
+            bad_state("no deferred-solve batch is waiting to be queued");
+        if (only.size() > 0)
+            bad_arg("mou runs the whole candidate population; it has no subset to narrow");
+        // sized here rather than in generate, so members the caller added or removed are
+        // honored - which is the entire point of handing the population over
+        gctx->new_op.reserve(gctx->new_dp.get_real_names(), tool.get_op_ptr()->get_var_names());
+        pop_run_ids = tool.queue_population(gctx->new_dp, true);
+        gphase = GPhase::POP_QUEUED;
+        return (int)pop_run_ids.size();
+    }
+    int harvest_solve_runs() override
+    {
+        if (gphase != GPhase::POP_QUEUED)
+            bad_state("no deferred-solve runs are in flight");
+        vector<int> failed = tool.harvest_population(gctx->new_dp, gctx->new_op, true, pop_run_ids);
+        pop_run_ids.clear();
+        gphase = GPhase::POP_RUN;
+        return (int)failed.size();
+    }
+    pestpp_status solve_finish(bool, int& pending) override
+    {
+        pending = 0;
+        if (gphase != GPhase::POP_RUN)
+            bad_state("pestpp_solve_finish() has nothing to continue: the population runs have "
+                      "not been harvested yet");
+        tool.evaluate_generation(*gctx);
+        tool.report_generation(*gctx);
+        gctx.reset();
+        gphase = GPhase::NONE;
+        iter++;
+        return PESTPP_OK;
+    }
+    int candidate_count() const override { return gctx ? 1 : 0; }
+    Ensemble* candidate(int idx) override
+    { return (gctx && (idx == 0)) ? &gctx->new_dp : nullptr; }
     void finalize() override { tool.finalize(); }
     int  iteration() override { return iter; }
     // mou has no convergence test - it runs the generations it was asked for
@@ -1128,6 +1403,9 @@ pestpp_status pestpp_solve_iteration(pestpp_handle h)
                                 "not been called since pestpp_initialize_prepare()");
         if (!s->initialized)
             bad_state("pestpp_initialize() must be called before pestpp_solve_iteration()");
+        if (s->adapter->solve_is_open())
+            bad_state("a deferred solve is open; finish it with pestpp_solve_finish() rather "
+                      "than starting a second iteration on top of it");
         // each tool's own notion of one step; RETRY is an algorithmic outcome, not a fault
         return s->adapter->advance();
     CAPI_END()
@@ -1178,6 +1456,22 @@ namespace {
 /** Resolve an ensemble id to the live object on the tool. */
 Ensemble* pick_ensemble(PestppSession* s, int id)
 {
+    // candidates are ordinary ensemble ids so that views, names and snapshots all work on
+    // them unchanged - see PESTPP_CANDIDATE_EN
+    if (id >= PESTPP_CANDIDATE_EN)
+    {
+        int idx = id - PESTPP_CANDIDATE_EN;
+        Ensemble* c = s->adapter->candidate(idx);
+        if (c == nullptr)
+        {
+            if (!s->adapter->solve_is_open())
+                bad_state("candidate ensembles exist only during a deferred solve; call "
+                          "pestpp_solve_prepare() first");
+            bad_arg("no such candidate; there are " +
+                    std::to_string(s->adapter->candidate_count()));
+        }
+        return c;
+    }
     if ((id < PESTPP_PAR_EN) || (id > PESTPP_WEIGHTS_EN))
         bad_arg("unknown ensemble id");
     Ensemble* e = s->adapter->ensemble(id);
@@ -1856,11 +2150,117 @@ pestpp_status pestpp_update_phi(pestpp_handle h)
     CAPI_END()
 }
 
+namespace {
+/// Refuse a deferred solve on a tool that cannot express one, with the reason rather than a
+/// bare "unsupported" - the two that cannot are structural, not unimplemented.
+void require_deferred_solve(PestppSession* s)
+{
+    if (s->adapter->supports_deferred_solve())
+        return;
+    string t = s->adapter->name();
+    if (t == "da")
+        unsupported("da cannot defer a solve: one advance() is a whole noptmax loop over a "
+                    "cycle rather than a single iteration, so there is no one batch to hand "
+                    "over. Use pestpp_solve_iteration()");
+    unsupported("sqp cannot defer a solve: its line search and trust-region step each propose, "
+                "run and judge a step, so one iteration issues several run batches rather than "
+                "one. Use pestpp_solve_iteration()");
+}
+}
+
+pestpp_status pestpp_solve_prepare(pestpp_handle h, int* n_runs)
+{
+    CAPI_BEGIN(h)
+        require_deferred_solve(s);
+        if (!s->initialized)
+            bad_state("pestpp_initialize() must be called before pestpp_solve_prepare()");
+        if (s->init_pending)
+            bad_state("the prior ensemble is still outstanding; call pestpp_initialize_finish()");
+        if (s->adapter->solve_is_open())
+            bad_state("a deferred solve is already open; finish it before starting another");
+        if (s->pending_runs_valid)
+            bad_state("runs are already queued; harvest them before starting a solve");
+        pestpp_status outcome = PESTPP_OK;
+        int n = s->adapter->solve_prepare(outcome);
+        if (n_runs != nullptr)
+            *n_runs = n;
+        return outcome;
+    CAPI_END()
+}
+
+pestpp_status pestpp_solve_finish(pestpp_handle h, int defer_runs, int* pending_runs)
+{
+    CAPI_BEGIN(h)
+        require_deferred_solve(s);
+        if (!s->adapter->solve_is_open())
+            bad_state("no deferred solve is open; call pestpp_solve_prepare() first");
+        if (s->adapter->solve_batch_queued())
+            bad_state("the queued runs have not been harvested; call pestpp_process_runs()");
+        int pending = 0;
+        pestpp_status st = s->adapter->solve_finish(defer_runs != 0, pending);
+        if (pending_runs != nullptr)
+            *pending_runs = pending;
+        return st;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_candidate_count(pestpp_handle h, int* n)
+{
+    CAPI_BEGIN(h)
+        if (n == nullptr) bad_arg("null out-param");
+        *n = s->adapter->candidate_count();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_candidate_info(pestpp_handle h, int idx, double* inflation,
+                                        double* backtrack)
+{
+    CAPI_BEGIN(h)
+        double inf = 0.0, back = 0.0;
+        s->adapter->candidate_info(idx, inf, back);
+        if (inflation != nullptr) *inflation = inf;
+        if (backtrack != nullptr) *backtrack = back;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_queue_runs_subset(pestpp_handle h, const char* names, int n, int* n_queued)
+{
+    CAPI_BEGIN(h)
+        require_deferred_solve(s);
+        if (!s->adapter->solve_is_open())
+            bad_state("no deferred solve is open; call pestpp_solve_prepare() first");
+        if (s->pending_runs_valid)
+            bad_state("runs are already queued; harvest them before queueing again");
+        vector<string> only;
+        if ((names != nullptr) && (n > 0))
+            only = unpack_names(names, n);
+        int queued = s->adapter->queue_solve_runs(only);
+        // the session's flag is what makes process_runs() route back here, and what stops a
+        // second queue landing on top of the first
+        s->pending_runs_valid = true;
+        if (n_queued != nullptr)
+            *n_queued = queued;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued)
 {
     CAPI_BEGIN(h)
         if (s->pending_runs_valid)
             bad_state("runs are already queued; harvest them before queueing again");
+        // a deferred solve owns the batch: queue ITS candidates rather than the tool's
+        // current ensemble, so the plain call keeps working inside the deferred loop
+        if (s->adapter->solve_is_open())
+        {
+            int queued = s->adapter->queue_solve_runs(vector<string>());
+            s->pending_runs_valid = true;
+            if (n_queued != nullptr)
+                *n_queued = queued;
+            return PESTPP_OK;
+        }
         // The cycle has to be passed explicitly: it defaults to NULL_DA_CYCLE, so a da handle
         // driving its own queue/harvest would tag runs with no cycle at all while the in-tree
         // da path tagged them correctly. Invisible on a control file whose first cycle is 0.
@@ -1880,6 +2280,14 @@ pestpp_status pestpp_process_runs(pestpp_handle h, int* n_failed)
     CAPI_BEGIN(h)
         if (!s->pending_runs_valid)
             bad_state("no queued runs to harvest; call pestpp_queue_runs first");
+        if (s->adapter->solve_is_open())
+        {
+            int nfail = s->adapter->harvest_solve_runs();
+            s->pending_runs_valid = false;
+            if (n_failed != nullptr)
+                *n_failed = nfail;
+            return PESTPP_OK;
+        }
         vector<int> failed = harvest_ensemble_util(s->performance_log.get(),
                                                    s->file_manager->rec_ofstream(),
                                                    *s->adapter->par_ensemble(), *s->adapter->obs_ensemble(),

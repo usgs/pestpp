@@ -45,6 +45,9 @@ PESTPP_INVALID_STATE = 7
 
 TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP = 0, 1, 2, 3
 PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN = 0, 1, 2, 3
+#: candidate ensembles of a deferred solve are ordinary ensemble ids, CANDIDATE_EN + i, so
+#: views, names and snapshots all work on them unchanged
+CANDIDATE_EN = 1000
 TSTAT = {0: "ctl", 1: "num", 2: "model"}
 
 RUN_QUEUED, RUN_RUNNING, RUN_COMPLETED, RUN_FAILED, RUN_TIMED_OUT, RUN_CANCELLED = range(6)
@@ -230,6 +233,18 @@ class PestppLib:
         for name in ("pestpp_initialize", "pestpp_solve_iteration", "pestpp_finalize"):
             getattr(lib, name).argtypes = (c_void_p,)
             getattr(lib, name).restype = c_int
+
+        lib.pestpp_solve_prepare.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_solve_prepare.restype = c_int
+        lib.pestpp_solve_finish.argtypes = (c_void_p, c_int, POINTER(c_int))
+        lib.pestpp_solve_finish.restype = c_int
+        lib.pestpp_get_candidate_count.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_get_candidate_count.restype = c_int
+        lib.pestpp_get_candidate_info.argtypes = (
+            c_void_p, c_int, POINTER(c_double), POINTER(c_double))
+        lib.pestpp_get_candidate_info.restype = c_int
+        lib.pestpp_queue_runs_subset.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_queue_runs_subset.restype = c_int
 
         for name in ("pestpp_get_iteration", "pestpp_should_terminate",
                      "pestpp_get_par_transform_status"):
@@ -471,6 +486,46 @@ class PestppLib:
     def solve_iteration(self) -> int:
         """Run one iteration. Returns PESTPP_OK or PESTPP_RETRY."""
         return self._check(self.lib.pestpp_solve_iteration(self.handle), "pestpp_solve_iteration")
+
+    def solve_prepare(self) -> int:
+        """Generate the candidates without running them. Returns the runs they imply."""
+        n = c_int()
+        self._check(self.lib.pestpp_solve_prepare(self.handle, byref(n)), "pestpp_solve_prepare")
+        return n.value
+
+    def solve_finish(self, defer_runs: bool = False) -> tuple[int, int]:
+        """Continue after a batch. Returns (status, pending_runs)."""
+        pending = c_int()
+        st = self._check(
+            self.lib.pestpp_solve_finish(self.handle, c_int(1 if defer_runs else 0),
+                                         byref(pending)), "pestpp_solve_finish")
+        return st, pending.value
+
+    def get_candidate_count(self) -> int:
+        n = c_int()
+        self._check(self.lib.pestpp_get_candidate_count(self.handle, byref(n)),
+                    "pestpp_get_candidate_count")
+        return n.value
+
+    def get_candidate_info(self, idx: int) -> tuple[float, float]:
+        """(inflation, backtrack) factors candidate `idx` was generated with."""
+        inf, back = c_double(), c_double()
+        self._check(self.lib.pestpp_get_candidate_info(self.handle, c_int(idx), byref(inf),
+                                                       byref(back)), "pestpp_get_candidate_info")
+        return inf.value, back.value
+
+    def queue_runs_subset(self, names=None) -> int:
+        """Queue the deferred solve's outstanding batch. None means the algorithm's choice."""
+        n = c_int()
+        if names:
+            names = list(names)
+            self._check(self.lib.pestpp_queue_runs_subset(
+                self.handle, self._pack_names(names), len(names), byref(n)),
+                "pestpp_queue_runs_subset")
+        else:
+            self._check(self.lib.pestpp_queue_runs_subset(self.handle, None, 0, byref(n)),
+                        "pestpp_queue_runs_subset")
+        return n.value
 
     def finalize(self) -> None:
         self._check(self.lib.pestpp_finalize(self.handle), "pestpp_finalize")

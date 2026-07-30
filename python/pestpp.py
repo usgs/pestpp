@@ -66,7 +66,7 @@ from pestpp_lib import (  # noqa: E402
 _ToolT = TypeVar("_ToolT", bound="_Tool")
 
 __all__ = [
-    "Ies", "Da", "Mou", "Sqp", "IterationStep", "PestppError", "ExpiredViewError",
+    "Ies", "Da", "Mou", "Sqp", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
     "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
     "PHI_MEAS", "PHI_COMPOSITE", "PHI_REGUL", "PHI_ACTUAL", "PHI_NOISE",
 ]
@@ -205,6 +205,10 @@ class IterationStep:
     iter: int
     n_reals: int
     retried: bool          # the step was rejected and the algorithm wants another attempt
+    #: runs still needed before this iteration can complete. Always 0 from :meth:`_Tool.solve`;
+    #: non-zero only from :meth:`_Tool.finish_solve` with ``defer_runs=True``, where it means
+    #: the remaining realizations are waiting to be queued and run.
+    pending_runs: int = 0
     phi_mean: float = float("nan")
     phi_std: float = float("nan")
     phi_min: float = float("nan")
@@ -442,12 +446,63 @@ class _Tool:
             self._lib.initialize_finish()
         self._initialized = True
 
-    def solve(self) -> IterationStep:
-        """One iteration (a generation, for mou)."""
+    def solve(self, defer_runs: bool = False) -> IterationStep | int:
+        """One iteration (a generation, for mou).
+
+        ``defer_runs=True`` generates the upgrade candidates and stops WITHOUT running them,
+        returning how many runs they imply, so the candidates can be inspected or changed
+        before they are evaluated::
+
+            n = ies.solve(defer_runs=True)
+            for c in ies.candidates():
+                c.par_df()                       # or edit through c.par_view()
+            ies.queue_runs()                     # or queue_runs(reals=[...])
+            ies.run(); ies.process_runs()
+            step = ies.finish_solve(defer_runs=True)
+            while step.pending_runs:
+                ies.queue_runs(); ies.run(); ies.process_runs()
+                step = ies.finish_solve(defer_runs=True)
+
+        A return of 0 means the iteration finished during preparation - a lambda that could
+        not be generated, or the non-iterative shortcut - and there is nothing to run or
+        finish.
+
+        ies and mou only. da's one iteration is a whole noptmax loop over a cycle and sqp's
+        line search issues several run batches per iteration, so neither can be split this way
+        and both raise.
+        """
         from pestpp_lib import PESTPP_RETRY
+        if defer_runs:
+            with self._q():
+                return self._lib.solve_prepare()
         with self._q():
             status = self._lib.solve_iteration()
         return self._step(retried=(status == PESTPP_RETRY))
+
+    def finish_solve(self, defer_runs: bool = False) -> IterationStep:
+        """Continue a deferred :meth:`solve` after its runs have been processed.
+
+        ``defer_runs=True`` stops rather than running the remaining realizations itself: after
+        a subset of the ensemble has picked the winning lambda, the REST of the ensemble still
+        has to be run at it. The count comes back as ``step.pending_runs``; queue, run and
+        process them, then call this again. ``pending_runs`` of 0 means the iteration is done.
+
+        ``defer_runs=False`` (the default) runs them internally and completes the iteration in
+        one call.
+        """
+        from pestpp_lib import PESTPP_RETRY
+        with self._q():
+            status, pending = self._lib.solve_finish(defer_runs)
+        return self._step(retried=(status == PESTPP_RETRY), pending_runs=pending)
+
+    def candidates(self) -> list:
+        """The upgrade candidates of an open deferred :meth:`solve`.
+
+        ies generates one per lambda x scale-factor combination; mou generates one. Each is a
+        :class:`Candidate` exposing the same frame and view calls the tool's own ensembles do,
+        so editing one is the same code as editing :meth:`par_df` / :meth:`par_view`.
+        """
+        return [Candidate(self, i) for i in range(self._lib.get_candidate_count())]
 
     def set_option(self, key: str, value) -> None:
         """Set a ++ option or a * control data value. An unknown key raises.
@@ -1053,10 +1108,23 @@ class _Tool:
 
     # -- running things yourself -----------------------------------------------------------
 
-    def queue_runs(self) -> int:
-        """Queue the current ensemble with the run manager. Returns how many runs were queued."""
+    def queue_runs(self, reals=None) -> int:
+        """Queue runs with the run manager. Returns how many were queued.
+
+        Normally the current ensemble. During a deferred :meth:`solve` it is that solve's
+        outstanding batch instead - the candidates, or the remaining realizations once
+        :meth:`finish_solve` has asked for them - so the same call works inside the loop.
+
+        ``reals`` names the realizations to run, and is meaningful only for the candidate
+        batch: it REPLACES the subset the algorithm picked, so whatever is left unnamed
+        becomes the remainder that :meth:`finish_solve` asks for later. ``None`` keeps the
+        algorithm's own choice.
+        """
         with self._q():
-            self._queued = self._lib.queue_runs()
+            if reals is not None:
+                self._queued = self._lib.queue_runs_subset(_up_all(reals))
+            else:
+                self._queued = self._lib.queue_runs()
         return self._queued
 
     def run(self, slice_seconds: float = 0.05, callback=None) -> None:
@@ -1090,8 +1158,9 @@ class _Tool:
 
     # -- internals -------------------------------------------------------------------------
 
-    def _step(self, retried: bool) -> IterationStep:
-        step = IterationStep(iter=self.iteration, n_reals=self.n_reals, retried=retried)
+    def _step(self, retried: bool, pending_runs: int = 0) -> IterationStep:
+        step = IterationStep(iter=self.iteration, n_reals=self.n_reals, retried=retried,
+                             pending_runs=pending_runs)
         if self._has_phi:
             try:
                 p = self.get_phi()
@@ -1100,6 +1169,53 @@ class _Tool:
             except PestppError:
                 pass          # phi is not meaningful yet; leave the NaNs
         return step
+
+
+class Candidate:
+    """One upgrade candidate of an open deferred solve.
+
+    A thin handle rather than a copy: the frame and view calls go straight at the tool's
+    candidate ensemble, so a write through :meth:`par_view` is what gets run. Valid only until
+    the solve moves on - :meth:`_Tool.finish_solve` releases the candidates, and using a handle
+    afterwards raises rather than reading freed memory.
+    """
+
+    def __init__(self, tool, index: int):
+        self._tool = tool
+        self._lib = tool._lib
+        self.index = index
+        #: the lambda (or mda factor) and backtrack scale this candidate was generated with.
+        #: mou has neither and reports 0.
+        self.inflation, self.backtrack = self._lib.get_candidate_info(index)
+
+    @property
+    def _en_id(self) -> int:
+        from pestpp_lib import CANDIDATE_EN
+        return CANDIDATE_EN + self.index
+
+    def par_df(self, lower: bool = False) -> pd.DataFrame:
+        """This candidate's parameters, as a copy."""
+        arr, token = self._lib.get_ensemble_view(self._en_id)
+        try:
+            out = pd.DataFrame(arr.copy(),
+                               index=self._lib.get_ensemble_row_names(self._en_id),
+                               columns=self._lib.get_ensemble_col_names(self._en_id))
+        finally:
+            self._lib.release_view(token)
+        return _named(_maybe_lower(out, lower), "realization", "parnme")
+
+    @contextmanager
+    def par_view(self):
+        """Zero-copy view of this candidate, valid only in this block. Writes reach the run."""
+        yield from self._tool._view(self._en_id)
+
+    @property
+    def shape(self):
+        return self.par_df().shape
+
+    def __repr__(self):
+        return ("Candidate(index={0}, inflation={1:.6g}, backtrack={2:.6g})"
+                .format(self.index, self.inflation, self.backtrack))
 
 
 class Ies(_Tool):

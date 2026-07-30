@@ -140,6 +140,15 @@ typedef enum {
     PESTPP_WEIGHTS_EN = 3
 } pestpp_ensemble_id;
 
+/* The candidate ensembles of a DEFERRED SOLVE, addressed as PESTPP_CANDIDATE_EN + i for i in
+   [0, pestpp_get_candidate_count()). They are ordinary ensemble ids on purpose: views, row and
+   column names and the snapshot calls all work on them unchanged, so inspecting a candidate is
+   the same code as inspecting the parameter ensemble.
+
+   Valid only between pestpp_solve_prepare() and the call that consumes them. A candidate id
+   outside an open deferred solve is an error, not an empty ensemble. */
+#define PESTPP_CANDIDATE_EN 1000
+
 /* Buffer sizes the library owns. Read these from the library rather than hard-coding them,
    the way xmipy and pypestutils do - and note they are DATA exports, which is why the
    dllimport half of PESTPP_API above matters.
@@ -338,6 +347,59 @@ PESTPP_API pestpp_status pestpp_initialize_finish(pestpp_handle h);
    rejected the upgrade and wants another attempt with a new lambda. That is an outcome, not a
    fault, which is why it is in the negative band: `if (rc) goto fail` would get it wrong. */
 PESTPP_API pestpp_status pestpp_solve_iteration(pestpp_handle h);
+
+/* ---- deferred solve --------------------------------------------------------------------
+ *
+ * The same iteration, split so the caller owns the model runs and can see - or change - the
+ * candidates before they are evaluated:
+ *
+ *     pestpp_solve_prepare(h, &n);        // generate candidates, run nothing
+ *     ... inspect/edit PESTPP_CANDIDATE_EN + i ...
+ *     pestpp_queue_runs_subset(h, NULL, 0, &nq);   // NULL = the algorithm's own subset
+ *     begin_batch -> run_slice -> end_batch
+ *     pestpp_process_runs(h, &nfail);
+ *     pestpp_solve_finish(h, 1, &pending);
+ *     while (pending) { queue -> run -> process; pestpp_solve_finish(h, 1, &pending); }
+ *
+ * `n_runs` from prepare is how many runs the candidates imply. ZERO means the iteration
+ * finished during preparation - a lambda that could not be generated, or the non-iterative
+ * shortcut - and there is nothing to run or finish.
+ *
+ * ies and mou only. da's advance() is a whole noptmax loop rather than one iteration, and
+ * sqp's line search issues several run batches per iteration, so neither can be expressed as
+ * one generate -> run -> evaluate; both refuse rather than approximating it.
+ *
+ * Not available when 'ies_upgrades_in_memory' is false: the candidates are files on that
+ * path, so there is nothing in memory to inspect. */
+PESTPP_API pestpp_status pestpp_solve_prepare(pestpp_handle h, int* n_runs);
+
+/* Continue after the candidate runs. `defer_runs` nonzero stops rather than running the
+ * remaining realizations itself and reports how many are waiting in `pending_runs`; queue,
+ * run and process them, then call again. Zero runs them internally and completes the
+ * iteration in one call.
+ *
+ * `pending_runs` is 0 when the iteration is complete. The return value carries the same
+ * PESTPP_RETRY as pestpp_solve_iteration() when the upgrade was rejected. */
+PESTPP_API pestpp_status pestpp_solve_finish(pestpp_handle h, int defer_runs, int* pending_runs);
+
+/* How many candidate ensembles are waiting. ies generates one per lambda x scale-factor
+   combination; mou generates one. 0 when no deferred solve is open. */
+PESTPP_API pestpp_status pestpp_get_candidate_count(pestpp_handle h, int* n);
+
+/* The factors candidate `idx` was generated with - lambda (or mda factor) and the backtrack
+   scale. Both out-params may be NULL. mou has neither and reports 0. */
+PESTPP_API pestpp_status pestpp_get_candidate_info(pestpp_handle h, int idx,
+                                                   double* inflation, double* backtrack);
+
+/* Queue the outstanding batch of a deferred solve - the candidates, or the remaining
+   realizations after pestpp_solve_finish() asked for them.
+
+   `names`/`n` name the realizations to run, packed PESTPP_NAME_LEN wide like every other name
+   buffer. Pass names=NULL, n=0 for the algorithm's own choice: the subset it picked for
+   candidate testing, or every remaining realization. Naming realizations explicitly REPLACES
+   the subset, so the realizations you do not name become the remainder. */
+PESTPP_API pestpp_status pestpp_queue_runs_subset(pestpp_handle h, const char* names, int n,
+                                                  int* n_queued);
 
 PESTPP_API pestpp_status pestpp_finalize(pestpp_handle h);
 PESTPP_API pestpp_status pestpp_get_iteration(pestpp_handle h, int* iter);

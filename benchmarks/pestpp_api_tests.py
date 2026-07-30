@@ -543,7 +543,8 @@ def api_notebook_runs_test():
     assert not failures, "notebook cells raised:\n  " + "\n  ".join(failures)
 
     # scratch directories the notebook creates alongside itself
-    for name in ("nb_ies", "nb_prior", "nb_cull", "nb_parallel", "nb_parallel_workers"):
+    for name in ("nb_ies", "nb_prior", "nb_cull", "nb_parallel", "nb_parallel_workers",
+                 "nb_defer"):
         shutil.rmtree(os.path.join(nb_dir, name), ignore_errors=True)
 
 
@@ -995,6 +996,298 @@ def api_option_sequence_reaches_the_algorithm_test():
         ies.finalize()
 
 
+def _mou_case(name, noptmax=1, pop=10):
+    """A small mou case in its own directory, from the g07 template."""
+    base = os.path.join(_BENCH, "g07", "template")
+    d = os.path.join(_BENCH, name)
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(base, d)
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    for k in [k for k in pst.pestpp_options if k.startswith("sqp_")]:
+        pst.pestpp_options.pop(k)
+    pst.pestpp_options["mou_population_size"] = pop
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["random_seed"] = 11
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    return d
+
+
+def api_deferred_solve_drives_the_runs_test():
+    """solve -> inspect candidates -> run -> finish, with the caller owning every batch.
+
+    The whole point is that no model run happens inside a library call. ies generates one
+    candidate per lambda x scale-factor combination, runs a SUBSET of the ensemble against all
+    of them to pick a winner, then runs the REST of the ensemble at that winner - two batches,
+    and finish_solve(defer_runs=True) hands back the second rather than running it.
+    """
+    wd = _case("api_defer_ies", noptmax=2, num_reals=8, ies_subset_size=4)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        n = ies.solve(defer_runs=True)
+        cands = ies.candidates()
+        assert len(cands) > 1, "expected a candidate per lambda x scale combination"
+        assert n == len(cands) * 4, \
+            "{0} runs implied by {1} candidates over a subset of 4".format(n, len(cands))
+        # the candidates are ordinary ensembles: same frames, same views
+        assert cands[0].par_df().shape[0] == ies.n_reals
+        assert list(cands[0].par_df().index) == list(ies.par_df().index)
+        # every candidate carries the factors it was generated with
+        assert all(c.inflation > 0 for c in cands), [c.inflation for c in cands]
+
+        assert ies.queue_runs() == n
+        ies.run()
+        assert ies.process_runs() == 0
+
+        step = ies.finish_solve(defer_runs=True)
+        assert step.pending_runs == 4, \
+            "the 4 realizations outside the subset should be handed back: {0}".format(
+                step.pending_runs)
+        ies.queue_runs()
+        ies.run()
+        ies.process_runs()
+        step = ies.finish_solve(defer_runs=True)
+        assert step.pending_runs == 0, step.pending_runs
+        assert np.isfinite(step.phi_mean)
+
+        # and the composed path still works on the same session afterwards
+        after = ies.solve()
+        assert after.pending_runs == 0
+        assert after.iter == step.iter + 1, (after.iter, step.iter)
+        ies.finalize()
+
+
+def api_deferred_solve_matches_composed_test():
+    """The deferred path and solve() produce the same iteration, to the last digit.
+
+    This is the test that matters: the decomposition is only safe if driving the stages by
+    hand is the same computation as letting solve() do it. Same seed, same case, one iteration
+    each way, compared on the resulting ensembles rather than on phi alone.
+    """
+    def composed():
+        wd = _case("api_defer_cmp_a", noptmax=1, num_reals=8, ies_subset_size=4)
+        with Ies.from_pst("pest.pst", workdir=wd) as ies:
+            ies.initialize()
+            ies.solve()
+            out = (ies.par_df().copy(), ies.obs_df().copy(), ies.phi)
+            ies.finalize()
+        return out
+
+    def deferred():
+        wd = _case("api_defer_cmp_b", noptmax=1, num_reals=8, ies_subset_size=4)
+        with Ies.from_pst("pest.pst", workdir=wd) as ies:
+            ies.initialize()
+            ies.solve(defer_runs=True)
+            ies.queue_runs(); ies.run(); ies.process_runs()
+            step = ies.finish_solve(defer_runs=True)
+            while step.pending_runs:
+                ies.queue_runs(); ies.run(); ies.process_runs()
+                step = ies.finish_solve(defer_runs=True)
+            out = (ies.par_df().copy(), ies.obs_df().copy(), ies.phi)
+            ies.finalize()
+        return out
+
+    par_a, obs_a, phi_a = composed()
+    par_b, obs_b, phi_b = deferred()
+    assert par_a.shape == par_b.shape, (par_a.shape, par_b.shape)
+    assert np.allclose(par_a.values, par_b.values), \
+        "deferred solve produced a different parameter ensemble than solve()"
+    assert np.allclose(obs_a.values, obs_b.values), \
+        "deferred solve produced a different observation ensemble than solve()"
+    assert phi_a == phi_b, (phi_a, phi_b)
+
+
+def api_deferred_solve_edit_reaches_the_runs_test():
+    """A write through a candidate view is what gets run - otherwise inspection is all it is."""
+    wd = _case("api_defer_edit", noptmax=1, num_reals=6, ies_subset_size=6)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        ies.solve(defer_runs=True)
+        cand = ies.candidates()[0]
+        before = cand.par_df()
+        with cand.par_view() as v:
+            v[:, 0] = v[:, 0] * 0.5
+        after = cand.par_df()
+        assert not np.allclose(before.values, after.values), \
+            "the write did not land in the candidate ensemble"
+        # and it survives to the queue: the run manager takes what is in the ensemble now
+        ies.queue_runs()
+        ies.run()
+        ies.process_runs()
+        step = ies.finish_solve()
+        assert step.pending_runs == 0
+        ies.finalize()
+
+
+def api_deferred_solve_subset_override_test():
+    """Naming realizations replaces the algorithm's subset, and the rest become the remainder."""
+    wd = _case("api_defer_subset", noptmax=1, num_reals=8, ies_subset_size=4)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        n_default = ies.solve(defer_runs=True)
+        cands = len(ies.candidates())
+        reals = list(ies.par_df().index)[:2]
+        n = ies.queue_runs(reals=reals)
+        assert n == cands * 2, \
+            "naming 2 realizations should queue 2 per candidate, got {0}".format(n)
+        ies.run(); ies.process_runs()
+        step = ies.finish_solve(defer_runs=True)
+        # 8 realizations, 2 named -> 6 left over
+        assert step.pending_runs == 6, \
+            "the unnamed realizations should become the remainder: {0}".format(
+                step.pending_runs)
+        assert n_default > n, "the default subset was larger, so it should have implied more runs"
+        ies.queue_runs(); ies.run(); ies.process_runs()
+        assert ies.finish_solve(defer_runs=True).pending_runs == 0
+        ies.finalize()
+
+        # a name that is not in the ensemble is refused rather than silently skipped
+        ies2 = Ies.from_pst("pest.pst", workdir=wd)
+        ies2.initialize()
+        ies2.solve(defer_runs=True)
+        try:
+            ies2.queue_runs(reals=["not_a_realization"])
+        except PestppError as e:
+            assert "no such realization" in str(e), str(e)
+        else:
+            raise AssertionError("an unknown realization name should raise")
+        ies2.close()
+
+
+def api_deferred_solve_mou_test():
+    """mou has the same shape with one candidate population and never a second batch."""
+    # noptmax=2 because the test runs a second generation below: mou past its noptmax throws
+    # from deep in the archive bookkeeping, on the composed path just the same
+    d = _mou_case("api_defer_mou", noptmax=2, pop=10)
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        n = mou.solve(defer_runs=True)
+        cands = mou.candidates()
+        assert len(cands) == 1, "mou generates one candidate population: {0}".format(len(cands))
+        assert n == cands[0].par_df().shape[0], (n, cands[0].par_df().shape)
+        mou.queue_runs()
+        mou.run()
+        mou.process_runs()
+        step = mou.finish_solve(defer_runs=True)
+        assert step.pending_runs == 0, "mou never needs a second batch"
+        # the generation counter has to advance, or every generation overwrites the same files
+        assert step.iter == 1, step.iter
+        assert mou.solve().iter == 2, "the composed path should carry on from the deferred one"
+        mou.finalize()
+
+
+def api_deferred_solve_refused_where_it_does_not_fit_test():
+    """da and sqp say why they cannot defer, rather than approximating the shape.
+
+    Both are structural: da's one advance() is a whole noptmax loop over a cycle, and sqp's
+    line search proposes, runs and judges a step and may try again, so one iteration issues
+    several run batches. Neither is one generate -> run -> evaluate.
+    """
+    d = _mou_case("api_defer_sqp", noptmax=1)
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    for k in [k for k in pst.pestpp_options if k.startswith("mou_")]:
+        pst.pestpp_options.pop(k)
+    pst.pestpp_options["sqp_num_reals"] = 8
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+        sqp.initialize()
+        try:
+            sqp.solve(defer_runs=True)
+        except PestppError as e:
+            assert "sqp cannot defer" in str(e), str(e)
+            assert "several run batches" in str(e), str(e)
+        else:
+            raise AssertionError("sqp should refuse a deferred solve")
+        sqp.finalize()
+
+
+def api_deferred_solve_state_guards_test():
+    """The sequence is enforced, because every way of getting it wrong is silent otherwise."""
+    wd = _case("api_defer_guards", noptmax=2, num_reals=6, ies_subset_size=3)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+
+        # finishing before starting
+        try:
+            ies.finish_solve()
+        except PestppError as e:
+            assert "no deferred solve is open" in str(e), str(e)
+        else:
+            raise AssertionError("finish_solve before solve_prepare should raise")
+
+        ies.solve(defer_runs=True)
+        # a second solve on top of an open one
+        try:
+            ies.solve(defer_runs=True)
+        except PestppError as e:
+            assert "already open" in str(e), str(e)
+        else:
+            raise AssertionError("a second deferred solve should raise")
+        # the composed path must not run underneath an open deferred solve either
+        try:
+            ies.solve()
+        except PestppError as e:
+            assert "deferred solve is open" in str(e), str(e)
+        else:
+            raise AssertionError("solve() during a deferred solve should raise")
+        # finishing before the runs have been harvested
+        ies.queue_runs()
+        try:
+            ies.finish_solve()
+        except PestppError as e:
+            assert "not been harvested" in str(e), str(e)
+        else:
+            raise AssertionError("finish_solve with runs in flight should raise")
+        ies.run(); ies.process_runs()
+        step = ies.finish_solve()
+        assert step.pending_runs == 0, "defer_runs=False should complete in one call"
+        ies.finalize()
+
+
+def api_mou_runs_past_noptmax_test():
+    """A caller driving its own loop can run more generations than noptmax.
+
+    The population schedule is built once at initialize() for generations 0..noptmax, and
+    both readers of it were wrong past the end: generate_population() used at() and threw a
+    bare "map::at: key not found" - nothing in the message connects that to a population
+    schedule - while update_archive_spea() used operator[], which inserted a size of ZERO and
+    carried on with an empty archive. noptmax is a bound on the SHIPPED loop, not on what the
+    API can do, so the schedule holds its last value instead.
+    """
+    d = _mou_case("api_mou_past_noptmax", noptmax=1, pop=10)
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        for expect in (1, 2, 3):
+            step = mou.solve()
+            assert step.iter == expect, (step.iter, expect)
+            assert mou.n_reals > 0, \
+                "generation {0} produced an empty population".format(step.iter)
+        mou.finalize()
+
+
+def api_deferred_solve_needs_upgrades_in_memory_test():
+    """Deferring is refused when the candidates were spilled to disk, and says why.
+
+    With 'ies_upgrades_in_memory' false the candidate ensembles are files, so there is nothing
+    in memory to inspect or edit - the whole reason to defer. Refusing beats handing back
+    views onto ensembles that were emptied on the way to disk.
+    """
+    wd = _case("api_defer_spill", noptmax=1, num_reals=6, ies_upgrades_in_memory=False)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        try:
+            ies.solve(defer_runs=True)
+        except PestppError as e:
+            assert "ies_upgrades_in_memory" in str(e), str(e)
+        else:
+            raise AssertionError("a deferred solve should be refused on the spill path")
+        # and the composed path still works, on the same session, right after the refusal
+        step = ies.solve()
+        assert np.isfinite(step.phi_mean), "the refusal left the session unusable"
+        ies.finalize()
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -1027,4 +1320,13 @@ if __name__ == "__main__":
     api_reinflate_grows_after_activation_test()
     api_option_values_are_native_types_test()
     api_option_sequence_reaches_the_algorithm_test()
+    api_deferred_solve_drives_the_runs_test()
+    api_deferred_solve_matches_composed_test()
+    api_deferred_solve_edit_reaches_the_runs_test()
+    api_deferred_solve_subset_override_test()
+    api_deferred_solve_mou_test()
+    api_deferred_solve_refused_where_it_does_not_fit_test()
+    api_deferred_solve_state_guards_test()
+    api_mou_runs_past_noptmax_test()
+    api_deferred_solve_needs_upgrades_in_memory_test()
     print("all helper tests passed")

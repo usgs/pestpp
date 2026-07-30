@@ -203,6 +203,19 @@ public:
 
 	// One generation, as separately callable phases: generate -> run -> evaluate -> report.
 	// iterate_to_solution() is the in-tree composition of exactly these calls.
+	/// Advance the generation counter, which solve_generation() does before the phases run.
+	/// A caller driving the phases has to do it too - and BEFORE generating, because the
+	/// number is not cosmetic: it names the .N. population files and is read by the reporting
+	/// and chance machinery.
+	void advance_generation() { iter++; }
+	/// The scheduled population size for a generation, holding the last scheduled value for
+	/// anything past the end of the schedule. See the definition for why that matters.
+	int get_scheduled_population_size(int generation);
+	// queue -> (drive the run manager) -> harvest. run_population() is the in-tree
+	// composition; the halves let a caller run its own run_slice() loop in between, which is
+	// what a deferred generation does.
+	map<string, int> queue_population(ParameterEnsemble& _dp, bool allow_chance);
+	vector<int> harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids);
 	void generate_generation(GenerationContext& ctx);
 	void run_generation(GenerationContext& ctx);
 	void evaluate_generation(GenerationContext& ctx);
@@ -301,10 +314,6 @@ private:
 
 
 	void sanity_checks();
-	// queue -> (drive the run manager) -> harvest. run_population() is the in-tree
-	// composition; the halves let a caller run its own run_slice() loop in between.
-	map<string, int> queue_population(ParameterEnsemble& _dp, bool allow_chance);
-	vector<int> harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids);
 	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance);
 
 	void queue_chance_runs(ParameterEnsemble& _dp);

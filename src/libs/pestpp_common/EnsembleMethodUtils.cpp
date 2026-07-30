@@ -7362,23 +7362,30 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
     }
 }
 
-UpgradeStatus EnsembleMethod::solve_glm(int cycle)
+void EnsembleMethod::get_glm_factors(vector<double>& inflation_factors, vector<double>& backtrack_factors)
 {
 	// read the lambda multipliers live from the options (was a member cached at initialize),
 	// so a runtime change to ies_lambda_mults takes effect on the next solve
-	vector<double> lambdas = pest_scenario.get_pestpp_options().get_ies_lam_mults();
-	if (lambdas.size() == 0)
-		lambdas.push_back(1.0);
+	inflation_factors = pest_scenario.get_pestpp_options().get_ies_lam_mults();
+	if (inflation_factors.size() == 0)
+		inflation_factors.push_back(1.0);
 	message(1, "current lambda: ", last_best_lam);
-	for (auto& m : lambdas)
+	for (auto& m : inflation_factors)
 		m *= last_best_lam;
 
-	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+	backtrack_factors = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+}
+
+UpgradeStatus EnsembleMethod::solve_glm(int cycle)
+{
+	vector<double> lambdas, scale_facs;
+	get_glm_factors(lambdas, scale_facs);
 	return solve(false, lambdas, scale_facs,cycle);
 
 }
 
-UpgradeStatus EnsembleMethod::solve_mda(bool last_iter,int cycle)
+void EnsembleMethod::get_mda_factors(bool last_iter, vector<double>& inflation_factors,
+	vector<double>& backtrack_factors)
 {
 
 	//this function should cover the case where noptmax = 1 (vanilla) also...
@@ -7462,10 +7469,15 @@ UpgradeStatus EnsembleMethod::solve_mda(bool last_iter,int cycle)
 
 	}
 	
-	mda_facs = vector<double>{ mda_lambdas[iter-1] };
-	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
-	return solve(true, mda_facs, scale_facs,cycle);
-	
+	inflation_factors = vector<double>{ mda_lambdas[iter-1] };
+	backtrack_factors = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+}
+
+UpgradeStatus EnsembleMethod::solve_mda(bool last_iter,int cycle)
+{
+	vector<double> mda_facs, scale_facs;
+	get_mda_factors(last_iter, mda_facs, scale_facs);
+	return solve(true, mda_facs, scale_facs, cycle);
 }
 
 /**
@@ -7790,32 +7802,82 @@ UpgradeStatus EnsembleMethod::check_noniterative_shortcut(UpgradeContext& ctx)
  * This is the first of the two run-manager round trips in an upgrade solve; the second is in
  * complete_subset_runs(). An API caller driving the run manager itself replaces this stage.
  */
-void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
-	const vector<double>& inflation_factors, const vector<double>& backtrack_factors)
+vector<map<string, int>> EnsembleMethod::queue_upgrade_ensembles(UpgradeContext& ctx, int cycle)
 {
 	stringstream ss;
 	message(0, "running upgrade ensembles");
 	ss.str("");
-	ss << inflation_factors.size() << " inflation factors (lambdas) times " << backtrack_factors.size() << " backtracking factors" << endl;
+	ss << ctx.inflation_factors.size() << " inflation factors (lambdas) times " << ctx.backtrack_factors.size() << " backtracking factors" << endl;
 	ss << "   times " << ctx.subset_names.size() << " realizations";
-	ss << " yields " << inflation_factors.size() * backtrack_factors.size() * ctx.subset_names.size() << " model runs for upgrade testing";
+	ss << " yields " << ctx.inflation_factors.size() * ctx.backtrack_factors.size() * ctx.subset_names.size() << " model runs for upgrade testing";
 	message(1,ss.str());
 
 	//if we are saving upgrades to disk
 	// resolve against the CURRENT membership of each ensemble
-	vector<int> pe_subset = resolve_subset_idxs(ctx.subset_names, pe.get_real_names());
-	vector<int> oe_subset = resolve_subset_idxs(ctx.subset_names, oe.get_real_names());
+	ctx.pe_subset_idxs = resolve_subset_idxs(ctx.subset_names, pe.get_real_names());
+	ctx.oe_subset_idxs = resolve_subset_idxs(ctx.subset_names, oe.get_real_names());
 	if (ctx.pe_filenames.size() > 0)
 	{
 		// on the spill path pe_lams have already been reduced to the subset rows, so the
 		// parameter side is simply 0..n-1
-		vector<int> temp;
+		ctx.pe_subset_idxs.clear();
 		for (int i = 0; i < ctx.subset_names.size(); i++)
-			temp.push_back(i);
-		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, temp, oe_subset);
+			ctx.pe_subset_idxs.push_back(i);
 	}
-	else
- 		ctx.oe_lams = run_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle, pe_subset, oe_subset);
+	return queue_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, cycle,
+		ctx.pe_subset_idxs, ctx.oe_subset_idxs);
+}
+
+map<string, int> EnsembleMethod::queue_remaining_runs(UpgradeContext& ctx, int cycle)
+{
+	stringstream ss;
+	ss << " iteration:" << iter;
+	return queue_ensemble_util(performance_log, file_manager.rec_ofstream(), ctx.remaining_pe,
+		run_mgr_ptr, pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(),
+		vector<int>(), cycle, ss.str());
+}
+
+void EnsembleMethod::harvest_remaining_runs(UpgradeContext& ctx, map<string, int>& run_ids)
+{
+	ctx.failed_remaining = harvest_ensemble_util(performance_log, file_manager.rec_ofstream(),
+		ctx.remaining_pe, ctx.remaining_oe, run_mgr_ptr,
+		pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(),
+		vector<int>(), run_ids);
+}
+
+void EnsembleMethod::harvest_upgrade_ensembles(UpgradeContext& ctx, vector<map<string, int>>& run_ids)
+{
+	ctx.oe_lams = harvest_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, run_ids,
+		ctx.pe_subset_idxs, ctx.oe_subset_idxs);
+}
+
+void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
+	const vector<double>& inflation_factors, const vector<double>& backtrack_factors)
+{
+	// the factors are read from ctx by the queue half; solve() fills them in for the in-tree
+	// path, and solve_prepare() for a caller driving the stages
+	if (ctx.inflation_factors.size() == 0)
+	{
+		ctx.inflation_factors = inflation_factors;
+		ctx.backtrack_factors = backtrack_factors;
+	}
+	vector<map<string, int>> run_ids = queue_upgrade_ensembles(ctx, cycle);
+	performance_log->log_event("making runs");
+	try
+	{
+		drive_run_batch(run_mgr_ptr);
+	}
+	catch (const exception& e)
+	{
+		stringstream ss;
+		ss << "error running ensembles: " << e.what();
+		throw_em_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_em_error(string("error running ensembles"));
+	}
+	harvest_upgrade_ensembles(ctx, run_ids);
 }
 
 /**
@@ -7925,6 +7987,16 @@ UpgradeStatus EnsembleMethod::evaluate_upgrades(UpgradeContext& ctx)
  * was used this just re-scores the winner.
  */
 UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycle, bool use_mda)
+{
+	UpgradeStatus status = prepare_subset_completion(ctx, cycle, use_mda);
+	if (status != UpgradeStatus::CONTINUE)
+		return status;
+	if (ctx.needs_remaining_runs)
+		ctx.failed_remaining = run_ensemble(ctx.remaining_pe, ctx.remaining_oe, vector<int>(), cycle);
+	return finish_subset_completion(ctx, cycle, use_mda);
+}
+
+UpgradeStatus EnsembleMethod::prepare_subset_completion(UpgradeContext& ctx, int cycle, bool use_mda)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
@@ -8066,8 +8138,50 @@ UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycl
         //save these names for later
         org_pe_idxs = remaining_pe_lam.get_real_names();
         org_oe_idxs = remaining_oe_lam.get_real_names();
-        ///run
-        vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam, vector<int>(), cycle);
+
+        // hand the runs over. Everything above is setup and everything below is assembly,
+        // which is why this is the seam: the caller can own the batch without owning any of
+        // the bookkeeping either side of it.
+        ctx.remaining_pe = remaining_pe_lam;
+        ctx.remaining_oe = remaining_oe_lam;
+        ctx.org_pe_names = org_pe_idxs;
+        ctx.org_oe_names = org_oe_idxs;
+        ctx.pe_keep_names = pe_keep_names;
+        ctx.oe_keep_names = oe_keep_names;
+        ctx.needs_remaining_runs = true;
+	}
+	else
+	{
+		ctx.needs_remaining_runs = false;
+	}
+	return UpgradeStatus::CONTINUE;
+}
+
+UpgradeStatus EnsembleMethod::finish_subset_completion(UpgradeContext& ctx, int cycle, bool use_mda)
+{
+	stringstream ss;
+    double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
+
+    // the no-subset case: nothing was run, so there is nothing to assemble
+    if (!ctx.needs_remaining_runs)
+    {
+        ph.update(ctx.oe_lam_best, ctx.pe_lams[ctx.best_idx], weights);
+        ctx.best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+        ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+        return UpgradeStatus::CONTINUE;
+    }
+
+    // aliases, so the assembly below reads the way it did when these were locals
+    ParameterEnsemble& remaining_pe_lam = ctx.remaining_pe;
+    ObservationEnsemble& remaining_oe_lam = ctx.remaining_oe;
+    vector<string>& org_pe_idxs = ctx.org_pe_names;
+    vector<string>& org_oe_idxs = ctx.org_oe_names;
+    vector<string>& pe_keep_names = ctx.pe_keep_names;
+    vector<int> fails = ctx.failed_remaining;
+
+    {
+        // checked here rather than beside the run: a stop file that appeared while the
+        // remaining realizations were in flight means the same thing whoever ran them
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2)) {
             message(1, "'pest.stp' found, quitting");
@@ -8149,12 +8263,6 @@ UpgradeStatus EnsembleMethod::complete_subset_runs(UpgradeContext& ctx, int cycl
 		ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ ctx.lam_vals[ctx.best_idx],ctx.scale_vals[ctx.best_idx] }));
 		ph.report(true, false);
-	}
-	else
-	{
-		ph.update(ctx.oe_lam_best, ctx.pe_lams[ctx.best_idx], weights);
-        ctx.best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-		ctx.best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	}
 	return UpgradeStatus::CONTINUE;
 }
@@ -8307,6 +8415,24 @@ UpgradeStatus EnsembleMethod::accept_or_reject(UpgradeContext& ctx, bool use_mda
  * Returns the UpgradeStatus rather than a bool: REJECTED_RETRY means "no upgrade taken, try
  * again with the new lambda", which a bool could never distinguish from an error.
  */
+UpgradeStatus EnsembleMethod::solve_prepare(UpgradeContext& ctx, bool use_mda, bool last_iter)
+{
+	// the factors live in the context from here on, so the run and evaluate halves cannot
+	// drift onto a different set than the candidates were generated with - and so a caller
+	// driving the stages gets exactly what solve_glm()/solve_mda() would have computed
+	ctx.use_mda = use_mda;
+	if (use_mda)
+		get_mda_factors(last_iter, ctx.inflation_factors, ctx.backtrack_factors);
+	else
+		get_glm_factors(ctx.inflation_factors, ctx.backtrack_factors);
+
+	UpgradeStatus status = prepare_upgrades(ctx, use_mda, ctx.inflation_factors, ctx.backtrack_factors);
+	if (status != UpgradeStatus::CONTINUE)
+		return status;
+	generate_upgrades(ctx, use_mda, ctx.inflation_factors, ctx.backtrack_factors);
+	return check_noniterative_shortcut(ctx);
+}
+
 UpgradeStatus EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
 {
 	UpgradeContext ctx(&pest_scenario);

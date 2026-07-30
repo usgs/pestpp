@@ -456,6 +456,12 @@ struct UpgradeContext
 	UpgradeContext(const UpgradeContext&) = delete;
 	UpgradeContext& operator=(const UpgradeContext&) = delete;
 
+	// -- the factors this solve is running with, filled by solve_prepare(). Held here so the
+	//    run and evaluate halves cannot drift onto a different set than the candidates were
+	//    generated with, which is a real hazard once a caller can change options mid-solve.
+	bool use_mda = false;
+	vector<double> inflation_factors, backtrack_factors;
+
 	// -- filled by prepare_upgrades()
 	int local_subset_size = 0;
 	/// Realizations chosen for subset testing, held by NAME rather than by position.
@@ -471,6 +477,10 @@ struct UpgradeContext
 	vector<double> lam_vals, scale_vals;
 	vector<string> pe_filenames;   ///< non-empty only when ies_upgrades_in_memory is false
 
+	// -- filled by queue_upgrade_ensembles(), reused by harvest_upgrade_ensembles() so both
+	//    halves address the same rows even if membership moved in between
+	vector<int> pe_subset_idxs, oe_subset_idxs;
+
 	// -- filled by run_upgrade_ensembles()
 	vector<ObservationEnsemble> oe_lams;
 
@@ -478,6 +488,24 @@ struct UpgradeContext
 	ObservationEnsemble oe_lam_best;
 	int best_idx = -1;
 	double best_mean = 1.0e+300, best_std = 1.0e+300;
+
+	// -- filled by prepare_subset_completion(), consumed by finish_subset_completion()
+	//
+	// The remaining-realization runs. Subset testing evaluates a few realizations against
+	// every lambda; once a winner is picked the REST of the ensemble still has to be run at
+	// that lambda. That run sat in the middle of complete_subset_runs() with a dozen locals
+	// either side of it, which is precisely what stopped a caller from owning it.
+	/// false when subset testing was not in play and there is nothing left to run
+	bool needs_remaining_runs = false;
+	ParameterEnsemble remaining_pe;
+	ObservationEnsemble remaining_oe;
+	/// the realization names remaining_pe/remaining_oe went in with, so failures can be
+	/// identified positionally after the fact the way the in-tree path always has
+	vector<string> org_pe_names, org_oe_names;
+	/// the non-subset members, i.e. who the remaining runs are for
+	vector<string> pe_keep_names, oe_keep_names;
+	/// positions within remaining_pe that failed; filled by whoever performed the runs
+	vector<int> failed_remaining;
 
 	/**
 	 * Who decides when the losing candidates die.
@@ -574,6 +602,16 @@ public:
 	// is written against nothing but these, so if the built-in loop compiles, an API caller
 	// can write any loop. solve()/solve_glm()/solve_mda() are the in-tree compositions of the
 	// stages below and double as the worked example of how to sequence them.
+	/// The inflation (lambda / mda) and backtrack (scale) factors for the current iteration -
+	/// the prologues of solve_glm()/solve_mda(), so a caller driving the stages gets the same
+	/// numbers. get_mda_factors() advances the mda schedule and must be called once per
+	/// iteration, which is why solve_prepare() is the only thing that should call it.
+	void get_glm_factors(vector<double>& inflation_factors, vector<double>& backtrack_factors);
+	void get_mda_factors(bool last_iter, vector<double>& inflation_factors, vector<double>& backtrack_factors);
+	/// solve() up to but NOT including the upgrade runs: factors, prepare, generate, shortcut
+	/// check. Leaves the candidates in ctx.pe_lams for a caller to inspect or replace before
+	/// they are run. CONTINUE means candidates are waiting; anything else ended the iteration.
+	UpgradeStatus solve_prepare(UpgradeContext& ctx, bool use_mda, bool last_iter = false);
 	UpgradeStatus solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
 
 	UpgradeStatus solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
@@ -588,10 +626,25 @@ public:
 	void generate_upgrades(UpgradeContext& ctx, bool use_mda,
 		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
 	UpgradeStatus check_noniterative_shortcut(UpgradeContext& ctx);
+	/// The two halves of run_upgrade_ensembles(), for a caller that wants to own the candidate
+	/// batch. They live here rather than in the caller because resolving the subset against
+	/// current membership - and the spill path's different indexing - are the tool's business.
+	vector<map<string, int>> queue_upgrade_ensembles(UpgradeContext& ctx, int cycle);
+	void harvest_upgrade_ensembles(UpgradeContext& ctx, vector<map<string, int>>& run_ids);
+	/// Likewise for the remaining-realization batch prepare_subset_completion() sets up. Here
+	/// rather than in the caller because the run manager and performance log are the tool's.
+	map<string, int> queue_remaining_runs(UpgradeContext& ctx, int cycle);
+	void harvest_remaining_runs(UpgradeContext& ctx, map<string, int>& run_ids);
 	void run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
 		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
 	UpgradeStatus evaluate_upgrades(UpgradeContext& ctx);
 	UpgradeStatus complete_subset_runs(UpgradeContext& ctx, int cycle, bool use_mda);
+	/// The two halves of complete_subset_runs(), either side of the remaining-realization
+	/// runs. prepare_ leaves ctx.remaining_pe/remaining_oe ready and ctx.needs_remaining_runs
+	/// set; whoever runs them records failures in ctx.failed_remaining; finish_ assembles the
+	/// result. complete_subset_runs() is the in-tree composition and runs them itself.
+	UpgradeStatus prepare_subset_completion(UpgradeContext& ctx, int cycle, bool use_mda);
+	UpgradeStatus finish_subset_completion(UpgradeContext& ctx, int cycle, bool use_mda);
 	UpgradeStatus accept_or_reject(UpgradeContext& ctx, bool use_mda, int cycle);
 
 	// Candidate lifetime. Called inline by the stages above unless the context asks to defer

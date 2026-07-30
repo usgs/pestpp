@@ -2616,7 +2616,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
  */
 void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 {
-    int current_archive_size = population_schedule[iter] * 2;
+    int current_archive_size = get_scheduled_population_size(iter) * 2;
 	message(2, "updating archive");
 	stringstream ss;
 	if (op_archive.shape().first != dp_archive.shape().first)
@@ -4090,7 +4090,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 ParameterEnsemble MOEA::generate_population()
 {
 	//int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
-    int total_new_members = population_schedule.at(iter);
+    int total_new_members = get_scheduled_population_size(iter);
 	//add new members for any missing
 	//total_new_members += (total_new_members - dp.shape().first);
 	// one live read per generation - the generator mix can change between generations
@@ -4435,7 +4435,7 @@ void MOEA::solve_generation()
 	// loop gets the same numbering the built-in one does - the generation number is not
 	// cosmetic, it names the .N. population files and is read by the reporting and chance
 	// machinery. initialize() leaves iter at 0, so the first pass through here is generation 1.
-	iter++;
+	advance_generation();
 	GenerationContext ctx(&pest_scenario, &rand_gen);
 	generate_generation(ctx);
 	run_generation(ctx);
@@ -4490,6 +4490,35 @@ bool MOEA::should_use_multigen() {
 /**
  * @brief Initialize population schedule.
  */
+int MOEA::get_scheduled_population_size(int generation)
+{
+    // The schedule is built once at initialize() for generations 0..noptmax. Any generation
+    // past that is off the end of it - which an API caller driving its own loop reaches
+    // routinely, and the built-in loop reaches whenever noptmax is raised mid-run. Both ways
+    // of reading it straight were wrong: generate_population() used at() and threw a bare
+    // "map::at: key not found" with nothing to connect it to the population schedule, and
+    // update_archive_spea() used operator[], which silently INSERTED a size of zero and
+    // carried on with an empty archive - the quieter and worse of the two.
+    //
+    // Holding the last scheduled size is the same treatment the mda lambda schedule already
+    // gets when noptmax outgrows it.
+    if (population_schedule.size() == 0)
+        return pest_scenario.get_pestpp_options().get_mou_population_size();
+    map<int, int>::const_iterator it = population_schedule.find(generation);
+    if (it != population_schedule.end())
+        return it->second;
+    map<int, int>::const_iterator ub = population_schedule.upper_bound(generation);
+    if (ub == population_schedule.begin())
+        return ub->second;                  // before the first entry; take the first
+    --ub;                                   // the largest scheduled generation at or below
+    stringstream ss;
+    ss << "generation " << generation << " is past the end of the population schedule (built"
+       << " for 0.." << population_schedule.rbegin()->first << "); holding population size "
+       << ub->second;
+    message(2, ss.str());
+    return ub->second;
+}
+
 void MOEA::initialize_population_schedule()
 {
     stringstream ss;
