@@ -59,6 +59,8 @@ from pestpp_lib import (  # noqa: E402
     WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT,
 )
 
+from pestpp_progress import Progress, auto as _progress_auto  # noqa: E402
+
 # Bound to _Tool so from_pst() reports the SUBCLASS it was called on: Ies.from_pst() infers
 # as Ies, Mou.from_pst() as Mou. Without it a classmethod returning cls() is opaque to jedi
 # and pylance, which is what makes `Ies.from_pst("pest.pst").<TAB>` come back empty in a
@@ -67,7 +69,7 @@ _ToolT = TypeVar("_ToolT", bound="_Tool")
 
 __all__ = [
     "Ies", "Da", "Mou", "Sqp", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
-    "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
+    "Progress", "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
     "PHI_MEAS", "PHI_COMPOSITE", "PHI_REGUL", "PHI_ACTUAL", "PHI_NOISE",
 ]
 
@@ -555,7 +557,7 @@ class _Tool:
         # loop bound, which is how "no iterations" turns into "iterate forever"
         return int(self._lib.get_option("NOPTMAX"))
 
-    def iterations(self, max_iter: int | None = None):
+    def iterations(self, max_iter: int | None = None, progress=False):
         """Yield an :class:`IterationStep` per iteration.
 
         Stops at ``noptmax``, or when the tool's own convergence test fires, whichever comes
@@ -570,14 +572,28 @@ class _Tool:
         endless loop.
 
         ``max_iter`` overrides noptmax, for a caller that wants a few steps and a look around.
+
+        ``progress=True`` draws a bar across the iterations, annotated with phi as it moves.
+        Each iteration is one blocking call into the library, so this advances per ITERATION,
+        not per run - use :meth:`run` with ``progress=True``, or a deferred :meth:`solve`, to
+        watch the model runs inside one.
         """
         limit = max_iter if max_iter is not None else self.noptmax
         if limit < 0:
             limit = 0
         n = 0
-        while n < limit and not self.should_terminate:
-            yield self.solve()
-            n += 1
+        with _progress_auto(progress) as bar:
+            bar.start("iterating", total=limit)
+            while n < limit and not self.should_terminate:
+                step = self.solve()
+                n += 1
+                fields = {"iter": step.iter}
+                if step.phi_mean == step.phi_mean:      # not NaN
+                    fields["phi"] = step.phi_mean
+                if step.retried:
+                    fields["retry"] = "yes"
+                bar.update(done=n, **fields)
+                yield step
 
     def finalize(self) -> None:
         with self._q():
@@ -1127,21 +1143,44 @@ class _Tool:
                 self._queued = self._lib.queue_runs()
         return self._queued
 
-    def run(self, slice_seconds: float = 0.05, callback=None) -> None:
+    def run(self, slice_seconds: float = 0.05, callback=None, progress=False) -> None:
         """Drive the queued runs to completion.
 
-        ``callback`` is called with this tool after each slice, which is where progress
-        reporting or a cancel decision goes. PANTHER only - serial and external finish the
-        whole batch in the first slice.
+        ``callback`` is called with this tool after each slice, which is where a cancel
+        decision goes. PANTHER only - serial and external finish the whole batch in the first
+        slice, so a callback fires at most once there.
+
+        ``progress=True`` draws a live bar of completed/failed runs, in a terminal or a
+        notebook. Pass a :class:`~pestpp_progress.Progress` instead to render it yourself.
+        The counts come from the run manager, so they are only as live as it is: PANTHER
+        reports them as workers land, the serial manager reports the whole batch at once.
         """
+        bar = _progress_auto(progress)
         with self._q():
             self._lib.begin_batch()
             try:
+                bar.start("running", total=self._queued or None)
                 while not self._lib.run_slice(slice_seconds):
+                    self._update_run_progress(bar)
                     if callback is not None:
                         callback(self)
             finally:
                 self._lib.end_batch()
+                self._update_run_progress(bar)
+                bar.close()
+
+    def _update_run_progress(self, bar) -> None:
+        """Feed the run manager's counters to a progress renderer, if it can supply them."""
+        try:
+            stats = self._lib.get_run_time_stats()
+        except PestppError:
+            return                      # not every run manager keeps these; a bar is not
+        fields = {}                     # worth failing a run over
+        if stats.get("failed"):
+            fields["failed"] = stats["failed"]
+        if stats.get("running"):
+            fields["running"] = stats["running"]
+        bar.update(done=stats.get("completed", 0), **fields)
 
     def process_runs(self) -> int:
         """Process the completed runs into the observation ensemble. Returns how many failed."""

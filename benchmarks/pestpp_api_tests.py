@@ -544,7 +544,7 @@ def api_notebook_runs_test():
 
     # scratch directories the notebook creates alongside itself
     for name in ("nb_ies", "nb_prior", "nb_cull", "nb_parallel", "nb_parallel_workers",
-                 "nb_defer"):
+                 "nb_defer", "nb_progress"):
         shutil.rmtree(os.path.join(nb_dir, name), ignore_errors=True)
 
 
@@ -1288,6 +1288,142 @@ def api_deferred_solve_needs_upgrades_in_memory_test():
         ies.finalize()
 
 
+def api_progress_renders_in_a_terminal_test():
+    """A tty gets one rewriting line; a redirected stream gets whole readable lines.
+
+    The distinction is the point. Carriage returns in a log file collapse the whole run into
+    one unreadable line, and `quiet=True` sends output to a log by default - so the same
+    renderer has to behave differently depending on where it is pointed.
+    """
+    import io
+    sys.path.insert(0, os.path.join(_REPO, "python"))
+    import pestpp_progress as pp
+
+    class _Tty(io.StringIO):
+        def isatty(self):
+            return True
+
+    tty = _Tty()
+    bar = pp.TextProgress(stream=tty)
+    bar.min_interval = 0
+    bar.start("running", total=8)
+    for i in range(1, 9):
+        bar.update(done=i, failed=1 if i > 5 else 0)
+    bar.close()
+    out = tty.getvalue()
+    assert "\r" in out, "a tty should be redrawn in place"
+    assert out.endswith("\n"), "the final frame should end the line rather than leaving it open"
+    final = out.split("\r")[-1]
+    assert "8/8" in final and "100%" in final, final
+    assert "failed=1" in final, final
+
+    plain = io.StringIO()            # isatty() is False
+    bar = pp.TextProgress(stream=plain)
+    bar.min_interval = 0
+    bar.start("running", total=8)
+    for i in range(1, 9):
+        bar.update(done=i)
+    bar.note("lambda rejected, retrying")
+    bar.close()
+    text = plain.getvalue()
+    assert "\r" not in text, "a redirected stream must not be given carriage returns"
+    assert "lambda rejected, retrying" in text
+    lines = text.splitlines()
+    assert 3 <= len(lines) <= 12, "expected sparse whole lines, got {0}".format(len(lines))
+
+
+def api_progress_is_inert_when_disabled_test():
+    """progress=False costs nothing and every hook is still safe to call."""
+    sys.path.insert(0, os.path.join(_REPO, "python"))
+    import pestpp_progress as pp
+
+    bar = pp.auto(False)
+    assert type(bar) is pp.Progress, type(bar)
+    # the no-op has to accept the same calls in any order, or callers end up branching
+    bar.update(done=1)
+    bar.start("x", total=2)
+    bar.note("y")
+    bar.close()
+    bar.close()
+
+    os.environ["PESTPP_NO_PROGRESS"] = "1"
+    try:
+        assert type(pp.auto(True)) is pp.Progress, "PESTPP_NO_PROGRESS should switch it off"
+    finally:
+        os.environ.pop("PESTPP_NO_PROGRESS")
+
+
+def api_progress_renders_in_a_notebook_test():
+    """In a real kernel it picks the notebook renderer and updates ONE output in place.
+
+    Executed in a kernel rather than mocked, because the thing being tested is a property of
+    the display protocol: many updates must collapse to a single output area. A mock would
+    assert that update_display was called and prove nothing about what the notebook shows.
+    """
+    import nbformat
+    from nbclient import NotebookClient
+
+    src = (
+        "import sys\n"
+        "sys.path.insert(0, {0!r})\n"
+        "import pestpp_progress as pp\n"
+        "print('in_notebook:', pp.in_notebook())\n"
+        "bar = pp.auto(True)\n"
+        "print('renderer:', type(bar).__name__)\n"
+        "bar.min_interval = 0\n"
+        "bar.start('running', total=6)\n"
+        "for i in range(1, 7):\n"
+        "    bar.update(done=i, phi=100.0 / i)\n"
+        "bar.close()\n"
+    ).format(os.path.join(_REPO, "python"))
+
+    nb = nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell(src)])
+    NotebookClient(nb, timeout=300, kernel_name="python3", allow_errors=True).execute()
+
+    outs = nb.cells[0].get("outputs", [])
+    errors = [o for o in outs if o.output_type == "error"]
+    assert not errors, "{0}: {1}".format(errors[0].ename, errors[0].evalue)
+    stream = "".join(o.get("text", "") for o in outs if o.output_type == "stream")
+    assert "in_notebook: True" in stream, stream
+    assert "renderer: NotebookProgress" in stream, stream
+
+    displays = [o for o in outs if o.output_type in ("display_data", "update_display_data")]
+    assert len(displays) == 1, \
+        "six updates should collapse into one output area, got {0}".format(len(displays))
+    html = displays[0].get("data", {}).get("text/html", "")
+    assert "6/6" in html and "100%" in html, html[:400]
+
+
+def api_progress_during_a_real_run_test():
+    """progress=True on a live run reports the run manager's counters and gets out of the way.
+
+    Also the check that it cannot break a run: the counters come from the run manager, and a
+    manager that does not keep them must cost a bar, not the batch.
+    """
+    import io
+    sys.path.insert(0, os.path.join(_REPO, "python"))
+    import pestpp_progress as pp
+
+    wd = _case("api_progress_run", noptmax=1, num_reals=6)
+    sink = io.StringIO()
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        n = ies.queue_runs()
+        ies.run(progress=pp.TextProgress(stream=sink))
+        failed = ies.process_runs()
+        assert failed == 0, failed
+        text = sink.getvalue()
+        assert "running" in text, text
+        assert str(n) in text, "the batch size should appear in the bar: {0}".format(text)
+
+        # and across iterations, annotated with phi
+        sink2 = io.StringIO()
+        steps = list(ies.iterations(max_iter=1, progress=pp.TextProgress(stream=sink2)))
+        assert len(steps) == 1
+        assert "phi=" in sink2.getvalue(), sink2.getvalue()
+        ies.finalize()
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -1329,4 +1465,8 @@ if __name__ == "__main__":
     api_deferred_solve_state_guards_test()
     api_mou_runs_past_noptmax_test()
     api_deferred_solve_needs_upgrades_in_memory_test()
+    api_progress_renders_in_a_terminal_test()
+    api_progress_is_inert_when_disabled_test()
+    api_progress_renders_in_a_notebook_test()
+    api_progress_during_a_real_run_test()
     print("all helper tests passed")
