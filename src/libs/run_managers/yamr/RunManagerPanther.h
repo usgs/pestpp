@@ -283,6 +283,7 @@ public:
 	 * about. Returns how many requests were actually sent.
 	 */
 	int request_partial_results(const std::vector<int>& run_ids) override;
+	bool get_partial_info(int run_id, int& n_reported, int& n_total) const override;
 private:
 	void record_timed_out(int run_id);
 	pest_utils::thread_flag terminate_idle_thread;

@@ -113,6 +113,11 @@ public:
 	 */
 	virtual int request_partial_results(const std::vector<int>& run_ids) { (void)run_ids; return 0; }
 
+	/// Partial results reported for a run in THIS batch, if any. False when none have been
+	/// reported, or on a run manager that has no workers to report them.
+	virtual bool get_partial_info(int run_id, int& n_reported, int& n_total) const
+	{ (void)run_id; (void)n_reported; (void)n_total; return false; }
+
 	/// Set once an observer has asked for STOP_BATCH; the run managers check it in their
 	/// scheduling loops. Cleared by the next set_progress_observer() or begin_batch().
 	bool progress_stop_requested = false;

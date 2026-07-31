@@ -2297,6 +2297,16 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
  *
  * @return Description.
  */
+bool RunManagerPanther::get_partial_info(int run_id, int& n_reported, int& n_total) const
+{
+	map<int, PartialInfo>::const_iterator it = partial_info_map.find(run_id);
+	if (it == partial_info_map.end())
+		return false;
+	n_reported = it->second.n_reported;
+	n_total = it->second.n_total;
+	return true;
+}
+
 int RunManagerPanther::request_partial_results(const vector<int>& run_ids)
 {
 	set<int> want(run_ids.begin(), run_ids.end());

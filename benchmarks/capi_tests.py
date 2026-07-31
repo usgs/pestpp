@@ -1193,6 +1193,8 @@ def capi_partial_results_test():
             ies.begin_batch()
             requested = 0
             running_since = None
+            saw_live_partial = False
+            partial_masks = []
             deadline = time.time() + 180
             while time.time() < deadline:
                 if ies.run_slice(0.05):
@@ -1206,6 +1208,20 @@ def capi_partial_results_test():
                 if stats["running"] > 0 and (time.time() - (running_since or 0)) > 1.0:
                     running_since = time.time()
                     requested += ies.request_partial_results()
+                # ...and look at what came back, WHILE it is still partial. After the batch
+                # every run reads FINAL, so this is the only moment the partial path exists.
+                for rid in range(ies.get_run_count()):
+                    live = ies.get_run_partial_info(rid)
+                    if not live["has_partial"]:
+                        continue
+                    saw_live_partial = True
+                    info = ies.get_run_info(rid)
+                    if info["completeness"] == 1:      # 1 == PARTIAL
+                        _p, _o, _v = ies.get_run_values(rid)
+                        # a partial run is partly valid: some real, some not. That mask is
+                        # the whole reason a caller never has to spot a sentinel by eye.
+                        if 0 < int(_v.sum()) < len(_v):
+                            partial_masks.append((int(_v.sum()), len(_v)))
             ies.end_batch()
             ies.process_runs()
             ies.initialize_finish()
@@ -1233,6 +1249,47 @@ def capi_partial_results_test():
             # 0 == PHI_MEAS
             assert np.isfinite(ies.get_phi_summary(0)["mean"]), \
                 "the batch did not complete after a partial-results request"
+
+            # ---- reading it back ------------------------------------------------------
+            # Every run finished in the end, so storage should now report them FINAL with a
+            # fully-valid mask. The partial values written mid-run were overwritten by the
+            # real ones - which is the correct outcome and worth asserting, because a partial
+            # write that SURVIVED completion would be silently wrong data.
+            n_runs = ies.get_run_count()
+            assert n_runs > 0, n_runs
+            finals = 0
+            for rid in range(n_runs):
+                info = ies.get_run_info(rid)
+                if info["completeness"] != 2:        # 2 == FINAL
+                    continue
+                finals += 1
+                pars, obs, valid = ies.get_run_values(rid)
+                assert len(obs) == info["n_obs_total"], (len(obs), info)
+                assert valid.all(), \
+                    "a completed run should have every observation marked valid: {0}".format(
+                        rid)
+                assert info["n_obs_reported"] == info["n_obs_total"], info
+                assert np.isfinite(obs).all(), "completed run has non-finite observations"
+                assert len(pars) > 0
+            assert finals > 0, "no run read back as FINAL"
+
+            # the partial path itself: seen live, and read back with a partly-valid mask
+            assert saw_live_partial, \
+                "no run ever reported live partial results, so the partial read path was " \
+                "never exercised"
+            assert partial_masks, \
+                "no run read back as PARTIAL with a partly-valid mask; partial values were " \
+                "either not stored or not distinguishable from complete ones"
+            for n_valid, n_total in partial_masks:
+                assert 0 < n_valid < n_total, (n_valid, n_total)
+
+            # a run_id that does not exist is refused, not silently empty
+            try:
+                ies.get_run_info(n_runs + 50)
+            except PestppError as e:
+                assert "no such run_id" in str(e), str(e)
+            else:
+                raise AssertionError("an out-of-range run_id should raise")
     finally:
         for p_ in procs:
             try:

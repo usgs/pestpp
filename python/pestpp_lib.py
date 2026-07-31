@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from ctypes import (
     CDLL,
+    c_ubyte,
     CFUNCTYPE,
     POINTER,
     Structure,
@@ -303,6 +304,18 @@ class PestppLib:
         lib.pestpp_run_slice.restype = c_int
         lib.pestpp_end_batch.argtypes = (c_void_p,)
         lib.pestpp_end_batch.restype = c_int
+        lib.pestpp_get_run_partial_info.argtypes = (
+            c_void_p, c_int, POINTER(c_int), POINTER(c_int), POINTER(c_int))
+        lib.pestpp_get_run_partial_info.restype = c_int
+        lib.pestpp_get_run_count.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_get_run_count.restype = c_int
+        lib.pestpp_get_run_info.argtypes = (
+            c_void_p, c_int, POINTER(c_int), POINTER(c_int), POINTER(c_int), POINTER(c_int))
+        lib.pestpp_get_run_info.restype = c_int
+        lib.pestpp_get_run_values.argtypes = (
+            c_void_p, c_int, POINTER(c_double), c_int, POINTER(c_double), c_int,
+            POINTER(c_ubyte), POINTER(c_int), POINTER(c_int))
+        lib.pestpp_get_run_values.restype = c_int
         lib.pestpp_request_partial_results.argtypes = (
             c_void_p, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_request_partial_results.restype = c_int
@@ -734,6 +747,45 @@ class PestppLib:
         self._check(self.lib.pestpp_set_run_observer(
             self.handle, self._observer_thunk, None, c_double(float(min_interval_sec))),
             "pestpp_set_run_observer")
+
+    def get_run_partial_info(self, run_id: int) -> dict:
+        """Live: what a worker has reported for this run in the CURRENT batch."""
+        has, rep, tot = c_int(), c_int(), c_int()
+        self._check(self.lib.pestpp_get_run_partial_info(
+            self.handle, c_int(run_id), byref(has), byref(rep), byref(tot)),
+            "pestpp_get_run_partial_info")
+        return {"has_partial": bool(has.value), "n_obs_reported": rep.value,
+                "n_obs_total": tot.value}
+
+    def get_run_count(self) -> int:
+        n = c_int()
+        self._check(self.lib.pestpp_get_run_count(self.handle, byref(n)),
+                    "pestpp_get_run_count")
+        return n.value
+
+    def get_run_info(self, run_id: int) -> dict:
+        """Stored: status, and how complete the VALUES are (0 none, 1 partial, 2 final)."""
+        st, comp, rep, tot = c_int(), c_int(), c_int(), c_int()
+        self._check(self.lib.pestpp_get_run_info(
+            self.handle, c_int(run_id), byref(st), byref(comp), byref(rep), byref(tot)),
+            "pestpp_get_run_info")
+        return {"status": st.value, "completeness": comp.value,
+                "n_obs_reported": rep.value, "n_obs_total": tot.value}
+
+    def get_run_values(self, run_id: int):
+        """Stored (pars, obs, obs_valid) for one run. obs_valid marks the REAL values."""
+        npar, nobs = c_int(), c_int()
+        self._check(self.lib.pestpp_get_run_values(
+            self.handle, c_int(run_id), None, 0, None, 0, None, byref(npar), byref(nobs)),
+            "pestpp_get_run_values")
+        p = (c_double * npar.value)()
+        o = (c_double * nobs.value)()
+        v = (c_ubyte * nobs.value)()
+        self._check(self.lib.pestpp_get_run_values(
+            self.handle, c_int(run_id), p, npar.value, o, nobs.value, v,
+            byref(npar), byref(nobs)), "pestpp_get_run_values")
+        return (np.ctypeslib.as_array(p).copy(), np.ctypeslib.as_array(o).copy(),
+                np.ctypeslib.as_array(v).copy().astype(bool))
 
     def request_partial_results(self, run_ids=None) -> int:
         """Ask the workers running these runs for whatever they have. Returns requests sent."""

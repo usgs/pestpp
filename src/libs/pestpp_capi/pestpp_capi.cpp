@@ -2262,6 +2262,113 @@ pestpp_status pestpp_get_candidate_info(pestpp_handle h, int idx, double* inflat
     CAPI_END()
 }
 
+pestpp_status pestpp_get_run_partial_info(pestpp_handle h, int run_id, int* has_partial,
+                                          int* n_obs_reported, int* n_obs_total)
+{
+    CAPI_BEGIN_OBSERVER_SAFE(h)
+        int n_rep = 0, n_tot = 0;
+        bool got = s->run_manager->get_partial_info(run_id, n_rep, n_tot);
+        if (has_partial != nullptr)    *has_partial = got ? 1 : 0;
+        if (n_obs_reported != nullptr) *n_obs_reported = got ? n_rep : 0;
+        if (n_obs_total != nullptr)    *n_obs_total = got ? n_tot : 0;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_run_count(pestpp_handle h, int* n)
+{
+    CAPI_BEGIN(h)
+        if (n == nullptr) bad_arg("null out-param");
+        *n = s->run_manager->get_nruns();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+namespace {
+/// Read one stored run and describe how complete it is.
+///
+/// completeness is derived from the values, not stored: a completed run is FINAL, an
+/// incomplete one holding at least one real observation is PARTIAL, and one holding none is
+/// NONE. Deriving it means it stays true after a restart, when the live bookkeeping is gone.
+int read_stored_run(PestppSession* s, int run_id, Parameters& pars, Observations& obs,
+                    int& status, int& n_reported)
+{
+    int nruns = s->run_manager->get_nruns();
+    if ((run_id < 0) || (run_id >= nruns))
+        bad_arg("no such run_id: " + std::to_string(run_id) + " (storage holds " +
+                std::to_string(nruns) + ")");
+    string info_txt;
+    double info_value = 0.0;
+    s->run_manager->get_info(run_id, status, info_txt, info_value);
+    s->run_manager->get_run(run_id, pars, obs);
+    n_reported = 0;
+    vector<string> onames = s->run_manager->get_obs_name_vec();
+    vector<double> ovals = obs.get_data_vec(onames);
+    for (size_t i = 0; i < ovals.size(); i++)
+        if (ovals[i] != Transformable::no_data)
+            n_reported++;
+    if (status == 1)
+        return PESTPP_RUN_VALUES_FINAL;
+    return (n_reported > 0) ? PESTPP_RUN_VALUES_PARTIAL : PESTPP_RUN_VALUES_NONE;
+}
+}
+
+pestpp_status pestpp_get_run_info(pestpp_handle h, int run_id, int* status, int* completeness,
+                                  int* n_obs_reported, int* n_obs_total)
+{
+    CAPI_BEGIN(h)
+        Parameters pars;
+        Observations obs;
+        int st = 0, n_rep = 0;
+        int comp = read_stored_run(s, run_id, pars, obs, st, n_rep);
+        if (status != nullptr)         *status = st;
+        if (completeness != nullptr)   *completeness = comp;
+        if (n_obs_reported != nullptr) *n_obs_reported = n_rep;
+        if (n_obs_total != nullptr)
+            *n_obs_total = (int)s->run_manager->get_obs_name_vec().size();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_run_values(pestpp_handle h, int run_id, double* pars_out, int npars,
+                                    double* obs_out, int nobs, unsigned char* obs_valid,
+                                    int* npars_out, int* nobs_out)
+{
+    CAPI_BEGIN(h)
+        Parameters pars;
+        Observations obs;
+        int st = 0, n_rep = 0;
+        read_stored_run(s, run_id, pars, obs, st, n_rep);
+        vector<string> pnames = s->run_manager->get_par_name_vec();
+        vector<string> onames = s->run_manager->get_obs_name_vec();
+        if (npars_out != nullptr) *npars_out = (int)pnames.size();
+        if (nobs_out != nullptr)  *nobs_out = (int)onames.size();
+        // sizing call
+        if ((pars_out == nullptr) && (obs_out == nullptr) && (obs_valid == nullptr))
+            return PESTPP_OK;
+        if ((pars_out != nullptr) && (npars < (int)pnames.size()))
+            too_small("parameter buffer too small; call with NULL arrays to size it first");
+        if (((obs_out != nullptr) || (obs_valid != nullptr)) && (nobs < (int)onames.size()))
+            too_small("observation buffer too small; call with NULL arrays to size it first");
+        if (pars_out != nullptr)
+        {
+            vector<double> pvals = pars.get_data_vec(pnames);
+            for (size_t i = 0; i < pvals.size(); i++)
+                pars_out[i] = pvals[i];
+        }
+        vector<double> ovals = obs.get_data_vec(onames);
+        for (size_t i = 0; i < ovals.size(); i++)
+        {
+            if (obs_out != nullptr)
+                obs_out[i] = ovals[i];
+            // filled for completed runs too (all non-zero), so one code path serves both
+            if (obs_valid != nullptr)
+                obs_valid[i] = (ovals[i] != Transformable::no_data) ? 1 : 0;
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_request_partial_results(pestpp_handle h, const int* run_ids, int n,
                                              int* n_requested)
 {

@@ -710,6 +710,60 @@ PESTPP_API pestpp_status pestpp_set_run_observer(pestpp_handle h, pestpp_run_obs
 PESTPP_API pestpp_status pestpp_request_partial_results(pestpp_handle h, const int* run_ids,
                                                         int n, int* n_requested);
 
+
+/* ---- partial results ---------------------------------------------------------------------
+ *
+ * Two views of the same idea, and the difference matters. The first is LIVE: what a worker has
+ * reported for a run in the batch that is executing now. The second reads it back out of run
+ * storage, and works after the fact.
+ *
+ * Neither reports partial-ness as a run STATUS. The status byte has four meanings and three of
+ * them are load-bearing in the failed-run, good-run and restart logic; a fifth would have to be
+ * handled correctly at every one of those sites, silently wrong if it were not. Partial-ness is
+ * a property of the VALUES, so it is reported alongside them. */
+
+/* Live: has a worker reported partial results for this run in the current batch?
+ *
+ * `has_partial` is 0/1; the counts say how much of the run is real. PANTHER only - the serial
+ * manager has no worker to ask - and it reports has_partial=0 rather than failing. Cleared when
+ * a new batch begins, because a partial result describes a process that is still running. */
+PESTPP_API pestpp_status pestpp_get_run_partial_info(pestpp_handle h, int run_id,
+                                                     int* has_partial, int* n_obs_reported,
+                                                     int* n_obs_total);
+
+/* How complete a run's stored VALUES are - see pestpp_get_run_values(). */
+typedef enum {
+    PESTPP_RUN_VALUES_NONE    = 0,  /* nothing recorded yet                            */
+    PESTPP_RUN_VALUES_PARTIAL = 1,  /* preemption wrote what a worker could parse      */
+    PESTPP_RUN_VALUES_FINAL   = 2   /* the run finished and these are its real results */
+} pestpp_run_completeness;
+
+/* How many runs are in storage. */
+PESTPP_API pestpp_status pestpp_get_run_count(pestpp_handle h, int* n);
+
+/* Status and completeness for one stored run; any out-param may be NULL.
+ *
+ * `completeness` is DERIVED from the values rather than stored: a completed run is FINAL, a
+ * run that is not complete but has at least one real observation is PARTIAL, and one with
+ * none is NONE. That keeps it truthful after a restart, when the live bookkeeping is gone and
+ * ought to be - a partial result from a process that is no longer running is not meaningful. */
+PESTPP_API pestpp_status pestpp_get_run_info(pestpp_handle h, int run_id, int* status,
+                                             int* completeness, int* n_obs_reported,
+                                             int* n_obs_total);
+
+/* Values for one stored run. Pass npars/nobs of 0 with NULL arrays to learn the sizes.
+ *
+ * `obs_valid` is the point of this signature: one byte per observation, non-zero where the
+ * value is real. A partial result fills the rest with the no-data sentinel, and a caller must
+ * never have to recognise that sentinel by eye - that is how a magic number ends up in
+ * somebody's phi. It may be NULL, and it is filled for completed runs too (all non-zero), so
+ * one code path serves both. */
+PESTPP_API pestpp_status pestpp_get_run_values(pestpp_handle h, int run_id,
+                                               double* pars, int npars,
+                                               double* obs, int nobs,
+                                               unsigned char* obs_valid,
+                                               int* npars_out, int* nobs_out);
+
 /* Aggregate counts for the batch in flight. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
                                                    int* n_completed, int* n_failed,
