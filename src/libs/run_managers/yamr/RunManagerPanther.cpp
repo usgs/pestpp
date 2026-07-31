@@ -799,6 +799,24 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UN
 
         }
 		echo();
+		// one place for both entry points: run_slice() and the composed run() both come
+		// through this loop, and it is the calling thread - see notify_progress()
+		{
+			PantherRunTimeStats st = get_run_time_stats();
+			RunProgress p;
+			p.n_total = st.n_completed + st.n_failed + st.n_timed_out + st.n_queued + st.n_running;
+			p.n_completed = st.n_completed;
+			p.n_failed = st.n_failed;
+			p.n_timed_out = st.n_timed_out;
+			p.n_running = st.n_running;
+			p.elapsed_sec = get_duration_sec(start_time);
+			notify_progress(p);
+		}
+		if (progress_stop_requested)
+		{
+			terminate_reason = RUN_UNTIL_COND::NO_OPS;
+			break;
+		}
 		init_agents();
 		//schedule runs on available nodes
 		schedule_runs();

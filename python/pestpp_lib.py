@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from ctypes import (
     CDLL,
+    CFUNCTYPE,
     POINTER,
     Structure,
     byref,
@@ -21,6 +22,7 @@ from ctypes import (
     c_char_p,
     c_double,
     c_int,
+    c_void_p,
     create_string_buffer,
     sizeof,
 )
@@ -60,6 +62,25 @@ PHI_MEAS, PHI_COMPOSITE, PHI_REGUL, PHI_ACTUAL, PHI_NOISE = range(5)
 
 RM_SERIAL, RM_PANTHER, RM_EXTERNAL = 0, 1, 2
 RUN_MANAGER = {RM_SERIAL: "serial", RM_PANTHER: "panther", RM_EXTERNAL: "external"}
+
+
+#: what a run observer asks for next; mirrors pestpp_run_action
+PESTPP_RUN_CONTINUE, PESTPP_RUN_STOP_BATCH = 0, 1
+
+
+class RunProgress(Structure):
+    """Mirrors pestpp_run_progress. struct_size is the library's, not ours to set."""
+    _fields_ = [("struct_size", c_int),
+                ("n_total", c_int),
+                ("n_completed", c_int),
+                ("n_failed", c_int),
+                ("n_timed_out", c_int),
+                ("n_running", c_int),
+                ("run_id", c_int),
+                ("elapsed_sec", c_double)]
+
+
+_RUN_OBSERVER_FN = CFUNCTYPE(c_int, POINTER(RunProgress), c_void_p)
 
 
 class CreateOptions(Structure):
@@ -167,6 +188,9 @@ class PestppLib:
 
         from ctypes import c_void_p
 
+        # holds the ctypes thunk for a registered run observer; C keeps a raw pointer to it,
+        # so it must stay referenced for as long as the session lives
+        self._observer_thunk = None
         self.handle = c_void_p()
         if run_manager is None:
             run_manager = RM_PANTHER if port is not None else RM_SERIAL
@@ -279,6 +303,9 @@ class PestppLib:
         lib.pestpp_run_slice.restype = c_int
         lib.pestpp_end_batch.argtypes = (c_void_p,)
         lib.pestpp_end_batch.restype = c_int
+        lib.pestpp_set_run_observer.argtypes = (
+            c_void_p, _RUN_OBSERVER_FN, c_void_p, c_double)
+        lib.pestpp_set_run_observer.restype = c_int
         lib.pestpp_get_run_time_stats.argtypes = (
             c_void_p, POINTER(c_double), POINTER(c_int), POINTER(c_int), POINTER(c_int),
             POINTER(c_int), POINTER(c_int))
@@ -667,6 +694,43 @@ class PestppLib:
 
     def end_batch(self) -> None:
         self._check(self.lib.pestpp_end_batch(self.handle), "pestpp_end_batch")
+
+    def set_run_observer(self, fn, min_interval_sec: float = 0.0) -> None:
+        """Watch every batch this session runs, from inside the library.
+
+        ``fn`` is called with a dict of counters and returns True to carry on or False to stop
+        the batch. Pass None to stop observing.
+
+        The thunk is stored on THIS OBJECT deliberately. A ctypes callback held only by a
+        local is garbage-collected while C still has the pointer, and the crash lands at some
+        unrelated later run - the single most common way to get this wrong.
+        """
+        if fn is None:
+            # a NULL of the right function-pointer type: ctypes will not accept a bare None
+            # where it has been told to expect a CFUNCTYPE
+            self._check(self.lib.pestpp_set_run_observer(
+                self.handle, _RUN_OBSERVER_FN(), None, c_double(0.0)),
+                "pestpp_set_run_observer")
+            self._observer_thunk = None      # only after C has stopped pointing at it
+            return
+
+        def _trampoline(progress_ptr, _user_data):
+            # nothing may escape into C: an exception here would unwind through the run
+            # manager, and on some ABIs through a C function pointer at all
+            try:
+                p = progress_ptr.contents
+                out = fn({"n_total": p.n_total, "n_completed": p.n_completed,
+                          "n_failed": p.n_failed, "n_timed_out": p.n_timed_out,
+                          "n_running": p.n_running, "run_id": p.run_id,
+                          "elapsed_sec": p.elapsed_sec})
+                return PESTPP_RUN_CONTINUE if (out is None or out) else PESTPP_RUN_STOP_BATCH
+            except Exception:
+                return PESTPP_RUN_CONTINUE
+
+        self._observer_thunk = _RUN_OBSERVER_FN(_trampoline)
+        self._check(self.lib.pestpp_set_run_observer(
+            self.handle, self._observer_thunk, None, c_double(float(min_interval_sec))),
+            "pestpp_set_run_observer")
 
     def get_run_time_stats(self) -> dict:
         avg = c_double()

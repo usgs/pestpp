@@ -584,16 +584,37 @@ class _Tool:
         n = 0
         with _progress_auto(progress) as bar:
             bar.start("iterating", total=limit)
-            while n < limit and not self.should_terminate:
-                step = self.solve()
-                n += 1
-                fields = {"iter": step.iter}
-                if step.phi_mean == step.phi_mean:      # not NaN
-                    fields["phi"] = step.phi_mean
-                if step.retried:
-                    fields["retry"] = "yes"
-                bar.update(done=n, **fields)
-                yield step
+            state = {"iter": 0}
+
+            def _observe(p):
+                # inside a solve the runs are the library's, so this is the only place they
+                # can be seen. Reported as runs, with the iteration as context.
+                bar.update(done=p["n_completed"], total=p["n_total"] or None,
+                           iter=state["iter"],
+                           **({"failed": p["n_failed"]} if p["n_failed"] else {}))
+                return True
+
+            observing = not isinstance(bar, Progress) or type(bar) is not Progress
+            if observing:
+                self._lib.set_run_observer(_observe, min_interval_sec=0.1)
+            try:
+                while n < limit and not self.should_terminate:
+                    state["iter"] = self.iteration + 1
+                    step = self.solve()
+                    n += 1
+                    fields = {"iter": step.iter}
+                    if step.phi_mean == step.phi_mean:      # not NaN
+                        fields["phi"] = step.phi_mean
+                    if step.retried:
+                        fields["retry"] = "yes"
+                    # the observer has been driving `done` in run units; hand the line back to
+                    # iteration units now that one is complete
+                    bar.start("iterating", total=limit)
+                    bar.update(done=n, **fields)
+                    yield step
+            finally:
+                if observing:
+                    self._lib.set_run_observer(None)
 
     def finalize(self) -> None:
         with self._q():

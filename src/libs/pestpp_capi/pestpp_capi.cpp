@@ -337,6 +337,12 @@ struct PestppSession
     unique_ptr<RunManagerAbstract> run_manager;
     unique_ptr<ToolAdapter>       adapter;
 
+    // set while a run observer is executing. Everything outside the run-management allowlist
+    // is refused for its duration - see reject_if_observing()
+    bool in_observer = false;
+    pestpp_run_observer_fn observer_fn = nullptr;
+    void* observer_data = nullptr;
+
     bool initialized = false;
     // set between initialize_prepare() and initialize_finish(): the tool is half-initialized,
     // its ensembles drawn but the prior results not yet processed
@@ -930,7 +936,38 @@ struct ScopedWorkingDir
         s->last_error.clear();                                                 \
         if (!g_cwd_restore_error.empty())                                      \
             bad_state(g_cwd_restore_error);                                    \
+        reject_if_observing(s, __func__);                                      \
         ScopedWorkingDir _swd(s->working_dir);
+
+/* The same, for the handful of calls that ARE legal from inside a run observer. The observer
+   fires mid-batch, so most of the API would be reading a half-updated tool - but the
+   run-management calls read only the run manager, which is precisely the state the observer
+   was told about. Preemption needs exactly this door: look at what is running, decide, cancel.
+   Hence an allowlist rather than a ban. */
+#define CAPI_BEGIN_OBSERVER_SAFE(h)                                            \
+    PestppSession* s = as_session(h);                                          \
+    if (s == nullptr) return PESTPP_INVALID_HANDLE;                            \
+    try {                                                                      \
+        s->last_error.clear();                                                 \
+        if (!g_cwd_restore_error.empty())                                      \
+            bad_state(g_cwd_restore_error);                                    \
+        ScopedWorkingDir _swd(s->working_dir);
+
+/// Refuse a call that is not legal from inside a run observer.
+///
+/// The observer runs mid-batch, with ensembles part-harvested and phi not yet recomputed.
+/// Reading them there is not merely discouraged, it is meaningless - and writing them is
+/// worse. Rather than document a rule nobody can check, the state is enforced, and the
+/// message names the two calls that are actually useful from in there.
+static void reject_if_observing(PestppSession* s, const char* fn)
+{
+    if (!s->in_observer)
+        return;
+    bad_state(string("'") + fn + "' cannot be called from inside a run observer: the batch is "
+              "mid-flight, so the ensembles and phi it would read are part-updated. Only the "
+              "run-management calls are legal there - pestpp_get_run_states, "
+              "pestpp_get_run_time_stats, pestpp_cancel_runs and pestpp_get_worker_*");
+}
 
 /* capi_error is caught first so a throw site's chosen status survives; everything else is a
    plain failure. Both bands clamp the message to PESTPP_MESSAGE_LEN, because that constant is
@@ -1878,7 +1915,7 @@ pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
                                         int* n_completed, int* n_failed, int* n_timed_out,
                                         int* n_queued, int* n_running)
 {
-    CAPI_BEGIN(h)
+    CAPI_BEGIN_OBSERVER_SAFE(h)
         PantherRunTimeStats st = panther(s)->get_run_time_stats();
         if (avg_run_sec  != nullptr) *avg_run_sec  = st.global_avg_run_sec;
         if (n_completed  != nullptr) *n_completed  = st.n_completed;
@@ -1894,7 +1931,7 @@ pestpp_status pestpp_get_run_states(pestpp_handle h, const int* want_ids, int n_
                                     int* run_ids, int* statuses, double* elapsed_sec,
                                     int* n_failures, char* hosts, int max_n, int* n_out)
 {
-    CAPI_BEGIN(h)
+    CAPI_BEGIN_OBSERVER_SAFE(h)
         RunManagerPanther* p = panther(s);
         vector<PantherRunState> states;
         if ((want_ids != nullptr) && (n_want > 0))
@@ -1926,7 +1963,7 @@ pestpp_status pestpp_get_run_states(pestpp_handle h, const int* want_ids, int n_
 
 pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids, int n, int* n_cancelled)
 {
-    CAPI_BEGIN(h)
+    CAPI_BEGIN_OBSERVER_SAFE(h)
         if ((run_ids == nullptr) || (n <= 0))
             bad_arg("pestpp_cancel_runs needs at least one run id");
         int c = panther(s)->cancel_runs(vector<int>(run_ids, run_ids + n));
@@ -1938,7 +1975,7 @@ pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids, int n, int
 
 pestpp_status pestpp_get_worker_count(pestpp_handle h, int* n)
 {
-    CAPI_BEGIN(h)
+    CAPI_BEGIN_OBSERVER_SAFE(h)
         if (n == nullptr) bad_arg("null out-param");
         *n = (int)panther(s)->get_worker_states().size();
         return PESTPP_OK;
@@ -1951,7 +1988,7 @@ pestpp_status pestpp_get_worker_state(pestpp_handle h, int idx,
                                       int* current_run_id, double* current_elapsed_sec,
                                       double* avg_runtime_sec, int* n_failed_pings)
 {
-    CAPI_BEGIN(h)
+    CAPI_BEGIN_OBSERVER_SAFE(h)
         vector<PantherWorkerState> ws = panther(s)->get_worker_states();
         if ((idx < 0) || (idx >= (int)ws.size()))
             bad_arg("worker index out of range");
@@ -1969,7 +2006,7 @@ pestpp_status pestpp_get_worker_state(pestpp_handle h, int idx,
 pestpp_status pestpp_get_worker_run_history(pestpp_handle h, int idx, int which,
                                             int* run_ids, int max_n, int* n_out)
 {
-    CAPI_BEGIN(h)
+    CAPI_BEGIN_OBSERVER_SAFE(h)
         vector<PantherWorkerState> ws = panther(s)->get_worker_states();
         if ((idx < 0) || (idx >= (int)ws.size()))
             bad_arg("worker index out of range");
@@ -2221,6 +2258,58 @@ pestpp_status pestpp_get_candidate_info(pestpp_handle h, int idx, double* inflat
         s->adapter->candidate_info(idx, inf, back);
         if (inflation != nullptr) *inflation = inf;
         if (backtrack != nullptr) *backtrack = back;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_set_run_observer(pestpp_handle h, pestpp_run_observer_fn fn,
+                                      void* user_data, double min_interval_sec)
+{
+    CAPI_BEGIN(h)
+        s->observer_fn = fn;
+        s->observer_data = user_data;
+        if (fn == nullptr)
+        {
+            s->run_manager->set_progress_observer(nullptr);
+            return PESTPP_OK;
+        }
+        // captured by value: the session outlives every batch, and capturing `s` by reference
+        // from a lambda stored on the run manager would dangle if the session moved
+        PestppSession* sess = s;
+        s->run_manager->set_progress_observer(
+            [sess](const RunProgress& p) -> RunAction
+            {
+                if (sess->observer_fn == nullptr)
+                    return RunAction::CONTINUE;
+                pestpp_run_progress out;
+                out.struct_size = (int)sizeof(pestpp_run_progress);
+                out.n_total = p.n_total;
+                out.n_completed = p.n_completed;
+                out.n_failed = p.n_failed;
+                out.n_timed_out = p.n_timed_out;
+                out.n_running = p.n_running;
+                out.run_id = p.run_id;
+                out.elapsed_sec = p.elapsed_sec;
+                // the flag is what the allowlist checks; cleared on every path out, including
+                // the one where the observer throws
+                sess->in_observer = true;
+                int action = PESTPP_RUN_CONTINUE;
+                try
+                {
+                    action = sess->observer_fn(&out, sess->observer_data);
+                }
+                catch (...)
+                {
+                    sess->in_observer = false;
+                    throw;         // notify_progress() unregisters on this
+                }
+                sess->in_observer = false;
+                // an unknown action from a caller built against a later header is CONTINUE,
+                // not an error: a progress observer must never be able to fail a batch
+                return (action == PESTPP_RUN_STOP_BATCH) ? RunAction::STOP_BATCH
+                                                         : RunAction::CONTINUE;
+            },
+            min_interval_sec);
         return PESTPP_OK;
     CAPI_END()
 }

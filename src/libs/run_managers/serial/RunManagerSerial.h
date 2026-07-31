@@ -35,6 +35,25 @@ public:
 	virtual void run();
 	~RunManagerSerial(void);
 private:
+	// Where the batch has got to, so the inner poll loop can report during a run that is
+	// still executing. Without this the observer would only hear between runs, and a slow
+	// model - the case that most needs a progress bar - would look frozen for its whole
+	// duration.
+	int prog_nruns = 0, prog_done = 0, prog_failed = 0, prog_cur_run = -1;
+	std::chrono::system_clock::time_point prog_start;
+	RunProgress make_progress() const
+	{
+		RunProgress p;
+		p.n_total = prog_nruns;
+		p.n_completed = prog_done;
+		p.n_failed = prog_failed;
+		p.n_running = (prog_cur_run >= 0) ? 1 : 0;   // serial runs one at a time
+		p.run_id = prog_cur_run;
+		std::chrono::duration<double> d = std::chrono::system_clock::now() - prog_start;
+		p.elapsed_sec = d.count();
+		return p;
+	}
+
 	ModelInterface mi;
 	std::string run_dir;
 

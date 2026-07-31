@@ -26,6 +26,7 @@
 #include "RunStorage.h"
 #include <Eigen/Dense>
 #include <chrono>
+#include <functional>
 
 
 
@@ -48,11 +49,65 @@ class Observations;
  * every completed model run (both successes and failures) across all iterations
  * and also persists after a graceful exit.
  */
+/**
+ * @brief What a progress observer is told, and what it can ask for in return.
+ *
+ * Deliberately a plain value with no references into run-manager internals: it is copied
+ * across the C ABI to a caller that may be in another language, and it is emitted from inside
+ * a batch, when very little else is in a consistent state.
+ */
+struct RunProgress
+{
+	int n_total = 0;        ///< runs in this batch
+	int n_completed = 0;
+	int n_failed = 0;
+	int n_timed_out = 0;
+	int n_running = 0;
+	/// the run this notification is about, or -1 for a periodic tick with no particular run
+	int run_id = -1;
+	double elapsed_sec = 0.0;
+};
+
+/**
+ * @brief What an observer asks the run manager to do next.
+ *
+ * The observer is the only place a caller sees runs WHILE THEY ARE IN FLIGHT, so it is also
+ * the only place a decision about them can be made in time to matter. That is why this is an
+ * action rather than void: preemption - ask the workers what they have, kill the runs that
+ * are not worth finishing (see docs/api_part1/panther_preemption.md) - is a new value here,
+ * not a new callback. A void observer would have made that an ABI break.
+ */
+enum class RunAction
+{
+	CONTINUE = 0,    ///< carry on
+	STOP_BATCH = 1   ///< stop scheduling new runs and bring the batch to an orderly end
+	// REQUEST_PARTIAL = 2 - reserved for preemption
+};
+
 class RunManagerAbstract
 {
 public:
 	enum class RUN_UNTIL_COND { NORMAL, NO_OPS, TIME, NO_OPS_OR_TIME };
 	enum class RUN_MGR_TYPE {NOTDEFINED, PANTHER, SERIAL};
+
+	/// Observe a batch as it runs. Pass an empty function to stop observing.
+	///
+	/// `min_interval_sec` throttles at the SOURCE rather than in the observer: a serial batch
+	/// of thousands of sub-second runs would otherwise pay for a cross-ABI call per run, and
+	/// an observer that only draws a bar cannot decline the call it has already been handed.
+	/// A run that finishes, fails or times out is always reported, whatever the interval -
+	/// throttling may drop periodic ticks, never events.
+	void set_progress_observer(std::function<RunAction(const RunProgress&)> fn,
+		double min_interval_sec = 0.0)
+	{
+		progress_fn = fn;
+		progress_min_interval = min_interval_sec;
+		progress_last = std::chrono::system_clock::time_point::min();
+		progress_stop_requested = false;
+	}
+	/// Set once an observer has asked for STOP_BATCH; the run managers check it in their
+	/// scheduling loops. Cleared by the next set_progress_observer() or begin_batch().
+	bool progress_stop_requested = false;
 	RunManagerAbstract(const std::vector<std::string> _comline_vec,
 		const std::vector<std::string> _tplfile_vec, const std::vector<std::string> _inpfile_vec,
 		const std::vector<std::string> _insfile_vec, const std::vector<std::string> _outfile_vec,
@@ -132,6 +187,50 @@ public:
 	virtual RUN_MGR_TYPE get_mgr_type() { return mgr_type; }
 
 protected:
+	std::function<RunAction(const RunProgress&)> progress_fn;
+	double progress_min_interval = 0.0;
+	std::chrono::system_clock::time_point progress_last =
+		std::chrono::system_clock::time_point::min();
+
+	/**
+	 * @brief Tell the observer where the batch has got to.
+	 *
+	 * Called from the run managers' own scheduling loops. `is_event` marks a run that
+	 * finished, failed or timed out - those are never dropped by the throttle, because a
+	 * caller deciding whether to keep waiting must not miss the thing it is waiting for.
+	 *
+	 * MUST be called only from the thread that entered the run manager. Both scheduling
+	 * loops run there, so this costs nothing to honour - and it is what keeps a cross-ABI
+	 * observer out of a foreign thread, where taking python's GIL while the calling thread
+	 * sits blocked inside the library is a deadlock rather than an error.
+	 */
+	void notify_progress(const RunProgress& p, bool is_event = false)
+	{
+		if (!progress_fn)
+			return;
+		std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+		if ((!is_event) && (progress_min_interval > 0.0) &&
+			(progress_last != std::chrono::system_clock::time_point::min()))
+		{
+			std::chrono::duration<double> since = now - progress_last;
+			if (since.count() < progress_min_interval)
+				return;
+		}
+		progress_last = now;
+		// an observer that throws must not unwind through a batch: a C ABI observer cannot
+		// let an exception cross the boundary at all, and a C++ one has no business killing
+		// runs that are already in flight
+		try
+		{
+			if (progress_fn(p) == RunAction::STOP_BATCH)
+				progress_stop_requested = true;
+		}
+		catch (...)
+		{
+			progress_fn = nullptr;   // it failed once; do not keep calling it
+		}
+	}
+
 	int total_runs;
 	int max_n_failure; // maximum number of times to retry a failed model run
 	int cur_group_id;  // used in some of the derived classes (ie PANTHER)

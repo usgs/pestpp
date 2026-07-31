@@ -1424,6 +1424,155 @@ def api_progress_during_a_real_run_test():
         ies.finalize()
 
 
+def api_run_observer_fires_during_a_composed_solve_test():
+    """The observer sees runs inside solve() - the call that is otherwise completely silent.
+
+    Every other way of watching runs requires the caller to own them (queue/run/process, or a
+    deferred solve). This is the one that works for someone driving `iterations()`, which is
+    most people.
+    """
+    wd = _case("api_observer_solve", noptmax=1, num_reals=8)
+    seen = []
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        ies._lib.set_run_observer(lambda p: seen.append(dict(p)) or True, 0.0)
+        ies.solve()
+        ies._lib.set_run_observer(None)
+        assert seen, "the observer was never called during solve()"
+        assert max(p["n_completed"] for p in seen) > 0, "no completions were reported"
+        assert max(p["n_total"] for p in seen) > 0, "the batch size was never reported"
+        # the struct the library filled in must be the one we declared
+        assert seen[0]["run_id"] is not None
+        ies.finalize()
+
+
+def api_run_observer_is_throttled_in_the_library_test():
+    """Throttling is at the source, because an observer cannot decline a call it was handed.
+
+    The run managers poll in a hot loop, so an unthrottled observer pays a cross-ABI call per
+    poll rather than per run - hundreds of thousands of them on a case this size.
+    """
+    wd = _case("api_observer_throttle", noptmax=1, num_reals=8)
+    counts = {}
+    for interval in (0.0, 0.25):
+        n = [0]
+        with Ies.from_pst("pest.pst", workdir=wd) as ies:
+            ies.initialize()
+            ies._lib.set_run_observer(lambda p: n.__setitem__(0, n[0] + 1) or True, interval)
+            ies.solve()
+            ies._lib.set_run_observer(None)
+            ies.finalize()
+        counts[interval] = n[0]
+    assert counts[0.25] < counts[0.0], counts
+    assert counts[0.25] < 500, \
+        "a throttled observer should be called a handful of times, got {0}".format(counts[0.25])
+
+
+def api_run_observer_reentrancy_is_an_allowlist_test():
+    """Mid-batch, run management is legal and everything else is refused BY NAME.
+
+    Not a ban: preemption needs exactly this door - look at what is running, decide, cancel -
+    so the rule has to admit the run-management calls while keeping out the ones that would
+    read a part-updated ensemble. Enforced rather than documented, because a rule nobody can
+    check is not a rule.
+    """
+    wd = _case("api_observer_reentry", noptmax=1, num_reals=6)
+    result = {}
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+
+        def probe(p):
+            try:
+                ies._lib.get_phi_summary(0)
+                result["phi"] = "ALLOWED"
+            except PestppError as e:
+                result["phi"] = str(e)
+            try:
+                ies._lib.cancel_runs([])
+                result["cancel"] = "ALLOWED"
+            except PestppError as e:
+                result["cancel"] = str(e)
+            return True
+
+        ies._lib.set_run_observer(probe, 1e9)
+        ies.solve()
+        ies._lib.set_run_observer(None)
+        ies.finalize()
+
+    assert "cannot be called from inside a run observer" in result["phi"], result["phi"]
+    assert "pestpp_get_phi_summary" in result["phi"], "the message should name the call"
+    # cancel_runs is on the allowlist, so it reaches its OWN argument check rather than the
+    # observer guard - which is what proves it got through
+    assert "cannot be called from inside a run observer" not in result["cancel"], result["cancel"]
+    assert "run id" in result["cancel"], result["cancel"]
+
+
+def api_run_observer_can_stop_a_batch_test():
+    """Returning False stops the batch, keeping the runs that already finished.
+
+    The observer returns an action rather than nothing precisely so this - and later,
+    preemption - is a new return VALUE rather than a new callback.
+    """
+    wd = _case("api_observer_stop", noptmax=1, num_reals=12)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize(defer_runs=True)
+        queued = ies.queue_runs()
+        assert queued == 12, queued
+        seen = []
+
+        def stop_after_3(p):
+            seen.append(p["n_completed"])
+            return p["n_completed"] < 3
+
+        ies._lib.set_run_observer(stop_after_3, 0.0)
+        ies.run()
+        ies._lib.set_run_observer(None)
+        assert max(seen) == 3, \
+            "the batch should have stopped at 3 of {0}, saw {1}".format(queued, max(seen))
+        ies.close()
+
+
+def api_run_observer_survives_a_raising_callback_test():
+    """An observer that raises is dropped, not allowed to unwind through runs in flight.
+
+    A python exception crossing back into C++ through a function pointer is undefined
+    behaviour on some ABIs, and a progress bar has no business failing a batch either way.
+    """
+    wd = _case("api_observer_raises", noptmax=1, num_reals=6)
+    calls = [0]
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+
+        def bad(p):
+            calls[0] += 1
+            raise ValueError("observer blew up")
+
+        ies._lib.set_run_observer(bad, 0.0)
+        step = ies.solve()          # must complete regardless
+        ies._lib.set_run_observer(None)
+        assert calls[0] > 0, "the observer was never called"
+        assert np.isfinite(step.phi_mean), "the batch did not survive a raising observer"
+        ies.finalize()
+
+
+def api_run_observer_thunk_is_retained_test():
+    """The ctypes thunk is held by the session, or C ends up pointing at collected memory.
+
+    The classic ctypes footgun: a CFUNCTYPE kept only by a local is garbage-collected while
+    the library still holds the pointer, and the crash lands at some unrelated later run.
+    """
+    wd = _case("api_observer_thunk", noptmax=1, num_reals=6)
+    with Ies.from_pst("pest.pst", workdir=wd) as ies:
+        ies.initialize()
+        assert ies._lib._observer_thunk is None
+        ies._lib.set_run_observer(lambda p: True, 0.1)
+        assert ies._lib._observer_thunk is not None, \
+            "the thunk must be referenced by the session for as long as C holds it"
+        ies._lib.set_run_observer(None)
+        assert ies._lib._observer_thunk is None, "unregistering should release it"
+        ies.finalize()
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -1469,4 +1618,10 @@ if __name__ == "__main__":
     api_progress_is_inert_when_disabled_test()
     api_progress_renders_in_a_notebook_test()
     api_progress_during_a_real_run_test()
+    api_run_observer_fires_during_a_composed_solve_test()
+    api_run_observer_is_throttled_in_the_library_test()
+    api_run_observer_reentrancy_is_an_allowlist_test()
+    api_run_observer_can_stop_a_batch_test()
+    api_run_observer_survives_a_raising_callback_test()
+    api_run_observer_thunk_is_retained_test()
     print("all helper tests passed")

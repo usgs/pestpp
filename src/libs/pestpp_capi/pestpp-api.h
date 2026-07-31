@@ -641,6 +641,60 @@ PESTPP_API pestpp_status pestpp_end_batch(pestpp_handle h);
  * one is open is refused too - it would reset the run counters with runs in flight. */
 PESTPP_API pestpp_status pestpp_is_batch_open(pestpp_handle h, int* out);
 
+/* ---- watching a batch from inside -------------------------------------------------------
+ *
+ * The counters below are a POLL: they answer when you ask. This is the push side, and it is
+ * the only way to see anything during pestpp_solve_iteration(), which owns its runs and does
+ * not return until they are done.
+ *
+ * The observer is also the only place a caller sees runs WHILE THEY ARE IN FLIGHT, which is
+ * why it returns an action rather than void. Stopping a batch is the action that exists
+ * today; preemption - ask the workers what they have, keep the runs worth finishing - is a
+ * new RETURN VALUE here rather than a new callback, and `struct_size` is what lets the struct
+ * gain the fields that will need (see docs/api_part1/panther_preemption.md). Both would have
+ * been ABI breaks against a void observer taking a bare struct. */
+
+typedef struct {
+    int    struct_size;      /* = sizeof(pestpp_run_progress); required, and checked */
+    int    n_total;          /* runs in this batch */
+    int    n_completed;
+    int    n_failed;
+    int    n_timed_out;
+    int    n_running;
+    int    run_id;           /* the run this is about, or -1 for a periodic tick */
+    double elapsed_sec;
+} pestpp_run_progress;
+
+/* What the observer asks for next. Unknown values are treated as CONTINUE, so a caller built
+   against a later header cannot wedge an older library. */
+typedef enum {
+    PESTPP_RUN_CONTINUE   = 0,
+    PESTPP_RUN_STOP_BATCH = 1
+    /* 2 reserved: request partial results from the runs still going */
+} pestpp_run_action;
+
+typedef int (*pestpp_run_observer_fn)(const pestpp_run_progress* progress, void* user_data);
+
+/* Observe every batch this session runs. Pass fn=NULL to stop observing.
+ *
+ * `min_interval_sec` throttles inside the library, because an observer cannot decline a call
+ * it has already been handed and a serial batch of thousands of quick runs would otherwise
+ * pay a cross-ABI call for each one. A run that finishes, fails or times out is reported
+ * whatever the interval - throttling drops periodic ticks, never events.
+ *
+ * Three rules, and the first is the one that bites:
+ *
+ * 1. The observer is called with the tool's state MID-BATCH. Only the run-management calls
+ *    are legal from inside it - pestpp_get_run_states, pestpp_get_run_time_stats,
+ *    pestpp_cancel_runs, pestpp_get_worker_*. Anything touching ensembles, phi or options is
+ *    refused with PESTPP_INVALID_STATE rather than allowed to read a half-updated ensemble.
+ *    That allowlist is exactly what preemption needs, which is why it is a list and not a ban.
+ * 2. It is called on the thread that called into the library, never a worker thread.
+ * 3. It must not throw across the boundary. One that does is unregistered rather than being
+ *    allowed to unwind through a batch. */
+PESTPP_API pestpp_status pestpp_set_run_observer(pestpp_handle h, pestpp_run_observer_fn fn,
+                                                 void* user_data, double min_interval_sec);
+
 /* Aggregate counts for the batch in flight. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
                                                    int* n_completed, int* n_failed,

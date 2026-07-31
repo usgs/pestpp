@@ -110,6 +110,15 @@ void RunManagerSerial::run(Parameters* pars, Observations* obs)
             f_terminate.set(true);
             break;
         }
+        // the run below is blocking, so this is the only place an observer can be told
+        // anything while a single model run is in flight. Throttled at the source, and this
+        // is the calling thread - see RunManagerAbstract::notify_progress().
+        notify_progress(make_progress());
+        if (progress_stop_requested)
+        {
+            f_terminate.set(true);
+            break;
+        }
 
     }
     // single join for every exit path: the exception/quit branches above set
@@ -145,10 +154,21 @@ void RunManagerSerial::run()
 	string info_txt;
 	int group_id = -1;
 	double info_value;
+	prog_nruns = nruns;
+	prog_done = 0;
+	prog_failed = 0;
+	prog_cur_run = -1;
+	prog_start = start_time_all;
+	notify_progress(make_progress(), true);
 	while (!(run_id_vec = get_outstanding_run_ids()).empty())
 	{
+		if (progress_stop_requested)
+			break;
 		for (int i_run : run_id_vec)
 		{
+			if (progress_stop_requested)
+				break;
+			prog_cur_run = i_run;
             int q = pest_utils::quit_file_found();
             if ((q == 1) || (q == 2) || (q == 4))
             {
@@ -217,6 +237,10 @@ void RunManagerSerial::run()
 			message << endl << endl << "-->" << pest_utils::get_time_string() << " run complete, took: " << pest_utils::get_duration_sec(start_time) << " seconds";
 			message << endl << "-->" << success_runs << " of " << nruns << " complete, "<<  failed_runs << " failed" << endl << endl << endl;
 			std::cout << message.str();
+			prog_done = success_runs;
+			prog_failed = failed_runs;
+			prog_cur_run = -1;
+			notify_progress(make_progress(), true);
 		}
 	}
 	total_runs += success_runs;
