@@ -1177,17 +1177,26 @@ class _Tool:
         reports them as workers land, the serial manager reports the whole batch at once.
         """
         bar = _progress_auto(progress)
+        # Asked ONCE, and only when there is a bar to feed. The counters are PANTHER-only, so
+        # on the serial manager every one of these calls throws - and a call that throws is
+        # not free: it still enters and leaves the library's working directory on the way. A
+        # per-run guaranteed exception on the most common path is not something to leave in
+        # for the sake of a progress bar nobody asked for.
+        live = (not isinstance(bar, Progress) or type(bar) is not Progress) \
+            and self.supports_live_control
         with self._q():
             self._lib.begin_batch()
             try:
                 bar.start("running", total=self._queued or None)
                 while not self._lib.run_slice(slice_seconds):
-                    self._update_run_progress(bar)
+                    if live:
+                        self._update_run_progress(bar)
                     if callback is not None:
                         callback(self)
             finally:
                 self._lib.end_batch()
-                self._update_run_progress(bar)
+                if live:
+                    self._update_run_progress(bar)
                 bar.close()
 
     def _update_run_progress(self, bar) -> None:
