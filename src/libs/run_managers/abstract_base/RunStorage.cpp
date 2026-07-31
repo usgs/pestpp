@@ -513,6 +513,27 @@ void RunStorage::update_run(int run_id, const Parameters &pars, const Observatio
  * @param run_id Description.
  * @param obs Description.
  */
+void RunStorage::update_run_partial(int run_id, const Observations &obs)
+{
+	check_rec_id(run_id);
+	vector<double> obs_data(obs.get_data_vec(obs_names));
+	size_t n_pars = par_names.size();
+
+	buf_stream.seekp(get_stream_pos(run_id), ios_base::beg);
+	// step OVER the status byte rather than writing it - that is the whole point
+	buf_stream.seekp(sizeof(std::int8_t), ios_base::cur);
+	//skip over info_txt and info_value fields
+	buf_stream.seekp(sizeof(char)*info_txt_length + sizeof(double), ios_base::cur);
+	//skip over parameter section
+	buf_stream.seekp(n_pars * sizeof(double), ios_base::cur);
+	buf_stream.write(reinterpret_cast<char*>(obs_data.data()), obs_data.size() * sizeof(double));
+	buf_stream.flush();
+	if (!buf_stream)
+	{
+		throw runtime_error("RunStorage::update_run_partial() stream not good");
+	}
+}
+
 void RunStorage::update_run(int run_id, const Observations &obs)
 {
 

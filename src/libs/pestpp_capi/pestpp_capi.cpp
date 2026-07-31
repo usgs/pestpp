@@ -2262,6 +2262,20 @@ pestpp_status pestpp_get_candidate_info(pestpp_handle h, int idx, double* inflat
     CAPI_END()
 }
 
+pestpp_status pestpp_request_partial_results(pestpp_handle h, const int* run_ids, int n,
+                                             int* n_requested)
+{
+    CAPI_BEGIN_OBSERVER_SAFE(h)
+        vector<int> ids;
+        if ((run_ids != nullptr) && (n > 0))
+            ids.assign(run_ids, run_ids + n);
+        int sent = s->run_manager->request_partial_results(ids);
+        if (n_requested != nullptr)
+            *n_requested = sent;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_set_run_observer(pestpp_handle h, pestpp_run_observer_fn fn,
                                       void* user_data, double min_interval_sec)
 {

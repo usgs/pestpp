@@ -27,6 +27,8 @@
 #include "EnsembleMethodUtils.h"
 #include "MOEA.h"
 #include "SQP.h"
+#include "model_interface.h"
+#include "RunStorage.h"
 
 using namespace std;
 using PO = PestppOptions;
@@ -654,6 +656,561 @@ static void test_run_map_survives_resize()
         "no surviving realizations -> no runs to harvest");
 }
 
+/**
+ * @brief A parse that fails part way still yields what it read, and names the rest.
+ *
+ * This is the foundation preemption stands on: asking a run that is STILL GOING what it has
+ * so far. The strict reader cannot answer that question and must not be made to - a run that
+ * genuinely finishes has to keep failing loudly on a malformed output file.
+ *
+ * The obstacle was not the exception, it was WHERE the data lived: read_output_file() built
+ * its Observations in a local and returned by value, so everything read before a failure died
+ * with the stack frame. Catching the exception higher up would have caught an exception and
+ * no data. The parse now writes into a caller-owned Observations, so what was read survives.
+ */
+static void test_instruction_file_tolerant_read()
+{
+    cout << "[instruction files: a failed parse still yields what it read]" << endl;
+    const string ins_name = "selftest_tolerant.ins";
+    const string out_name = "selftest_tolerant.out";
+    {
+        ofstream f(ins_name);
+        f << "pif ~" << endl;
+        f << "l2 !obs1! !obs2!" << endl;
+        f << "l1 !obs3!" << endl;
+    }
+    // a COMPLETE output file first: the strict and forgiving paths must agree exactly when
+    // nothing is wrong, or the forgiving one is not a twin of anything
+    {
+        ofstream f(out_name);
+        f << "header line" << endl;
+        f << " 1.5 2.5" << endl;
+        f << " 3.5" << endl;
+    }
+    {
+        InstructionFile ins_strict(ins_name), ins_soft(ins_name);
+        Observations strict = ins_strict.read_output_file(out_name);
+        Observations soft;
+        vector<string> missing, problems;
+        ins_soft.try_read_output_file(out_name, soft, missing, problems);
+        CHK(strict.size() == 3, "strict read of a complete file should give 3 observations");
+        CHK(soft.size() == 3, "tolerant read of a complete file should give 3 observations");
+        CHK(missing.empty(), "nothing should be missing from a complete file");
+        CHK(problems.empty(), "a complete file should report no problems");
+        for (auto& name : strict.get_keys())
+            CHK(abs(strict.get_rec(name) - soft.get_rec(name)) < 1.0e-12,
+                "tolerant read must agree with strict read value for " + name);
+    }
+
+    // now TRUNCATE it: obs1/obs2 are readable, obs3's line never arrives
+    {
+        ofstream f(out_name);
+        f << "header line" << endl;
+        f << " 1.5 2.5" << endl;
+    }
+    {
+        InstructionFile ins_strict(ins_name);
+        bool threw = false;
+        try { ins_strict.read_output_file(out_name); }
+        catch (const exception&) { threw = true; }
+        CHK(threw, "the strict reader must still fail loudly on a truncated output file");
+
+        InstructionFile ins_soft(ins_name);
+        Observations soft;
+        vector<string> missing, problems;
+        ins_soft.try_read_output_file(out_name, soft, missing, problems);
+        CHK(soft.size() == 2, "the observations read before the failure must survive it");
+        CHK(soft.find("OBS1") != soft.end(), "obs1 was read before the failure");
+        CHK(soft.find("OBS2") != soft.end(), "obs2 was read before the failure");
+        CHK(missing.size() == 1 && missing[0] == "OBS3",
+            "the unread observation must be named as missing");
+        CHK(problems.size() == 1, "the failure must be described rather than thrown");
+    }
+
+    // and an output file that does not exist at all - the ordinary case for a run that has
+    // not written anything yet. Everything the file covers is missing; nothing throws.
+    {
+        remove(out_name.c_str());
+        InstructionFile ins_soft(ins_name);
+        Observations soft;
+        vector<string> missing, problems;
+        ins_soft.try_read_output_file(out_name, soft, missing, problems);
+        CHK(soft.size() == 0, "an absent output file yields no observations");
+        CHK(missing.size() == 3, "an absent output file makes every covered name missing");
+        CHK(problems.size() == 1, "an absent output file is reported, not thrown");
+    }
+    remove(ins_name.c_str());
+}
+
+/**
+ * @brief A partial read must never be WRONG - only incomplete.
+ *
+ * The truncation in the test above cuts at a line boundary, which is the easy case. A run
+ * that is still going is writing its output file as we read it, so the realistic cut is
+ * mid-line, mid-token, mid-NUMBER. Those are dangerous in a way a missing line is not: a
+ * value truncated from "1.2345" to "1.2" still parses, so a caller computing phi from
+ * partial results would get a confident wrong answer rather than an obviously absent one.
+ *
+ * This sweeps every byte offset of a realistic output file and asserts the invariant that
+ * makes partial results usable at all: ANY value reported must equal what the strict reader
+ * gets from the complete file. Absent is fine. Different is not.
+ */
+static void test_instruction_file_partial_reads_are_never_wrong()
+{
+    cout << "[instruction files: a partial read is incomplete, never wrong]" << endl;
+    const string ins_name = "selftest_partial.ins";
+    const string out_name = "selftest_partial.out";
+    {
+        ofstream f(ins_name);
+        f << "pif ~" << endl;
+        f << "~head~" << endl;
+        f << "l1 !oa! !ob!" << endl;
+        f << "l1 !oc!" << endl;
+        f << "~tag~ !od!" << endl;
+        // fixed and semi-fixed read by COLUMN, so a short line is a different failure mode
+        // from a short token - they are the cases most likely to read past what is there
+        f << "l1 [oe]1:9" << endl;
+        f << "l1 (of)1:9" << endl;
+    }
+    // digits chosen so that cutting a number short yields a DIFFERENT VALID number
+    const string complete =
+        "head\n"
+        " 1.2345 6.7891\n"
+        " 22.3456\n"
+        "tag 98.7654\n"
+        " 33.44556\n"
+        " 77.88991\n";
+    {
+        ofstream f(out_name, ios::binary);
+        f << complete;
+    }
+
+    Observations truth;
+    {
+        InstructionFile ins(ins_name);
+        truth = ins.read_output_file(out_name);
+    }
+    CHK(truth.size() == 6, "the complete file should yield 6 observations");
+
+    int wrong_values = 0, threw = 0, invented = 0;
+    string first_wrong;
+    for (size_t cut = 0; cut < complete.size(); cut++)
+    {
+        {
+            ofstream f(out_name, ios::binary | ios::trunc);
+            f << complete.substr(0, cut);
+        }
+        InstructionFile ins(ins_name);
+        Observations got;
+        vector<string> missing, problems;
+        try
+        {
+            ins.try_read_output_file(out_name, got, missing, problems);
+        }
+        catch (...)
+        {
+            threw++;
+            continue;
+        }
+        for (auto& name : got.get_keys())
+        {
+            if (truth.find(name) == truth.end())
+            {
+                invented++;
+                continue;
+            }
+            if (abs(got.get_rec(name) - truth.get_rec(name)) > 1.0e-12)
+            {
+                wrong_values++;
+                if (first_wrong.empty())
+                {
+                    stringstream ss;
+                    ss << name << " read as " << got.get_rec(name) << " instead of "
+                       << truth.get_rec(name) << " when the file was cut at byte " << cut
+                       << " (" << complete.substr(0, cut).size() << " of "
+                       << complete.size() << ")";
+                    first_wrong = ss.str();
+                }
+            }
+        }
+        // present and missing must together account for everything the file covers
+        CHK(got.size() + missing.size() == truth.size(),
+            "present + missing must equal the covered set at every truncation");
+    }
+    CHK(threw == 0, "the tolerant reader must never throw, at any truncation");
+    CHK(invented == 0, "a partial read must not invent observations the file does not cover");
+    CHK(wrong_values == 0, "a partial read reported a WRONG value: " + first_wrong);
+
+    remove(ins_name.c_str());
+    remove(out_name.c_str());
+}
+
+/**
+ * @brief One output file complete, another mid-write: the partial run must keep both halves.
+ *
+ * The single-file tests prove a truncated file yields what it holds. This proves the case
+ * that actually happens when you interrupt a real run: several output files, some finished
+ * and some not. One unreadable file must not cost the results sitting in the others - which
+ * is exactly what the strict reader does, because it throws on the first bad one.
+ */
+static void test_model_interface_partial_across_files()
+{
+    cout << "[model interface: a partial run keeps the files that ARE readable]" << endl;
+    const string ins_a = "selftest_mi_a.ins", out_a = "selftest_mi_a.out";
+    const string ins_b = "selftest_mi_b.ins", out_b = "selftest_mi_b.out";
+    { ofstream f(ins_a); f << "pif ~" << endl << "l1 !ma1! !ma2!" << endl; }
+    { ofstream f(ins_b); f << "pif ~" << endl << "l1 !mb1! !mb2!" << endl; }
+    { ofstream f(out_a); f << " 11.25 22.5" << endl; }          // complete
+    { ofstream f(out_b, ios::binary); f << " 33.75 4"; }        // mid-write, no newline
+
+    ModelInterface mi(vector<string>(), vector<string>(),
+                      vector<string>{ins_a, ins_b}, vector<string>{out_a, out_b},
+                      vector<string>());
+    Observations obs;
+    vector<string> missing, problems;
+    mi.try_read_output_files(&obs, missing, problems);
+
+    CHK(obs.size() == 4, "every covered observation should be present, read or not");
+    CHK(abs(obs.get_rec("MA1") - 11.25) < 1.0e-12, "the complete file's first value survives");
+    CHK(abs(obs.get_rec("MA2") - 22.5) < 1.0e-12, "the complete file's second value survives");
+    // out_b has no complete line at all, so BOTH of its observations are missing - and
+    // crucially the truncated "4" is not reported as a value
+    CHK(missing.size() == 2, "the mid-write file's observations should be missing");
+    CHK(abs(obs.get_rec("MB1") - Transformable::no_data) < 1.0e-12,
+        "a missing observation carries the sentinel, not a plausible number");
+    CHK(problems.size() >= 1, "the mid-write file should be reported as a problem");
+
+    // and once it finishes, the same call gets everything
+    { ofstream f(out_b); f << " 33.75 44.5" << endl; }
+    ModelInterface mi2(vector<string>(), vector<string>(),
+                       vector<string>{ins_a, ins_b}, vector<string>{out_a, out_b},
+                       vector<string>());
+    Observations obs2;
+    vector<string> missing2, problems2;
+    mi2.try_read_output_files(&obs2, missing2, problems2);
+    CHK(missing2.empty(), "nothing should be missing once both files are complete");
+    CHK(problems2.empty(), "no problems once both files are complete");
+    CHK(abs(obs2.get_rec("MB2") - 44.5) < 1.0e-12, "the finished file reads normally");
+
+    for (auto& f : {ins_a, out_a, ins_b, out_b})
+        remove(f.c_str());
+}
+
+/**
+ * @brief Byte-by-byte truncation of a REAL instruction set, not a synthetic one.
+ *
+ * out1.dat.ins from benchmarks/tplins_test_1 - the case that exists to exercise instruction
+ * files - together with its output file and the .obf of expected values that ships with it.
+ * Between them they cover the whole instruction vocabulary the parser dispatches on:
+ *
+ *   primary markers          ~ primary ~ , ~dummy_obs~
+ *   SECONDARY markers        ~secondary~ , and a chain of eight ~,~ on one line
+ *   free                     !h01_01! ... eight on a single instruction line
+ *   fixed                    [h01_09]45:54 , [h02_01]1:8 ...
+ *   semi-fixed               (h01_08)107:114
+ *   multi-line advance       l3 (skipping lines outright)
+ *   20 observations over 8 instruction lines, ragged across 14 output lines
+ *
+ * The invariant is the one that makes partial results safe to use at all: at EVERY truncation
+ * offset, any value reported must equal what a strict read of the complete file gives.
+ */
+static void test_instruction_file_partial_real_case()
+{
+    cout << "[instruction files: byte-by-byte truncation of a REAL instruction set]" << endl;
+    const string ins_text =
+        "pif ~\n"
+        "l1 ~,~ ~,~ ~,~ ~,~ ~,~ ~,~ ~,~ ~,~ !h02_09!\n"
+        "~ primary ~ !h01_10! ~  secondary  ~ [h01_09]45:54\n"
+        "l3\n"
+        "l1 !h01_01! ~secondary~  !h01_02! !h01_03! !h01_04! !h01_05! !h01_06! !h01_07! (h01_08)107:114\n"
+        "l1 [h02_01]1:8 [h02_02]9:16 [h02_03]17:24 !h02_04! !h02_05! !h02_06! !h02_07! !h02_08!  \n"
+        "l1 [h02_10]1:5 \n"
+        "l1 ~dummy_obs~ !dummy_obs!\n";
+    const string out_text =
+        "1,633800024,633800039,1983-08-03 00:00:00,1983-08-03 00:00:00,0,24.22192,16.30086,7.921060000000001,3,3\n"
+        "\n"
+        "\n"
+        "\n"
+        "primary\n"
+        "\n"
+        " primary  1.234567 junk etc   secondary     9.87654321   \n"
+        "\n"
+        "\n"
+        "\n"
+        "   1.000  more crap here nan etc secondary       1.200     1.400     1.600     1.800     2.00000  2.200    2.400   # not used   2.600     2.800\n"
+        "1236.5678495.123-900.999     2.200     2.600     3.000     3.400     3.800     4.200     \n"
+        "4.123trash\n"
+        "dummy_obs 123456789.987654321\n";
+    const string ins_name = "selftest_real.ins";
+    const string out_name = "selftest_real.out";
+    { ofstream f(ins_name, ios::binary); f << ins_text; }
+    { ofstream f(out_name, ios::binary); f << out_text; }
+
+    Observations truth;
+    {
+        InstructionFile ins(ins_name);
+        truth = ins.read_output_file(out_name);
+    }
+    // cross-check the parse itself against the .obf that ships with the case, so this test
+    // fails if the READER is wrong rather than only if the tolerant path is
+    const pair<string, double> expected[] = {
+        {"H02_09", 7.921060},
+        {"H01_10", 1.234567},
+        {"H01_09", 9.876543},
+        {"H01_01", 1.000000},
+        {"H01_02", 1.200000},
+        {"H01_03", 1.400000},
+        {"H01_04", 1.600000},
+        {"H01_05", 1.800000},
+        {"H01_06", 2.000000},
+        {"H01_07", 2.200000},
+        {"H01_08", 2.400000},
+        {"H02_01", 1236.567},
+        {"H02_02", 8495.123},
+        {"H02_03", -900.9990},
+        {"H02_04", 2.200000},
+        {"H02_05", 2.600000},
+        {"H02_06", 3.000000},
+        {"H02_07", 3.400000},
+        {"H02_08", 3.800000},
+        {"H02_10", 4.123000},
+    };
+    for (auto& kv : expected)
+    {
+        CHK(truth.find(kv.first) != truth.end(),
+            "the real instruction set should read " + kv.first);
+        if (truth.find(kv.first) != truth.end())
+            CHK(abs(truth.get_rec(kv.first) - kv.second) <= 1.0e-5 * max(1.0, abs(kv.second)),
+                "value mismatch against the shipped .obf for " + kv.first);
+    }
+
+    int threw = 0, invented = 0, wrong = 0, max_recovered = 0;
+    string first_wrong;
+    for (size_t cut = 0; cut <= out_text.size(); cut++)
+    {
+        { ofstream f(out_name, ios::binary | ios::trunc); f << out_text.substr(0, cut); }
+        InstructionFile ins(ins_name);
+        Observations got;
+        vector<string> missing, problems;
+        try { ins.try_read_output_file(out_name, got, missing, problems); }
+        catch (...) { threw++; continue; }
+
+        max_recovered = max(max_recovered, (int)got.size());
+        for (auto& name : got.get_keys())
+        {
+            if (truth.find(name) == truth.end()) { invented++; continue; }
+            if (abs(got.get_rec(name) - truth.get_rec(name)) > 1.0e-12)
+            {
+                wrong++;
+                if (first_wrong.empty())
+                {
+                    stringstream ss;
+                    ss << name << " read as " << got.get_rec(name) << " instead of "
+                       << truth.get_rec(name) << " at truncation byte " << cut
+                       << " of " << out_text.size();
+                    first_wrong = ss.str();
+                }
+            }
+        }
+        CHK(got.size() + missing.size() == truth.size(),
+            "present + missing must account for every covered observation");
+    }
+    CHK(threw == 0, "the tolerant reader must never throw on a real instruction set");
+    CHK(invented == 0, "a partial read must not invent observations");
+    CHK(wrong == 0, "a partial read reported a WRONG value: " + first_wrong);
+    // and it must actually recover something on the way, or the sweep proves nothing
+    CHK(max_recovered >= 10,
+        "a partial read of a mostly-complete file should recover most observations");
+
+    remove(ins_name.c_str());
+    remove(out_name.c_str());
+}
+
+/**
+ * @brief The two instruction branches the main real case does not reach: dum, and whitespace.
+ *
+ * out1.dat.ins covers free, fixed, semi-fixed, line advance and both marker kinds, but the
+ * parser dispatches on six token types and reaches DUM by name. These two real files close
+ * the set: out1dum.dat.ins is the same case with observations replaced by !DUM! and !dum!
+ * (both cases, deliberately), and obj.dat.ins from the mou constraint case is the smallest
+ * real user of the whitespace instruction, `l1 w !obj_1!`.
+ *
+ * Same invariant as the other sweeps: at every truncation, reported values match a strict
+ * read of the complete file, and a discarded DUM is never reported as an observation.
+ */
+static void test_instruction_file_partial_remaining_branches()
+{
+    cout << "[instruction files: dum and whitespace branches under truncation]" << endl;
+    struct Case { const char* tag; string ins; string out; };
+    vector<Case> cases;
+    cases.push_back({"dum",
+        "pif ~\n"
+        "l1 ~,~ ~,~ ~,~ ~,~ ~,~ ~,~ ~,~ ~,~ !h02_09!\n"
+        "~ primary ~ !h01_10! ~  secondary  ~ [h01_09]45:54\n"
+        "l3\n"
+        "l1 !h01_01! ~secondary~  !h01_02! !DUM! !h01_04! !h01_05! !h01_06! !dum! (h01_08)107:114\n"
+        "l1 [h02_01]1:8 [h02_02]9:16 [h02_03]17:24 !h02_04! !h02_05! !h02_06! !h02_07! !h02_08!  \n"
+        "l1 [h02_10]1:5 \n",
+        "1,633800024,633800039,1983-08-03 00:00:00,1983-08-03 00:00:00,0,24.22192,16.30086,7.921060000000001,3,3\n"
+        "\n"
+        "\n"
+        "\n"
+        "primary\n"
+        "\n"
+        " primary  1.234567 junk etc   secondary     9.87654321   \n"
+        "\n"
+        "\n"
+        "\n"
+        "   1.000  more crap here nan etc secondary       1.200     1.400     1.600     1.800     2.00000  2.200    2.400   # not used   2.600     2.800\n"
+        "1236.5678495.123-900.999     2.200     2.600     3.000     3.400     3.800     4.200     \n"
+        "4.123trash\n"
+        "dummy_obs 123456789.987654321\n"});
+    cases.push_back({"whitespace",
+        "pif ~\n"
+        "l1 w !obj_1!\n"
+        "l1 w !obj_2!\n",
+        "obj_1 0.5\n"
+        "obj_2 7.0\n"});
+
+    for (auto& c : cases)
+    {
+        const string ins_name = string("selftest_br_") + c.tag + ".ins";
+        const string out_name = string("selftest_br_") + c.tag + ".out";
+        { ofstream f(ins_name, ios::binary); f << c.ins; }
+        { ofstream f(out_name, ios::binary); f << c.out; }
+
+        Observations truth;
+        {
+            InstructionFile ins(ins_name);
+            truth = ins.read_output_file(out_name);
+        }
+        CHK(truth.size() > 0, string("the ") + c.tag + " case should read something");
+        CHK(truth.find("DUM") == truth.end(),
+            string("a DUM placeholder must never become an observation (") + c.tag + ")");
+
+        int threw = 0, wrong = 0, dum_leaked = 0;
+        string first_wrong;
+        for (size_t cut = 0; cut <= c.out.size(); cut++)
+        {
+            { ofstream f(out_name, ios::binary | ios::trunc); f << c.out.substr(0, cut); }
+            InstructionFile ins(ins_name);
+            Observations got;
+            vector<string> missing, problems;
+            try { ins.try_read_output_file(out_name, got, missing, problems); }
+            catch (...) { threw++; continue; }
+            if (got.find("DUM") != got.end())
+                dum_leaked++;
+            for (auto& name : got.get_keys())
+            {
+                if (truth.find(name) == truth.end())
+                    continue;
+                if (abs(got.get_rec(name) - truth.get_rec(name)) > 1.0e-12)
+                {
+                    wrong++;
+                    if (first_wrong.empty())
+                    {
+                        stringstream ss;
+                        ss << c.tag << ": " << name << " read as " << got.get_rec(name)
+                           << " instead of " << truth.get_rec(name) << " at byte " << cut;
+                        first_wrong = ss.str();
+                    }
+                }
+            }
+            CHK(got.size() + missing.size() == truth.size(),
+                string("present + missing must account for the covered set (") + c.tag + ")");
+        }
+        CHK(threw == 0, string("the tolerant reader must never throw (") + c.tag + ")");
+        CHK(dum_leaked == 0, string("a truncated read must not leak DUM (") + c.tag + ")");
+        CHK(wrong == 0, "a partial read reported a WRONG value: " + first_wrong);
+
+        remove(ins_name.c_str());
+        remove(out_name.c_str());
+    }
+}
+
+/**
+ * @brief A partial write must leave the run's STATUS alone, and everything that reads it.
+ *
+ * update_run() marks a run complete as it writes the observations. For preemption that is
+ * exactly wrong - the run is still executing, and the status byte is what get_num_good_runs(),
+ * get_failed_run_ids() and the restart logic all key off. The plan is explicit that the byte
+ * does not gain a fifth "partial" value, because each of those call sites would then have to
+ * handle it correctly and the failure mode if one did not is silent.
+ *
+ * So the test is not really about the observations - it is about everything that must NOT
+ * have changed.
+ */
+static void test_run_storage_partial_update()
+{
+    cout << "[run storage: a partial write leaves the run status untouched]" << endl;
+    const string stor = "selftest_partial.rns";
+    remove(stor.c_str());
+    vector<string> pnames{"P1", "P2"}, onames{"O1", "O2", "O3"};
+
+    RunStorage rs(stor);
+    rs.reset(pnames, onames, stor);
+    Parameters pars;
+    pars.insert("P1", 1.0);
+    pars.insert("P2", 2.0);
+    int rid = rs.add_run(pars, "a run", 0.0);
+    int other = rs.add_run(pars, "another", 0.0);
+
+    int status = -99;
+    string info_txt;
+    double info_value = 0.0;
+    rs.get_info(rid, status, info_txt, info_value);
+    CHK(status == 0, "a queued run starts as not-completed");
+    CHK(rs.get_num_good_runs() == 0, "no runs are good before any complete");
+
+    // partial results: two observations read, one not (carrying the sentinel the model
+    // interface fills in)
+    Observations partial;
+    partial.insert("O1", 11.5);
+    partial.insert("O2", 22.5);
+    partial.insert("O3", Transformable::no_data);
+    rs.update_run_partial(rid, partial);
+
+    rs.get_info(rid, status, info_txt, info_value);
+    CHK(status == 0, "a PARTIAL write must not mark the run completed");
+    CHK(rs.get_num_good_runs() == 0, "a partial run must not count as a good run");
+    CHK(rs.get_run_status(rid) == 0, "a partial run must not read as failed or complete");
+    CHK(info_txt.find("a run") != string::npos, "the run's info text must survive a partial write");
+
+    // ...and the values are readable, with the status saying they are not final
+    Parameters gp;
+    Observations go;
+    int read_status = rs.get_run(rid, gp, go);
+    CHK(read_status == 0, "reading a partial run reports it as not completed");
+    CHK(abs(go.get_rec("O1") - 11.5) < 1.0e-12, "the partial observation is readable");
+    CHK(abs(go.get_rec("O2") - 22.5) < 1.0e-12, "the partial observation is readable");
+    CHK(abs(go.get_rec("O3") - Transformable::no_data) < 1.0e-12,
+        "the unread observation keeps the sentinel");
+    CHK(abs(gp.get_rec("P1") - 1.0) < 1.0e-12, "a partial write must not disturb parameters");
+    CHK(abs(gp.get_rec("P2") - 2.0) < 1.0e-12, "a partial write must not disturb parameters");
+
+    // the neighbouring record must be untouched - the seek arithmetic is the risk here
+    rs.get_info(other, status, info_txt, info_value);
+    CHK(status == 0, "a partial write must not reach the next run's record");
+    CHK(info_txt.find("another") != string::npos, "the next run's info text is intact");
+
+    // and when it really finishes, the ordinary path still marks it complete
+    Observations finished;
+    finished.insert("O1", 11.5);
+    finished.insert("O2", 22.5);
+    finished.insert("O3", 33.5);
+    rs.update_run(rid, finished);
+    rs.get_info(rid, status, info_txt, info_value);
+    CHK(status == 1, "completing the run after a partial write still marks it complete");
+    CHK(rs.get_num_good_runs() == 1, "the completed run now counts as good");
+    Observations go2;
+    Parameters gp2;
+    rs.get_run(rid, gp2, go2);
+    CHK(abs(go2.get_rec("O3") - 33.5) < 1.0e-12, "completion overwrites the sentinel");
+
+    rs.free_memory();
+    remove(stor.c_str());
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -671,6 +1228,12 @@ int main()
     test_ensemble_zero_copy_view();
     test_run_map_survives_resize();
     test_subset_names_survive_membership_change();
+    test_instruction_file_tolerant_read();
+    test_instruction_file_partial_reads_are_never_wrong();
+    test_model_interface_partial_across_files();
+    test_instruction_file_partial_real_case();
+    test_instruction_file_partial_remaining_branches();
+    test_run_storage_partial_update();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

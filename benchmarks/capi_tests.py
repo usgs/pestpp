@@ -12,6 +12,7 @@ run map; only a caller doing something the built-in loop never does can.
 The library is located in the build tree rather than installed, matching how CI builds it.
 """
 import os
+import re
 import platform
 import shutil
 import subprocess
@@ -61,13 +62,21 @@ def _find_agent_exe():
     roots = [os.path.join("pestpp", "bin"),
              os.path.join("..", "..", "pestpp", "bin"),
              os.path.join("..", "..", "..", "..", "pestpp", "bin"),
-             os.path.join(_REPO, "bin")]
+             os.path.join(_REPO, "bin"),
+             os.path.join(_REPO, "build", "src", "programs", "pestpp-ies")]
+    found = []
     for root in roots:
         for cand in (os.path.join(root, _sub, "pestpp-ies" + exe),
                      os.path.join(root, "pestpp-ies" + exe)):
             if os.path.exists(cand):
-                return os.path.abspath(cand)
-    raise RuntimeError("could not find pestpp-ies under any of {0}".format(roots))
+                found.append(os.path.abspath(cand))
+    if not found:
+        raise RuntimeError("could not find pestpp-ies under any of {0}".format(roots))
+    # NEWEST wins, exactly as _find_library() picks the shared library. An installed copy in
+    # bin/ competes on mtime rather than short-circuiting: a stale agent silently shadowing a
+    # fresh build is how a protocol change appears to do nothing at all, and the agent is now
+    # a protocol participant - it advertises what messages it understands.
+    return max(found, key=os.path.getmtime)
 
 
 port = 4062
@@ -1130,6 +1139,108 @@ def capi_unknown_option_is_reported_test():
 
 # ---- panther ------------------------------------------------------------------------------
 
+
+def capi_partial_results_test():
+    """Ask a worker mid-run what it has, and get a real answer back.
+
+    The whole preemption chain, end to end against a live master and agents: REQ_PARTIAL out,
+    the agent reading its output files tolerantly WITHOUT disturbing the run, PARTIAL_OBS back,
+    and update_run_partial() storing it without marking the run complete.
+
+    The model is slowed deliberately - there has to be a run genuinely in flight to ask about,
+    and on a fast model every run finishes before the request lands.
+    """
+    wd = _setup("capi_partial", noptmax=1, num_reals=6)
+    # a forward run that writes its output and THEN dawdles, so a request arrives while the
+    # run is still executing but after there is something real to report
+    # A model that writes its output PROGRESSIVELY - the first line of observations, a pause,
+    # then the second. That is exactly the state preemption exists to interrogate, and it is
+    # what this case's real model never shows: mfnwt writes 10par_xsec.hds only on a complete
+    # successful run, so there is no moment at which it is half written.
+    with open(os.path.join(wd, "slow_model.py"), "w") as f:
+        f.write("import subprocess, time\n"
+                "subprocess.run(['mfnwt', '10par_xsec.nam'], check=False)\n"
+                "row = ' '.join(['1.5'] * 10)\n"
+                "with open('10par_xsec.hds', 'w') as o:\n"
+                "    o.write(row + '\\n')\n"      # first line complete, second absent
+                "    o.flush()\n"
+                "time.sleep(6)\n"
+                "with open('10par_xsec.hds', 'w') as o:\n"
+                "    o.write(row + '\\n' + row + '\\n')\n")
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.model_command = ["python slow_model.py"]
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    worker_root = os.path.join(_BENCH, "capi_partial_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    procs = []
+    agent_exe = _find_agent_exe()
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=port) as ies:
+            for i in range(3):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+
+            n = ies.initialize_prepare()
+            assert n > 0, n
+            ies.queue_runs()
+            ies.begin_batch()
+            requested = 0
+            running_since = None
+            deadline = time.time() + 180
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    break
+                stats = ies.get_run_time_stats()
+                # Ask REPEATEDLY, about once a second, for as long as the batch runs.
+                # A single well-timed request is not enough: runs start and finish
+                # continuously, and a request that lands in the moment after pest++ deletes
+                # the old output file and before the model rewrites it is answered honestly
+                # with "0 of 20" - correct, but it demonstrates nothing.
+                if stats["running"] > 0 and (time.time() - (running_since or 0)) > 1.0:
+                    running_since = time.time()
+                    requested += ies.request_partial_results()
+            ies.end_batch()
+            ies.process_runs()
+            ies.initialize_finish()
+
+            assert requested > 0, \
+                "no partial-results requests were sent; no run was ever seen running"
+            # the master logs each partial reply it stores - to the PANTHER log, not the .rec
+            rmr = open(os.path.join(wd, "pest.rmr")).read()
+            replies = [ln for ln in rmr.splitlines() if "partial results from" in ln]
+            assert replies, "the master never recorded a partial reply:\n" + rmr[-2000:]
+            # and at least one reply carried REAL observations, read out of a file the model
+            # was still running against
+            got_real = False
+            for ln in replies:
+                m = re.search(r"(\d+) of (\d+) observations", ln)
+                if m and int(m.group(1)) > 0:
+                    got_real = True
+                    # the model had written exactly the first of two observation lines
+                    assert int(m.group(1)) == 10, \
+                        "expected the 10 observations on the completed line: " + ln
+            assert got_real, \
+                "every partial reply was empty; the tolerant read recovered nothing:\n" + \
+                "\n".join(replies)
+            # and the run still completed normally afterwards - asking must not disturb it
+            # 0 == PHI_MEAS
+            assert np.isfinite(ies.get_phi_summary(0)["mean"]), \
+                "the batch did not complete after a partial-results request"
+    finally:
+        for p_ in procs:
+            try:
+                p_.terminate()
+            except Exception:
+                pass
+
+
 def capi_panther_control_test():
     """Watch and cancel runs mid-batch against a real PANTHER master.
 
@@ -1243,4 +1354,5 @@ if __name__ == "__main__":
     capi_da_resize_between_queue_and_harvest_test()
     capi_tool_ensemble_availability_test()
     capi_panther_control_test()
+    capi_partial_results_test()
     print("all capi tests passed")

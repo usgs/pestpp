@@ -16,6 +16,7 @@
 #include <unordered_set>
 #include "model_interface.h"
 #include <limits>
+#include <filesystem>
 
 using namespace std;
 
@@ -545,6 +546,36 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
  *
  * @param obs Description.
  */
+void ModelInterface::try_read_output_files(Observations *obs, vector<string>& missing,
+	vector<string>& problems)
+{
+	// built from insfile_vec, the way ThreadedInstructionProcess::work does. The
+	// `instructionfiles` member looks like the right thing to iterate and is always empty -
+	// its only push_back sits inside a commented-out block.
+	for (int i = 0; i < insfile_vec.size(); i++)
+	{
+		Observations file_obs;
+		vector<string> file_missing, file_problems;
+		InstructionFile ins(insfile_vec[i]);
+		ins.set_additional_delimiters(additional_ins_delimiters);
+		// never throws, by contract - so one unreadable output file cannot cost us the
+		// results sitting in the others, which is the entire point of asking
+		ins.try_read_output_file(outfile_vec[i], file_obs, file_missing, file_problems);
+		vector<string> keys = file_obs.get_keys();
+		obs->update_without_clear(keys, file_obs.get_data_vec(keys));
+		missing.insert(missing.end(), file_missing.begin(), file_missing.end());
+		problems.insert(problems.end(), file_problems.begin(), file_problems.end());
+	}
+	// fill the gaps with the sentinel so the caller gets a complete vector, and keep the
+	// names alongside so it never has to detect absence by comparing against a magic number
+	if (missing.size() > 0)
+	{
+		vector<double> fill(missing.size(), Transformable::no_data);
+		obs->update_without_clear(missing, fill);
+	}
+	sort(missing.begin(), missing.end());
+}
+
 void ModelInterface::read_output_files(Observations *obs)
 {
 	int nnum_threads = num_threads;
@@ -1477,6 +1508,13 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
  */
 Observations InstructionFile::read_output_file(const string& output_filename)
 {
+	Observations obs;
+	read_output_file(output_filename, obs);
+	return obs;
+}
+
+void InstructionFile::read_output_file(const string& output_filename, Observations& obs)
+{
 	if (!pest_utils::check_exist_in(output_filename))
 		throw_ins_error("output file'" + output_filename + "' not found");
 	ifstream f_ins(ins_filename);
@@ -1488,7 +1526,6 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 	}
 	string ins_line, out_line;
 	vector<string> tokens;
-	Observations obs;
 	pair<string, double> lhs;
 	while (true)
 	{
@@ -1577,7 +1614,127 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 	}
 	f_ins.close();
 	f_out.close();
-	return obs;	
+}
+
+/**
+ * @brief Copy the complete (newline-terminated) prefix of a file to a temp file.
+ *
+ * Returns the temp file's name, or "" when the file has no complete line yet. Used only by
+ * the tolerant reader - see try_read_output_file() for why a partial final line must not be
+ * parsed. Written to the system temp directory rather than beside the output file, because
+ * the model may still be writing in that directory.
+ */
+string InstructionFile::write_complete_lines_to_temp(const string& output_filename)
+{
+	ifstream f_in(output_filename, ios::binary);
+	if (!f_in.good())
+		throw runtime_error("could not open '" + output_filename + "' for reading");
+	stringstream buf;
+	buf << f_in.rdbuf();
+	f_in.close();
+	string text = buf.str();
+	size_t last = text.find_last_of('\n');
+	if (last == string::npos)
+		return string();                 // nothing complete to read yet
+	std::filesystem::path tmp = std::filesystem::temp_directory_path() /
+		(std::filesystem::path(output_filename).filename().string() + ".pestpp_partial");
+	ofstream f_out(tmp, ios::binary | ios::trunc);
+	if (!f_out.good())
+		throw runtime_error("could not open a temp file for the partial read");
+	f_out.write(text.data(), (streamsize)(last + 1));
+	f_out.close();
+	return tmp.string();
+}
+
+void InstructionFile::try_read_output_file(const string& output_filename, Observations& obs,
+	vector<string>& missing, vector<string>& problems)
+{
+	// every name this instruction file is responsible for. Asked up front because it is the
+	// only way to report what is MISSING after a parse that stopped early - and because a
+	// file that could not be opened at all still has to name everything it was going to
+	// supply rather than reporting nothing at all.
+	unordered_set<string> covered;
+	try
+	{
+		covered = parse_and_check();
+	}
+	catch (const exception& e)
+	{
+		// the instruction file itself is unreadable, which is not a partial-results problem:
+		// there is nothing to be partial about, and nothing can be named as missing
+		problems.push_back(string("could not parse instruction file '") + ins_filename +
+			"': " + e.what());
+		return;
+	}
+	catch (...)
+	{
+		problems.push_back(string("could not parse instruction file '") + ins_filename + "'");
+		return;
+	}
+
+	// A missing or unopenable output file is NOT an error here. A run that has not written
+	// its output yet is the ordinary case when asking a run in flight what it has.
+	if (!pest_utils::check_exist_in(output_filename))
+	{
+		problems.push_back("output file '" + output_filename + "' not found (yet)");
+	}
+	else
+	{
+		// Only COMPLETE lines are trusted. A run that is still going may be mid-write, and an
+		// unterminated final line is indistinguishable from a finished one to getline() - so
+		// "1.2345" caught at "1.2" parses cleanly and would be reported as a confident WRONG
+		// value rather than an absent one. That is the one outcome partial results must never
+		// produce: a caller computing phi from them would get a plausible wrong answer.
+		//
+		// The cost is a legitimately-complete last line with no trailing newline being
+		// skipped. That is the right trade here - a run that has genuinely FINISHED is read
+		// by the strict path, which is unchanged and reads it.
+		string safe_name;
+		try
+		{
+			safe_name = write_complete_lines_to_temp(output_filename);
+		}
+		catch (const exception& e)
+		{
+			problems.push_back(string("could not stage output file '") + output_filename +
+				"' for a partial read: " + e.what());
+		}
+		if (safe_name.empty())
+		{
+			if (problems.empty())
+				problems.push_back("output file '" + output_filename +
+					"' has no complete lines yet");
+		}
+		else
+		{
+			try
+			{
+				read_output_file(safe_name, obs);
+			}
+			catch (const exception& e)
+			{
+				// obs keeps whatever was read before this - that is the point of the reference
+				problems.push_back(e.what());
+			}
+			catch (...)
+			{
+				problems.push_back("unknown error reading output file '" + output_filename + "'");
+			}
+			std::error_code ec;
+			std::filesystem::remove(safe_name, ec);
+		}
+	}
+
+	vector<string> have = obs.get_keys();
+	unordered_set<string> hset(have.begin(), have.end());
+	for (const string& name : covered)
+	{
+		if (name == "DUM")            // the throwaway name; never a real observation
+			continue;
+		if (hset.find(name) == hset.end())
+			missing.push_back(name);
+	}
+	sort(missing.begin(), missing.end());
 }
 
 

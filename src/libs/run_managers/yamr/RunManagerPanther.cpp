@@ -731,6 +731,8 @@ void RunManagerPanther::begin_batch()
 	stringstream ss;
 	model_runs_done = 0;
 	model_runs_failed = 0;
+	// partial results describe runs that were in flight; a new batch has none
+	partial_info_map.clear();
 	model_runs_timed_out = 0;
 	bytes_transferred = 0;
 	files_transferred = 0;
@@ -1867,6 +1869,12 @@ void RunManagerPanther::process_message(int i_sock)
 	{
 		// ready message received from agent
 		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
+		// an agent that can answer REQ_PARTIAL says so here. An older one never does, and
+		// that is what keeps us from sending it a message its in-run loop would treat as
+		// corrupt and kill the run over.
+		string ready_txt = net_pack.get_info_txt();
+		if (ready_txt.find(NetPackage::PARTIAL_CAPABILITY_TAG) != string::npos)
+			agent_info_iter->set_supports_partial(true);
 	}
 
 	else if ( (net_pack.get_type() == NetPackage::PackType::RUN_FINISHED
@@ -1915,6 +1923,45 @@ void RunManagerPanther::process_message(int i_sock)
 
 
 
+	}
+	else if (net_pack.get_type() == NetPackage::PackType::PARTIAL_OBS)
+	{
+		int run_id = net_pack.get_run_id();
+		// a run that finished while the request was in flight: the real result has already
+		// been stored and marked complete, and a partial write over it would be a downgrade
+		if (!run_finished(run_id))
+		{
+			try
+			{
+				Parameters pars;
+				Observations obs;
+				double run_time = 0;
+				Serialization::unserialize(net_pack.get_data(), pars, get_par_name_vec(), obs,
+					get_obs_name_vec(), run_time);
+				file_stor.update_run_partial(run_id, obs);
+				int n_real = 0;
+				vector<double> ovals = obs.get_data_vec(get_obs_name_vec());
+				for (size_t i = 0; i < ovals.size(); i++)
+					if (ovals[i] != Transformable::no_data)
+						n_real++;
+				PartialInfo pi;
+				pi.n_reported = n_real;
+				pi.n_total = (int)ovals.size();
+				partial_info_map[run_id] = pi;
+				stringstream ss;
+				ss << " run_id:" << run_id << " partial results from:" << host_name << "$"
+				   << agent_info_iter->get_work_dir() << " " << n_real << " of " << pi.n_total
+				   << " observations";
+				report(ss.str(), false);
+			}
+			catch (const exception& e)
+			{
+				// partial results are advisory - a bad one costs the report, not the batch
+				stringstream ss;
+				ss << " run_id:" << run_id << " unusable partial results: " << e.what();
+				report(ss.str(), false);
+			}
+		}
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUN_FAILED)
 	{
@@ -2250,6 +2297,46 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
  *
  * @return Description.
  */
+int RunManagerPanther::request_partial_results(const vector<int>& run_ids)
+{
+	set<int> want(run_ids.begin(), run_ids.end());
+	int n_sent = 0, n_skipped = 0;
+	for (auto& agent : agent_info_set)
+	{
+		if (agent.get_state() != AgentInfoRec::State::ACTIVE)
+			continue;
+		int run_id = agent.get_run_id();
+		if ((want.size() > 0) && (want.find(run_id) == want.end()))
+			continue;
+		if (!agent.get_supports_partial())
+		{
+			// NOT merely unsupported: this agent would treat the message as corrupt and kill
+			// the run. Skipping it is the difference between no answer and lost work.
+			n_skipped++;
+			continue;
+		}
+		NetPackage net_pack(NetPackage::PackType::REQ_PARTIAL, cur_group_id, run_id, "");
+		char data = '\0';
+		pair<int, string> err = net_pack.send(agent.get_socket_fd(), &data, sizeof(data));
+		if (err.first == 1)
+			n_sent++;
+		else
+		{
+			stringstream ss;
+			ss << " error requesting partial results for run_id:" << run_id << " : "
+			   << err.second;
+			report(ss.str(), false);
+		}
+	}
+	if (n_skipped > 0)
+	{
+		stringstream ss;
+		ss << " skipped " << n_skipped << " agent(s) that cannot report partial results";
+		report(ss.str(), false);
+	}
+	return n_sent;
+}
+
 bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 {
 	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(sock_id);
@@ -3009,6 +3096,14 @@ vector<PantherRunState> RunManagerPanther::get_run_states(const vector<int>& run
 		PantherRunState st;
 		st.run_id = run_id;
 		st.n_failures = (int)failure_map.count(run_id);
+		// partial results, if a worker has reported any for this run
+		map<int, PartialInfo>::const_iterator pit = partial_info_map.find(run_id);
+		if (pit != partial_info_map.end())
+		{
+			st.has_partial = true;
+			st.n_obs_reported = pit->second.n_reported;
+			st.n_obs_total = pit->second.n_total;
+		}
 		st.n_concurrent = get_n_concurrent(run_id);
 
 		auto range = active_runid_to_iterset_map.equal_range(run_id);

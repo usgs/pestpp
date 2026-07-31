@@ -695,6 +695,21 @@ typedef int (*pestpp_run_observer_fn)(const pestpp_run_progress* progress, void*
 PESTPP_API pestpp_status pestpp_set_run_observer(pestpp_handle h, pestpp_run_observer_fn fn,
                                                  void* user_data, double min_interval_sec);
 
+/* Ask the workers running these runs to report whatever results they have RIGHT NOW.
+ *
+ * Asynchronous: this returns as soon as the requests are sent. A worker answers when it can,
+ * or not at all - nothing blocks and no run is interrupted. `n_requested` receives how many
+ * requests actually went out, which can be fewer than asked for: a request is only sent to an
+ * agent that advertised support for it, because an older agent treats an unrecognised message
+ * during a run as corrupt and TERMINATES the run rather than ignoring it.
+ *
+ * Pass run_ids=NULL, n=0 for every run currently executing.
+ *
+ * PANTHER only - there is nobody to ask on the serial run manager, which reports 0 rather
+ * than failing. Legal from inside a run observer. */
+PESTPP_API pestpp_status pestpp_request_partial_results(pestpp_handle h, const int* run_ids,
+                                                        int n, int* n_requested);
+
 /* Aggregate counts for the batch in flight. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
                                                    int* n_completed, int* n_failed,

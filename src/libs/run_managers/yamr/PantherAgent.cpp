@@ -522,6 +522,55 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				smessage << "received kill request signal from master";
 				break;
 			}
+			else if (net_pack.get_type() == NetPackage::PackType::REQ_PARTIAL)
+			{
+				// Answer with whatever the output files hold RIGHT NOW. The run is NOT
+				// disturbed: no flag is set, no thread is signalled, and this returns to the
+				// loop either way. A request we cannot answer is simply not answered.
+				//
+				// Safe to run while the model thread is going because it reads the output
+				// FILES into a fresh Observations - it never touches `obs`, which the run
+				// thread owns and is writing - and try_read_output_files() only reads the
+				// interface's file-name vectors, which are fixed for the life of the run.
+				report("received partial results request from master", false);
+				try
+				{
+					Observations partial;
+					vector<string> missing, problems;
+					mi.try_read_output_files(&partial, missing, problems);
+					// captured BEFORE reset(), which overwrites them on the same object
+					int p_group = net_pack.get_group_id();
+					int p_run = net_pack.get_run_id();
+					// the master's ordering, not ours - the codec is positional
+					vector<int8_t> sdata = Serialization::serialize(pars, par_name_vec,
+						partial, master_obs_name_vec, 0.0);
+					stringstream pss;
+					pss << "partial: " << (master_obs_name_vec.size() - missing.size())
+						<< " of " << master_obs_name_vec.size() << " observations";
+					// say WHY when nothing came back - an empty partial result with no reason
+					// is indistinguishable from a broken exchange, which cost real debugging
+					if ((missing.size() == master_obs_name_vec.size()) && (problems.size() > 0))
+						pss << " (" << problems[0] << ")";
+					net_pack.reset(NetPackage::PackType::PARTIAL_OBS, p_group, p_run,
+						pss.str());
+					err = send_message(net_pack, sdata.data(), sdata.size());
+					if (err.first != 1)
+						report("error sending partial results to master: " + err.second, false);
+					else
+						report(pss.str(), false);
+				}
+				catch (const exception& e)
+				{
+					// a partial-results request must never be able to damage the run it is
+					// asking about, so nothing here is fatal
+					report(string("error gathering partial results (run continues): ")
+						+ e.what(), false);
+				}
+				catch (...)
+				{
+					report("unknown error gathering partial results (run continues)", false);
+				}
+			}
 			else if (net_pack.get_type() == NetPackage::PackType::TERMINATE)
 			{
 				ss.str("");
@@ -536,12 +585,12 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 			else
 			{
 				ss.str("");
-				ss << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run, not: ";
+				ss << "Received unsupported message from master, only PING REQ_KILL REQ_PARTIAL or TERMINATE can be sent during model run, not: ";
 				ss << net_pack.pack_strings[static_cast<int>(net_pack.get_type())] <<  " run_id:" << net_pack.get_run_id();
 				report(ss.str(), true);
 				f_terminate.set(true);
 				final_run_status = NetPackage::PackType::CORRUPT_MESG;
-				smessage << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run, not:";
+				smessage << "Received unsupported message from master, only PING REQ_KILL REQ_PARTIAL or TERMINATE can be sent during model run, not:";
 				smessage << net_pack.pack_strings[static_cast<int>(net_pack.get_type())] << " run_id:" << net_pack.get_run_id();
 				//terminate_or_restart(-1);
 				break;
@@ -841,6 +890,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), obs_name_vec);
+			master_obs_name_vec = obs_name_vec;
 			//make sure all par names are found in the scenario
 			//vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
             vector<string> vnames = pest_scenario.get_ctl_observations().get_keys();
@@ -970,6 +1020,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 							sort(obs_names.begin(), obs_names.end());
 							par_name_vec = par_names;
 							obs_name_vec = obs_names;
+							master_obs_name_vec = obs_name_vec;
 							mi = ModelInterface(childPest.get_tplfile_vec(), childPest.get_inpfile_vec(),
 								childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
 							obs = childPest.get_ctl_observations();
@@ -1116,7 +1167,10 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "sending ready signal to master";
 				report(ss.str(), true);
-				net_pack.reset(NetPackage::PackType::READY, 0, 0, "lets do it");
+				// the READY text is free-form and older masters ignore it, so it is where this
+				// agent says it can answer REQ_PARTIAL without changing the handshake
+				net_pack.reset(NetPackage::PackType::READY, 0, 0,
+					string("lets do it ") + NetPackage::PARTIAL_CAPABILITY_TAG);
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
@@ -1280,7 +1334,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "sending ready signal to master";
 				report(ss.str(), true);
-				net_pack.reset(NetPackage::PackType::READY, 0, 0, final_run_status.second);
+				net_pack.reset(NetPackage::PackType::READY, 0, 0,
+					final_run_status.second + " " + NetPackage::PARTIAL_CAPABILITY_TAG);
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)

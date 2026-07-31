@@ -303,6 +303,9 @@ class PestppLib:
         lib.pestpp_run_slice.restype = c_int
         lib.pestpp_end_batch.argtypes = (c_void_p,)
         lib.pestpp_end_batch.restype = c_int
+        lib.pestpp_request_partial_results.argtypes = (
+            c_void_p, POINTER(c_int), c_int, POINTER(c_int))
+        lib.pestpp_request_partial_results.restype = c_int
         lib.pestpp_set_run_observer.argtypes = (
             c_void_p, _RUN_OBSERVER_FN, c_void_p, c_double)
         lib.pestpp_set_run_observer.restype = c_int
@@ -731,6 +734,19 @@ class PestppLib:
         self._check(self.lib.pestpp_set_run_observer(
             self.handle, self._observer_thunk, None, c_double(float(min_interval_sec))),
             "pestpp_set_run_observer")
+
+    def request_partial_results(self, run_ids=None) -> int:
+        """Ask the workers running these runs for whatever they have. Returns requests sent."""
+        n_req = c_int()
+        if run_ids:
+            ids = list(run_ids)
+            arr = (c_int * len(ids))(*ids)
+            self._check(self.lib.pestpp_request_partial_results(
+                self.handle, arr, len(ids), byref(n_req)), "pestpp_request_partial_results")
+        else:
+            self._check(self.lib.pestpp_request_partial_results(
+                self.handle, None, 0, byref(n_req)), "pestpp_request_partial_results")
+        return n_req.value
 
     def get_run_time_stats(self) -> dict:
         avg = c_double()

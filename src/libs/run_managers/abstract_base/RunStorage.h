@@ -62,6 +62,30 @@ public:
 	void copy(const RunStorage &rhs_rs);
 	void update_run(int run_id, const Parameters &pars, const Observations &obs);
 	void update_run(int run_id, const Observations &obs);
+	/**
+	 * @brief Write a run's observation block WITHOUT touching its status.
+	 *
+	 * For partial results from a run that is still executing - see
+	 * docs/api_part1/panther_preemption.md. update_run() marks the run complete as it writes,
+	 * which is exactly what must not happen here: the run is still going, and anything that
+	 * counts completed runs or decides what to re-run on restart reads that byte.
+	 *
+	 * The status byte is deliberately NOT given a fifth "partial" value. Three of its four
+	 * meanings are load-bearing in get_failed_run_ids(), get_num_good_runs() and the restart
+	 * logic; a new one would have to be handled correctly at every one of those sites, and
+	 * the failure mode if it were not is silent. Partial-ness is live, in-flight state and
+	 * belongs with the live run state instead. A partial run therefore still reads back with
+	 * status 0 - not completed - and get_run() hands back whatever has been written so far.
+	 *
+	 * `obs` must span obs_names; observations that were not read carry no_data, so the caller
+	 * gets a full block plus a separate list of which entries are real.
+	 *
+	 * Unlike update_run() this does NOT use the end-of-file recovery buffer. A torn partial
+	 * write is not worth recovering: the run is still executing, the next partial write or
+	 * its eventual completion overwrites the block, and on restart an in-flight run is re-run
+	 * regardless.
+	 */
+	void update_run_partial(int run_id, const Observations &obs);
 	void update_run(int run_id, const std::vector<char> serial_data);
 	void update_run_failed(int run_id);
 	/** @brief Set the failure count for a run record.

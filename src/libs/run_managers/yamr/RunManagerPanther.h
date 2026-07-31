@@ -44,6 +44,20 @@ public:
 	void set_socket_fd(int _socket_fd);
 	int get_run_id() const;
 	void set_run_id(int _run_id);
+	/**
+	 * @brief Whether this agent understands REQ_PARTIAL.
+	 *
+	 * Gated, and it has to be. An agent that does not recognise a message DURING A RUN does
+	 * not ignore it - PantherAgent's in-run loop treats an unknown type as CORRUPT_MESG and
+	 * terminates the run it is executing. So sending REQ_PARTIAL to an older agent would not
+	 * "degrade to no partial results", it would KILL the run we were asking about.
+	 *
+	 * Announced by the agent in the free-text field of its READY message, which older masters
+	 * already ignore and older agents simply never fill in - so a mixed fleet is safe in both
+	 * directions without changing the handshake.
+	 */
+	bool get_supports_partial() const { return supports_partial; }
+	void set_supports_partial(bool _flag) { supports_partial = _flag; }
 	int get_group_id() const;
 	void set_group_id(int _group_id);
 	State get_state() const;
@@ -83,6 +97,7 @@ public:
 
 	~AgentInfoRec(){}
 private:
+	bool supports_partial = false;
 	int socket_fd;
 	int run_id;
 	int group_id;
@@ -124,6 +139,12 @@ struct PantherRunState
 	double elapsed_sec = 0.0;  ///< how long it has been running on that worker
 	int n_concurrent = 0;      ///< workers currently running this same run_id
 	int n_failures = 0;        ///< failures accrued against this run_id so far
+	/// Partial results reported by a worker for a run that is STILL GOING. Deliberately live
+	/// state rather than a run-storage status: it is only meaningful while the process that
+	/// produced it is running, and it correctly disappears on restart.
+	bool has_partial = false;
+	int n_obs_reported = 0;    ///< how many observations are real
+	int n_obs_total = 0;       ///< out of how many
 };
 
 /// A point-in-time view of one worker, including what it has done so far this session.
@@ -243,7 +264,26 @@ private:
 	std::set<int> user_cancelled_runs;   ///< runs a caller gave up on; never rescheduled
 	std::set<int> timed_out_runs;        ///< runs killed for running past the overdue threshold
 	std::chrono::system_clock::time_point batch_start_time;
+	/// Live partial-result bookkeeping, by run_id. Lives here rather than in run storage
+	/// because it describes a process that is still running - see update_run_partial().
+	struct PartialInfo { int n_reported = 0; int n_total = 0; };
+	std::map<int, PartialInfo> partial_info_map;
 	RUN_UNTIL_COND run_scheduling_loop(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec);
+public:
+	/**
+	 * @brief Ask the workers running these runs to report what they have so far.
+	 *
+	 * Asynchronous and advisory: the requests are sent and this returns. A worker answers when
+	 * it can, or never - nothing blocks and no run is interrupted. Poll get_run_states() for
+	 * has_partial.
+	 *
+	 * Only sent to agents that advertised support (AgentInfoRec::get_supports_partial()).
+	 * That gate is not politeness: an older agent's in-run loop treats an unknown message as
+	 * CORRUPT_MESG and terminates the run, so asking it would destroy the work we are asking
+	 * about. Returns how many requests were actually sent.
+	 */
+	int request_partial_results(const std::vector<int>& run_ids) override;
+private:
 	void record_timed_out(int run_id);
 	pest_utils::thread_flag terminate_idle_thread;
 	pest_utils::thread_flag currently_idle;

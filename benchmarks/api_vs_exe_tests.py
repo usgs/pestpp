@@ -98,6 +98,62 @@ def _compare_csvs(d_exe, d_api, tag):
     return sorted(names_e & names_a), differing, sorted(names_e - names_a), sorted(names_a - names_e)
 
 
+#: text that can only have come from a model's console output, never from a pest++ csv
+_MODEL_OUTPUT_MARKERS = ("MODFLOW", "Solving:  Stress period", "Normal termination",
+                         "Run end date and time")
+
+
+def looks_corrupted(path):
+    """Whether a .csv contains something that cannot have been written by pest++.
+
+    Descriptor corruption on windows has twice put a model's console output INSIDE one of the
+    library's own output files - once in pest.phi.meas.csv, once in pest.phi.composite.csv.
+    Both times the only symptom was "1 of 25 files differ", which reads like a numeric wobble
+    and is why it was written off as a flake the first time.
+
+    The exposure is long-lived streams: the phi csvs and the .rec are held open by the
+    FileManager for the whole run, and the run storage fstream likewise, so they are open
+    across every model spawn. The ensemble csvs are opened, written and closed between runs
+    and have never been seen corrupted.
+
+    Returns a reason, or None if the file looks like a csv.
+    """
+    try:
+        with open(path, "r", errors="replace") as fp:
+            text = fp.read()
+    except OSError as e:
+        return "could not be read: {0}".format(e)
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return None
+    for marker in _MODEL_OUTPUT_MARKERS:
+        if marker in text:
+            return ("contains model console output ({0!r}) - a descriptor the library holds "
+                    "open was written to by something else".format(marker))
+    # a csv whose rows disagree wildly on column count is not a csv any more
+    widths = [ln.count(",") for ln in lines]
+    if widths and max(widths) > 0:
+        odd = [w for w in widths if w == 0]
+        if len(odd) > max(1, len(widths) // 10):
+            return "{0} of {1} non-empty lines have no commas at all".format(
+                len(odd), len(widths))
+    return None
+
+
+def assert_outputs_well_formed(d, tag):
+    """Fail loudly, and by name, if any csv in this directory has been corrupted."""
+    bad = []
+    for f in sorted(os.listdir(d)):
+        if not f.endswith(".csv"):
+            continue
+        why = looks_corrupted(os.path.join(d, f))
+        if why:
+            bad.append("{0} {1}".format(f, why))
+    assert not bad, (
+        "{0}: output file(s) corrupted, which is NOT a numerical difference:\n  {1}".format(
+            tag, "\n  ".join(bad)))
+
+
 def _first_difference(d_exe, d_api, fname, max_lines=3):
     """The first few differing lines of one file, exe against api.
 
@@ -132,6 +188,11 @@ def _first_difference(d_exe, d_api, fname, max_lines=3):
 
 
 def _assert_identical(d_exe, d_api, tag):
+    # checked FIRST and separately: a corrupted file is not the same finding as a different
+    # one, and reporting it as "the API took a different path" sends you looking at the
+    # algorithm when the problem is a file descriptor
+    assert_outputs_well_formed(d_exe, tag + " (exe)")
+    assert_outputs_well_formed(d_api, tag + " (api)")
     shared, differing, only_e, only_a = _compare_csvs(d_exe, d_api, tag)
     detail = []
     for f in differing[:3]:

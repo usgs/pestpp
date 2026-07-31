@@ -199,7 +199,10 @@ NetPackage::NetPackage(PackType _type, int _group, int _run_id, const string &de
 	 */
 	pack_strings = vector<std::string>({ "unkn", "ok", "confirm_ok", "ready", "req_rundir", "rundir", "req_linpack", "linpack", "par_names",
 	"obs_names","start_run","run_finished","run_failed","run_killed","terminate","ping","req_kill","io_error","corrupt_mesg",
-		"debug_loop","debug_freeze_on_fail","file_wrkr2mstr","file_mstr2wrkr"});
+		"debug_loop","debug_freeze_on_fail","start_file_wrkr2mstr","cont_file_wrkr2mstr",
+		// finish_file_wrkr2mstr was MISSING: this table is indexed by the enum value, so
+		// pack_strings[FINISH_FILE_WRKR2MSTR] read past the end of the vector
+		"finish_file_wrkr2mstr","req_partial","partial_obs"});
 }
 /**
  * @brief Reset.

@@ -46,6 +46,12 @@ public:
 	std::pair<NetPackage::PackType,std::string> run_model(Parameters &pars, Observations &obs, NetPackage &net_pack);
 	void process_ctl_file(const string &ctl_filename);
 private:
+	/// The observation names the MASTER sent, in its order. Kept as a member because the
+	/// serialization codec is POSITIONAL - values only, ordered by the name vector handed to
+	/// it - so a partial-results reply assembled anywhere else has to use exactly this order
+	/// or the master unpacks the right numbers against the wrong names.
+	std::vector<std::string> master_obs_name_vec;
+
 	ofstream& frec;
 	int sockfd;
 	int fdmax;

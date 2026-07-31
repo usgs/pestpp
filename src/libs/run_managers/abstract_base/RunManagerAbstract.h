@@ -105,6 +105,14 @@ public:
 		progress_last = std::chrono::system_clock::time_point::min();
 		progress_stop_requested = false;
 	}
+	/**
+	 * @brief Ask the workers running these runs to report what they have so far.
+	 *
+	 * Asynchronous and advisory. Zero here means "nobody to ask": the serial and external
+	 * managers have no workers, so partial results are a PANTHER-only idea.
+	 */
+	virtual int request_partial_results(const std::vector<int>& run_ids) { (void)run_ids; return 0; }
+
 	/// Set once an observer has asked for STOP_BATCH; the run managers check it in their
 	/// scheduling loops. Cleared by the next set_progress_observer() or begin_batch().
 	bool progress_stop_requested = false;

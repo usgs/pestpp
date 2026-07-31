@@ -21,7 +21,10 @@ public:
 	enum class PackType :uint32_t {
 		UNKN, OK, CONFIRM_OK, READY, REQ_RUNDIR, RUNDIR, REQ_LINPACK, LINPACK, PAR_NAMES, OBS_NAMES,
 		START_RUN, RUN_FINISHED, RUN_FAILED, RUN_KILLED, TERMINATE,PING,REQ_KILL,IO_ERROR,CORRUPT_MESG,
-		DEBUG_LOOP,DEBUG_FAIL_FREEZE,START_FILE_WRKR2MSTR,CONT_FILE_WRKR2MSTR, FINISH_FILE_WRKR2MSTR};
+		DEBUG_LOOP,DEBUG_FAIL_FREEZE,START_FILE_WRKR2MSTR,CONT_FILE_WRKR2MSTR, FINISH_FILE_WRKR2MSTR,
+		// APPEND ONLY: the value is serialized as uint32_t, so inserting anywhere above
+		// renumbers every later type and two versions stop understanding each other.
+		REQ_PARTIAL, PARTIAL_OBS};
 	
 	static int get_new_group_id();
 	NetPackage(PackType _type=PackType::UNKN, int _group=-1, int _run_id=-1, const std::string &desc_str="");
@@ -29,6 +32,9 @@ public:
 
 	std::vector<std::string> pack_strings;
 	const static int DESC_LEN = 1001;
+	/// Announced by an agent in its READY text, and looked for by the master, to decide
+	/// whether REQ_PARTIAL is safe to send to it. See AgentInfoRec::get_supports_partial().
+	static constexpr const char* PARTIAL_CAPABILITY_TAG = "partial=1";
 	const static int NULL_DA_CYCLE = -9999;
 	const static int FILE_TRANS_BUF_SIZE = 102400;
 	std::pair<int,std::string> send(int sockfd, const void *data, int64_t data_len_l);

@@ -66,8 +66,33 @@ public:
 	InstructionFile(string _ins_filename, string _additional_delimiters="");
 	unordered_set<string> parse_and_check();
 	Observations read_output_file(const string& output_filename);
+	/**
+	 * @brief Read what can be read. Never throws.
+	 *
+	 * The forgiving twin of read_output_file(), for asking a run that is STILL GOING what it
+	 * has so far (see docs/api_part1/panther_preemption.md). The strict version is unchanged
+	 * and must stay that way: a run that genuinely finishes still has to fail loudly on a
+	 * malformed output file.
+	 *
+	 * Why this could not be done by catching read_output_file()'s exception: the strict
+	 * version built its observations in a LOCAL and returned by value, so everything read
+	 * before the failure died with the stack frame. Catching it higher up would have caught
+	 * an exception and no data. The parse now writes into a caller-owned Observations, which
+	 * is the whole trick - what was read survives the throw.
+	 *
+	 * @param obs      observations successfully read; absent means not read
+	 * @param missing  names this instruction file covers that are NOT in obs
+	 * @param problems what went wrong, in words, rather than thrown
+	 */
+	void try_read_output_file(const string& output_filename, Observations& obs,
+		vector<string>& missing, vector<string>& problems);
 	void set_additional_delimiters(string delims) { additional_delimiters = delims; }
 private:
+	/// The parse, writing into a caller-owned Observations so a throw does not destroy what
+	/// was read. Both public readers are thin wrappers over this.
+	void read_output_file(const string& output_filename, Observations& obs);
+	/// Stage the newline-terminated prefix of a file for a tolerant read; "" if none yet.
+	string write_complete_lines_to_temp(const string& output_filename);
 	int ins_line_num, out_line_num;
 	char marker;
 	string ins_filename, last_out_line, last_ins_line;
@@ -132,6 +157,30 @@ private:
 
 	void write_input_files(Parameters *pars_ptr);
 	void read_output_files(Observations *obs_ptr);
+public:
+	/**
+	 * @brief Read whatever the output files hold RIGHT NOW. Never throws.
+	 *
+	 * The model-interface half of partial results (docs/api_part1/panther_preemption.md): for
+	 * asking a run that is still going what it has, without disturbing it and without the
+	 * strict reader's all-or-nothing contract.
+	 *
+	 * Every observation the instruction files cover appears in `obs`. Ones that could not be
+	 * read carry Transformable::no_data AND are named in `missing`. Both are needed: filling
+	 * with zero would be indefensible - zero is a plausible simulated value and a caller
+	 * computing phi against it gets a confident wrong answer - but a sentinel alone makes a
+	 * caller scan for magic numbers to ask "how much of this run do I actually have?".
+	 *
+	 * Deliberately SERIAL, unlike read_output_files(). This runs once per preemption request
+	 * rather than once per model run, so thread-parallelism buys nothing measurable and would
+	 * add a concurrency surface to the one path whose whole job is to be unfailing.
+	 *
+	 * @param missing   observations that could not be read, by name
+	 * @param problems  what went wrong, in words
+	 */
+	void try_read_output_files(Observations *obs_ptr, vector<string>& missing,
+		vector<string>& problems);
+private:
 	void remove_existing();
 	void scrub_filename_ip(string& fname);
 
