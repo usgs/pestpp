@@ -1164,7 +1164,11 @@ def capi_partial_results_test():
                 "with open('10par_xsec.hds', 'w') as o:\n"
                 "    o.write(row + '\\n')\n"      # first line complete, second absent
                 "    o.flush()\n"
-                "time.sleep(6)\n"
+                # long enough that the half-written state is not a narrow window to hit. A
+                # request landing after the model finished is answered correctly with
+                # "20 of 20" - right, but it proves nothing about partial reads, so the test
+                # needs the partial state to be the common case rather than a lucky one.
+                "time.sleep(20)\n"
                 "with open('10par_xsec.hds', 'w') as o:\n"
                 "    o.write(row + '\\n' + row + '\\n')\n")
     pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
@@ -1195,6 +1199,7 @@ def capi_partial_results_test():
             running_since = None
             saw_live_partial = False
             partial_masks = []
+            saw_incomplete = False
             deadline = time.time() + 180
             while time.time() < deadline:
                 if ies.run_slice(0.05):
@@ -1239,9 +1244,15 @@ def capi_partial_results_test():
                 m = re.search(r"(\d+) of (\d+) observations", ln)
                 if m and int(m.group(1)) > 0:
                     got_real = True
-                    # the model had written exactly the first of two observation lines
-                    assert int(m.group(1)) == 10, \
-                        "expected the 10 observations on the completed line: " + ln
+                    n_read, n_tot = int(m.group(1)), int(m.group(2))
+                    assert n_read <= n_tot, ln
+                    # a reply of "20 of 20" is legitimate - the model finished before the
+                    # request landed - so the partial state is asserted separately below
+                    if n_read < n_tot:
+                        saw_incomplete = True
+            assert saw_incomplete, \
+                "every reply was complete; the model was not slow enough for a partial read " \
+                "to be observed, so this test proved nothing about partial parsing"
             assert got_real, \
                 "every partial reply was empty; the tolerant read recovered nothing:\n" + \
                 "\n".join(replies)
@@ -1283,19 +1294,57 @@ def capi_partial_results_test():
             for n_valid, n_total in partial_masks:
                 assert 0 < n_valid < n_total, (n_valid, n_total)
 
-            # a run_id that does not exist is refused, not silently empty
-            try:
-                ies.get_run_info(n_runs + 50)
-            except PestppError as e:
-                assert "no such run_id" in str(e), str(e)
-            else:
-                raise AssertionError("an out-of-range run_id should raise")
+
     finally:
         for p_ in procs:
             try:
                 p_.terminate()
             except Exception:
                 pass
+
+
+def capi_run_storage_read_test():
+    """Reading stored runs, including the ids that do not exist.
+
+    Serial and fast on purpose: it was originally folded into the PANTHER partial-results test,
+    which takes a couple of minutes and needs workers, so a crash here cost a full CI cycle to
+    see. An out-of-range id must be refused rather than seeking past the end of the storage
+    file - RunStorage::get_info() reads at a computed offset and only notices afterwards, which
+    surfaced as an access violation on windows.
+    """
+    wd = _setup("capi_storage_read", noptmax=1, num_reals=6)
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        ies.initialize()
+        n_runs = ies.get_run_count()
+        assert n_runs > 0, n_runs
+
+        # every stored run reads back with a full validity mask and finite values
+        for rid in range(n_runs):
+            info = ies.get_run_info(rid)
+            pars, obs, valid = ies.get_run_values(rid)
+            assert len(obs) == info["n_obs_total"], (len(obs), info)
+            assert len(valid) == len(obs)
+            if info["completeness"] == 2:            # FINAL
+                assert valid.all(), rid
+                assert np.isfinite(obs).all(), rid
+
+        # ids that do not exist are refused, on every platform, without reading anything
+        for bad in (n_runs, n_runs + 50, -1, 2**30):
+            try:
+                ies.get_run_info(bad)
+            except PestppError:
+                pass
+            else:
+                raise AssertionError(
+                    "run_id {0} should have been refused (storage holds {1})".format(
+                        bad, n_runs))
+            try:
+                ies.get_run_values(bad)
+            except PestppError:
+                pass
+            else:
+                raise AssertionError("get_run_values should refuse run_id {0}".format(bad))
+        ies.finalize()
 
 
 def capi_panther_control_test():
@@ -1410,6 +1459,7 @@ if __name__ == "__main__":
     capi_mou_test()
     capi_da_resize_between_queue_and_harvest_test()
     capi_tool_ensemble_availability_test()
+    capi_run_storage_read_test()
     capi_panther_control_test()
     capi_partial_results_test()
     print("all capi tests passed")

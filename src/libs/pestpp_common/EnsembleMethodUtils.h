@@ -62,6 +62,66 @@ protected:
     mutex next_lock, phi_map_lock;
 };
 
+/**
+ * @brief Inequality observations, and the 'drop_violations' nomination, derived from the scenario.
+ *
+ * Extracted from L2PhiHandler so that mou and sqp can use it. Neither has a phi handler, but
+ * the violation test needs only observed values, simulated values and the inequality treatment
+ * - all scenario-level. Keeping ONE definition matters more than the sharing is convenient:
+ * the harvest-time drop and the mid-run preemption screen must never disagree about whether a
+ * run is violating, or screening cancels a run that harvest would have kept.
+ *
+ * L2PhiHandler holds one of these and forwards to it, so phi's inequality treatment and the
+ * violation test are the same code.
+ */
+class ViolationDetector
+{
+public:
+	ViolationDetector() : pest_scenario(nullptr) {}
+	explicit ViolationDetector(Pest* _pest_scenario);
+
+	/// Zero the residuals of satisfied inequalities, in place. Moved here verbatim from
+	/// L2PhiHandler, which now forwards to it.
+	void apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names);
+
+	/**
+	 * @brief Does ONE run violate a nominated observation?
+	 *
+	 * Sound on a PARTIAL read because the test is a sum of non-negative terms - absolute
+	 * residuals, zero wherever the inequality is satisfied - so the sum over what has been
+	 * read is a lower bound on the final sum. Once over the threshold, reading the rest
+	 * cannot bring it back under. Anything that makes this a mean, a ratio or a variance
+	 * breaks that argument and silently breaks mid-run screening with it.
+	 *
+	 * @param valid_names which observations in `sim` are REAL; empty means all of them. An
+	 *        unread observation carries the no_data sentinel and must never be compared
+	 *        against a bound - it would violate almost any inequality.
+	 */
+	bool is_violating(Observations& sim, const set<string>& valid_names,
+	                  const vector<string>& viol_obs_names);
+
+	vector<string> get_lt_obs_names() { return lt_obs_names; }
+	vector<string> get_gt_obs_names() { return gt_obs_names; }
+	map<string,double> get_lt_obs_bounds() { return lt_obs_bounds; }
+	map<string,double> get_gt_obs_bounds() { return gt_obs_bounds; }
+	map<string,pair<double,double>> get_double_obs_bounds() { return double_obs_bounds; }
+
+	/// Observations nominated by the 'drop_violations' column of the external observation
+	/// file. Empty means the feature is off, and every violation call is a no-op.
+	const vector<string>& get_nominated() const { return nominated; }
+	bool has_nominated() const { return !nominated.empty(); }
+
+	/// The threshold every violation test uses.
+	static constexpr double VIOLATION_TOL = 1.0e-7;
+
+private:
+	Pest* pest_scenario;
+	vector<string> lt_obs_names, gt_obs_names, nominated;
+	map<string,double> lt_obs_bounds, gt_obs_bounds;
+	map<string,pair<double,double>> double_obs_bounds;
+};
+
+
 class L2PhiHandler
 {
 public:
@@ -106,11 +166,13 @@ public:
 	Eigen::MatrixXd get_actual_obs_resid(ObservationEnsemble &oe);
     //Eigen::MatrixXd get_noise_resid(ObservationEnsemble &oe, bool apply_ineq=true);
 	Eigen::VectorXd get_q_vector();
-	vector<string> get_lt_obs_names() { return lt_obs_names; }
-	vector<string> get_gt_obs_names() { return gt_obs_names; }
-    map<string,double> get_lt_obs_bounds() {return lt_obs_bounds;}
-    map<string,double> get_gt_obs_bounds() {return gt_obs_bounds;}
-    map<string,pair<double,double>> get_double_obs_bounds() {return double_obs_bounds;}
+	vector<string> get_lt_obs_names() { return ineq.get_lt_obs_names(); }
+	vector<string> get_gt_obs_names() { return ineq.get_gt_obs_names(); }
+    map<string,double> get_lt_obs_bounds() {return ineq.get_lt_obs_bounds();}
+    map<string,double> get_gt_obs_bounds() {return ineq.get_gt_obs_bounds();}
+    map<string,pair<double,double>> get_double_obs_bounds() {return ineq.get_double_obs_bounds();}
+    /// The shared evaluator; mou and sqp use one directly.
+    ViolationDetector& get_ineq() { return ineq; }
 
 	void apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names);
 
@@ -198,11 +260,8 @@ private:
     map<string, double> noise;
     map<string,int> num_conflict_group;
 
-	vector<string> lt_obs_names;
-	vector<string> gt_obs_names;
-    map<string,double> lt_obs_bounds;
-    map<string,double> gt_obs_bounds;
-    map<string,pair<double,double>> double_obs_bounds;
+	/// the shared inequality/violation evaluator - replaces the sets this class used to own
+	ViolationDetector ineq;
 
 	map<string, vector<int>> obs_group_idx_map;
 	map<string, vector<int>> par_group_idx_map;

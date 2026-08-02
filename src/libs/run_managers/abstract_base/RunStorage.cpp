@@ -719,6 +719,11 @@ int RunStorage::get_run_status(int run_id)
  */
 void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double &info_value)
 {
+	// Bounds-checked like the other record accessors. Without this, an out-of-range id seeks
+	// past the end of the storage file and READS ANYWAY - the stream reports the failure only
+	// afterwards, and the info_txt read lands in a buffer sized for a record that is not
+	// there. That surfaced as an access violation on windows rather than an error.
+	check_rec_id(run_id);
 
 	std::int8_t  r_status;
 	vector<char> info_txt_buf;

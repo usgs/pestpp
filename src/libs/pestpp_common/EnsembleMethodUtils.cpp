@@ -2199,18 +2199,10 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 }
 
-L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
-	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-	Covariance *_parcov, bool should_prep_csv, string _tag)
+
+ViolationDetector::ViolationDetector(Pest* _pest_scenario)
 {
 	pest_scenario = _pest_scenario;
-	file_manager = _file_manager;
-	oe_base = _oe_base;
-	pe_base = _pe_base;
-	tag = _tag;
-	
-	//check for inequality constraints
-	//for (auto &og : pest_scenario.get_ctl_ordered_obs_group_names())
 	string og;
 	double weight;
 	const ObservationInfo* oi = pest_scenario->get_ctl_observation_info_ptr();
@@ -2252,6 +2244,163 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
             }
         }
     }
+
+
+	// the 'drop_violations' nomination lives with the inequality sets it is judged against,
+	// so a tool that can test a violation can also discover which observations to test
+	map<string, string> viol_map = pest_scenario->get_ext_file_string_map(
+		"observation data external", "drop_violations");
+	for (auto& v : viol_map)
+	{
+		if (pest_utils::strip_cp(pest_utils::lower_cp(v.second)) == "true")
+			nominated.push_back(v.first);
+	}
+}
+
+void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals,vector<string> &names)
+{
+	if ((lt_obs_names.empty()) && (gt_obs_names.empty()) &&
+            (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
+            (double_obs_bounds.empty()))
+	    return;
+	assert(names.size() == resid.cols());
+
+	map<string, double> lt_vals,gt_vals;
+	Observations obs = pest_scenario->get_ctl_observations();
+	for (auto &n : lt_obs_names)
+		lt_vals[n] = obs.get_rec(n);
+	for (auto &n : gt_obs_names)
+		gt_vals[n] = obs.get_rec(n);
+	if ((lt_vals.empty()) && (gt_vals.empty()) &&
+       (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
+            (double_obs_bounds.empty()))
+		return;
+	map<string, int> idxs;
+	for (int i = 0; i < names.size(); i++)
+		idxs[names[i]] = i;
+	int idx;
+	double val,val2;
+	Eigen::VectorXd col, scol;
+
+    for (auto const iv : double_obs_bounds)
+    {
+        idx = idxs[iv.first];
+        col = resid.col(idx);
+        scol = sim_vals.col(idx);
+        val = iv.second.first;
+        val2 = iv.second.second;
+
+        for (int i = 0; i < resid.rows(); i++)
+            col(i) = ((scol(i) > val) && (scol(i) < val2)) ? 0.0 : col(i);
+        resid.col(idx) = col;
+    }
+
+	for (auto const iv : lt_vals)
+	{
+		idx = idxs[iv.first];
+		col = resid.col(idx);
+		val = iv.second;
+		//cout << resid.col(idx) << endl;
+		for (int i = 0; i < resid.rows(); i++)
+			col(i) = (col(i) < 0.0) ? 0.0 : col(i);
+		//cout << resid.col(idx) << endl;
+		resid.col(idx) = col;
+		//cout << resid.col(idx) << endl;
+	}
+
+
+    for (auto const iv : lt_obs_bounds)
+    {
+        idx = idxs[iv.first];
+        col = resid.col(idx);
+        scol = sim_vals.col(idx);
+        val = iv.second;
+        //cout << resid.col(idx) << endl;
+        for (int i = 0; i < resid.rows(); i++)
+            col(i) = (scol(i) < val) ? 0.0 : col(i);
+        //cout << resid.col(idx) << endl;
+        //cout << col << endl << endl;
+        resid.col(idx) = col;
+        //cout << resid.col(idx) << endl;
+    }
+
+
+    //Eigen::MatrixXd temp = resid;
+	for (auto const iv : gt_vals)
+	{
+		idx = idxs[iv.first];
+		col = resid.col(idx);
+		val = iv.second;
+		for (int i = 0; i < resid.rows(); i++)
+			col(i) = (col(i) > 0.0) ? 0.0 : col(i);
+		resid.col(idx) = col;
+	}
+
+    for (auto const iv : gt_obs_bounds)
+    {
+        idx = idxs[iv.first];
+        col = resid.col(idx);
+        scol = sim_vals.col(idx);
+        val = iv.second;
+        for (int i = 0; i < resid.rows(); i++)
+            col(i) = (scol(i) > val) ? 0.0 : col(i);
+        resid.col(idx) = col;
+    }
+}
+
+bool ViolationDetector::is_violating(Observations& sim, const set<string>& valid_names,
+    const vector<string>& viol_obs_names)
+{
+    if (viol_obs_names.size() == 0)
+        return false;
+    const ObservationInfo* oi = pest_scenario->get_ctl_observation_info_ptr();
+    // the nominated observations that actually count: non-zero weighted and present in this
+    // run. Judging the columns we build below rather than the whole observation set keeps
+    // this independent of any ensemble.
+    vector<string> names;
+    for (auto& name : viol_obs_names)
+    {
+        if (sim.find(name) == sim.end())
+            continue;
+        if (oi->get_weight(name) > 0)
+            names.push_back(name);
+    }
+    if (names.size() == 0)
+        return false;
+
+    Observations obs = pest_scenario->get_ctl_observations();
+    Eigen::MatrixXd sim_row(1, names.size());
+    Eigen::MatrixXd resid(1, names.size());
+    for (int i = 0; i < (int)names.size(); i++)
+    {
+        sim_row(0, i) = sim.get_rec(names[i]);
+        resid(0, i) = sim_row(0, i) - obs.get_rec(names[i]);
+    }
+    apply_ineq_constraints(resid, sim_row, names);
+
+    double sum = 0.0;
+    for (int i = 0; i < (int)names.size(); i++)
+    {
+        // SKIP anything not actually read - an unread observation carries the no_data
+        // sentinel and would violate almost any inequality
+        if ((valid_names.size() > 0) && (valid_names.find(names[i]) == valid_names.end()))
+            continue;
+        sum += abs(resid(0, i));
+    }
+    return sum > VIOLATION_TOL;
+}
+
+L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
+	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
+	Covariance *_parcov, bool should_prep_csv, string _tag)
+{
+	pest_scenario = _pest_scenario;
+	file_manager = _file_manager;
+	oe_base = _oe_base;
+	pe_base = _pe_base;
+	tag = _tag;
+	
+	ineq = ViolationDetector(pest_scenario);
 
 	//save the org reg factor and org q vector
 	//Eigen::VectorXd parcov_inv_diag = parcov_inv.e_ptr()->diagonal();
@@ -3666,35 +3815,7 @@ map<string,int> L2PhiHandler::get_violation_idx_map(const vector<string>& viol_o
 bool L2PhiHandler::is_violating(Observations& sim, const set<string>& valid_names,
     const vector<string>& viol_obs_names)
 {
-    if (viol_obs_names.size() == 0)
-        return false;
-    vector<string> act_obs_names = oe_base->get_var_names();
-    map<string,int> nz_viol_vmap = get_violation_idx_map(viol_obs_names, act_obs_names);
-    if (nz_viol_vmap.size() == 0)
-        return false;
-
-    // the residual, computed exactly as get_actual_obs_resid() does for an ensemble row, so
-    // the inequality treatment is the same code and cannot drift
-    Observations obs = pest_scenario->get_ctl_observations();
-    Eigen::MatrixXd sim_row(1, act_obs_names.size());
-    for (int i=0;i<act_obs_names.size();i++)
-        sim_row(0,i) = sim.get_rec(act_obs_names[i]);
-    Eigen::MatrixXd ovals = obs.get_data_eigen_vec(act_obs_names);
-    ovals.transposeInPlace();
-    Eigen::MatrixXd resid(1, act_obs_names.size());
-    resid.row(0) = sim_row.row(0) - ovals;
-    apply_ineq_constraints(resid, sim_row, act_obs_names);
-
-    double sum = 0.0;
-    for (auto& v : nz_viol_vmap)
-    {
-        // SKIP anything not actually read: an unread observation carries the no_data
-        // sentinel, and comparing that against a bound would violate almost any inequality
-        if ((valid_names.size() > 0) && (valid_names.find(v.first) == valid_names.end()))
-            continue;
-        sum += abs(resid(0, v.second));
-    }
-    return sum > VIOLATION_TOL;
+    return ineq.is_violating(sim, valid_names, viol_obs_names);
 }
 
 vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names)
@@ -3728,95 +3849,10 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
 }
 
 
-void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals,vector<string> &names)
+void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names)
 {
-	if ((lt_obs_names.empty()) && (gt_obs_names.empty()) &&
-            (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
-            (double_obs_bounds.empty()))
-	    return;
-	assert(names.size() == resid.cols());
-
-	map<string, double> lt_vals,gt_vals;
-	Observations obs = pest_scenario->get_ctl_observations();
-	for (auto &n : lt_obs_names)
-		lt_vals[n] = obs.get_rec(n);
-	for (auto &n : gt_obs_names)
-		gt_vals[n] = obs.get_rec(n);
-	if ((lt_vals.empty()) && (gt_vals.empty()) &&
-       (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
-            (double_obs_bounds.empty()))
-		return;
-	map<string, int> idxs;
-	for (int i = 0; i < names.size(); i++)
-		idxs[names[i]] = i;
-	int idx;
-	double val,val2;
-	Eigen::VectorXd col, scol;
-
-    for (auto const iv : double_obs_bounds)
-    {
-        idx = idxs[iv.first];
-        col = resid.col(idx);
-        scol = sim_vals.col(idx);
-        val = iv.second.first;
-        val2 = iv.second.second;
-
-        for (int i = 0; i < resid.rows(); i++)
-            col(i) = ((scol(i) > val) && (scol(i) < val2)) ? 0.0 : col(i);
-        resid.col(idx) = col;
-    }
-
-	for (auto const iv : lt_vals)
-	{
-		idx = idxs[iv.first];
-		col = resid.col(idx);
-		val = iv.second;
-		//cout << resid.col(idx) << endl;
-		for (int i = 0; i < resid.rows(); i++)
-			col(i) = (col(i) < 0.0) ? 0.0 : col(i);
-		//cout << resid.col(idx) << endl;
-		resid.col(idx) = col;
-		//cout << resid.col(idx) << endl;
-	}
-
-
-    for (auto const iv : lt_obs_bounds)
-    {
-        idx = idxs[iv.first];
-        col = resid.col(idx);
-        scol = sim_vals.col(idx);
-        val = iv.second;
-        //cout << resid.col(idx) << endl;
-        for (int i = 0; i < resid.rows(); i++)
-            col(i) = (scol(i) < val) ? 0.0 : col(i);
-        //cout << resid.col(idx) << endl;
-        //cout << col << endl << endl;
-        resid.col(idx) = col;
-        //cout << resid.col(idx) << endl;
-    }
-
-
-    //Eigen::MatrixXd temp = resid;
-	for (auto const iv : gt_vals)
-	{
-		idx = idxs[iv.first];
-		col = resid.col(idx);
-		val = iv.second;
-		for (int i = 0; i < resid.rows(); i++)
-			col(i) = (col(i) > 0.0) ? 0.0 : col(i);
-		resid.col(idx) = col;
-	}
-
-    for (auto const iv : gt_obs_bounds)
-    {
-        idx = idxs[iv.first];
-        col = resid.col(idx);
-        scol = sim_vals.col(idx);
-        val = iv.second;
-        for (int i = 0; i < resid.rows(); i++)
-            col(i) = (scol(i) > val) ? 0.0 : col(i);
-        resid.col(idx) = col;
-    }
+	// forwards: phi's inequality treatment and the violation test are the same code
+	ineq.apply_ineq_constraints(resid, sim_vals, names);
 }
 
 
@@ -6524,15 +6560,9 @@ void EnsembleMethod::prep_drop_violations()
         return;
     }
 
-    string sval;
-    for (auto& v : viol_map)
-    {
-        sval = pest_utils::strip_cp(pest_utils::lower_cp(v.second));
-        if (sval == "true")
-        {
-            violation_obs.push_back(v.first);
-        }
-    }
+    // the nomination is read by ViolationDetector, so the tool that tests a violation and the
+    // tool that decides which observations to test cannot disagree about the answer
+    violation_obs = ph.get_ineq().get_nominated();
     stringstream ss;
     ss << violation_obs.size() << " 'drop_violations' observations detected, see rec file for listing";
     message(1,ss.str());
