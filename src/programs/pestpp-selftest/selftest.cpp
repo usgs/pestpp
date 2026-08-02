@@ -1211,6 +1211,96 @@ static void test_run_storage_partial_update()
     remove(stor.c_str());
 }
 
+/**
+ * @brief The single-run violation test must agree with the ensemble one, exactly.
+ *
+ * Mid-run screening cancels a run on the strength of is_violating(); the harvest-time drop
+ * uses get_violating_realizations(). If the two ever disagree at the margin, screening cancels
+ * a run that harvest would have KEPT - which turns a pure optimization into a silent change of
+ * results. So they share their arithmetic, and this asserts they still agree.
+ *
+ * Also asserts the partial-read property the whole scheme rests on: judging only the
+ * observations that have been read, never the sentinel sitting in the ones that have not.
+ */
+static void test_violation_single_run_matches_ensemble()
+{
+    cout << "[drop_violations: the single-run test agrees with the ensemble test]" << endl;
+    // built through the control-file path rather than by poking members: the handler reads
+    // ctl_ordered_obs_names, which only that path fills in, and a scenario assembled any other
+    // way silently has no inequality observations at all
+    struct TestPest : public Pest { using Pest::tokens_to_obs_rec; };
+    TestPest p;
+    p.set_defaults();
+    ofstream f_rec("selftest_viol.rec");
+    // name, value, weight, group. O_LT is tagged less-than by its group, so it violates only
+    // when the simulated value goes ABOVE the observed one
+    p.tokens_to_obs_rec(f_rec, vector<string>{"O_A", "1.0", "1.0", "OBSGP"});
+    p.tokens_to_obs_rec(f_rec, vector<string>{"O_LT", "10.0", "1.0", "L_CONSTRAINT"});
+    p.tokens_to_obs_rec(f_rec, vector<string>{"O_B", "2.0", "1.0", "OBSGP"});
+    vector<string> onames{"O_A", "O_LT", "O_B"};
+    CHK(p.get_ctl_ordered_obs_names().size() == 3, "the scenario has three observations");
+
+    std::mt19937 rgen(11);
+    FileManager fm;
+    // oe_base carries the observation names the handler judges against
+    Eigen::MatrixXd base(1, 3);
+    base << 1.0, 10.0, 2.0;
+    vector<string> rnames{"R0"};
+    ObservationEnsemble oe_base(&p, &rgen, base, rnames, onames);
+    Eigen::MatrixXd pm(1, 1);
+    pm << 1.0;
+    vector<string> pnames{"P0"};
+    ParameterEnsemble pe_base(&p, &rgen, pm, rnames, pnames);
+    Covariance parcov;
+    L2PhiHandler ph(&p, &fm, &oe_base, &pe_base, &parcov, false);
+
+    vector<string> nominated{"O_LT"};
+
+    // three simulated cases: satisfied (below the bound), satisfied at it, violating
+    const double sims[3] = {5.0, 10.0, 25.0};
+    const bool expect[3] = {false, false, true};
+    for (int c = 0; c < 3; c++)
+    {
+        Eigen::MatrixXd m(1, 3);
+        m << 1.0, sims[c], 2.0;
+        ObservationEnsemble oe(&p, &rgen, m, rnames, onames);
+        vector<string> viol = ph.get_violating_realizations(oe, nominated);
+
+        Observations sim;
+        sim.insert("O_A", 1.0);
+        sim.insert("O_LT", sims[c]);
+        sim.insert("O_B", 2.0);
+        bool single = ph.is_violating(sim, set<string>(), nominated);
+
+        CHK((viol.size() > 0) == expect[c], "ensemble test verdict for sim=" +
+            to_string(sims[c]));
+        CHK(single == expect[c], "single-run test verdict for sim=" + to_string(sims[c]));
+        CHK(single == (viol.size() > 0),
+            "the two violation tests disagree for sim=" + to_string(sims[c]));
+    }
+
+    // the partial-read property: a violating value that has NOT been read yet must not count
+    {
+        Observations sim;
+        sim.insert("O_A", 1.0);
+        sim.insert("O_LT", Transformable::no_data);   // not read yet
+        sim.insert("O_B", 2.0);
+        set<string> read_so_far;
+        read_so_far.insert("O_A");
+        read_so_far.insert("O_B");
+        CHK(!ph.is_violating(sim, read_so_far, nominated),
+            "an UNREAD nominated observation must never be judged - the sentinel would "
+            "violate almost any inequality");
+        // and once it is read, and violating, it counts
+        sim.update_rec("O_LT", 25.0);
+        read_so_far.insert("O_LT");
+        CHK(ph.is_violating(sim, read_so_far, nominated),
+            "a violating observation counts once it has actually been read");
+    }
+    f_rec.close();
+    remove("selftest_viol.rec");
+}
+
 int main()
 {
     test_registry_equivalence();
@@ -1234,6 +1324,7 @@ int main()
     test_instruction_file_partial_real_case();
     test_instruction_file_partial_remaining_branches();
     test_run_storage_partial_update();
+    test_violation_single_run_matches_ensemble();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;
     return g_fail == 0 ? 0 : 1;

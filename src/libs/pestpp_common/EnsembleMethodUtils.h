@@ -124,6 +124,36 @@ public:
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
+    /**
+     * @brief Does ONE run already violate a nominated 'drop_violations' observation?
+     *
+     * The single-run twin of get_violating_realizations(), for judging a run from a PARTIAL
+     * read while it is still executing (docs/api_part1/partial_screening_plan.md). Both go
+     * through the same residual computation and the same threshold, because a screen that
+     * disagreed with the harvest-time drop at the margin would cancel a run harvest would
+     * have kept.
+     *
+     * Sound on partial data because the test is a SUM OF NON-NEGATIVE TERMS - absolute
+     * residuals, zero wherever the inequality is satisfied - so the sum over what has been
+     * read is a lower bound on the final sum. Once it is over the threshold, reading the rest
+     * cannot bring it back under. Anything that later makes this a mean, a ratio or a
+     * variance breaks that argument and silently breaks mid-run screening with it.
+     *
+     * @param valid_names which observations in `sim` are REAL. Empty means all of them, for a
+     *        complete run. An unread observation carries the no_data sentinel and must never
+     *        be compared against a bound - it would violate almost anything.
+     */
+    bool is_violating(Observations& sim, const set<string>& valid_names,
+                      const vector<string>& viol_obs_names);
+    /// The threshold both violation tests use.
+    static constexpr double VIOLATION_TOL = 1.0e-7;
+private:
+    /// Nominated observations that actually count: present in the ensemble's variables and
+    /// non-zero weighted, as name -> column index. Shared so the two tests cannot disagree
+    /// about WHICH observations are being judged.
+    map<string,int> get_violation_idx_map(const vector<string>& viol_obs_names,
+                                          const vector<string>& act_obs_names);
+public:
     vector<string> detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag);
 
 private:

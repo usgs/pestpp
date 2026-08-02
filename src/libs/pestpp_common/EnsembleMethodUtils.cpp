@@ -3644,6 +3644,59 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 }
 
 
+map<string,int> L2PhiHandler::get_violation_idx_map(const vector<string>& viol_obs_names,
+    const vector<string>& act_obs_names)
+{
+    map<string,int> vmap;
+    for (int i=0;i<act_obs_names.size();i++)
+        vmap[act_obs_names[i]] = i;
+    map<string,int>::iterator end = vmap.end();
+    ObservationInfo* oi = pest_scenario->get_observation_info_ptr();
+    map<string,int> nz_viol_vmap;
+    for (auto& name : viol_obs_names)
+    {
+        if (vmap.find(name) == end)
+            continue;                       // not among the ensemble's observations
+        if (oi->get_weight(name) > 0)
+            nz_viol_vmap[name] = vmap.at(name);
+    }
+    return nz_viol_vmap;
+}
+
+bool L2PhiHandler::is_violating(Observations& sim, const set<string>& valid_names,
+    const vector<string>& viol_obs_names)
+{
+    if (viol_obs_names.size() == 0)
+        return false;
+    vector<string> act_obs_names = oe_base->get_var_names();
+    map<string,int> nz_viol_vmap = get_violation_idx_map(viol_obs_names, act_obs_names);
+    if (nz_viol_vmap.size() == 0)
+        return false;
+
+    // the residual, computed exactly as get_actual_obs_resid() does for an ensemble row, so
+    // the inequality treatment is the same code and cannot drift
+    Observations obs = pest_scenario->get_ctl_observations();
+    Eigen::MatrixXd sim_row(1, act_obs_names.size());
+    for (int i=0;i<act_obs_names.size();i++)
+        sim_row(0,i) = sim.get_rec(act_obs_names[i]);
+    Eigen::MatrixXd ovals = obs.get_data_eigen_vec(act_obs_names);
+    ovals.transposeInPlace();
+    Eigen::MatrixXd resid(1, act_obs_names.size());
+    resid.row(0) = sim_row.row(0) - ovals;
+    apply_ineq_constraints(resid, sim_row, act_obs_names);
+
+    double sum = 0.0;
+    for (auto& v : nz_viol_vmap)
+    {
+        // SKIP anything not actually read: an unread observation carries the no_data
+        // sentinel, and comparing that against a bound would violate almost any inequality
+        if ((valid_names.size() > 0) && (valid_names.find(v.first) == valid_names.end()))
+            continue;
+        sum += abs(resid(0, v.second));
+    }
+    return sum > VIOLATION_TOL;
+}
+
 vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names)
 {
     stringstream ss;
@@ -3652,28 +3705,8 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
         return viol_real_names;
 
     Eigen::MatrixXd resid = get_actual_obs_resid(oe);
-    map<string,int> vmap;
-    vector<string> nz_onames = oe_base->get_var_names();
-    for (int i=0;i<nz_onames.size();i++)
-        vmap[nz_onames[i]] = i;
-    map<string,int>::iterator end = vmap.end();
-    vector<string> missing;
-    ObservationInfo* oi = pest_scenario->get_observation_info_ptr();
-    vector<string> nz_viol_obs_names;
-    map<string,int> nz_viol_vmap;
-    for (auto& name : viol_obs_names)
-    {
-        if (vmap.find(name) == end)
-            missing.push_back(name);
-        else
-        {
-            if (oi->get_weight(name) > 0)
-            {
-                nz_viol_obs_names.push_back(name);
-                nz_viol_vmap[name] = vmap.at(name);
-            }
-        }
-    }
+    map<string,int> nz_viol_vmap = get_violation_idx_map(viol_obs_names,
+        oe_base->get_var_names());
 
     Eigen::VectorXd real;
     double sum;
@@ -3686,7 +3719,7 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
         {
             sum += real(v.second);
         }
-        if (sum > 1.0e-7)
+        if (sum > VIOLATION_TOL)
         {
             viol_real_names.push_back(rnames[i]);
         }
