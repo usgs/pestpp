@@ -2248,13 +2248,20 @@ ViolationDetector::ViolationDetector(Pest* _pest_scenario)
 
 	// the 'drop_violations' nomination lives with the inequality sets it is judged against,
 	// so a tool that can test a violation can also discover which observations to test
-	map<string, string> viol_map = pest_scenario->get_ext_file_string_map(
+	nominated = read_nominated(*pest_scenario);
+}
+
+vector<string> ViolationDetector::read_nominated(Pest& scenario)
+{
+	vector<string> out;
+	map<string, string> viol_map = scenario.get_ext_file_string_map(
 		"observation data external", "drop_violations");
 	for (auto& v : viol_map)
 	{
 		if (pest_utils::strip_cp(pest_utils::lower_cp(v.second)) == "true")
-			nominated.push_back(v.first);
+			out.push_back(v.first);
 	}
+	return out;
 }
 
 void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals,vector<string> &names)
@@ -6560,9 +6567,10 @@ void EnsembleMethod::prep_drop_violations()
         return;
     }
 
-    // the nomination is read by ViolationDetector, so the tool that tests a violation and the
-    // tool that decides which observations to test cannot disagree about the answer
-    violation_obs = ph.get_ineq().get_nominated();
+    // Read straight from the scenario, NOT via ph: on the normal path the phi handler is not
+    // constructed until after this runs, so asking it returned an empty list and
+    // drop_violations quietly did nothing. Same single definition, no ordering dependency.
+    violation_obs = ViolationDetector::read_nominated(pest_scenario);
     stringstream ss;
     ss << violation_obs.size() << " 'drop_violations' observations detected, see rec file for listing";
     message(1,ss.str());

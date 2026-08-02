@@ -114,6 +114,14 @@ public:
 	/// The threshold every violation test uses.
 	static constexpr double VIOLATION_TOL = 1.0e-7;
 
+	/// Read the 'drop_violations' nomination straight from the scenario.
+	///
+	/// Static because a caller must NOT have to own a detector - or a phi handler - to ask.
+	/// Routing this through L2PhiHandler made it depend on when that handler was constructed,
+	/// and on the normal path (noptmax != 0) it is built AFTER the nomination is read, so the
+	/// answer came back empty and drop_violations silently did nothing.
+	static vector<string> read_nominated(Pest& scenario);
+
 private:
 	Pest* pest_scenario;
 	vector<string> lt_obs_names, gt_obs_names, nominated;
