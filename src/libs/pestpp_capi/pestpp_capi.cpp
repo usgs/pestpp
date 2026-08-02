@@ -2284,6 +2284,12 @@ pestpp_status pestpp_get_run_count(pestpp_handle h, int* n)
     CAPI_END()
 }
 
+// extern "C++" on purpose: this file's body sits inside an extern "C" block, which would
+// otherwise give this helper C language linkage while it takes C++ REFERENCE parameters.
+// Every other helper in here takes plain pointers; this is the only one that does not, and a
+// C-linkage function with reference parameters is the kind of thing that is legal on paper
+// and differs between compilers in practice.
+extern "C++" {
 namespace {
 /// Read one stored run and describe how complete it is.
 ///
@@ -2310,6 +2316,7 @@ int read_stored_run(PestppSession* s, int run_id, Parameters& pars, Observations
     if (status == 1)
         return PESTPP_RUN_VALUES_FINAL;
     return (n_reported > 0) ? PESTPP_RUN_VALUES_PARTIAL : PESTPP_RUN_VALUES_NONE;
+}
 }
 }
 
