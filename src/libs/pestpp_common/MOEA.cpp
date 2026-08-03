@@ -2846,15 +2846,17 @@ void MOEA::drop_violating_members(ParameterEnsemble& _dp, ObservationEnsemble& _
 	}
 	if (drop.size() == 0)
 		return;
-	// never empty the population: a badly specified inequality can violate for everything, and
-	// a generation with nothing in it is a worse outcome than keeping members the user would
-	// rather not have
-	if (drop.size() >= (size_t)_op.shape().first)
+	// A badly specified inequality can violate for everything, and a generation with nothing
+	// (or almost nothing) in it is a worse outcome than keeping members the user would rather
+	// not have. Floored at error_min_reals, the same minimum ies/da and sqp enforce.
+	int n_left = _op.shape().first - (int)drop.size();
+	if (n_left < error_min_reals)
 	{
 		ss.str("");
-		ss << "all " << drop.size() << " members meet 'drop_violations' conditions - NOT "
-		   << "dropping any, since that would leave an empty population. Check the "
-		   << "'drop_violations' observations and their inequality groups";
+		ss << drop.size() << " members meet 'drop_violations' conditions but dropping them "
+		   << "would leave " << n_left << " (need at least " << error_min_reals << ") - NOT "
+		   << "dropping any. Check the 'drop_violations' observations and their inequality "
+		   << "groups";
 		message(0, ss.str());
 		return;
 	}

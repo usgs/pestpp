@@ -1030,7 +1030,23 @@ void SeqQuadProgram::initialize_parcov()
  * @brief Initialize.
  */
 void SeqQuadProgram::initialize()
-{	
+{
+	// same nomination ies/da/mou use - a 'drop_violations' column in the external observation
+	// file - read from the scenario so it cannot depend on any construction order
+	violation_obs = ViolationDetector::read_nominated(pest_scenario);
+	viol_detector = ViolationDetector(&pest_scenario);
+	if (violation_obs.size() > 0)
+	{
+		stringstream vss;
+		vss << violation_obs.size() << " 'drop_violations' observations detected, see rec file "
+		    << "for listing";
+		message(1, vss.str());
+		ofstream& vf_rec = file_manager.rec_ofstream();
+		vf_rec << endl << "The following observations are being used as 'drop_violations' "
+		       << "constraints:" << endl;
+		for (auto& o : violation_obs)
+			vf_rec << o << endl;
+	}	
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 	verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
@@ -1817,6 +1833,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		vector<int> failed = run_ensemble(dv, oe);
 		if (dv.shape().first == 0)
 			throw_sqp_error("all realizations failed during initial evaluation");
+		// a realization here is a candidate member, so the drop applies
+		drop_violating_members(dv, oe, "initial ensemble evaluation");
 
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
@@ -6015,7 +6033,11 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	{
 		throw_sqp_error(string("error running ensemble"));
 	}
-	return harvest_candidate_ensemble(dv_candidates, real_run_ids);
+	ObservationEnsemble _oe = harvest_candidate_ensemble(dv_candidates, real_run_ids);
+	// each of these is a candidate STEP; one that violates a nominated constraint is a step
+	// we do not want to take, which is exactly what the user nominated it for
+	drop_violating_members(dv_candidates, _oe, "candidate step evaluation");
+	return _oe;
 }
 
 /**
@@ -6109,6 +6131,68 @@ map<string, int> SeqQuadProgram::queue_ensemble(ParameterEnsemble &_pe, const ve
 /**
  * @brief Collect the queued runs (second half); assumes the runs have been made.
  */
+
+vector<string> SeqQuadProgram::get_violating_members(ObservationEnsemble& _oe)
+{
+	vector<string> out;
+	if (violation_obs.size() == 0)
+		return out;
+	vector<string> vnames = _oe.get_var_names();
+	vector<string> rnames = _oe.get_real_names();
+	Eigen::MatrixXd m = *_oe.get_eigen_ptr();
+	for (int i = 0; i < (int)rnames.size(); i++)
+	{
+		Observations sim;
+		for (int j = 0; j < (int)vnames.size(); j++)
+			sim.insert(vnames[j], m(i, j));
+		if (viol_detector.is_violating(sim, set<string>(), violation_obs))
+			out.push_back(rnames[i]);
+	}
+	return out;
+}
+
+void SeqQuadProgram::drop_violating_members(ParameterEnsemble& _pe, ObservationEnsemble& _oe,
+	const string& stage)
+{
+	if (violation_obs.size() == 0)
+		return;
+	vector<string> viol = get_violating_members(_oe);
+	if (viol.size() == 0)
+		return;
+	stringstream ss;
+	vector<string> drop;
+	for (auto& v : viol)
+	{
+		if (v == BASE_REAL_NAME)
+			message(2, "not dropping 'base' even though it meets 'drop_violations' conditions");
+		else
+			drop.push_back(v);
+	}
+	if (drop.size() == 0)
+		return;
+	// Never empty the set. For the candidates that means the line search simply finds no
+	// acceptable step and backtracks, which it already knows how to do - far better than
+	// handing it an empty ensemble.
+	// the same floor this class enforces elsewhere, not a second opinion about it
+	int min_keep = error_min_reals;
+	int n_left = _oe.shape().first - (int)drop.size();
+	if (n_left < min_keep)
+	{
+		ss.str("");
+		ss << drop.size() << " members meet 'drop_violations' conditions during " << stage
+		   << " but dropping them would leave " << n_left << " (need at least " << min_keep
+		   << ") - NOT dropping any";
+		message(0, ss.str());
+		return;
+	}
+	ss.str("");
+	ss << drop.size() << " members meet 'drop_violations' conditions during " << stage
+	   << " and are being dropped";
+	message(1, ss.str());
+	_pe.drop_rows(drop);
+	_oe.drop_rows(drop);
+}
+
 vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids)
 {
 	stringstream ss;

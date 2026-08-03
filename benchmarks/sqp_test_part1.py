@@ -624,3 +624,95 @@ if __name__ == "__main__":
     # basic_sqp_bounds_test()
     # basic_sqp_hessian_test()
 
+
+
+def sqp_drop_violations_test():
+    """sqp drops candidate members violating a nominated 'drop_violations' observation.
+
+    The point of this test is WHERE it applies. sqp is not like ies or mou, where every run is
+    a population member - it issues several kinds of batch per iteration, and only some of them
+    contain candidates:
+
+      applies      initial ensemble; line-search / trust-region candidate steps
+      must NOT     finite-difference gradient runs; the control-file and mean-dv runs
+
+    Dropping a gradient perturbation would leave a hole in the Jacobian - the constraint would
+    be steering the DERIVATIVE rather than the search - and dropping the current point would
+    leave sqp with nowhere to step from. So this asserts not just that dropping happens, but
+    that it only ever happens at the two candidate stages.
+    """
+    t_d = os.path.join("sqp_drop_viol")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+
+    with open(os.path.join(t_d, "forward.py"), "w") as f:
+        f.write('vals={}\n'
+                'for line in open("par.dat"):\n'
+                '    k,v=line.split(); vals[k.strip()]=float(v)\n'
+                'x,y=vals["x"],vals["y"]\n'
+                'f=(1.0-x)**2 + 100.0*(y-x*x)**2\n'
+                'with open("obs.dat","w") as fp:\n'
+                '    fp.write("obs {0:20.10E}\\n".format(f))\n'
+                '    fp.write("constraint {0:20.10E}\\n".format(x+y))\n')
+    with open(os.path.join(t_d, "par.dat.tpl"), "w") as f:
+        f.write("ptf ~\nx ~   x        ~\ny ~   y        ~\n")
+    with open(os.path.join(t_d, "obs.dat.ins"), "w") as f:
+        f.write("pif ~\nl1 w !obs!\nl1 w !constraint!\n")
+
+    cwd = os.getcwd()
+    os.chdir(t_d)
+    try:
+        pst = pyemu.Pst.from_io_files("par.dat.tpl", "par.dat", "obs.dat.ins", "obs.dat")
+    finally:
+        os.chdir(cwd)
+
+    par = pst.parameter_data
+    par.loc[:, "partrans"] = "none"
+    par.loc[:, "parlbnd"] = -2.0
+    par.loc[:, "parubnd"] = 2.0
+    par.loc[:, "pargp"] = "decvars"
+    par.loc[:, "parval1"] = 1.0
+
+    obs = pst.observation_data
+    obs.loc["obs", ["obgnme", "obsval", "weight"]] = ["obj_fn", 0.0, 1.0]
+    # a less-than constraint, violated whenever x+y exceeds the bound, and NOMINATED so that
+    # violating candidates are dropped rather than merely penalised
+    # bound at the starting point's value so roughly half the drawn ensemble
+    # violates - a constraint that everything violates tests the floor, not the drop
+    obs.loc["constraint", ["obgnme", "obsval", "weight"]] = ["l_constraint", 2.0, 1.0]
+    obs.loc[:, "drop_violations"] = False
+    obs.loc["constraint", "drop_violations"] = True
+
+    pst.pestpp_options["opt_dec_var_groups"] = "decvars"
+    pst.pestpp_options["opt_objective_function"] = "obs"
+    pst.pestpp_options["opt_direction"] = "min"
+    pst.pestpp_options["sqp_num_reals"] = 20
+    pst.pestpp_options["random_seed"] = 11
+    pst.control_data.noptmax = 2
+    pst.model_command = ["python forward.py"]
+    pst.write(os.path.join(t_d, "sqp_viol.pst"), version=2)
+
+    # newest first, and absolute: a relative exe path resolves through PATH to whatever
+    # pestpp-sqp is installed, which silently tests a release binary instead of this build
+    cands = [c for c in (
+        os.path.join("..", "build", "src", "programs", "pestpp-sqp", "pestpp-sqp" + exe),
+        os.path.abspath(exe_path)) if os.path.exists(c)]
+    assert cands, "could not find a pestpp-sqp to test"
+    sqp_exe = max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
+    print("testing with:", sqp_exe)
+    pyemu.os_utils.run("{0} sqp_viol.pst".format(sqp_exe), cwd=t_d)
+
+    rec = open(os.path.join(t_d, "sqp_viol.rec")).read()
+    # 1. the nomination registered - without this the rest passes with the feature OFF
+    assert "1 'drop_violations' observations detected" in rec, \
+        "sqp did not register the drop_violations nomination:\n" + rec[:3000]
+
+    # 2. dropping only ever happened at a candidate stage
+    stages = re.findall(r"meet 'drop_violations' conditions during ([a-z ]+?) and are being", rec)
+    allowed = {"initial ensemble evaluation", "candidate step evaluation"}
+    for st in stages:
+        assert st.strip() in allowed, \
+            "drop_violations was applied at a stage where a run is structurally required, " \
+            "not a candidate: '{0}'. Gradient runs and the current point must never be " \
+            "dropped.".format(st.strip())

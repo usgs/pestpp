@@ -209,6 +209,35 @@ public:
 
 	// queue -> (drive the run manager) -> harvest. The run_* calls are the in-tree
 	// compositions; the halves let a caller run its own run_slice() loop in between.
+	/**
+	 * @brief Members violating a nominated 'drop_violations' observation, by name.
+	 *
+	 * Applied at the batches where a run is a CANDIDATE AMONG ALTERNATIVES - the initial
+	 * ensemble, and the line-search / trust-region candidates - and deliberately NOT where a
+	 * run is structurally required:
+	 *
+	 *   - make_gradient_runs(): each run is a finite-difference perturbation, so dropping one
+	 *     leaves a hole in the Jacobian. The constraint would be steering the DERIVATIVE
+	 *     rather than the search, which is not what the user asked for.
+	 *   - the control-file and mean-dv runs: those are the current point. Dropping one leaves
+	 *     sqp with no position to step from.
+	 *
+	 * That is why this is called at specific sites rather than inside harvest_ensemble(),
+	 * which every batch flows through.
+	 */
+	vector<string> get_violating_members(ObservationEnsemble& _oe);
+	/// Drop them from both ensembles, sparing 'base' and never emptying the ensemble.
+	/// The floor is `error_min_reals` - the SAME minimum this class already enforces after a
+	/// bad-realization drop - rather than merely "not empty". Dropping to one realization
+	/// fails Hessian approximation with "insufficient ensemble size", which is a worse outcome
+	/// than keeping members the user would rather not have.
+	void drop_violating_members(ParameterEnsemble& _pe, ObservationEnsemble& _oe,
+	                            const string& stage);
+
+	/// Shared with ies/da/mou so no two tools disagree about what "violating" means.
+	ViolationDetector viol_detector;
+	vector<string> violation_obs;
+
 	map<string, int> queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs=vector<int>());
 	vector<int> harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids);
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
