@@ -2251,6 +2251,39 @@ ViolationDetector::ViolationDetector(Pest* _pest_scenario)
 	nominated = read_nominated(*pest_scenario);
 }
 
+string ViolationDetector::check_preemption_config(Pest& scenario)
+{
+	double interval = scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
+	if (interval <= 0.0)
+		return string();                      // preemption is off; nothing to check
+	vector<string> nominated = read_nominated(scenario);
+	stringstream ss;
+	if (nominated.size() == 0)
+	{
+		ss << "'preemption_poll_interval_minutes' is set to " << interval << " but no "
+		   << "observations are nominated with the 'drop_violations' column of the external "
+		   << "observation data file - there would be nothing to judge a partial result "
+		   << "against";
+		return ss.str();
+	}
+	// at least one of them must actually count: the violation test skips zero-weighted
+	// observations, so a nomination made up entirely of them can never abandon anything
+	const ObservationInfo* oi = scenario.get_ctl_observation_info_ptr();
+	int n_nz = 0;
+	for (auto& name : nominated)
+		if (oi->get_weight(name) > 0.0)
+			n_nz++;
+	if (n_nz == 0)
+	{
+		ss << "'preemption_poll_interval_minutes' is set to " << interval << " and "
+		   << nominated.size() << " observation(s) are nominated with 'drop_violations', but "
+		   << "NONE of them carry a non-zero weight - the violation test skips zero-weighted "
+		   << "observations, so no run could ever be abandoned";
+		return ss.str();
+	}
+	return string();
+}
+
 vector<string> ViolationDetector::read_nominated(Pest& scenario)
 {
 	vector<string> out;
@@ -6559,6 +6592,14 @@ double EnsembleMethod::get_lambda()
 void EnsembleMethod::prep_drop_violations()
 {
     violation_obs.clear();
+
+    // FIRST, before any early return: the commonest way to misconfigure preemption is to set
+    // the interval and nominate nothing, and the early return below is taken in exactly that
+    // case - so a check placed after it would never fire for the case it exists to catch.
+    string preempt_err = ViolationDetector::check_preemption_config(pest_scenario);
+    if (preempt_err.size() > 0)
+        throw_em_error(preempt_err);
+
     string section = "observation data external";
     string viol_col = "drop_violations";
     map<string, string> viol_map = pest_scenario.get_ext_file_string_map(section,viol_col);

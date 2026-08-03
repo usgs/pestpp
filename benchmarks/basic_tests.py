@@ -2366,3 +2366,112 @@ if __name__ == "__main__":
 
     #mf6_v5_glm_test()
     #mf6_v5_sen_test()
+
+
+def preemption_poll_config_test():
+    """'preemption_poll_interval_minutes' requires something it can actually act on.
+
+    The option says how often to ask workers what they have so far and abandon runs already
+    violating a nominated observation. Two ways to set it and get nothing:
+
+      1. no observation nominated with 'drop_violations' at all
+      2. observations nominated, but every one of them zero-weighted - the violation test
+         skips those, so no run could ever be abandoned
+
+    Both would poll the workers for the life of the run and never be able to do anything, so
+    both are refused at startup rather than discovered as a puzzling absence of effect. The
+    same shared check runs in every tool that supports preemption.
+    """
+    import re as _re
+    t_d = os.path.join("preempt_cfg")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+
+    with open(os.path.join(t_d, "par.tpl"), 'w') as f:
+        f.write("ptf ~\n ~   p1    ~\n~   p2    ~\n")
+    with open(os.path.join(t_d, "obs.ins"), 'w') as f:
+        f.write("pif ~\nl1 !o1!\nl1 !o2!\n")
+    with open(os.path.join(t_d, "forward_run.py"), 'w') as f:
+        f.write("v=[float(l.strip()) for l in open('par.dat')]\n")
+        f.write("open('obs.dat','w').write('{0}\\n{1}\\n'.format(v[0],v[1]))\n")
+
+    cwd = os.getcwd()
+    os.chdir(t_d)
+    try:
+        base = pyemu.Pst.from_io_files("par.tpl", "par.dat", "obs.ins", "obs.dat")
+    finally:
+        os.chdir(cwd)
+    base.parameter_data.loc[:, "partrans"] = "none"
+    base.parameter_data.loc[:, "parlbnd"] = 0.0
+    base.parameter_data.loc[:, "parubnd"] = 1.0
+    base.parameter_data.loc[:, "parval1"] = 0.5
+    base.model_command = ["python forward_run.py"]
+    base.control_data.noptmax = 1
+
+    def _write(name, nominate, weight):
+        pst = base.get()
+        obs = pst.observation_data
+        obs.loc[:, "weight"] = 1.0
+        obs.loc[:, "obgnme"] = "obsgp"
+        obs.loc["o1", "obgnme"] = "less_than_c"
+        obs.loc["o1", "obsval"] = 0.9
+        if nominate:
+            obs.loc[:, "drop_violations"] = False
+            obs.loc["o1", "drop_violations"] = True
+            obs.loc["o1", "weight"] = weight
+        pst.pestpp_options["preemption_poll_interval_minutes"] = 1.0
+        pst.pestpp_options["ies_num_reals"] = 6
+        pst.pestpp_options["mou_population_size"] = 6
+        pst.pestpp_options["sqp_num_reals"] = 6
+        pst.pestpp_options["mou_objectives"] = ["o2"]
+        pst.pestpp_options["opt_objective_function"] = "o2"
+        pst.pestpp_options["opt_dec_var_groups"] = "pargp"
+        pst.parameter_data.loc[:, "pargp"] = "pargp"
+        pst.write(os.path.join(t_d, name), version=2)
+        return os.path.join(t_d, name)
+
+    _sfx = ".exe" if "windows" in platform.platform().lower() else ""
+    _plat = ("win" if "windows" in platform.platform().lower()
+             else "mac" if "darwin" in platform.platform().lower() else "linux")
+
+    def _find_tool(tool):
+        cands = [c for c in (
+            os.path.join("..", "build", "src", "programs", tool, tool + _sfx),
+            os.path.join(bin_path, _plat, tool + _sfx),
+            os.path.join(bin_path, tool + _sfx)) if os.path.exists(c)]
+        assert cands, "could not find " + tool
+        # newest wins: a relative/installed path resolves to whatever release binary is around
+        return max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
+
+    def _run_expect_refusal(tool, pst_name, needle):
+        tool_exe = _find_tool(tool)
+        failed = False
+        try:
+            pyemu.os_utils.run("{0} {1}".format(tool_exe, pst_name), cwd=t_d)
+        except Exception:
+            failed = True
+        assert failed, "{0} should have refused: {1}".format(tool, needle)
+        rec = open(os.path.join(t_d, pst_name.replace(".pst", ".rec"))).read()
+        assert needle in rec, \
+            "{0} refused, but not for the stated reason ({1}):\n{2}".format(
+                tool, needle, rec[-2500:])
+
+    # 1. nothing nominated
+    _write("nonom.pst", nominate=False, weight=1.0)
+    for tool in ("pestpp-ies", "pestpp-mou", "pestpp-sqp"):
+        _run_expect_refusal(tool, "nonom.pst", "no observations are nominated")
+
+    # 2. nominated but zero-weighted
+    _write("zerowt.pst", nominate=True, weight=0.0)
+    for tool in ("pestpp-ies", "pestpp-mou", "pestpp-sqp"):
+        _run_expect_refusal(tool, "zerowt.pst", "NONE of them carry a non-zero weight")
+
+    # 3. properly configured: accepted (no refusal message at all)
+    good = _write("good.pst", nominate=True, weight=1.0)
+    ies_exe = _find_tool("pestpp-ies")
+    pyemu.os_utils.run("{0} good.pst".format(ies_exe), cwd=t_d)
+    rec = open(os.path.join(t_d, "good.rec")).read()
+    assert "preemption_poll_interval_minutes" not in rec or \
+        "no observations are nominated" not in rec, \
+        "a properly configured case was refused:\n" + rec[-2000:]

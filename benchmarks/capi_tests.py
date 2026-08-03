@@ -1233,6 +1233,14 @@ def capi_partial_results_test():
 
             assert requested > 0, \
                 "no partial-results requests were sent; no run was ever seen running"
+
+            # THE GUARD: outside a batch there is nothing executing to ask about, and a reply
+            # would arrive on PANTHER's idle-pinging thread - which calls listen() and so
+            # process_message() on its OWN thread between batches. Acting on it there would
+            # write run storage underneath the caller. end_batch() has already run here.
+            assert ies.request_partial_results() == 0, \
+                "partial results were requested with no batch open; a reply would be handled " \
+                "on the idle thread rather than the caller's"
             # the master logs each partial reply it stores - to the PANTHER log, not the .rec
             rmr = open(os.path.join(wd, "pest.rmr")).read()
             replies = [ln for ln in rmr.splitlines() if "partial results from" in ln]

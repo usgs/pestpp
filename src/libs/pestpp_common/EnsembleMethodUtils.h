@@ -122,6 +122,20 @@ public:
 	/// answer came back empty and drop_violations silently did nothing.
 	static vector<string> read_nominated(Pest& scenario);
 
+	/**
+	 * @brief Enforce the preemption precondition. Returns "" if fine, else why not.
+	 *
+	 * 'preemption_poll_interval_minutes' says how often to ask workers what they have so far
+	 * and abandon runs already violating. That is only meaningful if something has been
+	 * nominated to judge them against, AND that observation carries a non-zero weight - a
+	 * zero-weighted observation is excluded from every violation test, so nominating one and
+	 * nothing else would poll the workers forever and never be able to abandon anything.
+	 *
+	 * Shared so all four tools refuse the same configuration for the same reason, rather than
+	 * three of them refusing it and one polling pointlessly.
+	 */
+	static string check_preemption_config(Pest& scenario);
+
 private:
 	Pest* pest_scenario;
 	vector<string> lt_obs_names, gt_obs_names, nominated;

@@ -594,6 +594,19 @@ public:
 	void set_ies_num_reals(int _ies_num_reals) { ies_num_reals = _ies_num_reals; }
 	double get_ies_bad_phi() const { return ies_bad_phi; }
 	void set_ies_bad_phi(double _ies_bad_phi) { ies_bad_phi = _ies_bad_phi; }
+	/**
+	 * @brief How often to ask workers for partial results, in MINUTES. 0 (default) is off.
+	 *
+	 * Preemption: while a batch runs, the master periodically asks the workers what they have
+	 * so far and abandons any run already violating a nominated 'drop_violations' observation.
+	 * Setting this without nominating at least one non-zero-weighted observation is refused -
+	 * there would be nothing to judge a partial result against, and the polling would cost
+	 * worker time for no possible benefit.
+	 *
+	 * PANTHER only; the serial run manager has no worker to ask.
+	 */
+	void set_preemption_poll_interval_minutes(double val) { preemption_poll_interval_minutes = val; }
+	double get_preemption_poll_interval_minutes() const { return preemption_poll_interval_minutes; }
 	double get_ies_bad_phi_sigma() const { return ies_bad_phi_sigma; }
 	void set_ies_bad_phi_sigma(double _ies_bad_phi_sigma) { ies_bad_phi_sigma = _ies_bad_phi_sigma; }
 	bool get_ies_include_base() const { return ies_include_base; }
@@ -1004,6 +1017,7 @@ private:
 	int ies_num_reals;	
 	double ies_bad_phi;
 	double ies_bad_phi_sigma;
+	double preemption_poll_interval_minutes;
 	bool ies_include_base;
 	bool ies_use_empirical_prior;
 	bool ies_group_draws;

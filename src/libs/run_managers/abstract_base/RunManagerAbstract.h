@@ -118,9 +118,27 @@ public:
 	virtual bool get_partial_info(int run_id, int& n_reported, int& n_total) const
 	{ (void)run_id; (void)n_reported; (void)n_total; return false; }
 
+	/**
+	 * @brief Is a batch executing right now?
+	 *
+	 * Matters for partial results, and not only as bookkeeping. RunManagerPanther runs an
+	 * idle-pinging thread that calls listen() - and therefore process_message() - on ITS OWN
+	 * thread between batches. begin_batch() parks it, so during a batch every message is
+	 * handled on the thread that called in. Outside one, a late reply would be processed on
+	 * the idle thread, writing run storage underneath the caller and invoking a screener from
+	 * a thread the caller knows nothing about.
+	 *
+	 * A partial result also means nothing outside a batch: it describes a run that is
+	 * CURRENTLY EXECUTING. So ignoring late replies is correct, not merely convenient.
+	 */
+	bool is_batch_open() const { return batch_open; }
+
 	/// Set once an observer has asked for STOP_BATCH; the run managers check it in their
 	/// scheduling loops. Cleared by the next set_progress_observer() or begin_batch().
 	bool progress_stop_requested = false;
+protected:
+	bool batch_open = false;
+public:
 	RunManagerAbstract(const std::vector<std::string> _comline_vec,
 		const std::vector<std::string> _tplfile_vec, const std::vector<std::string> _inpfile_vec,
 		const std::vector<std::string> _insfile_vec, const std::vector<std::string> _outfile_vec,

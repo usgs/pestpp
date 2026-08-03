@@ -1035,6 +1035,9 @@ void SeqQuadProgram::initialize()
 	// file - read from the scenario so it cannot depend on any construction order
 	violation_obs = ViolationDetector::read_nominated(pest_scenario);
 	viol_detector = ViolationDetector(&pest_scenario);
+	string preempt_err = ViolationDetector::check_preemption_config(pest_scenario);
+	if (preempt_err.size() > 0)
+		throw_sqp_error(preempt_err);
 	if (violation_obs.size() > 0)
 	{
 		stringstream vss;

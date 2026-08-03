@@ -726,8 +726,10 @@ void RunManagerPanther::begin_batch()
 	stringstream message;
 	NetPackage net_pack;
 
-	// Pause idle pinging thread
+	// Pause idle pinging thread. While it is parked, every message is handled on the thread
+	// that called in - which is what makes the partial-results path single-threaded.
 	pause_idle();
+	batch_open = true;
 	stringstream ss;
 	model_runs_done = 0;
 	model_runs_failed = 0;
@@ -857,6 +859,9 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UN
  */
 void RunManagerPanther::end_batch(RUN_UNTIL_COND terminate_reason)
 {
+	// cleared FIRST: anything arriving from here on is a late reply about a run that is no
+	// longer executing, and must not be acted on
+	batch_open = false;
 	stringstream ss;
 	stringstream message;
 	NetPackage net_pack;
@@ -1927,6 +1932,17 @@ void RunManagerPanther::process_message(int i_sock)
 	else if (net_pack.get_type() == NetPackage::PackType::PARTIAL_OBS)
 	{
 		int run_id = net_pack.get_run_id();
+		// A late reply, arriving after the batch ended. Ignore it: the run it describes is no
+		// longer executing, and process_message() may be running on the IDLE THREAD here -
+		// writing run storage from it would race the caller.
+		if (!batch_open)
+		{
+			stringstream lss;
+			lss << " run_id:" << run_id << " partial results arrived after the batch ended - "
+			    << "ignoring";
+			report(lss.str(), false);
+			return;
+		}
 		// a run that finished while the request was in flight: the real result has already
 		// been stored and marked complete, and a partial write over it would be a downgrade
 		if (!run_finished(run_id))
@@ -2309,6 +2325,10 @@ bool RunManagerPanther::get_partial_info(int run_id, int& n_reported, int& n_tot
 
 int RunManagerPanther::request_partial_results(const vector<int>& run_ids)
 {
+	// nothing is executing, so there is nothing to ask about - and a reply would arrive
+	// outside the batch and be ignored anyway
+	if (!batch_open)
+		return 0;
 	set<int> want(run_ids.begin(), run_ids.end());
 	int n_sent = 0, n_skipped = 0;
 	for (auto& agent : agent_info_set)
