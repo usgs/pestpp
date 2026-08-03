@@ -326,6 +326,22 @@ private:
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
 
+	/**
+	 * @brief Members violating a nominated 'drop_violations' observation, by name.
+	 *
+	 * mou had no drop_violations at all - the nomination, the test and the drop all lived on
+	 * EnsembleMethod, so a mou user with a hard constraint had no way to say "this member is
+	 * not worth keeping". Same criterion as ies/da, same shared evaluator.
+	 */
+	vector<string> get_violating_members(ObservationEnsemble& _op);
+	/// Drop them from both populations, sparing 'base' the way drop_bad_reals() does, and
+	/// never emptying the population.
+	void drop_violating_members(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+
+	/// Shared with ies/da so the two cannot disagree about what "violating" means.
+	ViolationDetector viol_detector;
+	vector<string> violation_obs;
+
 	ParameterEnsemble generate_population();
 
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);

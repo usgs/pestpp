@@ -2802,3 +2802,96 @@ if __name__ == "__main__":
     #pop_sched_test()
     #simplex_invest_1()
     #pi_output_test()
+
+
+def mou_drop_violations_test():
+    """mou drops members violating a nominated 'drop_violations' observation.
+
+    ies and da have had this for a while; mou had none of it - the nomination, the test and the
+    drop all lived on EnsembleMethod. Same nomination (a 'drop_violations' column in the
+    external observation file), same inequality semantics, same shared evaluator, so a mou user
+    with a hard constraint can now say "this member is not worth keeping".
+
+    Asserts that the nomination REGISTERED as well as that members were dropped. A feature that
+    is silently switched off produces the same "no violating members survive" outcome as one
+    that works, which is exactly how a regression in this went unnoticed in ies.
+    """
+    test_d = os.path.join(test_root, "mou_drop_viol")
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    os.makedirs(test_d)
+
+    with open(os.path.join(test_d, "par.tpl"), 'w') as f:
+        f.write("ptf ~\n ~   par1    ~\n~   par2    ~\n")
+    with open(os.path.join(test_d, "obs.ins"), 'w') as f:
+        f.write("pif ~\nl1 !obj1!\nl1 !obj2!\nl1 !constr!\n")
+    with open(os.path.join(test_d, "forward_run.py"), 'w') as f:
+        f.write("import numpy as np\n")
+        f.write("v = [float(l.strip()) for l in open('par.dat')]\n")
+        # constr is par1: with the bound below, roughly half the population violates
+        f.write("with open('obs.dat','w') as o:\n")
+        f.write("    o.write('{0}\\n{1}\\n{2}\\n'.format(v[0], v[1], v[0]))\n")
+
+    pst = pyemu.Pst.from_io_files(os.path.join(test_d, "par.tpl"), "par.dat",
+                                  os.path.join(test_d, "obs.ins"), "obs.dat", pst_path=".")
+    par = pst.parameter_data
+    par.loc[:, "partrans"] = "none"
+    par.loc[:, "parlbnd"] = 0.0
+    par.loc[:, "parubnd"] = 1.0
+    par.loc[:, "parval1"] = 0.5
+
+    obs = pst.observation_data
+    obs.loc[:, "weight"] = 1.0
+    obs.loc[["obj1", "obj2"], "obgnme"] = "less_than_obj"
+    obs.loc[["obj1", "obj2"], "obsval"] = 0.0
+    # the constraint: a LESS-THAN observation, violated whenever the simulated value exceeds
+    # the observed one, and nominated so that violating members are dropped rather than kept
+    obs.loc["constr", "obgnme"] = "less_than_constr"
+    obs.loc["constr", "obsval"] = 0.5
+    obs.loc[:, "drop_violations"] = False
+    obs.loc["constr", "drop_violations"] = True
+
+    pst.pestpp_options["mou_objectives"] = ["obj1", "obj2"]
+    pst.pestpp_options["mou_population_size"] = 20
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["random_seed"] = 11
+    pst.control_data.noptmax = 2
+    pst.model_command = ["python forward_run.py"]
+    pst.write(os.path.join(test_d, "mou_viol.pst"), version=2)
+
+    # Resolve the exe explicitly and ABSOLUTELY, newest first. The module-level exe_path is
+    # relative, so it resolves through PATH to whatever pestpp-mou happens to be installed -
+    # which silently tested a release binary rather than the build under test, and reported
+    # "feature missing" for a feature that was present.
+    cands = []
+    for c in (os.path.join("..", "build", "src", "programs", "pestpp-mou", "pestpp-mou" + exe),
+              os.path.join("..", "bin", os_tag, "pestpp-mou" + exe) if "os_tag" in dir() else "",
+              os.path.join("..", "bin", "pestpp-mou" + exe),
+              exe_path):
+        if c and os.path.exists(c):
+            cands.append(os.path.abspath(c))
+    assert cands, "could not find a pestpp-mou to test"
+    mou_exe = max(cands, key=os.path.getmtime)
+    print("testing with:", mou_exe)
+    pyemu.os_utils.run("{0} mou_viol.pst".format(mou_exe), cwd=test_d)
+
+    rec = open(os.path.join(test_d, "mou_viol.rec")).read()
+    # 1. the nomination registered - without this the rest can pass with the feature OFF
+    assert "1 'drop_violations' observations detected" in rec, \
+        "mou did not register the drop_violations nomination:\n" + rec[:3000]
+    # 2. members were actually dropped for violating it
+    assert "meet 'drop_violations' conditions" in rec, \
+        "mou never dropped a violating member - with constr bounded at 0.5 and par1 drawn " \
+        "over [0,1], roughly half the population should violate"
+
+    # 3. and no surviving member violates, in any generation that was written
+    for gen in range(pst.control_data.noptmax + 1):
+        f = os.path.join(test_d, "mou_viol.{0}.obs_pop.csv".format(gen))
+        if not os.path.exists(f):
+            continue
+        op = pd.read_csv(f, index_col=0)
+        op.columns = [c.lower() for c in op.columns]
+        survivors = op.loc[op.index.map(lambda x: str(x).lower() != "base"), "constr"]
+        assert (survivors <= 0.5 + 1.0e-7).all(), \
+            "generation {0} kept members violating the nominated constraint:\n{1}".format(
+                gen, survivors[survivors > 0.5])

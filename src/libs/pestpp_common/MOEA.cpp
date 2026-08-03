@@ -2804,6 +2804,67 @@ map<string, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chanc
 /**
  * @brief Collect a queued population's runs into _op, returning the failed indices.
  */
+
+vector<string> MOEA::get_violating_members(ObservationEnsemble& _op)
+{
+	vector<string> out;
+	if (violation_obs.size() == 0)
+		return out;
+	vector<string> vnames = _op.get_var_names();
+	vector<string> rnames = _op.get_real_names();
+	Eigen::MatrixXd m = *_op.get_eigen_ptr();
+	for (int i = 0; i < (int)rnames.size(); i++)
+	{
+		Observations sim;
+		for (int j = 0; j < (int)vnames.size(); j++)
+			sim.insert(vnames[j], m(i, j));
+		// empty valid-name set: every value in a harvested run is real. The same call judges a
+		// PARTIAL read during preemption by passing the names actually read.
+		if (viol_detector.is_violating(sim, set<string>(), violation_obs))
+			out.push_back(rnames[i]);
+	}
+	return out;
+}
+
+void MOEA::drop_violating_members(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+	if (violation_obs.size() == 0)
+		return;
+	vector<string> viol = get_violating_members(_op);
+	if (viol.size() == 0)
+		return;
+	stringstream ss;
+	// 'base' is spared, exactly as EnsembleMethod::drop_bad_reals() spares it: it is the
+	// control-file member and dropping it would remove the run the user asked for
+	vector<string> drop;
+	for (auto& v : viol)
+	{
+		if (v == BASE_REAL_NAME)
+			message(2, "not dropping 'base' even though it meets 'drop_violations' conditions");
+		else
+			drop.push_back(v);
+	}
+	if (drop.size() == 0)
+		return;
+	// never empty the population: a badly specified inequality can violate for everything, and
+	// a generation with nothing in it is a worse outcome than keeping members the user would
+	// rather not have
+	if (drop.size() >= (size_t)_op.shape().first)
+	{
+		ss.str("");
+		ss << "all " << drop.size() << " members meet 'drop_violations' conditions - NOT "
+		   << "dropping any, since that would leave an empty population. Check the "
+		   << "'drop_violations' observations and their inequality groups";
+		message(0, ss.str());
+		return;
+	}
+	ss.str("");
+	ss << drop.size() << " members meet 'drop_violations' conditions and are being dropped";
+	message(1, ss.str());
+	_dp.drop_rows(drop);
+	_op.drop_rows(drop);
+}
+
 vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids)
 {
 	stringstream ss;
@@ -2846,6 +2907,10 @@ vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble
 		_dp.drop_rows(failed_real_indices);
 		_op.drop_rows(failed_real_indices);
 	}
+
+	// beside the failed-run drop, so every population evaluation is covered - the initial one
+	// and each generation - rather than only the generation path
+	drop_violating_members(_dp, _op);
 
 	//do this here in case something is wrong, we know sooner than later
 	if (allow_chance)
@@ -2910,6 +2975,23 @@ void MOEA::finalize()
  */
 void MOEA::initialize()
 {
+	// same nomination the ies/da tools use - a 'drop_violations' column in the external
+	// observation file - read straight from the scenario so it cannot depend on the
+	// construction order of anything else
+	violation_obs = ViolationDetector::read_nominated(pest_scenario);
+	viol_detector = ViolationDetector(&pest_scenario);
+	if (violation_obs.size() > 0)
+	{
+		stringstream vss;
+		vss << violation_obs.size() << " 'drop_violations' observations detected, see rec file "
+		    << "for listing";
+		message(1, vss.str());
+		ofstream& vf_rec = file_manager.rec_ofstream();
+		vf_rec << endl << "The following observations are being used as 'drop_violations' "
+		       << "constraints:" << endl;
+		for (auto& o : violation_obs)
+			vf_rec << o << endl;
+	}
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 	message(0, "initializing MOEA process");
