@@ -338,12 +338,6 @@ private:
 	/// never emptying the population.
 	void drop_violating_members(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
-	/// The smallest population worth continuing with. mou had no minimum-realization concept
-	/// at all, unlike EnsembleMethod and SeqQuadProgram which both carry error_min_reals -
-	/// so a drop here had nothing to check against beyond "not empty", and a population of
-	/// one would have been allowed through. Same value and same meaning as theirs.
-	int error_min_reals = 2;
-
 	/// Shared with ies/da so the two cannot disagree about what "violating" means.
 	ViolationDetector viol_detector;
 	vector<string> violation_obs;

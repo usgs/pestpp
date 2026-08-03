@@ -6170,27 +6170,27 @@ void SeqQuadProgram::drop_violating_members(ParameterEnsemble& _pe, ObservationE
 	}
 	if (drop.size() == 0)
 		return;
-	// Never empty the set. For the candidates that means the line search simply finds no
-	// acceptable step and backtracks, which it already knows how to do - far better than
-	// handing it an empty ensemble.
-	// the same floor this class enforces elsewhere, not a second opinion about it
-	int min_keep = error_min_reals;
-	int n_left = _oe.shape().first - (int)drop.size();
-	if (n_left < min_keep)
-	{
-		ss.str("");
-		ss << drop.size() << " members meet 'drop_violations' conditions during " << stage
-		   << " but dropping them would leave " << n_left << " (need at least " << min_keep
-		   << ") - NOT dropping any";
-		message(0, ss.str());
-		return;
-	}
+	// A HARD drop, like ies/da and mou: the members go, and if that leaves too few the run
+	// stops. Declining would silently continue with members the user declared worthless, and
+	// would make mid-run preemption unsound - a cancelled run cannot be un-cancelled to
+	// restore a set the floor would have saved.
 	ss.str("");
 	ss << drop.size() << " members meet 'drop_violations' conditions during " << stage
 	   << " and are being dropped";
 	message(1, ss.str());
 	_pe.drop_rows(drop);
 	_oe.drop_rows(drop);
+
+	if (_oe.shape().first < error_min_reals)
+	{
+		ss.str("");
+		ss << "only " << _oe.shape().first << " members remain after dropping "
+		   << drop.size() << " 'drop_violations' members during " << stage
+		   << " - need at least " << error_min_reals
+		   << ". Check the nominated observations and their inequality groups";
+		message(0, ss.str());
+		throw_sqp_error(ss.str());
+	}
 }
 
 vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids)

@@ -2895,3 +2895,70 @@ def mou_drop_violations_test():
         assert (survivors <= 0.5 + 1.0e-7).all(), \
             "generation {0} kept members violating the nominated constraint:\n{1}".format(
                 gen, survivors[survivors > 0.5])
+
+
+def mou_drop_violations_floor_test():
+    """An over-aggressive nomination stops mou rather than quietly continuing.
+
+    The drop is HARD - members that violate are removed, and if that leaves a population below
+    the minimum the run errors. The alternative (decline to drop when the floor would be
+    breached) was rejected for two reasons: it silently carries on with members the user
+    declared worthless, and it makes mid-run preemption unsound, because a cancelled run can
+    never be un-cancelled to restore a population the floor would have saved.
+    """
+    test_d = os.path.join(test_root, "mou_drop_viol_floor")
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    os.makedirs(test_d)
+
+    with open(os.path.join(test_d, "par.tpl"), 'w') as f:
+        f.write("ptf ~\n ~   par1    ~\n~   par2    ~\n")
+    with open(os.path.join(test_d, "obs.ins"), 'w') as f:
+        f.write("pif ~\nl1 !obj1!\nl1 !obj2!\nl1 !constr!\n")
+    with open(os.path.join(test_d, "forward_run.py"), 'w') as f:
+        f.write("v = [float(l.strip()) for l in open('par.dat')]\n")
+        f.write("with open('obs.dat','w') as o:\n")
+        f.write("    o.write('{0}\\n{1}\\n{2}\\n'.format(v[0], v[1], v[0]))\n")
+
+    pst = pyemu.Pst.from_io_files(os.path.join(test_d, "par.tpl"), "par.dat",
+                                  os.path.join(test_d, "obs.ins"), "obs.dat", pst_path=".")
+    par = pst.parameter_data
+    par.loc[:, "partrans"] = "none"
+    par.loc[:, "parlbnd"] = 0.0
+    par.loc[:, "parubnd"] = 1.0
+    par.loc[:, "parval1"] = 0.5
+
+    obs = pst.observation_data
+    obs.loc[:, "weight"] = 1.0
+    obs.loc[["obj1", "obj2"], "obgnme"] = "less_than_obj"
+    obs.loc[["obj1", "obj2"], "obsval"] = 0.0
+    # impossible: par1 is drawn over [0,1] and must be < -1, so EVERY member violates
+    obs.loc["constr", "obgnme"] = "less_than_constr"
+    obs.loc["constr", "obsval"] = -1.0
+    obs.loc[:, "drop_violations"] = False
+    obs.loc["constr", "drop_violations"] = True
+
+    pst.pestpp_options["mou_objectives"] = ["obj1", "obj2"]
+    pst.pestpp_options["mou_population_size"] = 20
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["random_seed"] = 11
+    pst.control_data.noptmax = 1
+    pst.model_command = ["python forward_run.py"]
+    pst.write(os.path.join(test_d, "mou_floor.pst"), version=2)
+
+    cands = [c for c in (
+        os.path.join("..", "build", "src", "programs", "pestpp-mou", "pestpp-mou" + exe),
+        os.path.abspath(exe_path)) if os.path.exists(c)]
+    assert cands, "could not find a pestpp-mou to test"
+    mou_exe = max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
+
+    failed = False
+    try:
+        pyemu.os_utils.run("{0} mou_floor.pst".format(mou_exe), cwd=test_d)
+    except Exception:
+        failed = True
+    assert failed, "mou should have stopped: every member violates the nominated constraint"
+
+    rec = open(os.path.join(test_d, "mou_floor.rec")).read()
+    assert "below the minimum" in rec, \
+        "mou stopped, but not with the population-size message that says why:\n" + rec[-3000:]

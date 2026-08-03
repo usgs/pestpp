@@ -2846,25 +2846,27 @@ void MOEA::drop_violating_members(ParameterEnsemble& _dp, ObservationEnsemble& _
 	}
 	if (drop.size() == 0)
 		return;
-	// A badly specified inequality can violate for everything, and a generation with nothing
-	// (or almost nothing) in it is a worse outcome than keeping members the user would rather
-	// not have. Floored at error_min_reals, the same minimum ies/da and sqp enforce.
-	int n_left = _op.shape().first - (int)drop.size();
-	if (n_left < error_min_reals)
-	{
-		ss.str("");
-		ss << drop.size() << " members meet 'drop_violations' conditions but dropping them "
-		   << "would leave " << n_left << " (need at least " << error_min_reals << ") - NOT "
-		   << "dropping any. Check the 'drop_violations' observations and their inequality "
-		   << "groups";
-		message(0, ss.str());
-		return;
-	}
+	// A HARD drop, like ies/da: the members go, and if that leaves too small a population the
+	// run stops. Declining to drop would be worse in two ways - it silently carries on with
+	// members the user declared worthless, and it makes mid-run preemption unsound, because a
+	// cancelled run can never be un-cancelled to restore a population the floor would have
+	// saved. Same rule everywhere means screening can only change wall-clock, never results.
 	ss.str("");
 	ss << drop.size() << " members meet 'drop_violations' conditions and are being dropped";
 	message(1, ss.str());
 	_dp.drop_rows(drop);
 	_op.drop_rows(drop);
+
+	if (_op.shape().first < error_min_members)
+	{
+		ss.str("");
+		ss << "population size " << _op.shape().first << " after dropping "
+		   << drop.size() << " 'drop_violations' members is below the minimum of "
+		   << error_min_members << " - check the nominated observations and their inequality "
+		   << "groups";
+		message(0, ss.str());
+		throw_moea_error(ss.str());
+	}
 }
 
 vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids)
