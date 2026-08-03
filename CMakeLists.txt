@@ -39,18 +39,22 @@ if(WIN32)
       set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
     endif()
     message(STATUS "PESTPP_MSVC_STATIC_RUNTIME=${PESTPP_MSVC_STATIC_RUNTIME} -> ${CMAKE_MSVC_RUNTIME_LIBRARY}")
-    if(PESTPP_MSVC_STATIC_RUNTIME)
-      # Deliberately whole-project rather than a property on pestpp_capi alone. That looks like
-      # the tidier fix and is a worse one: pestpp_com and the run managers are STATIC archives
-      # (BUILD_SHARED_LIBS defaults OFF) compiled with the project-wide setting, so putting /MD
-      # on the shared library only would link /MT archives into an /MD module - two runtimes
-      # inside one dll, with FileManager opening files on one and the C ABI on the other.
-      message(STATUS
-        "  note: /MT gives pestpp-api.<dll> a PRIVATE C runtime - its own heap and its own file "
-        "descriptor table, not shared with a host process that loads it. That is correct for the "
-        "executables, which ship without a redistributable, and is why it is the default. If THIS "
-        "build's pestpp-api.dll will be dlopen'd by python or another host with its own CRT, "
-        "configure with -DPESTPP_MSVC_STATIC_RUNTIME=OFF.")
+    # /MT gives pestpp-api.<dll> a PRIVATE C runtime: its own heap and its own file descriptor
+    # table, not shared with a host process that dlopen's it. That is fine, and deliberately
+    # left as the default, because the C ABI never lets ownership cross that boundary - no
+    # entry point returns memory the caller frees (the one double** is a borrowed view of the
+    # library's own buffer, returned via pestpp_release_view), and no FILE* or descriptor
+    # appears in the ABI. Keep it that way; see the ownership note in pestpp-api.h.
+    #
+    # This was NOT always true. pestpp_redirect_output() used to _dup2 file descriptor 1, which
+    # under /MT closed a console handle the host was still using - python's next write failed
+    # with WinError 6 and the freed handle value was recycled onto an open output file. That is
+    # fixed in the library rather than by changing runtimes, because switching would have to be
+    # whole-project anyway: pestpp_com and the run managers are STATIC archives
+    # (BUILD_SHARED_LIBS defaults OFF), so /MD on the shared target alone would link /MT
+    # archives into an /MD module - two runtimes inside one dll, which is the same bug moved.
+    if(NOT PESTPP_MSVC_STATIC_RUNTIME)
+      message(STATUS "  (shared runtime: required if you link the static libs into a CPython extension)")
     endif()
   endif()
 endif()

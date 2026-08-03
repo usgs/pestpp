@@ -27,6 +27,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import weakref
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from typing import TypeVar
@@ -354,6 +355,18 @@ class _Tool:
         self._pst_file = pst_file
         self._pst = None            # lazily parsed by the .pst property
 
+        # Cleanup backstop - see the note in PestppLib. It matters more here, because this
+        # layer owns SUBPROCESSES as well as the handle: the panther agents started by
+        # create(workers=N). `with` cannot cover the case this is really for, which is a
+        # notebook re-running its setup cell -
+        #
+        #     ies = Ies.create(wd, workers=8)     # run this three times
+        #
+        # rebinding the name drops the old session with no cleanup, and there are now 24 agents
+        # alive and three sessions holding ports, silently. Dropping the reference is what
+        # triggers the finalizer, so that case is exactly the one it catches.
+        self._finalizer = weakref.finalize(self, _release_session, self._workers, self._lib)
+
     def _q(self):
         """Capture the library's console output for the duration of a call."""
         return _capture_output(self._lib, self._log) if self._quiet else nullcontext()
@@ -621,16 +634,16 @@ class _Tool:
             self._lib.finalize()
 
     def close(self) -> None:
-        """Release the handle and stop any workers this session started."""
-        for p in self._workers:
-            try:
-                p.terminate()
-            except Exception:
-                pass
+        """Release the handle and stop any workers this session started.
+
+        Idempotent. Calling it is good practice and `with` calls it for you, but neither is
+        required: a dropped session is cleaned up by its finalizer.
+        """
+        # One code path for explicit close(), __exit__ and collection; finalize() runs the
+        # callback at most once, so the repeat calls this invites are free.
+        self._finalizer()
         self._workers = []
-        if self._lib is not None:
-            self._lib.destroy()
-            self._lib = None
+        self._lib = None
 
     def __enter__(self: _ToolT) -> _ToolT:
         return self
@@ -1339,6 +1352,34 @@ def _find_exe(name: str, explicit: str | None = None) -> str:
             return os.path.abspath(cand)
     raise FileNotFoundError(
         "could not find {0}; pass exe_path= or put it on PATH".format(exe))
+
+
+def _release_session(workers, lib) -> None:
+    """Stop this session's agents and hand the handle back. The counterpart to _start_workers.
+
+    Module level so a finalizer can hold it without holding the session (see the note in
+    _Tool.__init__), and it never raises: this runs from garbage collection and from the
+    interpreter's atexit unwind, where a traceback would be attached to no particular line of
+    anyone's code.
+    """
+    # Signal everything first, THEN collect. Agents shut down concurrently, so two passes cost
+    # about one timeout in total rather than one per worker - which matters when a notebook
+    # cell that asked for workers=8 is being cleaned up on rebind.
+    for p in workers:
+        try:
+            p.terminate()
+        except Exception:
+            pass
+    for p in workers:
+        try:
+            p.wait(timeout=2)
+        except Exception:
+            pass        # already gone, or refusing to; either way do not block a GC pass
+    try:
+        if lib is not None:
+            lib.destroy()
+    except Exception:
+        pass
 
 
 def _start_workers(workdir, n, port, worker_root, exe_path, exe_name, pst_file):

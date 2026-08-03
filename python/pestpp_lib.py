@@ -12,6 +12,7 @@ The ergonomic layer belongs on top of this, not inside it.
 from __future__ import annotations
 
 import os
+import weakref
 from ctypes import (
     CDLL,
     c_ubyte,
@@ -169,6 +170,22 @@ def format_option_value(value) -> str:
         "sequence of those".format(type(value).__name__))
 
 
+def _destroy_handle(lib, handle) -> None:
+    """Hand one session back to the library. Module level so a finalizer can hold it.
+
+    Never raises. This runs from garbage collection and from the interpreter's atexit unwind,
+    where an exception would surface as noise on stderr attached to no particular line of the
+    caller's code - and where there is nothing useful to do about it anyway, the process being
+    on its way out. A double free is already impossible: finalize() calls this at most once,
+    and pestpp_destroy() answers PESTPP_INVALID_HANDLE rather than crashing besides.
+    """
+    try:
+        if handle:
+            lib.pestpp_destroy(handle)
+    except Exception:
+        pass
+
+
 class PestppLib:
     """One loaded shared library plus one session handle."""
 
@@ -207,6 +224,24 @@ class PestppLib:
         status = self.lib.pestpp_create(byref(opts), byref(self.handle))
         if status != PESTPP_OK:
             raise PestppError(self.last_global_error())
+
+        # Cleanup backstop. `with` is a convenience here, not the contract - nothing gates the
+        # methods on having entered a context - so a caller working flat (a notebook, where the
+        # object has to outlive a cell) must not be punished for it. Without this, dropping the
+        # last reference leaks the session: the run manager, RunStorage and the FileManager's
+        # open output files all stay alive in the library for the rest of the process.
+        #
+        # weakref.finalize rather than __del__, deliberately. __del__ runs during interpreter
+        # shutdown when module globals may already be torn down, so `self.lib.pestpp_destroy`
+        # can fail confusingly at the worst possible moment; finalize keeps its own strong
+        # references to exactly what the callback needs and is invoked in a defined order.
+        #
+        # The first argument is watched WEAKLY, so naming self there is right and costs
+        # nothing. What must never appear is self among the callback ARGUMENTS (or a bound
+        # method of self, which smuggles one in): finalize holds those strongly, so that would
+        # keep the object alive forever - precisely the leak this exists to close. Hence a
+        # module-level function taking the handle, not a method.
+        self._finalizer = weakref.finalize(self, _destroy_handle, self.lib, self.handle)
 
     # -- plumbing ---------------------------------------------------------------------
 
@@ -493,9 +528,13 @@ class PestppLib:
         return major.value, minor.value, patch.value
 
     def destroy(self) -> None:
-        if getattr(self, "handle", None) is not None and self.handle:
-            self.lib.pestpp_destroy(self.handle)
-            self.handle = None
+        """Release the session. Idempotent, and safe to leave to the finalizer."""
+        # Routed through the finalizer rather than duplicating the call, so explicit destroy(),
+        # __exit__ and garbage collection are one code path that runs at most once.
+        fin = getattr(self, "_finalizer", None)
+        if fin is not None:
+            fin()
+        self.handle = None
 
     def __enter__(self):
         return self

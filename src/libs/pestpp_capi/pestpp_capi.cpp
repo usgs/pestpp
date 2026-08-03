@@ -2077,6 +2077,16 @@ pestpp_status pestpp_get_worker_run_history(pestpp_handle h, int idx, int which,
 
 /* ---- queue / harvest ------------------------------------------------------------------ */
 
+// extern "C++" on purpose, for the same reason as read_stored_run below: this file's body sits
+// inside an extern "C" block, which would otherwise give this helper C language linkage while
+// it RETURNS a C++ object by value. Returning a non-trivial type is not a register operation -
+// the caller passes a hidden pointer to storage for the result and the callee constructs it
+// there - and that hidden argument is part of the C++ ABI, which is exactly what C linkage
+// says not to use. gcc and clang happen to agree and only warn; MSVC is not obliged to, and
+// when it does not the object is constructed through whatever was in the slot the caller
+// believed it had set - an access violation if you are lucky. The anonymous namespace does not
+// help: it governs visibility, not language linkage.
+extern "C++" {
 namespace {
 
 /** Unpack fixed-width space-padded names into trimmed strings. */
@@ -2095,6 +2105,7 @@ vector<string> unpack_names(const char* buf, int n)
 }
 
 } // namespace
+} // extern "C++"
 
 pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights, int max_n, int* n_out)
 {
@@ -2339,10 +2350,16 @@ pestpp_status pestpp_get_run_count(pestpp_handle h, int* n)
 }
 
 // extern "C++" on purpose: this file's body sits inside an extern "C" block, which would
-// otherwise give this helper C language linkage while it takes C++ REFERENCE parameters.
-// Every other helper in here takes plain pointers; this is the only one that does not, and a
-// C-linkage function with reference parameters is the kind of thing that is legal on paper
-// and differs between compilers in practice.
+// otherwise give this helper C language linkage while it takes C++ REFERENCE parameters. A
+// C-linkage function with reference parameters is the kind of thing that is legal on paper and
+// differs between compilers in practice - and not hypothetically: getting this wrong is what
+// produced the windows access violation in pestpp_get_run_info().
+//
+// Helpers in here otherwise take and return plain C types, which need no such treatment. The
+// exception is unpack_names() above, wrapped for the same reason with a C++ RETURN type. If
+// you add a third, the rule is: any helper whose signature mentions a C++ type - reference,
+// or a class returned by value - needs this wrapper, because the anonymous namespace it sits
+// in controls visibility, not language linkage.
 extern "C++" {
 namespace {
 /// Read one stored run and describe how complete it is.

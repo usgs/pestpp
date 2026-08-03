@@ -8,6 +8,7 @@ Worth testing separately because the helper layer can drift from the binding und
 without anything failing to compile - a renamed C symbol shows up here as an AttributeError,
 and a semantic change (an iteration count, a transform space) shows up nowhere else at all.
 """
+import gc
 import os
 import platform
 import shutil
@@ -522,30 +523,36 @@ def api_notebook_runs_test():
     import nbformat
     from nbclient import NotebookClient
 
-    nb_path = os.path.join(_REPO, "examples", "pestpp_api_demo.ipynb")
-    assert os.path.exists(nb_path), nb_path
-    nb_dir = os.path.dirname(nb_path)
+    # The _flat variants are the same demos written without `with`, and they are covered here
+    # for the same reason as the original: they are what a notebook user is pointed at, so a
+    # stale cell in one is as bad as a stale cell in the other. They deliberately use their own
+    # scratch directories and ports, so running both in one session cannot have them collide.
+    for nb_name in ("pestpp_api_demo.ipynb", "pestpp_api_demo_flat.ipynb"):
+        nb_path = os.path.join(_REPO, "examples", nb_name)
+        assert os.path.exists(nb_path), nb_path
+        nb_dir = os.path.dirname(nb_path)
 
-    nb = nbformat.read(nb_path, as_version=4)
-    client = NotebookClient(nb, timeout=1800, kernel_name="python3",
-                            allow_errors=True,
-                            resources={"metadata": {"path": nb_dir}})
-    client.execute()
+        nb = nbformat.read(nb_path, as_version=4)
+        client = NotebookClient(nb, timeout=1800, kernel_name="python3",
+                                allow_errors=True,
+                                resources={"metadata": {"path": nb_dir}})
+        client.execute()
 
-    failures = []
-    for i, cell in enumerate(nb.cells):
-        if cell.cell_type != "code":
-            continue
-        for out in cell.get("outputs", []):
-            if out.output_type == "error":
-                failures.append("cell {0}: {1}: {2}".format(
-                    i, out.ename, str(out.evalue)[:200]))
-    assert not failures, "notebook cells raised:\n  " + "\n  ".join(failures)
+        failures = []
+        for i, cell in enumerate(nb.cells):
+            if cell.cell_type != "code":
+                continue
+            for out in cell.get("outputs", []):
+                if out.output_type == "error":
+                    failures.append("cell {0}: {1}: {2}".format(
+                        i, out.ename, str(out.evalue)[:200]))
+        assert not failures, "{0} cells raised:\n  ".format(nb_name) + "\n  ".join(failures)
 
-    # scratch directories the notebook creates alongside itself
-    for name in ("nb_ies", "nb_prior", "nb_cull", "nb_parallel", "nb_parallel_workers",
-                 "nb_defer", "nb_progress"):
-        shutil.rmtree(os.path.join(nb_dir, name), ignore_errors=True)
+        # scratch directories the notebook creates alongside itself
+        for stem in ("ies", "prior", "cull", "parallel", "parallel_workers",
+                     "defer", "progress"):
+            for prefix in ("nb_", "nbflat_"):
+                shutil.rmtree(os.path.join(nb_dir, prefix + stem), ignore_errors=True)
 
 
 def api_pyemu_objects_test():
@@ -1573,6 +1580,39 @@ def api_run_observer_thunk_is_retained_test():
         ies.finalize()
 
 
+def api_session_cleanup_does_not_need_with_test():
+    """A dropped session cleans itself up: `with` is a convenience, not the contract.
+
+    This is the notebook case, and `with` is no help for it. Re-running a setup cell rebinds
+    the name and drops the previous session - so if cleanup only happened in __exit__ or in an
+    explicit close(), every re-run would silently leak the handle AND leave that session's
+    panther agents running. Dropping the reference is what has to be safe.
+    """
+    wd = _case("api_no_with", noptmax=1, num_reals=6)
+
+    # 1. flat style, no context manager anywhere, runs to completion
+    ies = Ies.from_pst("pest.pst", workdir=wd)
+    ies.initialize()
+    assert ies.phi_df() is not None
+    fin = ies._finalizer
+    assert fin.alive, "a live session should have a live finalizer"
+
+    # 2. close() runs it, and is idempotent - the repeat calls a flat style invites are free
+    ies.close()
+    assert not fin.alive, "close() should have run the finalizer"
+    ies.close()
+
+    # 3. and dropping the last reference is enough on its own
+    ies2 = Ies.from_pst("pest.pst", workdir=wd)
+    ies2.initialize()
+    fin2 = ies2._finalizer
+    lib_fin = ies2._lib._finalizer
+    del ies2
+    gc.collect()
+    assert not fin2.alive, "dropping the session should have finalized it"
+    assert not lib_fin.alive, "...and released the underlying handle with it"
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -1624,4 +1664,5 @@ if __name__ == "__main__":
     api_run_observer_can_stop_a_batch_test()
     api_run_observer_survives_a_raising_callback_test()
     api_run_observer_thunk_is_retained_test()
+    api_session_cleanup_does_not_need_with_test()
     print("all helper tests passed")

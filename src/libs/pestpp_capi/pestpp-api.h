@@ -280,30 +280,44 @@ PESTPP_API pestpp_status pestpp_clear_fatal_error(void);
 /* Flush the library's console output.
  *
  * Needed because on windows the library links the static CRT (/MT), so it owns a COPY of the
- * C runtime with its own stdout buffer, independent of the host program's. A caller that
- * redirects file descriptor 1 to capture output gets the model's output - child processes
- * inherit the descriptor - but the library's own text stays in that private buffer and
- * surfaces later, after the redirect has been undone. Call this before restoring, and the
- * buffer lands where it was meant to. Harmless everywhere else. */
+ * C runtime with its own output buffer, independent of the host program's. Text the library
+ * has written but not flushed sits in that private buffer and surfaces later, after a redirect
+ * has been undone - landing wherever output points by then rather than in the log. Call this
+ * before restoring. Harmless everywhere else. */
 PESTPP_API pestpp_status pestpp_flush_output(void);
 
 /* Send the library's console output to a file, and put it back.
  *
- * This has to happen INSIDE the library. On windows it links the static CRT (/MT), so it owns
- * a private copy of the C runtime with its own file descriptor table: a host program that
- * redirects its own descriptor 1 moves the process std handle - so child processes such as
- * the model land in the file - while the library's descriptor 1 still refers to the original
- * console. Flushing does not help; the descriptor itself is the wrong one. Doing the dup2 in
- * here operates on the table that actually matters, and catches the child processes too.
+ * This has to happen INSIDE the library, and WHAT GETS CAPTURED DIFFERS BY PLATFORM.
+ *
+ * On posix it redirects file descriptor 1. There is one descriptor table per process, so that
+ * catches everything the library emits and the stdout of child processes too, since the model
+ * inherits the descriptor when it is spawned.
+ *
+ * On windows it redirects the library's C++ output stream and DOES NOT TOUCH ANY DESCRIPTOR.
+ * Two consequences worth knowing before you rely on this:
+ *
+ *   - the model's console output is NOT captured. It never was on windows: the model is
+ *     spawned with bInheritHandles=false, so it inherits nothing and writes to the console.
+ *     Only the library's own text lands in the file.
+ *   - it cannot damage the host. Under the static CRT (/MT, the default) this library owns a
+ *     private descriptor table, so calling _dup2 on ITS descriptor 1 closed a console handle
+ *     the HOST was still using - a python caller's next print died with WinError 6, and the
+ *     freed handle value was recycled onto the next file opened here, which is how model
+ *     output was found written inside pest.phi.composite.csv. Swapping the stream instead has
+ *     no such failure mode under any runtime configuration.
+ *
+ * If you need the model's output on windows, capture it in the host around the model command,
+ * not here.
  *
  * redirect() writes an opaque TOKEN into `redirect_token`; hand that back to restore().
  * Appends, so repeated redirects to one path accumulate rather than truncating.
  *
- * PROCESS-GLOBAL, and strictly LIFO. There is one file descriptor 1, so this is not really a
- * per-session operation however much it looks like one. Nesting is fine - each redirect
- * remembers what stdout was - but they must be undone INNERMOST FIRST, and restoring out of
- * order is refused with PESTPP_INVALID_STATE rather than performed. That refusal is the
- * feature: unwinding out of order used to leave stdout pointing at another session's log file
+ * PROCESS-GLOBAL, and strictly LIFO. Output is a process-wide resource, so this is not really
+ * a per-session operation however much it looks like one. Nesting is fine - each redirect
+ * remembers where output was going - but they must be undone INNERMOST FIRST, and restoring
+ * out of order is refused with PESTPP_INVALID_STATE rather than performed. That refusal is the
+ * feature: unwinding out of order used to leave output pointing at another session's log file
  * permanently, with nothing reported.
  *
  * The token is NOT a file descriptor - the saved descriptor stays inside the library, so a
