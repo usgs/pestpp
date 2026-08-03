@@ -216,6 +216,10 @@ add_custom_target(local_install
     pestpp-sqp
     pestpp-da
     pestpp_capi
+    # not shipped, but installed so bin/ never serves a stale selftest - and listed HERE
+    # because its install() rule would otherwise let ninja run cmake_install.cmake before the
+    # binary exists. Anything given an install() rule belongs in this list.
+    pestpp-selftest
   COMMENT "Installing local executables and the shared library to ${PESTPP_SOURCE_DIR}/bin"
 )
 
