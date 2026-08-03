@@ -5464,6 +5464,27 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
 
     prep_drop_violations();
 
+    // Install the preemption screener: the tool supplies the PREDICATE, the run manager owns
+    // the mechanics. The same violation test the harvest-time drop uses, so a run abandoned
+    // mid-flight is one that would have been dropped on arrival anyway - which is what keeps
+    // screening a saving in wall-clock rather than a change in results.
+    double _poll_min = pest_scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
+    if ((_poll_min > 0.0) && (violation_obs.size() > 0))
+    {
+        run_mgr_ptr->set_run_screener(
+            [this](int run_id, Observations& sim, const set<string>& valid) -> RunVerdict
+            {
+                return viol_detector.is_violating(sim, valid, violation_obs)
+                    ? RunVerdict::ABANDON : RunVerdict::KEEP;
+            },
+            _poll_min * 60.0);
+        stringstream _pss;
+        _pss << "preemption enabled: asking workers for partial results every " << _poll_min
+             << " minute(s) and abandoning runs that already violate a nominated observation";
+        message(1, _pss.str());
+    }
+
+
 	//todo: add sanity checks for weights en
 	//like conflict with da weight cycle table
 	sanity_checks();
@@ -6612,6 +6633,7 @@ void EnsembleMethod::prep_drop_violations()
     // constructed until after this runs, so asking it returned an empty list and
     // drop_violations quietly did nothing. Same single definition, no ordering dependency.
     violation_obs = ViolationDetector::read_nominated(pest_scenario);
+    viol_detector = ViolationDetector(&pest_scenario);
     stringstream ss;
     ss << violation_obs.size() << " 'drop_violations' observations detected, see rec file for listing";
     message(1,ss.str());
@@ -7973,6 +7995,10 @@ void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
 		ctx.inflation_factors = inflation_factors;
 		ctx.backtrack_factors = backtrack_factors;
 	}
+	// Lambda testing is a COMPARISON between candidates, not an evaluation of the ensemble:
+	// abandoning runs part way through changes which lambda wins, which is a change of answer
+	// rather than a saving. Screening resumes for the batches that feed the ensemble.
+	run_mgr_ptr->set_screening_active(false);
 	vector<map<string, int>> run_ids = queue_upgrade_ensembles(ctx, cycle);
 	performance_log->log_event("making runs");
 	try
@@ -7990,6 +8016,7 @@ void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
 		throw_em_error(string("error running ensembles"));
 	}
 	harvest_upgrade_ensembles(ctx, run_ids);
+	run_mgr_ptr->set_screening_active(true);
 }
 
 /**

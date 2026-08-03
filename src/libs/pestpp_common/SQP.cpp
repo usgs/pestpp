@@ -1038,6 +1038,27 @@ void SeqQuadProgram::initialize()
 	string preempt_err = ViolationDetector::check_preemption_config(pest_scenario);
 	if (preempt_err.size() > 0)
 		throw_sqp_error(preempt_err);
+
+    // Install the preemption screener: the tool supplies the PREDICATE, the run manager owns
+    // the mechanics. The same violation test the harvest-time drop uses, so a run abandoned
+    // mid-flight is one that would have been dropped on arrival anyway - which is what keeps
+    // screening a saving in wall-clock rather than a change in results.
+    double _poll_min = pest_scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
+    if ((_poll_min > 0.0) && (violation_obs.size() > 0))
+    {
+        run_mgr_ptr->set_run_screener(
+            [this](int run_id, Observations& sim, const set<string>& valid) -> RunVerdict
+            {
+                return viol_detector.is_violating(sim, valid, violation_obs)
+                    ? RunVerdict::ABANDON : RunVerdict::KEEP;
+            },
+            _poll_min * 60.0);
+        stringstream _pss;
+        _pss << "preemption enabled: asking workers for partial results every " << _poll_min
+             << " minute(s) and abandoning runs that already violate a nominated observation";
+        message(1, _pss.str());
+    }
+
 	if (violation_obs.size() > 0)
 	{
 		stringstream vss;

@@ -821,6 +821,10 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UN
 			terminate_reason = RUN_UNTIL_COND::NO_OPS;
 			break;
 		}
+		// preemption: ask the workers what they have, on the cadence the user set. Sent from
+		// HERE, so the replies land in this same loop on this same thread.
+		if (screen_poll_due())
+			request_partial_results(vector<int>());
 		init_agents();
 		//schedule runs on available nodes
 		schedule_runs();
@@ -1969,6 +1973,39 @@ void RunManagerPanther::process_message(int i_sock)
 				   << agent_info_iter->get_work_dir() << " " << n_real << " of " << pi.n_total
 				   << " observations";
 				report(ss.str(), false);
+
+				// hand it to the tool's predicate. Only the names actually READ are offered
+				// as valid - the rest carry the no-data sentinel, and judging those would
+				// condemn almost every run on the first reply.
+				if (screener_fn && (n_real > 0))
+				{
+					set<string> valid;
+					const vector<string>& _onames = get_obs_name_vec();
+					for (size_t vi = 0; vi < _onames.size(); vi++)
+						if (ovals[vi] != Transformable::no_data)
+							valid.insert(_onames[vi]);
+					RunVerdict verdict = RunVerdict::KEEP;
+					try
+					{
+						verdict = screener_fn(run_id, obs, valid);
+					}
+					catch (...)
+					{
+						// a screener must never be able to take down a batch
+						verdict = RunVerdict::KEEP;
+					}
+					if (verdict == RunVerdict::ABANDON)
+					{
+						stringstream ass;
+						ass << " run_id:" << run_id << " abandoned mid-run: its partial "
+						    << "results already violate a nominated observation";
+						report(ass.str(), false);
+						// cancel_runs(), NOT kill_run(): cancelling clears the waiting queue
+						// too, so the run is not simply rescheduled somewhere else - which
+						// would cost more than not screening at all
+						cancel_runs(vector<int>{run_id});
+					}
+				}
 			}
 			catch (const exception& e)
 			{

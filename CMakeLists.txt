@@ -39,6 +39,19 @@ if(WIN32)
       set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
     endif()
     message(STATUS "PESTPP_MSVC_STATIC_RUNTIME=${PESTPP_MSVC_STATIC_RUNTIME} -> ${CMAKE_MSVC_RUNTIME_LIBRARY}")
+    if(PESTPP_MSVC_STATIC_RUNTIME)
+      # Deliberately whole-project rather than a property on pestpp_capi alone. That looks like
+      # the tidier fix and is a worse one: pestpp_com and the run managers are STATIC archives
+      # (BUILD_SHARED_LIBS defaults OFF) compiled with the project-wide setting, so putting /MD
+      # on the shared library only would link /MT archives into an /MD module - two runtimes
+      # inside one dll, with FileManager opening files on one and the C ABI on the other.
+      message(STATUS
+        "  note: /MT gives pestpp-api.<dll> a PRIVATE C runtime - its own heap and its own file "
+        "descriptor table, not shared with a host process that loads it. That is correct for the "
+        "executables, which ship without a redistributable, and is why it is the default. If THIS "
+        "build's pestpp-api.dll will be dlopen'd by python or another host with its own CRT, "
+        "configure with -DPESTPP_MSVC_STATIC_RUNTIME=OFF.")
+    endif()
   endif()
 endif()
 

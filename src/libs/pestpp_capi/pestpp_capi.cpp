@@ -24,15 +24,11 @@
 #include <cstdio>
 #include <cstddef>
 #if defined(_WIN32)
-#  include <io.h>
-#  include <fcntl.h>
-#  define PESTPP_DUP    _dup
-#  define PESTPP_DUP2   _dup2
-#  define PESTPP_CLOSE  _close
-#  define PESTPP_OPEN   _open
-#  define PESTPP_O_FLAGS (_O_WRONLY | _O_CREAT | _O_APPEND | _O_TEXT)
-#  define PESTPP_O_MODE  (_S_IREAD | _S_IWRITE)
-#  include <sys/stat.h>
+// Deliberately no descriptor macros here. The windows redirect swaps cout's streambuf and must
+// never call _dup2/_close on fd 1: under the static CRT this library has a private descriptor
+// table, and closing its fd 1 destroys the console handle the HOST process is still using.
+// See the note on RedirectRecord for the full failure mode. Defining the macros for windows
+// would only make it easy to reintroduce.
 #else
 #  include <unistd.h>
 #  include <fcntl.h>
@@ -822,25 +818,60 @@ string g_create_error;
 
 /** Outstanding output redirects, innermost last.
  *
- * There is exactly one file descriptor 1 in the process, so redirecting it is not a per-handle
- * operation however much it looks like one. Nesting works - each redirect saves what stdout
- * was, so unwinding in the reverse order puts every layer back - but UNWINDING OUT OF ORDER
- * does not, and it fails silently and permanently:
+ * Redirecting output is a process-wide operation however much it looks like a per-handle one.
+ * Nesting works - each redirect saves what output was going to, so unwinding in the reverse
+ * order puts every layer back - but UNWINDING OUT OF ORDER does not, and it fails silently and
+ * permanently:
  *
  *     A redirects -> saved_a = the console
  *     B redirects -> saved_b = A's log file
- *     A restores  -> stdout = the console        (B is still "redirected", to nothing)
- *     B restores  -> stdout = A's log file       <- and stays there forever
+ *     A restores  -> output = the console        (B is still "redirected", to nothing)
+ *     B restores  -> output = A's log file       <- and stays there forever
  *
  * The old signature handed the caller the raw saved descriptor, so there was nothing to check
  * against: any int was as plausible as any other. Now the caller gets an opaque TOKEN, the
- * descriptor stays in here, and restoring anything but the innermost redirect is refused.
+ * saved state stays in here, and restoring anything but the innermost redirect is refused.
  * Enforcing the order beats guessing at a repair - silently unwinding somebody else's redirect
- * is the corruption, not the fix. */
+ * is the corruption, not the fix.
+ *
+ * HOW the redirect is done differs by platform, and the reason is worth stating because the
+ * obvious implementation is wrong on windows.
+ *
+ * POSIX redirects file descriptor 1 with dup2. There is exactly one descriptor table per
+ * process, so that captures everything - this library's cout, any printf, and the stdout of
+ * child processes that inherit it. That is the whole feature, and it is safe because the
+ * descriptor table really is shared with the host.
+ *
+ * WINDOWS HAS NO SUCH GUARANTEE, and doing the same thing there corrupted output files for
+ * months before anyone traced it. A CRT's fd 1 is a private table entry wrapping an OS handle.
+ * Build this library with the static runtime (/MT, the project default, since the executables
+ * ship without a redistributable) and load it into a host with its own CRT - python, via
+ * ctypes - and there are now TWO fd 1s wrapping THE SAME console handle, neither aware of the
+ * other. _dup2(sink, 1) closes the descriptor it replaces, _close calls CloseHandle, and the
+ * handle the HOST is still using is destroyed:
+ *
+ *     - the host's next write fails: OSError [WinError 6] The handle is invalid
+ *     - windows recycles the freed handle VALUE onto the next file this library opens. The
+ *       FileManager holds the phi csvs and the .rec open for the whole run, so they are the
+ *       likely recipients - which is how console output ended up written inside
+ *       pest.phi.composite.csv, twice, looking like a numeric difference in a comparison.
+ *
+ * So on windows we swap std::cout's streambuf instead and never touch a descriptor. It cannot
+ * destroy anything the host owns, under any runtime configuration. The cost is that printf and
+ * child-process output are NOT captured there - acceptable, and measured rather than assumed:
+ * pestpp_common, common and this file contain no printf-to-stdout at all, and the run managers'
+ * only ones are in the agent's linpack benchmark. Everything on the API path goes through cout.
+ *
+ * Do not "simplify" this back to a single dup2 path. */
 struct RedirectRecord
 {
     int token;
+#if defined(_WIN32)
+    std::ofstream* log;          ///< owned; open for the life of the redirect
+    std::streambuf* saved_buf;   ///< cout's buffer before we took it over
+#else
     int saved_fd;
+#endif
 };
 vector<RedirectRecord> g_redirect_stack;
 int g_next_redirect_token = 1;
@@ -1258,6 +1289,20 @@ pestpp_status pestpp_redirect_output(const char* path, int* redirect_token)
     {
         cout.flush();
         fflush(stdout);
+        RedirectRecord rec;
+#if defined(_WIN32)
+        // See the note on RedirectRecord: descriptors are not safely shared with the host on
+        // windows, so redirect the stream, not the descriptor.
+        std::ofstream* log = new std::ofstream(path, std::ios::out | std::ios::app);
+        if (!log->is_open())
+        {
+            delete log;
+            g_create_error = string("could not open '") + path + "' for output capture";
+            return PESTPP_ERROR;
+        }
+        rec.log = log;
+        rec.saved_buf = cout.rdbuf(log->rdbuf());
+#else
         int sink = PESTPP_OPEN(path, PESTPP_O_FLAGS, PESTPP_O_MODE);
         if (sink < 0)
         {
@@ -1273,9 +1318,9 @@ pestpp_status pestpp_redirect_output(const char* path, int* redirect_token)
             return PESTPP_ERROR;
         }
         PESTPP_CLOSE(sink);
-        RedirectRecord rec;
-        rec.token = g_next_redirect_token++;
         rec.saved_fd = saved;
+#endif
+        rec.token = g_next_redirect_token++;
         g_redirect_stack.push_back(rec);
         *redirect_token = rec.token;
         return PESTPP_OK;
@@ -1312,10 +1357,18 @@ pestpp_status pestpp_restore_output(int redirect_token)
             g_create_error = ss.str();
             return PESTPP_INVALID_STATE;
         }
-        int saved = g_redirect_stack.back().saved_fd;
+        RedirectRecord rec = g_redirect_stack.back();
         g_redirect_stack.pop_back();
         cout.flush();
         fflush(stdout);
+#if defined(_WIN32)
+        // Put the buffer back before closing the file, or cout is left pointing at a dead
+        // streambuf for the instant in between - and at a destroyed one if the close throws.
+        cout.rdbuf(rec.saved_buf);
+        rec.log->close();
+        delete rec.log;
+#else
+        int saved = rec.saved_fd;
         if (PESTPP_DUP2(saved, 1) < 0)
         {
             // stdout is now whatever the redirect pointed at, and the caller has no way to
@@ -1326,6 +1379,7 @@ pestpp_status pestpp_restore_output(int redirect_token)
             return PESTPP_ERROR;
         }
         PESTPP_CLOSE(saved);
+#endif
         return PESTPP_OK;
     }
     catch (const std::exception& e) { g_create_error = clamp_message(e.what()); return PESTPP_ERROR; }

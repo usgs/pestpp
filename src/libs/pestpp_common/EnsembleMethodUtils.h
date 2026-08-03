@@ -841,6 +841,11 @@ protected:
 	vector<string> init_pnames, init_onames;
 	bool init_needs_finish = false;
 	vector<string> violation_obs;
+	/// This class's OWN evaluator, not ph's. The phi handler is constructed at several points
+	/// and is still default-constructed during the initial ensemble run - reaching through it
+	/// from the screener closure dereferenced a null scenario and segfaulted the master. mou
+	/// and sqp each hold their own for the same reason.
+	ViolationDetector viol_detector;
 	ParameterEnsemble pe, pe_base;
 	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;

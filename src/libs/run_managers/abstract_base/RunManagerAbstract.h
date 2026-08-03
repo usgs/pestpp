@@ -27,6 +27,7 @@
 #include <Eigen/Dense>
 #include <chrono>
 #include <functional>
+#include <string>
 
 
 
@@ -84,6 +85,13 @@ enum class RunAction
 	// REQUEST_PARTIAL = 2 - reserved for preemption
 };
 
+/// What a screener decides about a run it has just been shown partial results for.
+enum class RunVerdict
+{
+	KEEP = 0,      ///< carry on
+	ABANDON = 1    ///< this run cannot be kept; stop it now rather than finishing it
+};
+
 class RunManagerAbstract
 {
 public:
@@ -105,6 +113,44 @@ public:
 		progress_last = std::chrono::system_clock::time_point::min();
 		progress_stop_requested = false;
 	}
+	/**
+	 * @brief Judge runs from their partial results, mid-batch, and abandon the hopeless ones.
+	 *
+	 * The tool supplies the PREDICATE; the run manager owns the mechanics. It has to be this
+	 * way round - the master knows who is running and how to stop them, and knows nothing
+	 * about observed values, inequality groups or what the user nominated.
+	 *
+	 * `poll_interval_sec` of 0 disables polling entirely, which is the default: asking costs
+	 * a worker a parse of its output files, and on a fast model that is pure overhead.
+	 *
+	 * Called only from the scheduling loop, on the thread that entered the run manager - see
+	 * is_batch_open() for why that is not an accident.
+	 */
+	void set_run_screener(std::function<RunVerdict(int, Observations&, const std::set<std::string>&)> fn,
+		double poll_interval_sec)
+	{
+		screener_fn = fn;
+		screen_interval = poll_interval_sec;
+		screen_last = std::chrono::system_clock::time_point::min();
+	}
+	bool screening_enabled() const
+	{ return (bool)screener_fn && (screen_interval > 0.0) && screen_active; }
+
+	/**
+	 * @brief Suspend screening for batches where abandoning a run would change the ANSWER.
+	 *
+	 * Screening is only a saving when an abandoned run is one the tool would have discarded
+	 * anyway. That holds for batches whose results feed the ensemble directly - the initial
+	 * evaluation, the remaining-realization run - because a violating member is dropped at
+	 * harvest either way.
+	 *
+	 * It does NOT hold for ies lambda testing. Those runs are a COMPARISON: each candidate
+	 * lambda is scored over the same subset, and drop_bad_reals() only removes violators once
+	 * a lambda has been chosen. Abandon runs mid-comparison and a different lambda wins - the
+	 * equivalence test caught exactly that, as an extra .rejected. file in the screened run.
+	 */
+	void set_screening_active(bool flag) { screen_active = flag; }
+
 	/**
 	 * @brief Ask the workers running these runs to report what they have so far.
 	 *
@@ -219,6 +265,27 @@ public:
 
 protected:
 	std::function<RunAction(const RunProgress&)> progress_fn;
+	std::function<RunVerdict(int, Observations&, const std::set<std::string>&)> screener_fn;
+	double screen_interval = 0.0;
+	bool screen_active = true;
+	std::chrono::system_clock::time_point screen_last =
+		std::chrono::system_clock::time_point::min();
+
+	/// Is another round of asking due? Advances the clock when it says yes.
+	bool screen_poll_due()
+	{
+		if (!screening_enabled())
+			return false;
+		std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+		if (screen_last != std::chrono::system_clock::time_point::min())
+		{
+			std::chrono::duration<double> since = now - screen_last;
+			if (since.count() < screen_interval)
+				return false;
+		}
+		screen_last = now;
+		return true;
+	}
 	double progress_min_interval = 0.0;
 	std::chrono::system_clock::time_point progress_last =
 		std::chrono::system_clock::time_point::min();

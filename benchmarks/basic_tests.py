@@ -2475,3 +2475,99 @@ def preemption_poll_config_test():
     assert "preemption_poll_interval_minutes" not in rec or \
         "no observations are nominated" not in rec, \
         "a properly configured case was refused:\n" + rec[-2000:]
+
+
+def preemption_screening_test():
+    """Mid-run screening must change wall-clock and NOTHING else.
+
+    A run abandoned mid-flight is one whose partial results already violate a nominated
+    observation - and the violation test is a sum of non-negative terms, so a partial sum over
+    the observations read so far is a LOWER BOUND on the final sum. Once it is over the
+    threshold, finishing the run cannot bring it back under: the harvest-time drop would have
+    discarded that member anyway. Screening therefore saves the rest of the model run and
+    changes nothing about the answer.
+
+    That is the entire safety argument, and this is it made executable: same case, same seed,
+    screening off then on, output files compared. It also asserts screening actually FIRED -
+    without that, the comparison passes vacuously whenever the feature is switched off.
+    """
+    import filecmp
+
+    _sfx = ".exe" if "windows" in platform.platform().lower() else ""
+    _plat = ("win" if "windows" in platform.platform().lower()
+             else "mac" if "darwin" in platform.platform().lower() else "linux")
+    cands = [c for c in (
+        os.path.join("..", "build", "src", "programs", "pestpp-ies", "pestpp-ies" + _sfx),
+        os.path.join(bin_path, _plat, "pestpp-ies" + _sfx)) if os.path.exists(c)]
+    assert cands, "could not find pestpp-ies"
+    ies_exe = max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
+    agent_exe = ies_exe
+
+    base_t = os.path.join("ies_10par_xsec", "template")
+    results = {}
+    worker_root = os.path.join("preempt_screen_workers")
+
+    for tag, interval in (("off", 0.0), ("on", 0.02)):     # 0.02 min ~ 1.2 s
+        t_d = os.path.join("preempt_screen_" + tag)
+        if os.path.exists(t_d):
+            shutil.rmtree(t_d)
+        shutil.copytree(base_t, t_d)
+
+        # a slow model, so a run is genuinely in flight long enough to be asked about
+        with open(os.path.join(t_d, "slow_model.py"), "w") as f:
+            f.write("import subprocess, time\n"
+                    "subprocess.run(['mfnwt', '10par_xsec.nam'], check=False)\n"
+                    "time.sleep(3)\n")
+
+        pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
+        obs = pst.observation_data
+        obs.loc[:, "weight"] = 1.0
+        # a constraint a good fraction of realizations will violate
+        # h02_10 is the most variable observation in this case; h01_01 and friends are fixed
+        # boundary heads, constant across every realization, so nominating one of those can
+        # never violate and the test would pass vacuously. Bound at its median so roughly half
+        # the ensemble violates.
+        viol_obs = "h02_10"
+        obs.loc[viol_obs, "obgnme"] = "less_than_screen"
+        obs.loc[viol_obs, "obsval"] = 5.35
+        obs.loc[:, "drop_violations"] = False
+        obs.loc[viol_obs, "drop_violations"] = True
+
+        pst.pestpp_options["ies_num_reals"] = 12
+        pst.pestpp_options["random_seed"] = 11
+        pst.pestpp_options["ies_lambda_mults"] = [1.0]
+        pst.pestpp_options["lambda_scale_fac"] = [1.0]
+        pst.pestpp_options["preemption_poll_interval_minutes"] = interval
+        pst.control_data.noptmax = 1
+        pst.model_command = ["python slow_model.py"]
+        pst.write(os.path.join(t_d, "screen.pst"), version=2)
+
+        if os.path.exists(worker_root):
+            shutil.rmtree(worker_root)
+        os.makedirs(worker_root)
+        # PANTHER: preemption needs workers to ask
+        pyemu.os_utils.start_workers(t_d, agent_exe, "screen.pst", num_workers=4,
+                                     master_dir=t_d + "_master", worker_root=worker_root,
+                                     port=4023)
+        results[tag] = t_d + "_master"
+
+    # 1. screening actually happened, or the comparison below proves nothing
+    rmr = ""
+    for f in os.listdir(results["on"]):
+        if f.endswith(".rmr"):
+            rmr = open(os.path.join(results["on"], f)).read()
+    assert "abandoned mid-run" in rmr, \
+        "no run was abandoned mid-run, so this test did not exercise screening:\n" + rmr[-3000:]
+
+    # 2. and it changed nothing: every csv identical between the two runs
+    off_files = {f for f in os.listdir(results["off"]) if f.endswith(".csv")}
+    on_files = {f for f in os.listdir(results["on"]) if f.endswith(".csv")}
+    assert off_files == on_files, \
+        "different output files were written:\n only off: {0}\n only on: {1}".format(
+            sorted(off_files - on_files), sorted(on_files - off_files))
+    differing = [f for f in sorted(off_files)
+                 if not filecmp.cmp(os.path.join(results["off"], f),
+                                    os.path.join(results["on"], f), shallow=False)]
+    assert not differing, \
+        "mid-run screening CHANGED THE RESULTS - it must only change wall-clock. " \
+        "differing files: {0}".format(differing)
