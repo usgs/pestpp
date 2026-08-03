@@ -97,8 +97,9 @@ public:
 	 *        unread observation carries the no_data sentinel and must never be compared
 	 *        against a bound - it would violate almost any inequality.
 	 */
+	/// `why`, when given, names the observation that condemned the run and its values.
 	bool is_violating(Observations& sim, const set<string>& valid_names,
-	                  const vector<string>& viol_obs_names);
+	                  const vector<string>& viol_obs_names, string* why = nullptr);
 
 	vector<string> get_lt_obs_names() { return lt_obs_names; }
 	vector<string> get_gt_obs_names() { return gt_obs_names; }
@@ -227,8 +228,9 @@ public:
      *        complete run. An unread observation carries the no_data sentinel and must never
      *        be compared against a bound - it would violate almost anything.
      */
+    /// `why`, when given, names the observation that condemned the run and its values.
     bool is_violating(Observations& sim, const set<string>& valid_names,
-                      const vector<string>& viol_obs_names);
+                      const vector<string>& viol_obs_names, string* why = nullptr);
     /// The threshold both violation tests use.
     static constexpr double VIOLATION_TOL = 1.0e-7;
 private:

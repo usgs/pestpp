@@ -620,6 +620,14 @@ void  RunManagerPanther::free_memory()
 	model_runs_done = 0;
 	failure_map.clear();
 	active_runid_to_iterset_map.clear();
+	// Cancellations are per BATCH, because run ids are. They restart from zero every time a
+	// batch is set up, so a set that is only ever inserted into means a run cancelled in one
+	// batch condemns whichever unrelated realization inherits its number later - silently, and
+	// without ever being cancelled itself. That is how 'base' vanished from an ies iteration:
+	// it took a run id that a violating realization had been given, and abandoned, an
+	// iteration earlier.
+	user_cancelled_runs.clear();
+	partial_info_map.clear();
 }
 
 /**
@@ -1977,7 +1985,28 @@ void RunManagerPanther::process_message(int i_sock)
 				// hand it to the tool's predicate. Only the names actually READ are offered
 				// as valid - the rest carry the no-data sentinel, and judging those would
 				// condemn almost every run on the first reply.
-				if (screener_fn && (n_real > 0))
+				// screening_enabled(), NOT merely screener_fn: it also carries screen_active,
+				// and a reply can outlive the window it was asked in.
+				//
+				// Requests are asynchronous. set_screening_active(false) stops new ones going
+				// out - screen_poll_due() checks the same predicate - but a PARTIAL_OBS asked
+				// for just BEFORE lambda testing began can land in the middle of it, and
+				// gating only on screener_fn here acted on it. That is the precise case the
+				// suspension exists to prevent: cancel a run mid-comparison and a different
+				// lambda wins. Whether a late reply lands inside the window is a matter of
+				// machine timing, which is why this passed locally and failed on CI.
+				//
+				// An exempt run is not offered to the predicate either. Gating on the VERDICT
+				// would also be correct, but it would let a tool log "abandoning base" and
+				// then not do it; the exemption is easier to trust with one observable place.
+				if (screening_enabled() && (n_real > 0) && is_screen_exempt(run_id))
+				{
+					stringstream xss;
+					xss << " run_id:" << run_id << " is exempt from screening and will not be "
+					    << "abandoned however badly it violates";
+					report(xss.str(), false);
+				}
+				else if (screening_enabled() && (n_real > 0))
 				{
 					set<string> valid;
 					const vector<string>& _onames = get_obs_name_vec();

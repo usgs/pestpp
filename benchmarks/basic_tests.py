@@ -2559,15 +2559,99 @@ def preemption_screening_test():
     assert "abandoned mid-run" in rmr, \
         "no run was abandoned mid-run, so this test did not exercise screening:\n" + rmr[-3000:]
 
-    # 2. and it changed nothing: every csv identical between the two runs
+    # 2. 'base' survived. Screening is only ever allowed to be an EARLY version of a decision
+    #    the tool would have taken at harvest, and no harvest path drops base - EnsembleMethod,
+    #    MOEA and SeqQuadProgram each spare it explicitly. So an abandoned base is a change of
+    #    answer, not a saving.
+    #
+    #    Checked directly, and BEFORE the equivalence assertions, because this is the CAUSE and
+    #    they are the symptom: when base goes missing the ensemble is different, the mean phi
+    #    moves, and the iteration rejects an upgrade it would have accepted - which surfaces
+    #    below as two mysterious extra .rejected. files with nothing pointing at base.
+    #
+    #    Not parsed out of the .rmr: run ids are reissued per batch, so 'run_id:7 abandoned'
+    #    in one batch and 'run_id:7 ... realization:base' in another would intersect and read
+    #    as a failure that never happened. Membership of the written ensembles has no such
+    #    ambiguity - if base's run were abandoned, base would be dropped and absent here.
+    for tag in ("off", "on"):
+        for f in sorted(os.listdir(results[tag])):
+            if not (f.endswith(".obs.csv") or f.endswith(".par.csv")):
+                continue
+            reals = pd.read_csv(os.path.join(results[tag], f), index_col=0).index
+            reals = [str(r).lower() for r in reals]
+            assert "base" in reals, \
+                "'base' is missing from {0}/{1} - screening must never abandon it, and no " \
+                "drop path ever removes it. Present: {2}".format(tag, f, reals[:15])
+
+    # 3. the same files were written
     off_files = {f for f in os.listdir(results["off"]) if f.endswith(".csv")}
     on_files = {f for f in os.listdir(results["on"]) if f.endswith(".csv")}
     assert off_files == on_files, \
         "different output files were written:\n only off: {0}\n only on: {1}".format(
             sorted(off_files - on_files), sorted(on_files - off_files))
-    differing = [f for f in sorted(off_files)
+
+    # 4. and it changed nothing except HOW MUCH WAS RUN.
+    #
+    # Byte-identity across every file is the wrong bar, and asserting it was a mistake: it
+    # demands that screening produce records for the very runs it declined to make. Two kinds
+    # of file legitimately differ, and only these two:
+    #
+    #   - the iteration ensembles, which are written BEFORE drop_bad_reals() culls them. The
+    #     unscreened run therefore reports values for realizations it is about to discard; the
+    #     screened run never computed them. Every realization present in BOTH must still agree
+    #     exactly, and every one missing must be a violator - checked below, not waved through.
+    #   - the phi summaries, whose total_runs column counts model runs. Fewer runs IS the
+    #     feature; a saving that did not show up here would mean nothing had been saved.
+    #
+    # Everything else - the final ensembles, the lambda record, every statistic in the phi
+    # files - must match to the byte. That is the real claim: same answer, less work.
+    ens_prefixes = tuple("screen.{0}.".format(i) for i in range(0, 2))
+    exempt = {f for f in off_files
+              if f.startswith(ens_prefixes) or f.startswith("screen.phi.")}
+    differing = [f for f in sorted(off_files - exempt)
                  if not filecmp.cmp(os.path.join(results["off"], f),
                                     os.path.join(results["on"], f), shallow=False)]
     assert not differing, \
         "mid-run screening CHANGED THE RESULTS - it must only change wall-clock. " \
         "differing files: {0}".format(differing)
+
+    # 4a. the phi summaries agree on every statistic, and differ ONLY by having run less.
+    #     "fewer runs" is asserted ACROSS the phi files, not within each: a phi type that is
+    #     not in play for this case (regul, with no regularization) reports nothing to save.
+    saved_somewhere = False
+    for f in sorted(x for x in off_files if x.startswith("screen.phi.")):
+        a = pd.read_csv(os.path.join(results["off"], f))
+        b = pd.read_csv(os.path.join(results["on"], f))
+        assert list(a.columns) == list(b.columns), (f, list(a.columns), list(b.columns))
+        assert len(a) == len(b), "{0}: different number of iterations".format(f)
+        stats = [c for c in a.columns if c != "total_runs"]
+        assert a[stats].equals(b[stats]), \
+            "{0}: screening changed a phi STATISTIC, not just the run count:\n{1}\n{2}".format(
+                f, a[stats].to_string(), b[stats].to_string())
+        if ("total_runs" in a.columns) and (len(a) > 0):
+            assert (b["total_runs"] <= a["total_runs"]).all(), \
+                "{0}: the screened run made MORE runs than the unscreened one".format(f)
+            if (b["total_runs"] < a["total_runs"]).any():
+                saved_somewhere = True
+    assert saved_somewhere, \
+        "screening saved no runs in any phi summary, so it did nothing measurable"
+
+    # 4b. the ensembles agree on every realization they share, and anything the screened run
+    #     is missing must be a realization that violates - i.e. one the unscreened run went on
+    #     to drop anyway. A realization that survives 'off' but vanishes from 'on' is the
+    #     failure this whole test exists to catch.
+    viol_col = "h02_10"
+    for f in sorted(x for x in off_files if x.startswith(ens_prefixes) and x.endswith(".obs.csv")):
+        a = pd.read_csv(os.path.join(results["off"], f), index_col=0)
+        b = pd.read_csv(os.path.join(results["on"], f), index_col=0)
+        a.index = [str(i).lower() for i in a.index]
+        b.index = [str(i).lower() for i in b.index]
+        common = [i for i in a.index if i in b.index]
+        col = [c for c in a.columns if c.lower() == viol_col][0]
+        assert (a.loc[common] - b.loc[common]).abs().max().max() < 1e-10, \
+            "{0}: a realization present in both runs has different values".format(f)
+        for missing in set(a.index) - set(b.index):
+            assert a.loc[missing, col] > 5.35, \
+                "{0}: realization '{1}' was screened out but does NOT violate " \
+                "({2} <= 5.35) - screening may only ever drop what the harvest would " \
+                "have dropped".format(f, missing, a.loc[missing, col])

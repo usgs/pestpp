@@ -2650,6 +2650,26 @@ map<string,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,cons
 		run_id = run_mgr_ptr->add_run(pars_real,info_txt+"  realization:"+rname);
 		real_run_ids[rname]  = run_id;
 	}
+
+	// Tell the run manager which of these runs mid-run screening may not abandon.
+	//
+	// 'base' is the control file's own parameter values rather than a draw, and every drop
+	// path spares it - EnsembleMethod::drop_bad_reals(), MOEA and SeqQuadProgram all say so
+	// explicitly. Screening is only allowed to be an EARLY version of a decision the tool
+	// would have made anyway, so it has to honour the same exception; abandoning base's run
+	// removes a realization no harvest would have removed, which shifts the mean phi and can
+	// flip an iteration from accepting its upgrade to rejecting it.
+	//
+	// Registered HERE, rather than in the three tools' screener callbacks, because this is the
+	// only point that knows both the realization names and the run ids just issued for them -
+	// and the only one every tool goes through. mou and sqp do not use queue_ensemble_util(),
+	// so anything written there would have silently covered ies alone.
+	// Accumulates: a single batch may be queued from several ensembles, each with its own
+	// 'base' run, and all of them need the exemption. reinitialize() clears it per batch.
+	map<string, int>::const_iterator bit = real_run_ids.find(BASE_REAL_NAME);
+	if (bit != real_run_ids.end())
+		run_mgr_ptr->add_screen_exempt_run(bit->second);
+
 	return real_run_ids;
 }
 
@@ -4439,9 +4459,33 @@ vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids
 			failed_real_idxs.push_back(rr.first);
 		}
 
+		// get_run() answers FALSE when the run did not complete, and that answer must be
+		// honoured - it fills `obs` either way, so ignoring it harvests whatever the storage
+		// record happens to hold.
+		//
+		// Which is never nothing, and never obviously wrong. RunStorage::add_run() writes only
+		// the status byte, the info text and the PARAMETER block; the observation region of
+		// the record is skipped and the file grows past it, so it is a hole that reads back as
+		// ZEROS. Not the no_data sentinel - zeros, which are a plausible observation value
+		// that no sentinel check will ever flag. And where preemption has stored partial
+		// results, update_run_partial() has written real numbers into that same region, which
+		// then read back as though the run had finished.
+		//
+		// The gap is runs that are neither completed NOR in failed_runs: model failures were
+		// always handled, cancelled runs were not, and a cancelled run took this branch and
+		// contributed its record verbatim to the ensemble.
+		//
+		// Not preemption-specific, which is why the check belongs here rather than around the
+		// cancel. Treating it as a failed realization is also what makes screening
+		// result-preserving: the realization is dropped, which is exactly what
+		// drop_bad_reals() would have done to it once it finished and was seen to violate.
+		else if (!run_mgr_ptr->get_run(rr.second, pars, obs))
+		{
+			failed_real_idxs.push_back(rr.first);
+		}
+
 		else
 		{
-			run_mgr_ptr->get_run(rr.second, pars, obs);
 			update_from_obs(rr.first, obs);
 			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
 			run_mgr_pe.update_real_ip(real_names[rr.first], real);

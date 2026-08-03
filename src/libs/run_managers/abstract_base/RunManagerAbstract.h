@@ -152,6 +152,35 @@ public:
 	void set_screening_active(bool flag) { screen_active = flag; }
 
 	/**
+	 * @brief Runs that must never be abandoned, however badly they are violating.
+	 *
+	 * Screening may only ever be an EARLY version of a decision the tool would have taken at
+	 * harvest. Where the tool would have kept a violating realization, the screen must keep it
+	 * too, or the feature stops being a saving and becomes a change of answer.
+	 *
+	 * The case that exists today is 'base'. Every drop path spares it - EnsembleMethod,
+	 * MOEA and SeqQuadProgram each say so explicitly - because it is the control file's own
+	 * parameter values rather than a draw, and losing it is not a smaller ensemble but a
+	 * different one. Without this, screening abandoned base's run mid-flight, the mean phi
+	 * moved, and an iteration that should have accepted its upgrade rejected it instead.
+	 *
+	 * Set at QUEUE time, from ParameterEnsemble::add_runs(), which is the only place that
+	 * knows both the realization names and the run ids they were given. Run ids are handed
+	 * out per batch, so this is cleared by reinitialize() - an exemption carried over from a
+	 * previous batch would protect whichever unrelated realization inherited the number.
+	 */
+	/// ACCUMULATES. One batch can be queued from several ensembles - ies adds one candidate
+	/// per lambda x scale before running any of them - and each has its own 'base' run. An
+	/// assigning setter let the last add_runs() call silently drop every earlier exemption,
+	/// which cost base exactly one of the candidate ensembles. reinitialize() does the
+	/// clearing, once, where the batch actually starts.
+	void add_screen_exempt_run(int run_id) { screen_exempt.insert(run_id); }
+	void set_screen_exempt_runs(const std::set<int>& ids) { screen_exempt = ids; }
+	void clear_screen_exempt_runs() { screen_exempt.clear(); }
+	bool is_screen_exempt(int run_id) const
+	{ return screen_exempt.find(run_id) != screen_exempt.end(); }
+
+	/**
 	 * @brief Ask the workers running these runs to report what they have so far.
 	 *
 	 * Asynchronous and advisory. Zero here means "nobody to ask": the serial and external
@@ -268,6 +297,7 @@ protected:
 	std::function<RunVerdict(int, Observations&, const std::set<std::string>&)> screener_fn;
 	double screen_interval = 0.0;
 	bool screen_active = true;
+	std::set<int> screen_exempt;   ///< run ids the screen must never abandon; see above
 	std::chrono::system_clock::time_point screen_last =
 		std::chrono::system_clock::time_point::min();
 

@@ -130,6 +130,12 @@ void RunManagerAbstract::reinitialize(const string &_filename)
 	// Note: failed_file_stor and all_file_stor are intentionally NOT reset here
 	// so that failed runs and the full run history accumulate across all
 	// iterations/batches.
+
+	// Screening exemptions are the opposite case: they are keyed by run id, and run ids are
+	// reissued from zero for the batch being set up here. Carrying one over would exempt
+	// whichever unrelated realization inherits the number, which is worse than not exempting
+	// at all - it would be silent, and it would protect the wrong run.
+	screen_exempt.clear();
 }
 
 /**

@@ -31,6 +31,7 @@
 #include <algorithm>
 #include "RunStorage.h"
 #include "Serialization.h"
+#include "Transformable.h"    // Transformable::no_data, for initializing new runs' observations
 #include "Transformable.h"
 #include <limits>
 #include "utilities.h"
@@ -350,6 +351,11 @@ streamoff RunStorage::get_stream_pos(int run_id)
 	buf_stream.write(reinterpret_cast<char*>(info_txt_buf.data()), sizeof(char)*info_txt_buf.size());
 	buf_stream.write(reinterpret_cast<char*>(&info_value), sizeof(double));
 	buf_stream.write(reinterpret_cast<const char*>(&model_pars[0]), model_pars.size()*sizeof(double));
+	//and the observation block, explicitly as no_data. Leaving it unwritten made it a hole in
+	//the file, and a hole reads back as ZEROS - a perfectly plausible observation value, so a
+	//record read before its run completed handed back numbers nothing could tell were absent.
+	vector<double> no_data_obs(obs_names.size(), Observations::no_data);
+	buf_stream.write(reinterpret_cast<const char*>(no_data_obs.data()), no_data_obs.size()*sizeof(double));
 	//add flag for double buffering
 	std::int8_t buf_status = 0;
 	int end_of_runs = get_nruns();
@@ -384,6 +390,9 @@ streamoff RunStorage::get_stream_pos(int run_id)
 	buf_stream.write(reinterpret_cast<char*>(info_txt_buf.data()), sizeof(char)*info_txt_buf.size());
 	buf_stream.write(reinterpret_cast<char*>(&info_value), sizeof(double));
 	buf_stream.write(reinterpret_cast<const char*>(&model_pars(0)), model_pars.size()*sizeof(model_pars(0)));
+	//and the observation block as no_data, for the reason given in the overload above
+	vector<double> no_data_obs(obs_names.size(), Observations::no_data);
+	buf_stream.write(reinterpret_cast<const char*>(no_data_obs.data()), no_data_obs.size()*sizeof(double));
 	//add flag for double buffering
 	std::int8_t buf_status = 0;
 	int end_of_runs = get_nruns();

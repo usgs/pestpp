@@ -2389,7 +2389,7 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
 }
 
 bool ViolationDetector::is_violating(Observations& sim, const set<string>& valid_names,
-    const vector<string>& viol_obs_names)
+    const vector<string>& viol_obs_names, string* why)
 {
     if (viol_obs_names.size() == 0)
         return false;
@@ -2418,16 +2418,33 @@ bool ViolationDetector::is_violating(Observations& sim, const set<string>& valid
     }
     apply_ineq_constraints(resid, sim_row, names);
 
-    double sum = 0.0;
+    // OR across the nominated observations: ANY one of them violating its inequality condemns
+    // the run. Tested per observation rather than as a sum so that the offending one can be
+    // named - and because that is the actual semantic, which a total only happens to match
+    // while every term is non-negative.
+    //
+    // This is also what makes the test sound on PARTIAL data: reading more observations can
+    // only ever ADD a violation, never withdraw one, so a violation seen now survives to the
+    // end of the run. Which is exactly why unread observations must be skipped and not judged.
     for (int i = 0; i < (int)names.size(); i++)
     {
         // SKIP anything not actually read - an unread observation carries the no_data
         // sentinel and would violate almost any inequality
         if ((valid_names.size() > 0) && (valid_names.find(names[i]) == valid_names.end()))
             continue;
-        sum += abs(resid(0, i));
+        if (abs(resid(0, i)) > VIOLATION_TOL)
+        {
+            if (why != nullptr)
+            {
+                stringstream wss;
+                wss << names[i] << " sim:" << sim_row(0, i)
+                    << " obs:" << obs.get_rec(names[i]) << " resid:" << resid(0, i);
+                *why = wss.str();
+            }
+            return true;
+        }
     }
-    return sum > VIOLATION_TOL;
+    return false;
 }
 
 L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
@@ -3853,9 +3870,9 @@ map<string,int> L2PhiHandler::get_violation_idx_map(const vector<string>& viol_o
 }
 
 bool L2PhiHandler::is_violating(Observations& sim, const set<string>& valid_names,
-    const vector<string>& viol_obs_names)
+    const vector<string>& viol_obs_names, string* why)
 {
-    return ineq.is_violating(sim, valid_names, viol_obs_names);
+    return ineq.is_violating(sim, valid_names, viol_obs_names, why);
 }
 
 vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names)
@@ -5474,8 +5491,14 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
         run_mgr_ptr->set_run_screener(
             [this](int run_id, Observations& sim, const set<string>& valid) -> RunVerdict
             {
-                return viol_detector.is_violating(sim, valid, violation_obs)
-                    ? RunVerdict::ABANDON : RunVerdict::KEEP;
+                string why;
+                if (!viol_detector.is_violating(sim, valid, violation_obs, &why))
+                    return RunVerdict::KEEP;
+                stringstream wss;
+                wss << "run_id:" << run_id << " violates " << why
+                    << " (" << valid.size() << " obs read so far)";
+                message(2, wss.str());
+                return RunVerdict::ABANDON;
             },
             _poll_min * 60.0);
         stringstream _pss;

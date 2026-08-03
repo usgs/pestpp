@@ -1433,7 +1433,16 @@ def capi_panther_control_test():
 
             ies.process_runs()
             oe, _ = ies.get_ensemble_view(OBS_EN)
-            assert oe.shape[0] == len(names), (oe.shape, len(names))
+            # A cancelled run produces NO realization. This used to assert len(names), and
+            # that was asserting a bug: update_from_runs() discarded get_run()'s false and
+            # reused one Observations buffer for the whole loop, so the cancelled run's slot
+            # was filled with the PREVIOUS realization's values. The count looked right and
+            # one row was quietly somebody else's data.
+            assert oe.shape[0] == len(names) - cancelled, (oe.shape, len(names), cancelled)
+            # ...and the rows that did survive are distinct, which is the property the old
+            # assertion was silently violating
+            assert np.unique(oe, axis=0).shape[0] == oe.shape[0], \
+                "a surviving realization duplicates another - harvest copied a stale buffer"
     finally:
         for p in procs:
             try:

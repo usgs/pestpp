@@ -1636,8 +1636,22 @@ string InstructionFile::write_complete_lines_to_temp(const string& output_filena
 	size_t last = text.find_last_of('\n');
 	if (last == string::npos)
 		return string();                 // nothing complete to read yet
-	std::filesystem::path tmp = std::filesystem::temp_directory_path() /
-		(std::filesystem::path(output_filename).filename().string() + ".pestpp_partial");
+	// BESIDE the output file, never in the shared system temp directory.
+	//
+	// temp_directory_path() is machine-wide and this name derives only from the output file's
+	// BASENAME - which is identical for every agent running the same case. So every agent on
+	// one host wrote to, and read back, one single file. Whichever wrote last won, and all of
+	// them then reported ITS observations as their own: four agents on four realizations
+	// returned byte-identical values, and mid-run screening abandoned runs on the strength of
+	// another realization's results.
+	//
+	// The output file's own directory is the right home because PANTHER already guarantees one
+	// working directory per agent, so it is per-agent by construction. A relative
+	// output_filename gives an empty parent_path(), which resolves to the agent's cwd - the
+	// same directory - so both forms land in the right place.
+	std::filesystem::path out_path(output_filename);
+	std::filesystem::path tmp = out_path.parent_path() /
+		(out_path.filename().string() + ".pestpp_partial");
 	ofstream f_out(tmp, ios::binary | ios::trunc);
 	if (!f_out.good())
 		throw runtime_error("could not open a temp file for the partial read");
