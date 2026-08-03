@@ -4408,7 +4408,8 @@ map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& 
  * Second half of run_ensemble_util(); assumes the runs have been made.
  */
 vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe, ObservationEnsemble& _oe,
-	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids)
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids,
+	vector<string>* abandoned_names)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
@@ -4425,10 +4426,12 @@ vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& fre
 		_oe.keep_rows(real_idxs);
 	}
 	vector<int> failed_real_indices;
+	vector<int> abandoned_real_indices;
 	ParameterEnsemble run_mgr_pe = _pe.zeros_like(0);
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe, par_real_names);
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe,
+			par_real_names, &abandoned_real_indices);
 	}
 	catch (const exception& e)
 	{
@@ -4445,16 +4448,45 @@ vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& fre
 	
 	if (failed_real_indices.size() > 0)
 	{
-		ss.str("");
+		// Abandoned and failed are both dropped, and are reported SEPARATELY. A run the
+		// screener gave up on did exactly what it was asked to do; calling it a failure sends
+		// whoever reads this looking for a model problem that does not exist.
+		set<int> abandoned(abandoned_real_indices.begin(), abandoned_real_indices.end());
 		vector<string> par_real_names = _pe.get_real_names();
 		vector<string> obs_real_names = _oe.get_real_names();
-		ss << "the following par:obs realization runs failed: ";
+		stringstream fss, ass;
+		int n_failed = 0;
 		for (auto& i : failed_real_indices)
 		{
-			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+			if (abandoned.find(i) != abandoned.end())
+			{
+				ass << par_real_names[i] << ":" << obs_real_names[i] << ',';
+				// recorded by NAME because the caller that reports the initial ensemble works
+				// out what it lost by diffing names, not by index
+				if (abandoned_names != nullptr)
+					abandoned_names->push_back(par_real_names[i]);
+			}
+			else
+			{
+				fss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+				n_failed++;
+			}
 		}
-		performance_log->log_event(ss.str());
-		performance_log->log_event("dropping failed realizations");
+		if (n_failed > 0)
+		{
+			ss.str("");
+			ss << "the following par:obs realization runs failed: " << fss.str();
+			performance_log->log_event(ss.str());
+		}
+		if (abandoned.size() > 0)
+		{
+			ss.str("");
+			ss << "the following " << abandoned.size() << " par:obs realization runs were "
+			   << "abandoned mid-run for violating a nominated observation (not a model "
+			   << "failure): " << ass.str();
+			performance_log->log_event(ss.str());
+		}
+		performance_log->log_event("dropping failed and abandoned realizations");
 		_pe.drop_rows(failed_real_indices);
 		_oe.drop_rows(failed_real_indices);
 	}
@@ -4521,7 +4553,8 @@ vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& fre
  * @brief Queue, run and harvest one ensemble - the in-tree composition.
  */
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe,
-	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag)
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag,
+	vector<string>* abandoned_names)
 {
 	map<string, int> real_run_ids = queue_ensemble_util(performance_log, frec, _pe, run_mgr_ptr, check_pe_consistency, real_idxs, da_cycle, additional_tag);
 	stringstream ss;
@@ -4542,7 +4575,7 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 		performance_log->log_event("error running ensemble");
 		throw runtime_error(string("error running ensemble"));
 	}
-	return harvest_ensemble_util(performance_log, frec, _pe, _oe, run_mgr_ptr, check_pe_consistency, real_idxs, real_run_ids);
+	return harvest_ensemble_util(performance_log, frec, _pe, _oe, run_mgr_ptr, check_pe_consistency, real_idxs, real_run_ids, abandoned_names);
 }
 
 EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
@@ -5163,10 +5196,14 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 	vector<int> failed_real_indices;
 	try
 	{
-		failed_real_indices = run_ensemble_util(performance_log, file_manager.rec_ofstream(), 
-			_pe, _oe, run_mgr_ptr, 
-			pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(), 
-			real_idxs, cycle,ss.str());
+		vector<string> _abandoned;
+		failed_real_indices = run_ensemble_util(performance_log, file_manager.rec_ofstream(),
+			_pe, _oe, run_mgr_ptr,
+			pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(),
+			real_idxs, cycle,ss.str(), &_abandoned);
+		// remembered so the callers that report what an ensemble LOST - which work it out by
+		// diffing realization names, not indices - can say 'abandoned' rather than 'failed'
+		abandoned_real_names.insert(_abandoned.begin(), _abandoned.end());
 	}
 	catch (const exception& e)
 	{
@@ -6196,15 +6233,43 @@ void EnsembleMethod::initialize_finish(int cycle)
         }
         if (failed.size() > 0)
         {
-            ss.str("");
-            ss << "the following " << failed.size() << " par:obs realization runs failed during evaluation of the initial parameter ensemble:" << endl;
+            // Split before reporting: a run the screener abandoned is not a model failure, and
+            // saying so sends people looking for a problem preemption deliberately caused.
+            vector<int> really_failed, were_abandoned;
             for (auto ifail : failed)
             {
-                ss << pnames[ifail] << ":" << onames[ifail];
-                if (ifail + 1 % 5 > 0)
-                    ss << endl;
+                if (abandoned_real_names.find(pnames[ifail]) != abandoned_real_names.end())
+                    were_abandoned.push_back(ifail);
+                else
+                    really_failed.push_back(ifail);
             }
-            message(0,ss.str());
+            if (really_failed.size() > 0)
+            {
+                ss.str("");
+                ss << "the following " << really_failed.size() << " par:obs realization runs failed during evaluation of the initial parameter ensemble:" << endl;
+                for (auto ifail : really_failed)
+                {
+                    ss << pnames[ifail] << ":" << onames[ifail];
+                    if (ifail + 1 % 5 > 0)
+                        ss << endl;
+                }
+                message(0,ss.str());
+            }
+            if (were_abandoned.size() > 0)
+            {
+                ss.str("");
+                ss << "the following " << were_abandoned.size() << " par:obs realizations were abandoned mid-run during"
+                   << " evaluation of the initial parameter ensemble because they already violated a nominated"
+                   << " 'drop_violations' observation - these are NOT model failures:" << endl;
+                for (auto iab : were_abandoned)
+                {
+                    ss << pnames[iab] << ":" << onames[iab];
+                    if (iab + 1 % 5 > 0)
+                        ss << endl;
+                }
+                message(0,ss.str());
+            }
+            ss.str("");
         	ss.str("");
         	if (pest_scenario.get_pestpp_options().get_save_dense())
         	{

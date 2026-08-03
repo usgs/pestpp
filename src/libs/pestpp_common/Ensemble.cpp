@@ -4415,10 +4415,10 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
  * @return Description.
  */
 vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr,
-	const vector<string>& par_real_names)
+	const vector<string>& par_real_names, vector<int>* abandoned_idxs)
 {
 	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
-	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe, par_real_names);
+	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe, par_real_names, abandoned_idxs);
 }
 
 /**
@@ -4431,7 +4431,7 @@ vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids
  * @return Description.
  */
 vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe,
-	const vector<string>& par_real_names)
+	const vector<string>& par_real_names, vector<int>* abandoned_idxs)
 {
 	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the
 	//par values from the run mgr are consistent with what par values were desired
@@ -4479,17 +4479,50 @@ vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids
 		// cancel. Treating it as a failed realization is also what makes screening
 		// result-preserving: the realization is dropped, which is exactly what
 		// drop_bad_reals() would have done to it once it finished and was seen to violate.
-		else if (!run_mgr_ptr->get_run(rr.second, pars, obs))
-		{
-			failed_real_idxs.push_back(rr.first);
-		}
-
 		else
 		{
-			update_from_obs(rr.first, obs);
-			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
-			run_mgr_pe.update_real_ip(real_names[rr.first], real);
-
+			// get_run() fills pars/obs from the stored record whatever it answers, so what
+			// matters is whether the record actually HOLDS anything - not the status byte.
+			//
+			// The status byte was the obvious test and it is the wrong one, because its
+			// meaning is not shared across run managers. Under the EXTERNAL run manager the
+			// caller's own script writes observations into run storage and leaves the status
+			// at the 0 that add_run() set, signalling failure only by explicitly writing a
+			// negative value. Status 0 there means "fine, here are your values", so rejecting
+			// status <= 0 dropped every realization of every external run.
+			//
+			// Asking about the values instead is run-manager agnostic, and it is answerable
+			// only because add_run() now initializes the observation block to no_data. It used
+			// to leave a hole that read back as zeros, which is a plausible observation value
+			// and indistinguishable from a real result - that is the whole reason a run which
+			// never completed could contribute confident numbers to an ensemble.
+			run_mgr_ptr->get_run(rr.second, pars, obs);
+			bool abandoned = run_mgr_ptr->run_was_abandoned(rr.second);
+			bool no_values = true;
+			if (!abandoned)
+			{
+				for (Observations::const_iterator it = obs.begin(); it != obs.end(); ++it)
+					if (it->second != Observations::no_data)
+					{
+						no_values = false;
+						break;
+					}
+			}
+			if (abandoned || no_values)
+			{
+				failed_real_idxs.push_back(rr.first);
+				// ...and separately note the ones that were CANCELLED rather than failed, so
+				// the caller can say which is which. The realization is lost either way; only
+				// the wording differs, and it differs a lot to whoever reads it.
+				if ((abandoned_idxs != nullptr) && abandoned)
+					abandoned_idxs->push_back(rr.first);
+			}
+			else
+			{
+				update_from_obs(rr.first, obs);
+				Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
+				run_mgr_pe.update_real_ip(real_names[rr.first], real);
+			}
 		}
 	}
 	return failed_real_idxs;

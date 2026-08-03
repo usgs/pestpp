@@ -2559,6 +2559,35 @@ def preemption_screening_test():
     assert "abandoned mid-run" in rmr, \
         "no run was abandoned mid-run, so this test did not exercise screening:\n" + rmr[-3000:]
 
+    # 1b. and it was reported as ABANDONED, not as a model failure.
+    #
+    # An abandoned run and a failed run both cost their realization, so it is tempting to fold
+    # them together - but they tell a user opposite things. "N runs failed" sends someone
+    # hunting a broken model when preemption did precisely what it was asked to. The screened
+    # run must therefore say 'abandoned' about them, and must NOT report them under the
+    # initial-ensemble failure message.
+    rec = ""
+    for f in os.listdir(results["on"]):
+        if f.endswith(".rec"):
+            rec = open(os.path.join(results["on"], f)).read()
+    assert "abandoned mid-run" in rec, \
+        "the .rec never mentions abandoning a run; screened runs are being reported as " \
+        "something else:\n" + rec[-3000:]
+    assert "NOT model failures" in rec, \
+        "abandoned realizations are not being distinguished from model failures in the .rec"
+    # the unscreened run has no abandonments at all, so it must say none of this
+    rec_off = ""
+    for f in os.listdir(results["off"]):
+        if f.endswith(".rec"):
+            rec_off = open(os.path.join(results["off"], f)).read()
+    assert "abandoned mid-run" not in rec_off, \
+        "the UNscreened run reported an abandonment, which it cannot have made"
+    # and nothing may be claimed to have failed in either: this case has no failing model
+    for tag, text in (("off", rec_off), ("on", rec)):
+        assert "runs failed during evaluation of the initial parameter ensemble" not in text, \
+            "{0}: realizations were reported as model FAILURES, but nothing failed here - " \
+            "abandoned runs are being mislabelled".format(tag)
+
     # 2. 'base' survived. Screening is only ever allowed to be an EARLY version of a decision
     #    the tool would have taken at harvest, and no harvest path drops base - EnsembleMethod,
     #    MOEA and SeqQuadProgram each spare it explicitly. So an abandoned base is a change of

@@ -174,6 +174,19 @@ public:
 	/// assigning setter let the last add_runs() call silently drop every earlier exemption,
 	/// which cost base exactly one of the candidate ensembles. reinitialize() does the
 	/// clearing, once, where the batch actually starts.
+	/**
+	 * @brief Was this run deliberately given up on, rather than having failed?
+	 *
+	 * An abandoned run and a failed run both end with no results, so both cost their
+	 * realization - but they mean opposite things to a user. A failure says the model is
+	 * broken and wants investigating; an abandonment says preemption worked and saved the
+	 * time. Reporting them with one word sends people hunting a model problem that does not
+	 * exist, so callers building a failure message must ask this and say the other thing.
+	 *
+	 * False everywhere there is nothing to give up on: only PANTHER can cancel a run in flight.
+	 */
+	virtual bool run_was_abandoned(int run_id) const { (void)run_id; return false; }
+
 	void add_screen_exempt_run(int run_id) { screen_exempt.insert(run_id); }
 	void set_screen_exempt_runs(const std::set<int>& ids) { screen_exempt = ids; }
 	void clear_screen_exempt_runs() { screen_exempt.clear(); }

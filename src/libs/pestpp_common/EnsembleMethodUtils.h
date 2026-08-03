@@ -338,14 +338,18 @@ map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& 
 	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(), int da_cycle=NetPackage::NULL_DA_CYCLE,
 	string additional_tag="");
 
+// `abandoned_names`, when given, receives the names of realizations whose runs were CANCELLED
+// rather than having failed - reported separately so a user is not told the model broke when
+// preemption did exactly what it was asked to.
 vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
-	bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids);
+	bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids,
+	vector<string>* abandoned_names = nullptr);
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
 	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE,
-	string additional_tag="");
+	string additional_tag="", vector<string>* abandoned_names = nullptr);
 
 class EnsembleSolver
 {
@@ -848,6 +852,10 @@ protected:
 	/// from the screener closure dereferenced a null scenario and segfaulted the master. mou
 	/// and sqp each hold their own for the same reason.
 	ViolationDetector viol_detector;
+	/// Realizations lost because the screener ABANDONED their run, not because the model
+	/// failed. Kept by name because the code that reports what an ensemble lost works it out
+	/// by diffing names. Reporting only - membership is already handled by the drop.
+	set<string> abandoned_real_names;
 	ParameterEnsemble pe, pe_base;
 	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;

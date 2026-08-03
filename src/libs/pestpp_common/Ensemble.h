@@ -313,10 +313,16 @@ public:
 	// ensemble, and the two name sets are allowed to differ - pest++ pairs par and obs
 	// realizations by position, not by name (see drop_bad_reals()). Pass empty when the two
 	// name sets are known to match.
+	// `abandoned_idxs`, when given, receives the subset of the returned indices whose runs were
+	// CANCELLED rather than having failed. Both lose their realization and both appear in the
+	// return value - the distinction is for the message, because "4 runs failed" sends a user
+	// looking for a model problem that preemption deliberately caused.
 	vector<int> update_from_runs(map<string,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr,
-		const vector<string>& par_real_names=vector<string>());
+		const vector<string>& par_real_names=vector<string>(),
+		vector<int>* abandoned_idxs=nullptr);
 	vector<int> update_from_runs(map<string,int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe,
-		const vector<string>& par_real_names=vector<string>());
+		const vector<string>& par_real_names=vector<string>(),
+		vector<int>* abandoned_idxs=nullptr);
 
 	// Maps queued runs onto the rows they belong to now. key_names is the realization names in
 	// current row order; n_rows bounds it to the receiving ensemble. Returns (row, run_id) in

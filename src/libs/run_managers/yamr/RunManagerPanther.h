@@ -224,6 +224,8 @@ public:
 	int cancel_runs(const std::vector<int>& run_ids);
 	int cancel_run(int run_id) { return cancel_runs(std::vector<int>{ run_id }); }
 	const std::set<int>& get_cancelled_run_ids() const { return user_cancelled_runs; }
+	bool run_was_abandoned(int run_id) const override
+	{ return user_cancelled_runs.find(run_id) != user_cancelled_runs.end(); }
 	
 private:
 	std::string port;
