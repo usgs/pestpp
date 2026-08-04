@@ -782,6 +782,10 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 	try
 	{
 		remove_existing();
+		// from here the output files on disk can only be THIS run's: the previous run's are
+		// gone, and anything that appears was written by the model we are about to call. Until
+		// this point a partial read would have returned the previous realization's results.
+		if (outputs_cleared) outputs_cleared->store(true);
 		write_input_files(pars_ptr);
 		
 		std::chrono::system_clock::time_point start_time = chrono::system_clock::now();

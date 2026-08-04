@@ -2644,7 +2644,27 @@ def preemption_screening_test():
         "mid-run screening CHANGED THE RESULTS - it must only change wall-clock. " \
         "differing files: {0}".format(differing)
 
-    # 4a. the phi summaries agree on every statistic, and differ ONLY by having run less.
+    # 4a. the ensembles agree on every realization they share, and anything the screened run
+    #     is missing must be a realization that violates - i.e. one the unscreened run went on
+    #     to drop anyway. A realization that survives 'off' but vanishes from 'on' is the
+    #     failure this whole test exists to catch.
+    viol_col = "h02_10"
+    for f in sorted(x for x in off_files if x.startswith(ens_prefixes) and x.endswith(".obs.csv")):
+        a = pd.read_csv(os.path.join(results["off"], f), index_col=0)
+        b = pd.read_csv(os.path.join(results["on"], f), index_col=0)
+        a.index = [str(i).lower() for i in a.index]
+        b.index = [str(i).lower() for i in b.index]
+        common = [i for i in a.index if i in b.index]
+        col = [c for c in a.columns if c.lower() == viol_col][0]
+        assert (a.loc[common] - b.loc[common]).abs().max().max() < 1e-10, \
+            "{0}: a realization present in both runs has different values".format(f)
+        for missing in set(a.index) - set(b.index):
+            assert a.loc[missing, col] > 5.35, \
+                "{0}: realization '{1}' was screened out but does NOT violate " \
+                "({2} <= 5.35) - screening may only ever drop what the process would " \
+                "have dropped".format(f, missing, a.loc[missing, col])
+
+    # 4b. the phi summaries agree on every statistic, and differ ONLY by having run less.
     #     "fewer runs" is asserted ACROSS the phi files, not within each: a phi type that is
     #     not in play for this case (regul, with no regularization) reports nothing to save.
     saved_somewhere = False
@@ -2665,22 +2685,3 @@ def preemption_screening_test():
     assert saved_somewhere, \
         "screening saved no runs in any phi summary, so it did nothing measurable"
 
-    # 4b. the ensembles agree on every realization they share, and anything the screened run
-    #     is missing must be a realization that violates - i.e. one the unscreened run went on
-    #     to drop anyway. A realization that survives 'off' but vanishes from 'on' is the
-    #     failure this whole test exists to catch.
-    viol_col = "h02_10"
-    for f in sorted(x for x in off_files if x.startswith(ens_prefixes) and x.endswith(".obs.csv")):
-        a = pd.read_csv(os.path.join(results["off"], f), index_col=0)
-        b = pd.read_csv(os.path.join(results["on"], f), index_col=0)
-        a.index = [str(i).lower() for i in a.index]
-        b.index = [str(i).lower() for i in b.index]
-        common = [i for i in a.index if i in b.index]
-        col = [c for c in a.columns if c.lower() == viol_col][0]
-        assert (a.loc[common] - b.loc[common]).abs().max().max() < 1e-10, \
-            "{0}: a realization present in both runs has different values".format(f)
-        for missing in set(a.index) - set(b.index):
-            assert a.loc[missing, col] > 5.35, \
-                "{0}: realization '{1}' was screened out but does NOT violate " \
-                "({2} <= 5.35) - screening may only ever drop what the process would " \
-                "have dropped".format(f, missing, a.loc[missing, col])

@@ -1212,6 +1212,43 @@ static void test_run_storage_partial_update()
 }
 
 /**
+ * @brief A partial read must refuse until the run owns the files on disk.
+ *
+ * The agent answers REQ_PARTIAL from the moment the run thread is launched, but that thread has
+ * to reach ModelInterface::remove_existing() before the PREVIOUS run's output files are gone.
+ * In that window the old files are complete, well-formed, and belong to another realization -
+ * so a partial read taken there reports somebody else's results as this run's, and mid-run
+ * screening abandons a run that violates nothing.
+ *
+ * That is exactly what happened: a non-violating realization was screened out on one platform
+ * and not another, because the window is only a few instructions wide. The agent now asks
+ * outputs_are_current() first, and this pins the two states it depends on. The true state is
+ * covered by every real run in the benchmarks, where partial reads do come back full.
+ */
+static void test_partial_read_refuses_stale_outputs()
+{
+    cout << "[model interface: a partial read refuses until the run owns the files]" << endl;
+    // named, not temporaries: ModelInterface mi(vector<string>(), ...) is the most vexing
+    // parse and declares a function
+    vector<string> none;
+    ModelInterface mi(none, none, none, none, none);
+    // the only state that can cause harm is a SPURIOUS true, so that is what this pins
+    CHK(!mi.outputs_are_current(),
+        "a fresh interface must not claim the output files belong to a run");
+    mi.mark_outputs_stale();
+    CHK(!mi.outputs_are_current(),
+        "marking stale must leave a partial read refused");
+
+    // the agent reassigns its interface wholesale when a da cycle swaps the model definition.
+    // The flag is held by shared_ptr so that assignment still compiles - this asserts the
+    // reassigned interface does not inherit a 'current' claim from anywhere.
+    ModelInterface other(none, none, none, none, none);
+    mi = other;
+    CHK(!mi.outputs_are_current(),
+        "a reassigned interface must not claim the output files belong to a run");
+}
+
+/**
  * @brief A record holding values is a RESULT, whatever its status byte says.
  *
  * This guards the external run manager's contract, which is not obvious from the code and cost
@@ -1419,6 +1456,7 @@ int main()
     test_instruction_file_partial_remaining_branches();
     test_run_storage_partial_update();
     test_external_values_are_results();
+    test_partial_read_refuses_stale_outputs();
     test_violation_single_run_matches_ensemble();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;

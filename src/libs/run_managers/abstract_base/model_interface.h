@@ -2,6 +2,8 @@
 #define MODEL_INTERFACE_H_
 
 #include <vector>
+#include <atomic>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <mutex>
@@ -126,6 +128,21 @@ public:
 	ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
 		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec);
 	void throw_mio_error(string base_message);
+	/**
+	 * @brief Are the output files on disk this run's, rather than the previous run's?
+	 *
+	 * False from the moment a run is accepted until remove_existing() has cleared the old
+	 * files. A partial read taken in that window returns the PREVIOUS realization's results -
+	 * complete, well-formed and belonging to somebody else - which is how mid-run screening
+	 * abandoned a run that did not violate anything.
+	 *
+	 * Atomic because the run thread sets it and the agent's message loop reads it.
+	 */
+	bool outputs_are_current() const { return outputs_cleared && outputs_cleared->load(); }
+	/// Call when a run is ACCEPTED, before the run thread starts, so the window is closed from
+	/// the first instant rather than from whenever the thread happens to be scheduled.
+	void mark_outputs_stale() { if (outputs_cleared) outputs_cleared->store(false); }
+
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
 		exception_ptr& eptr,
@@ -140,6 +157,11 @@ public:
     void set_should_echo(bool _should_echo){should_echo=_should_echo;}
 
 private:
+	/// see outputs_are_current(): false until this run's remove_existing() has run.
+	/// Held by shared_ptr because a bare std::atomic would delete this class's copy
+	/// assignment, and the agent reassigns its ModelInterface wholesale when a da cycle
+	/// swaps the model definition.
+	std::shared_ptr<std::atomic<bool>> outputs_cleared = std::make_shared<std::atomic<bool>>(false);
 	int num_threads;
 	int sleep_ms;
 	//Pest* pest_scenario_ptr;

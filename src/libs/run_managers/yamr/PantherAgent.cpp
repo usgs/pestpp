@@ -446,6 +446,13 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
     }
 
     vector<double> obs_vec;
+    // Close the stale-output window BEFORE the thread starts, not inside it. The message loop
+    // below can answer REQ_PARTIAL from the instant this thread is launched, and the run thread
+    // may not have reached remove_existing() yet - in that gap the previous realization's
+    // output files are still on disk, complete and readable, and a partial read would report
+    // them as this run's. That is not hypothetical: it abandoned a non-violating realization on
+    // one platform and not another, because the window is only a few instructions wide.
+    mi.mark_outputs_stale();
     thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, std::ref(run_exception),
                       &pars, &obs);
 
@@ -537,7 +544,17 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				{
 					Observations partial;
 					vector<string> missing, problems;
-					mi.try_read_output_files(&partial, missing, problems);
+					// only read once this run owns the files on disk - see
+					// ModelInterface::outputs_are_current()
+					if (mi.outputs_are_current())
+						mi.try_read_output_files(&partial, missing, problems);
+					else
+					{
+						for (auto& on : master_obs_name_vec)
+							missing.push_back(on);
+						problems.push_back("the previous run's output files have not been "
+							"cleared yet, so nothing here belongs to this run");
+					}
 					// captured BEFORE reset(), which overwrites them on the same object
 					int p_group = net_pack.get_group_id();
 					int p_run = net_pack.get_run_id();
