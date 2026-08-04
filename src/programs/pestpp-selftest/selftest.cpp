@@ -1212,6 +1212,100 @@ static void test_run_storage_partial_update()
 }
 
 /**
+ * @brief A record holding values is a RESULT, whatever its status byte says.
+ *
+ * This guards the external run manager's contract, which is not obvious from the code and cost
+ * a CI cycle to rediscover. Under /e, pest++ writes the queued runs to run storage, an external
+ * script fills in the OBSERVATIONS, and pest++ reads them back. That script leaves run_status
+ * at the 0 that add_run() set - it signals failure only by explicitly writing a negative value
+ * (see modify_runstor() in benchmarks/ies_test_part4.py). So under the external run manager,
+ * status 0 means "fine, here are your values".
+ *
+ * A harvest that rejected status <= 0 as "did not complete" therefore dropped every realization
+ * of every external run, which is exactly what happened. update_from_runs() now asks whether
+ * the record HOLDS values instead, and that question is only answerable because add_run()
+ * initializes the observation block to no_data - it used to leave a hole that read back as
+ * ZEROS, which is a plausible observation value and indistinguishable from a real result.
+ *
+ * Both halves are asserted here, because they only work together.
+ */
+static void test_external_values_are_results()
+{
+    cout << "[run storage: values with status 0 are results, not an empty record]" << endl;
+    const string stor = "selftest_extvals.rns";
+    remove(stor.c_str());
+    vector<string> pnames{"P1", "P2"}, onames{"O1", "O2", "O3"};
+
+    RunStorage rs(stor);
+    rs.reset(pnames, onames, stor);
+    Parameters pars;
+    pars.insert("P1", 1.0);
+    pars.insert("P2", 2.0);
+    int filled = rs.add_run(pars, "filled by an external script", 0.0);
+    int never = rs.add_run(pars, "never run", 0.0);
+
+    // 1. a queued-but-unrun record reads back as NO_DATA, not as zeros. This is what makes
+    //    "does this hold values?" a question with an answer.
+    Parameters gp;
+    Observations go;
+    rs.get_run(never, gp, go);
+    for (auto& on : onames)
+    {
+        CHK(abs(go.get_rec(on) - Transformable::no_data) < 1.0e-12,
+            "an unrun record's observations must be the no_data sentinel");
+        CHK(go.get_rec(on) != 0.0,
+            "an unrun record must NOT read back as zeros - zero is a plausible observation");
+    }
+
+    // 2. an external script writes observations and leaves the status alone
+    Observations ext;
+    ext.insert("O1", 123456789.987);
+    ext.insert("O2", 123456789.987);
+    ext.insert("O3", 123456789.987);
+    rs.update_run_partial(filled, ext);
+
+    int status = -99;
+    string info_txt;
+    double info_value = 0.0;
+    rs.get_info(filled, status, info_txt, info_value);
+    CHK(status == 0, "writing observations without completing leaves the status at 0");
+
+    // 3. ...and the harvest predicate must call that a RESULT. Same test update_from_runs()
+    //    applies: a record is empty only when every observation is still the sentinel.
+    Observations gf;
+    Parameters gfp;
+    rs.get_run(filled, gfp, gf);
+    bool filled_has_values = false;
+    for (Observations::const_iterator it = gf.begin(); it != gf.end(); ++it)
+        if (it->second != Transformable::no_data)
+        {
+            filled_has_values = true;
+            break;
+        }
+    CHK(filled_has_values,
+        "a record whose observations were written must be harvested, whatever its status - "
+        "this is the external run manager's contract");
+    CHK(abs(gf.get_rec("O2") - 123456789.987) < 1.0e-6,
+        "the externally written value must read back intact");
+
+    Observations gn;
+    Parameters gnp;
+    rs.get_run(never, gnp, gn);
+    bool never_has_values = false;
+    for (Observations::const_iterator it = gn.begin(); it != gn.end(); ++it)
+        if (it->second != Transformable::no_data)
+        {
+            never_has_values = true;
+            break;
+        }
+    CHK(!never_has_values,
+        "a record that was never filled must NOT be harvested - it holds nothing");
+
+    rs.free_memory();
+    remove(stor.c_str());
+}
+
+/**
  * @brief The single-run violation test must agree with the ensemble one, exactly.
  *
  * Mid-run screening cancels a run on the strength of is_violating(); the harvest-time drop
@@ -1324,6 +1418,7 @@ int main()
     test_instruction_file_partial_real_case();
     test_instruction_file_partial_remaining_branches();
     test_run_storage_partial_update();
+    test_external_values_are_results();
     test_violation_single_run_matches_ensemble();
     cout << "\npestpp-selftest: " << (g_fail == 0 ? "PASS" : "FAIL")
          << " (" << (g_total - g_fail) << "/" << g_total << " checks)" << endl;

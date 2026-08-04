@@ -31,7 +31,6 @@
 #include <algorithm>
 #include "RunStorage.h"
 #include "Serialization.h"
-#include "Transformable.h"    // Transformable::no_data, for initializing new runs' observations
 #include "Transformable.h"
 #include <limits>
 #include "utilities.h"
