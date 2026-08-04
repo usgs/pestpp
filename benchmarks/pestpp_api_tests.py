@@ -1613,6 +1613,64 @@ def api_session_cleanup_does_not_need_with_test():
     assert not lib_fin.alive, "...and released the underlying handle with it"
 
 
+def api_deferred_initialize_mou_test():
+    """mou's initialize() splits, and the split must equal the atomic one exactly.
+
+    This is the feature that was impossible for mou until now: initialize() drew the initial
+    population AND evaluated it in one uninterruptible call, so the members that got run were
+    always the ones mou drew. defer_runs=True stops in between, and that window is the only
+    point at which the population can be replaced.
+
+    The claim is that splitting changes WHO runs the batch and nothing else, so this drives
+    both paths on the same case and seed and compares the written populations. A restart case
+    hands back 0 runs and must still finish - that path is asserted too, because "returns 0"
+    and "does nothing" are easy to conflate and only one of them is correct.
+    """
+    import filecmp
+
+    # 1. the composed path, for reference
+    d_atomic = _mou_case("api_init_mou_atomic", noptmax=1, pop=10)
+    with Mou.from_pst("g07.pst", workdir=d_atomic) as mou:
+        mou.initialize()
+        atomic_dv = mou.par_df().copy()
+        atomic_obs = mou.obs_df().copy()
+
+    # 2. the split path: prepare hands back the runs, we service them, then finish
+    d_split = _mou_case("api_init_mou_split", noptmax=1, pop=10)
+    with Mou.from_pst("g07.pst", workdir=d_split) as mou:
+        n = mou.initialize(defer_runs=True)
+        assert n > 0, \
+            "mou's initialize should now hand back the initial population's runs, got {0}".format(n)
+        # the window that makes this worth having: the population is in memory and unevaluated
+        drawn = mou.par_df()
+        assert drawn.shape[0] == n, (drawn.shape, n)
+        mou.queue_runs()
+        mou.run()
+        mou.process_runs()
+        mou.finish_initialize()
+        split_dv = mou.par_df().copy()
+        split_obs = mou.obs_df().copy()
+
+    # 3. same members, same values - splitting changes who runs the batch, nothing else
+    assert list(split_dv.index) == list(atomic_dv.index), \
+        "the split path produced a different population:\n atomic: {0}\n split : {1}".format(
+            list(atomic_dv.index), list(split_dv.index))
+    assert np.allclose(split_dv.values, atomic_dv.values, rtol=0, atol=1e-10), \
+        "the split path produced different decision variable values"
+    assert np.allclose(split_obs.values, atomic_obs.values, rtol=0, atol=1e-10), \
+        "the split path produced different observation values"
+
+    # 4. and the files agree too - the reporting in finish() is half the work it does
+    for f in sorted(os.listdir(d_atomic)):
+        if not f.endswith(".csv") or not f.startswith("g07."):
+            continue
+        b = os.path.join(d_split, f)
+        if not os.path.exists(b):
+            continue
+        assert filecmp.cmp(os.path.join(d_atomic, f), b, shallow=False), \
+            "{0} differs between the atomic and split initialize".format(f)
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -1665,4 +1723,5 @@ if __name__ == "__main__":
     api_run_observer_survives_a_raising_callback_test()
     api_run_observer_thunk_is_retained_test()
     api_session_cleanup_does_not_need_with_test()
+    api_deferred_initialize_mou_test()
     print("all helper tests passed")

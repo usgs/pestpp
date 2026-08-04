@@ -139,6 +139,31 @@ struct ToolAdapter
     /// computing them, or this tool initializes atomically and has no batch to hand over.
     virtual int  initialize_prepare() = 0;
     virtual void initialize_finish() = 0;
+
+    /**
+     * @brief Queue / harvest the tool's current parameter ensemble.
+     *
+     * A PAIR, and overridden as a pair or not at all: whatever queues a batch has to be what
+     * harvests it. The default is the ies/da path, which is what pestpp_queue_runs() and
+     * pestpp_process_runs() did directly before this hook existed.
+     *
+     * mou overrides both because its batch is not just the population: queue_population()
+     * batches the CHANCE runs alongside it, and the harvest applies the chance shift. Driving
+     * a chance-enabled mou through the generic ensemble path would queue the population and
+     * silently omit the chance runs - a quiet wrong answer rather than an error.
+     */
+    virtual map<string, int> queue_runs(PerformanceLog* pl, ofstream& frec,
+                                        RunManagerAbstract* rm)
+    {
+        return queue_ensemble_util(pl, frec, *par_ensemble(), rm, false, vector<int>(),
+                                   da_cycle());
+    }
+    virtual vector<int> harvest_runs(PerformanceLog* pl, ofstream& frec, RunManagerAbstract* rm,
+                                     map<string, int>& ids)
+    {
+        return harvest_ensemble_util(pl, frec, *par_ensemble(), *obs_ensemble(), rm, false,
+                                     vector<int>(), ids);
+    }
     /// One iteration/generation. Returns PESTPP_RETRY when the step was rejected and the
     /// algorithm wants another attempt - an outcome, not a fault.
     virtual pestpp_status advance() = 0;
@@ -661,10 +686,17 @@ struct MouAdapter : public ToolAdapter
     Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(); }
-    // mou's initialize() issues several population evaluations rather than one, so there is
-    // no single batch to hand to a caller; it initializes atomically.
-    int  initialize_prepare() override { tool.initialize(); return 0; }
-    void initialize_finish() override {}
+    // The initial POPULATION evaluation is handed to the caller; the other two evaluations in
+    // mou's initialize() (control-file values, mean values) are one-off diagnostics on
+    // noptmax<=0 paths and stay atomic inside prepare().
+    int  initialize_prepare() override { return tool.initialize_prepare(); }
+    void initialize_finish() override { tool.initialize_finish(); }
+    // chance-aware, unlike the generic ensemble path - see ToolAdapter::queue_runs()
+    map<string, int> queue_runs(PerformanceLog*, ofstream&, RunManagerAbstract*) override
+    { return tool.queue_initial_population(); }
+    vector<int> harvest_runs(PerformanceLog*, ofstream&, RunManagerAbstract*,
+                             map<string, int>&) override
+    { return tool.harvest_initial_population(); }
     pestpp_status advance() override
     {
         // ONE call into the tool, not a re-implementation of its loop body. Doing the four
@@ -2552,10 +2584,9 @@ pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued)
         // The cycle has to be passed explicitly: it defaults to NULL_DA_CYCLE, so a da handle
         // driving its own queue/harvest would tag runs with no cycle at all while the in-tree
         // da path tagged them correctly. Invisible on a control file whose first cycle is 0.
-        s->pending_runs = queue_ensemble_util(s->performance_log.get(),
-                                              s->file_manager->rec_ofstream(),
-                                              *s->adapter->par_ensemble(), s->run_manager.get(),
-                                              false, vector<int>(), s->adapter->da_cycle());
+        s->pending_runs = s->adapter->queue_runs(s->performance_log.get(),
+                                                 s->file_manager->rec_ofstream(),
+                                                 s->run_manager.get());
         s->pending_runs_valid = true;
         if (n_queued != nullptr)
             *n_queued = (int)s->pending_runs.size();
@@ -2576,11 +2607,9 @@ pestpp_status pestpp_process_runs(pestpp_handle h, int* n_failed)
                 *n_failed = nfail;
             return PESTPP_OK;
         }
-        vector<int> failed = harvest_ensemble_util(s->performance_log.get(),
-                                                   s->file_manager->rec_ofstream(),
-                                                   *s->adapter->par_ensemble(), *s->adapter->obs_ensemble(),
-                                                   s->run_manager.get(), false, vector<int>(),
-                                                   s->pending_runs);
+        vector<int> failed = s->adapter->harvest_runs(s->performance_log.get(),
+                                                      s->file_manager->rec_ofstream(),
+                                                      s->run_manager.get(), s->pending_runs);
         // clear even on the way out, so a failed harvest cannot leave a stale map behind
         s->pending_runs.clear();
         s->pending_runs_valid = false;

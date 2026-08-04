@@ -455,17 +455,34 @@ def capi_initialize_split_guardrails_test():
 
 
 def capi_initialize_prepare_reports_zero_test():
-    """Tools that hand over no initial batch say so, so callers need no special-casing.
+    """initialize_prepare() reports its batch honestly, and 0 means 0 - not "unsupported".
 
-    mou evaluates several populations inside initialize() and sqp's only batch there is a
-    single control-file-values run, so neither exposes a caller-owned batch. Both must report
-    0 rather than leaving a caller to discover it.
+    sqp hands over nothing: its only batch inside initialize() is the single control-file-values
+    run, and the initial ensemble is evaluated deeper, inside prep_4_ensemble_grad(). It must
+    report 0 rather than leaving a caller to discover it.
+
+    mou now DOES hand over its initial population. This assertion used to read `== 0` for both,
+    which was correct when mou initialized atomically and became a test pinning a limitation
+    rather than a behaviour. Whichever it reports, the same four calls have to leave the tool
+    fully initialized and able to step - that is the part worth asserting for both.
     """
-    for tool, wd, pst_name, tag in (
-            (TOOL_MOU, _setup_mou("capi_init_mou"), "g07.pst", "mou"),
-            (TOOL_SQP, _setup_sqp("capi_init_sqp"), "pest.pst", "sqp")):
+    for tool, wd, pst_name, tag, hands_over in (
+            (TOOL_MOU, _setup_mou("capi_init_mou"), "g07.pst", "mou", True),
+            (TOOL_SQP, _setup_sqp("capi_init_sqp"), "pest.pst", "sqp", False)):
         with PestppLib(_find_library(), tool, pst_name, wd) as t:
-            assert t.initialize_prepare() == 0, "{0} should report no caller-owned batch".format(tag)
+            n = t.initialize_prepare()
+            if hands_over:
+                assert n > 0, \
+                    "{0} should hand back its initial batch, got {1}".format(tag, n)
+                t.queue_runs()
+                t.begin_batch()
+                while not t.run_slice(0.05):
+                    pass
+                t.end_batch()
+                t.process_runs()
+            else:
+                assert n == 0, \
+                    "{0} should report no caller-owned batch, got {1}".format(tag, n)
             t.initialize_finish()
             # still fully initialized: it can take a step
             t.solve_iteration()

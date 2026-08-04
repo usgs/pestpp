@@ -3004,7 +3004,19 @@ void MOEA::finalize()
 /**
  * @brief Initialize.
  */
-void MOEA::initialize()
+/**
+ * @brief First half of initialize(): everything up to the initial population evaluation.
+ *
+ * Returns how many runs the caller must service, or 0 when the population needs no evaluating
+ * (a restart file supplied the results). Paired with initialize_finish(); the caller drives the
+ * run manager in between, which is the only point at which the drawn initial population can be
+ * REPLACED with one of the caller's own.
+ *
+ * Splitting here rather than anywhere else because this is the single batch that decides what
+ * the search starts from. The other two evaluations in this function - the control-file values
+ * and the mean values - are one-off diagnostics on noptmax<=0 paths and stay atomic.
+ */
+int MOEA::initialize_prepare()
 {
 	// same nomination the ies/da tools use - a 'drop_violations' column in the external
 	// observation file - read straight from the scenario so it cannot depend on the
@@ -3542,7 +3554,7 @@ void MOEA::initialize()
 		pars.update(names, eigenvec_2_stlvec(_pe.get_real_vector(BASE_REAL_NAME)));
 		
 		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names, false);
-		return;
+		return 0;
 	}
 	
 	int pop_size = pest_scenario.get_pestpp_options().get_mou_population_size();
@@ -3651,7 +3663,7 @@ void MOEA::initialize()
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "mean value run failed...bummer");
-			return;
+			return 0;
 		}
 		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
 		message(1, "saving results from mean value run to ", obs_csv);
@@ -3671,7 +3683,7 @@ void MOEA::initialize()
 		pars.update(names, eigenvec_2_stlvec(_pe.get_real_vector("mean")));
 
 		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names, false);
-		return;
+		return 0;
 	}
 
 
@@ -3770,10 +3782,72 @@ void MOEA::initialize()
 		performance_log->log_event("running initial population");
 		message(1, "running initial population of size", dp.shape().first);
 	
-		vector<int> failed = run_population(dp, op, true);
+		init_ran_population = true;
+		// NOTHING is queued here, deliberately. The window between prepare and queue is the
+		// whole point of the split: it is the only moment at which a caller can REPLACE the
+		// drawn initial population with its own. Queueing here would draw the population and
+		// commit it in one step, which is the atomicity this exists to undo.
+		init_needs_finish = true;
+		return (int)dp.shape().first;
+	}
+	// the restart branch above supplied results without running anything: nothing to service,
+	// but finish() still has all the reporting and archive setup to do
+	init_ran_population = false;
+	init_real_run_ids.clear();
+	init_needs_finish = true;
+	return 0;
+}
+
+/**
+ * @brief Queue the initial population, after any caller changes to it.
+ *
+ * Separate from initialize_prepare() so the population can be replaced in between. Records the
+ * run ids for initialize_finish(), which is what pairs the harvest with this batch.
+ */
+map<string, int> MOEA::queue_initial_population()
+{
+	// allow_chance: queue_population() batches the chance runs together with the population,
+	// so this one batch is everything the caller has to service
+	init_real_run_ids = queue_population(dp, true);
+	return init_real_run_ids;
+}
+
+/**
+ * @brief Harvest the initial population's runs.
+ *
+ * Separate from initialize_finish() so an API caller can harvest through the same path the
+ * in-tree code uses - chance-aware, which the generic ensemble harvest is not. Clears the run
+ * ids, which is how initialize_finish() knows the harvest is already done.
+ */
+vector<int> MOEA::harvest_initial_population()
+{
+	vector<int> failed = harvest_population(dp, op, true, init_real_run_ids);
+	init_real_run_ids.clear();
+	return failed;
+}
+
+/**
+ * @brief Second half of initialize(): harvest the initial population and set the search up.
+ *
+ * Safe to call when nothing was queued - a restart supplies the results instead - which is why
+ * the harvest is guarded on init_real_run_ids rather than assumed.
+ */
+void MOEA::initialize_finish()
+{
+	if (!init_needs_finish)
+		return;
+	init_needs_finish = false;
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+	if (init_ran_population)
+	{
+		// empty when an API caller already harvested through harvest_initial_population();
+		// non-empty on the in-tree path, where this call IS the harvest
+		if (init_real_run_ids.size() > 0)
+			harvest_initial_population();
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
-		
+
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	ss.str("");
@@ -4037,6 +4111,39 @@ void MOEA::initialize()
     message(1,ss.str());
 	message(0, "initialization complete");
 }
+
+/**
+ * @brief Queue, run and harvest the initial population - the in-tree composition.
+ *
+ * Kept so every existing caller is unaffected: this must produce byte-identical output to the
+ * single function it replaced, which is what the equivalence test asserts. The two halves exist
+ * for callers that want to own the batch; the exe path still just calls this.
+ */
+void MOEA::initialize()
+{
+	int n_runs = initialize_prepare();
+	if (n_runs > 0)
+	{
+		queue_initial_population();
+		performance_log->log_event("making runs");
+		try
+		{
+			drive_run_batch(run_mgr_ptr);
+		}
+		catch (const exception& e)
+		{
+			stringstream ss;
+			ss << "error running initial population: " << e.what();
+			throw_moea_error(ss.str());
+		}
+		catch (...)
+		{
+			throw_moea_error(string("error running initial population"));
+		}
+	}
+	initialize_finish();
+}
+
 
 /**
  * @brief Update sim maps.

@@ -194,6 +194,15 @@ public:
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
 		PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr);
 	void initialize();
+	/// initialize(), split so a caller can own the initial population evaluation - and so
+	/// replace the drawn population with its own. Returns the number of runs to service, 0
+	/// when a restart file supplied the results. See the C ABI's pestpp_initialize_prepare().
+	int  initialize_prepare();
+	/// queue the initial population, AFTER any caller changes to it
+	map<string, int> queue_initial_population();
+	/// harvest them, chance-aware - the generic ensemble harvest is not
+	vector<int> harvest_initial_population();
+	void initialize_finish();
     void iterate_to_solution();
 	/// One generation: the loop body of iterate_to_solution(), including advancing the
 	/// generation counter. Available on its own so a caller driving its own loop - the C ABI -
@@ -296,6 +305,13 @@ private:
 	RunManagerAbstract* run_mgr_ptr;
 	const ObservationInfo *obs_info_ptr;
 
+	/// set between initialize_prepare() and initialize_finish(): the tool is half-initialized
+	/// and the caller owns the initial population's runs
+	bool init_needs_finish = false;
+	/// true when a population was actually evaluated, false on the restart path
+	bool init_ran_population = false;
+	/// the initial population's queued runs, empty when a restart supplied the results
+	map<string, int> init_real_run_ids;
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
