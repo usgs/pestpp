@@ -350,6 +350,14 @@ class PestppLib:
         lib.pestpp_get_run_values.argtypes = (
             c_void_p, c_int, POINTER(c_double), c_int, POINTER(c_double), c_int,
             POINTER(c_ubyte), POINTER(c_int), POINTER(c_int))
+        lib.pestpp_get_run_par_names.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_run_par_names.restype = c_int
+        lib.pestpp_get_run_obs_names.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_run_obs_names.restype = c_int
+        lib.pestpp_set_run_values.argtypes = (c_void_p, c_int, POINTER(c_double), c_int)
+        lib.pestpp_set_run_values.restype = c_int
+        lib.pestpp_set_run_failed.argtypes = (c_void_p, c_int)
+        lib.pestpp_set_run_failed.restype = c_int
         lib.pestpp_get_run_values.restype = c_int
         lib.pestpp_request_partial_results.argtypes = (
             c_void_p, POINTER(c_int), c_int, POINTER(c_int))
@@ -825,6 +833,41 @@ class PestppLib:
             byref(npar), byref(nobs)), "pestpp_get_run_values")
         return (np.ctypeslib.as_array(p).copy(), np.ctypeslib.as_array(o).copy(),
                 np.ctypeslib.as_array(v).copy().astype(bool))
+
+    def get_run_par_names(self) -> list[str]:
+        """Parameter names in RUN STORAGE order - what get_run_values() returns."""
+        return self._get_storage_names(self.lib.pestpp_get_run_par_names)
+
+    def get_run_obs_names(self) -> list[str]:
+        """Observation names in RUN STORAGE order - what set_run_values() expects.
+
+        Not the same as the ensemble's column order, which may differ and may be a subset.
+        """
+        return self._get_storage_names(self.lib.pestpp_get_run_obs_names)
+
+    def _get_storage_names(self, fn) -> list[str]:
+        n = c_int()
+        self._check(fn(self.handle, None, 0, byref(n)), "get run storage names")
+        buf = create_string_buffer(n.value * self.name_len)
+        self._check(fn(self.handle, buf, n.value * self.name_len, byref(n)),
+                    "get run storage names")
+        return self._unpack_names(buf.raw, n.value)
+
+    def set_run_values(self, run_id: int, obs) -> None:
+        """Record this run's observations and mark it complete - service the run yourself.
+
+        The mirror of get_run_values(): read the parameters, evaluate them however you like,
+        write the results back. `obs` is in get_obs_names() order and must be the full set.
+        """
+        arr = np.ascontiguousarray(np.asarray(obs, dtype=np.float64))
+        buf = (c_double * arr.size)(*arr.tolist())
+        self._check(self.lib.pestpp_set_run_values(
+            self.handle, c_int(run_id), buf, c_int(arr.size)), "pestpp_set_run_values")
+
+    def set_run_failed(self, run_id: int) -> None:
+        """Mark this run failed. Distinct from not writing it: this COUNTS as a failure."""
+        self._check(self.lib.pestpp_set_run_failed(self.handle, c_int(run_id)),
+                    "pestpp_set_run_failed")
 
     def request_partial_results(self, run_ids=None) -> int:
         """Ask the workers running these runs for whatever they have. Returns requests sent."""

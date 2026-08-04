@@ -2487,6 +2487,68 @@ pestpp_status pestpp_get_run_values(pestpp_handle h, int run_id, double* pars_ou
     CAPI_END()
 }
 
+pestpp_status pestpp_get_run_par_names(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        return pack_names(s->run_manager->get_par_name_vec(), buf, buf_len, count);
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_run_obs_names(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        return pack_names(s->run_manager->get_obs_name_vec(), buf, buf_len, count);
+    CAPI_END()
+}
+
+pestpp_status pestpp_set_run_values(pestpp_handle h, int run_id, const double* obs, int nobs)
+{
+    CAPI_BEGIN(h)
+        if (obs == nullptr)
+            bad_arg("pestpp_set_run_values needs an observation array");
+        int nruns = s->run_manager->get_nruns();
+        if ((run_id < 0) || (run_id >= nruns))
+            bad_arg("no such run_id: " + std::to_string(run_id) + " (storage holds " +
+                    std::to_string(nruns) + ")");
+        // A run manager writing results for a run the caller is also writing has no defined
+        // outcome, so refuse rather than race. This is the check that keeps "service the runs
+        // yourself" and "drive the run manager" from being usable at the same time by accident.
+        if (s->run_manager->is_batch_open())
+            bad_state("a batch is open; service runs yourself OR drive the run manager over "
+                      "them, not both");
+        vector<string> onames = s->run_manager->get_obs_name_vec();
+        if (nobs != (int)onames.size())
+            bad_arg("expected " + std::to_string(onames.size()) + " observations, got " +
+                    std::to_string(nobs));
+        // The stored parameters are read back and written through unchanged: update_run() takes
+        // both, and the caller has no business restating parameters it did not choose.
+        Parameters pars;
+        Observations existing;
+        int st = 0, n_rep = 0;
+        read_stored_run(s, run_id, pars, existing, st, n_rep);
+        Observations vals = s->adapter->scenario().get_ctl_observations();
+        vals.update(onames, vector<double>(obs, obs + nobs));
+        s->run_manager->update_run(run_id, pars, vals);
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_set_run_failed(pestpp_handle h, int run_id)
+{
+    CAPI_BEGIN(h)
+        int nruns = s->run_manager->get_nruns();
+        if ((run_id < 0) || (run_id >= nruns))
+            bad_arg("no such run_id: " + std::to_string(run_id) + " (storage holds " +
+                    std::to_string(nruns) + ")");
+        if (s->run_manager->is_batch_open())
+            bad_state("a batch is open; service runs yourself OR drive the run manager over "
+                      "them, not both");
+        s->run_manager->update_run_failed(run_id);
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+
 pestpp_status pestpp_request_partial_results(pestpp_handle h, const int* run_ids, int n,
                                              int* n_requested)
 {

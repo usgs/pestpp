@@ -394,7 +394,12 @@ protected:
 	 *
 	 * @param run_id  The run manager ID of the failed run.
 	 */
+	/// Public because a caller servicing runs itself (pestpp_set_run_failed) has to be able
+	/// to say a run failed. Not writing a run at all leaves it incomplete, which is dropped but
+	/// never COUNTED as a failure - and those are different things to whoever reads the report.
+public:
 	virtual void update_run_failed(int run_id);
+protected:
 	/**
 	 * @brief If SAVE_ALL_RUNS is enabled, copy a completed run (its parameters,
 	 *        observations, metadata and status) from the primary storage into the

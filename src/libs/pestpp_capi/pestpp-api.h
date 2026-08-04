@@ -784,6 +784,56 @@ PESTPP_API pestpp_status pestpp_get_run_values(pestpp_handle h, int run_id,
                                                unsigned char* obs_valid,
                                                int* npars_out, int* nobs_out);
 
+/* ---- servicing runs yourself ----------------------------------------------------------
+ *
+ * The mirror of pestpp_get_run_values(): evaluate the queued runs however you like and write
+ * the results back, instead of handing the batch to a run manager.
+ *
+ *     pestpp_queue_runs(h, &n);                       // parameters land in run storage
+ *     for (id = 0; id < n; id++) {
+ *         pestpp_get_run_values(h, id, pars, np, NULL, 0, NULL, NULL, NULL);
+ *         ... evaluate, in this process, on a cluster, wherever ...
+ *         pestpp_set_run_values(h, id, obs, nobs);    // or pestpp_set_run_failed(h, id)
+ *     }
+ *     pestpp_process_runs(h, &n_failed);              // into the ensembles, as usual
+ *
+ * This is what the EXTERNAL run manager does, without the round trip: /e writes the .rns, a
+ * script fills in observations, pest++ reads them back. From the API that detour is pointless
+ * when the caller is already in the process.
+ *
+ * The parameters you read back are in MODEL space - transformed, exactly as a forward run
+ * would receive them - because that is what was written when the runs were queued.
+ *
+ * Use INSTEAD of driving a run manager over the same batch, not alongside one. Both calls are
+ * refused while a batch is open, because a run manager writing results for a run you are also
+ * writing has no defined outcome.
+ *
+ * A run you never write stays incomplete, and pestpp_process_runs() drops its realization
+ * rather than inventing one - the observation block of an unwritten record is the no-data
+ * sentinel throughout, not zeros. Silence is therefore safe, if wasteful. */
+
+/* The run-storage name order, which is what pestpp_get_run_values() returns and what
+ * pestpp_set_run_values() expects. Packed as fixed-width PESTPP_NAME_LEN blocks, like the
+ * ensemble name calls; pass buf=NULL to query the count.
+ *
+ * Needed because run storage does NOT share the ensemble's column order - an ensemble may be
+ * ordered differently and can hold a subset - so the positional arrays either side of this
+ * interface are meaningless without it. Ask here, not from pestpp_get_ensemble_col_names(). */
+PESTPP_API pestpp_status pestpp_get_run_par_names(pestpp_handle h, char* buf, int buf_len,
+                                                  int* count);
+PESTPP_API pestpp_status pestpp_get_run_obs_names(pestpp_handle h, char* buf, int buf_len,
+                                                  int* count);
+
+/* Record this run's observations and mark it complete. `nobs` must be the full observation
+   count, in pestpp_get_run_obs_names() order. The run's stored parameters are left
+   untouched. */
+PESTPP_API pestpp_status pestpp_set_run_values(pestpp_handle h, int run_id,
+                                               const double* obs, int nobs);
+
+/* Mark this run failed - the model did not produce usable output. Distinct from simply not
+   writing it: this is recorded as a failure, and counts as one wherever failures are counted. */
+PESTPP_API pestpp_status pestpp_set_run_failed(pestpp_handle h, int run_id);
+
 /* Aggregate counts for the batch in flight. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
                                                    int* n_completed, int* n_failed,

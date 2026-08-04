@@ -1465,6 +1465,104 @@ def capi_panther_control_test():
                 pass
 
 
+def capi_service_runs_yourself_test():
+    """The caller writes the queued runs' results back - no run manager evaluates them.
+
+    This is the other half of run storage access. pestpp_get_run_values() reads the queued
+    PARAMETERS, the caller computes observations however it likes, pestpp_set_run_values()
+    records them, and pestpp_process_runs() harvests into the ensemble as usual. It is what the
+    external run manager does through a file, without the round trip.
+
+    Deliberately synthetic observations rather than a real forward run: the claim under test is
+    that what the caller writes is exactly what lands in the ensemble, and a recognisable value
+    per realization proves that far more sharply than re-deriving the model's own numbers would.
+    """
+    wd = _setup("capi_service_self")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        n = ies.initialize_prepare()
+        assert n > 0, "expected an initial batch to service, got {0}".format(n)
+        queued = ies.queue_runs()
+        assert queued == n, (queued, n)
+
+        count = ies.get_run_count()
+        assert count == queued, (count, queued)
+
+        # a value that says which run and which observation it came from
+        written = {}
+        for rid in range(count):
+            pars, obs, valid = ies.get_run_values(rid)
+            assert not valid.any(), \
+                "a queued run must hold no real observations yet (run {0})".format(rid)
+            assert np.isfinite(pars).all(), \
+                "the queued run's parameters should be readable (run {0})".format(rid)
+            vals = np.array([rid * 100.0 + i for i in range(obs.size)], dtype=float)
+            ies.set_run_values(rid, vals)
+            written[rid] = vals
+
+        # ...and it reads back as final, not partial
+        for rid in range(count):
+            info = ies.get_run_info(rid)
+            assert info["completeness"] == 2, \
+                "run {0} should be FINAL after set_run_values, got {1}".format(
+                    rid, info["completeness"])
+            _p, obs, valid = ies.get_run_values(rid)
+            assert valid.all(), "every observation should be real after set_run_values"
+            assert np.allclose(obs, written[rid], rtol=0, atol=1e-12), \
+                "run {0} did not read back what was written".format(rid)
+
+        nfail = ies.process_runs()
+        assert nfail == 0, "nothing should have failed: {0}".format(nfail)
+        ies.initialize_finish()
+
+        # and the ensemble carries what we wrote, not what any model produced.
+        #
+        # Mapped by NAME, because run storage and the ensemble do not share a column order -
+        # which is exactly why pestpp_get_run_obs_names() exists. Comparing positionally here
+        # passes only by luck and fails confusingly when it does not.
+        storage_names = [n.lower() for n in ies.get_run_obs_names()]
+        oe, _tok = ies.get_ensemble_view(OBS_EN)
+        ens_names = [n.lower() for n in ies.get_ensemble_col_names(OBS_EN)]
+        assert oe.shape[0] == count, (oe.shape, count)
+        pos = {n: i for i, n in enumerate(storage_names)}
+        for row in range(oe.shape[0]):
+            for col, name in enumerate(ens_names):
+                assert name in pos, "ensemble column {0} is not in run storage".format(name)
+                assert abs(oe[row, col] - written[row][pos[name]]) < 1e-10, \
+                    "row {0} column {1}: ensemble has {2}, caller wrote {3}".format(
+                        row, name, oe[row, col], written[row][pos[name]])
+
+
+def capi_service_runs_failure_test():
+    """set_run_failed is a FAILURE; simply not writing a run is not.
+
+    Both lose the realization, but only one is counted and reported as a model failure - the
+    same distinction preemption needed for abandoned runs. A caller servicing runs itself has
+    to be able to say which it means.
+    """
+    wd = _setup("capi_service_fail")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        n = ies.initialize_prepare()
+        ies.queue_runs()
+        count = ies.get_run_count()
+        assert count > 2, count
+        for rid in range(count):
+            _p, obs, _v = ies.get_run_values(rid)
+            if rid == 0:
+                ies.set_run_failed(rid)          # explicitly failed
+            elif rid == 1:
+                pass                             # silently unwritten
+            else:
+                ies.set_run_values(rid, np.full(obs.size, float(rid)))
+        nfail = ies.process_runs()
+        # the explicit failure is counted; the unwritten run is dropped as having no values
+        assert nfail >= 1, "the explicitly failed run should be reported: {0}".format(nfail)
+        ies.initialize_finish()
+        oe, _tok = ies.get_ensemble_view(OBS_EN)
+        assert oe.shape[0] == count - 2, \
+            "both the failed and the unwritten run should be gone: {0} of {1}".format(
+                oe.shape[0], count)
+
+
 if __name__ == "__main__":
     capi_smoke_test()
     capi_snapshot_roundtrip_test()
@@ -1493,4 +1591,6 @@ if __name__ == "__main__":
     capi_run_storage_read_test()
     capi_panther_control_test()
     capi_partial_results_test()
+    capi_service_runs_yourself_test()
+    capi_service_runs_failure_test()
     print("all capi tests passed")
