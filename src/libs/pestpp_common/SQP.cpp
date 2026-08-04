@@ -5915,10 +5915,14 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
 	
 	ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 	_oe.reserve(dv_candidates.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+	// candidates whose runs were ABANDONED mid-run rather than having failed - dropped just
+	// the same, but reported as what they are so a user is not sent hunting a model problem
+	vector<int> abandoned_real_indices;
 
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, dv_candidates.get_real_names());
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr,
+			dv_candidates.get_real_names(), &abandoned_real_indices);
 	}
 	catch (const exception &e)
 	{
@@ -5943,6 +5947,9 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
 		vector<string> obs_real_names = _oe.get_real_names();
 		vector<string> failed_par_names, failed_obs_names;
 		string oname, pname;
+		set<int> abandoned(abandoned_real_indices.begin(), abandoned_real_indices.end());
+		stringstream ass;
+		int n_failed = 0, n_abandoned = 0;
 		ss << "the following dv candidate runs failed -->";
 		for (auto& i : failed_real_indices)
 		{
@@ -5956,9 +5963,20 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
 
 				if (par_exists && obs_exists)
 				{
+					// both kinds are dropped, so both accumulate here; only the
+					// message they land in differs
 					failed_par_names.push_back(pname);
 					failed_obs_names.push_back(oname);
-					ss << pname << ":" << oname << ',';
+					if (abandoned.find(i) != abandoned.end())
+					{
+						ass << pname << ":" << oname << ',';
+						n_abandoned++;
+					}
+					else
+					{
+						ss << pname << ":" << oname << ',';
+						n_failed++;
+					}
 				}
 				else
 				{
@@ -5971,8 +5989,20 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
 					to_string(par_real_names.size()) + ", obs_size=" + to_string(obs_real_names.size()) + "), skipping");
 			}
 		}
-		string s = ss.str();
-		message(1, s);
+		if (n_failed > 0)
+		{
+			string s = ss.str();
+			message(1, s);
+		}
+		if (n_abandoned > 0)
+		{
+			stringstream hss;
+			hss << "the following " << n_abandoned << " dv candidate runs were abandoned "
+			    << "mid-run for violating a nominated observation - these are NOT model "
+			    << "failures --> " << ass.str();
+			string s = hss.str();
+			message(1, s);
+		}
 		if (failed_par_names.size() > 0 && failed_obs_names.size() > 0)
 		{
 			if (failed_real_indices.size() == _oe.shape().first)
@@ -6234,9 +6264,11 @@ vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, Observation
 		_oe.keep_rows(real_idxs);
 	}
 	vector<int> failed_real_indices;
+	vector<int> abandoned_real_indices;
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids,run_mgr_ptr,par_real_names);
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, par_real_names,
+			&abandoned_real_indices);
 	}
 	catch (const exception &e)
 	{
@@ -6255,19 +6287,43 @@ vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, Observation
 
 	if (failed_real_indices.size() > 0)
 	{
-		stringstream ss;
+		// abandoned and failed are both dropped, and are reported separately - see the dv
+		// candidate harvest above for why the distinction matters to whoever reads this
+		set<int> abandoned(abandoned_real_indices.begin(), abandoned_real_indices.end());
 		vector<string> par_real_names = _pe.get_real_names();
 		vector<string> obs_real_names = _oe.get_real_names();
-		ss << "the following par:obs realization runs failed: ";
+		stringstream fss, ass;
+		int n_failed = 0;
 		for (auto &i : failed_real_indices)
 		{
-			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+			if (abandoned.find(i) != abandoned.end())
+				ass << par_real_names[i] << ":" << obs_real_names[i] << ',';
+			else
+			{
+				fss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+				n_failed++;
+			}
 		}
-		performance_log->log_event(ss.str());
-		message(1, "failed realizations: ", failed_real_indices.size());
-		string s = ss.str();
-		message(1, s);
-		performance_log->log_event("dropping failed realizations");
+		if (n_failed > 0)
+		{
+			stringstream ss;
+			ss << "the following par:obs realization runs failed: " << fss.str();
+			performance_log->log_event(ss.str());
+			message(1, "failed realizations: ", n_failed);
+			string s = ss.str();
+			message(1, s);
+		}
+		if (abandoned.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following " << abandoned.size() << " par:obs realization runs were "
+			   << "abandoned mid-run for violating a nominated observation - these are NOT "
+			   << "model failures: " << ass.str();
+			performance_log->log_event(ss.str());
+			string s = ss.str();
+			message(1, s);
+		}
+		performance_log->log_event("dropping failed and abandoned realizations");
 		_pe.drop_rows(failed_real_indices);
 		_oe.drop_rows(failed_real_indices);
 	}

@@ -2962,3 +2962,168 @@ def mou_drop_violations_floor_test():
     rec = open(os.path.join(test_d, "mou_floor.rec")).read()
     assert "below the minimum" in rec, \
         "mou stopped, but not with the population-size message that says why:\n" + rec[-3000:]
+
+
+def mou_preemption_screening_test():
+    """mou: mid-run screening must change wall-clock and NOTHING else.
+
+    The ies version of this test found five bugs, so mou gets the same treatment rather than
+    being trusted because it shares the machinery. It does share most of it - the nomination,
+    the ViolationDetector, the screener hook in the panther master - but mou harvests through
+    its OWN update_from_runs() call rather than harvest_ensemble_util(), so the paths that
+    matter for correctness are NOT the ones ies exercised.
+
+    The claim under test is the same: with 'drop_violations' nominated, a screened run and an
+    unscreened one reach the same answer, and the screened one does less work. Anything a
+    screened run discards must be a member the unscreened run went on to drop anyway.
+    """
+    test_d = os.path.join(test_root, "mou_preempt")
+    worker_root = os.path.join(test_root, "mou_preempt_workers")
+    results = {}
+
+    for tag, interval in (("off", 0.0), ("on", 0.02)):     # 0.02 min ~ 1.2 s
+        t_d = test_d + "_" + tag
+        if os.path.exists(t_d):
+            shutil.rmtree(t_d)
+        os.makedirs(t_d)
+
+        with open(os.path.join(t_d, "par.tpl"), 'w') as f:
+            f.write("ptf ~\n ~   par1    ~\n~   par2    ~\n")
+        with open(os.path.join(t_d, "obs.ins"), 'w') as f:
+            f.write("pif ~\nl1 !obj1!\nl1 !obj2!\nl1 !constr!\n")
+        # deliberately slow, so a run is genuinely in flight long enough to be asked about
+        with open(os.path.join(t_d, "forward_run.py"), 'w') as f:
+            f.write("import time\n")
+            f.write("v = [float(l.strip()) for l in open('par.dat')]\n")
+            f.write("with open('obs.dat','w') as o:\n")
+            f.write("    o.write('{0}\\n{1}\\n{2}\\n'.format(v[0], v[1], v[0]))\n")
+            f.write("time.sleep(3)\n")
+
+        pst = pyemu.Pst.from_io_files(os.path.join(t_d, "par.tpl"), "par.dat",
+                                      os.path.join(t_d, "obs.ins"), "obs.dat", pst_path=".")
+        par = pst.parameter_data
+        par.loc[:, "partrans"] = "none"
+        par.loc[:, "parlbnd"] = 0.0
+        par.loc[:, "parubnd"] = 1.0
+        par.loc[:, "parval1"] = 0.5
+
+        obs = pst.observation_data
+        obs.loc[:, "weight"] = 1.0
+        obs.loc[["obj1", "obj2"], "obgnme"] = "less_than_obj"
+        obs.loc[["obj1", "obj2"], "obsval"] = 0.0
+        obs.loc["constr", "obgnme"] = "less_than_constr"
+        obs.loc["constr", "obsval"] = 0.5
+        obs.loc[:, "drop_violations"] = False
+        obs.loc["constr", "drop_violations"] = True
+
+        pst.pestpp_options["mou_objectives"] = ["obj1", "obj2"]
+        pst.pestpp_options["mou_population_size"] = 20
+        pst.pestpp_options["mou_generator"] = "de"
+        pst.pestpp_options["random_seed"] = 11
+        pst.pestpp_options["preemption_poll_interval_minutes"] = interval
+        pst.control_data.noptmax = 1
+        pst.model_command = ["python forward_run.py"]
+        pst.write(os.path.join(t_d, "mou_pre.pst"), version=2)
+
+        cands = [c for c in (
+            os.path.join("..", "build", "src", "programs", "pestpp-mou", "pestpp-mou" + exe),
+            os.path.abspath(exe_path)) if os.path.exists(c)]
+        assert cands, "could not find a pestpp-mou to test"
+        mou_exe = max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
+
+        if os.path.exists(worker_root):
+            shutil.rmtree(worker_root)
+        os.makedirs(worker_root)
+        # PANTHER: preemption needs workers to ask
+        pyemu.os_utils.start_workers(t_d, mou_exe, "mou_pre.pst", num_workers=4,
+                                     master_dir=t_d + "_master", worker_root=worker_root,
+                                     port=4027)
+        results[tag] = t_d + "_master"
+
+    # 1. screening actually fired, or everything below passes vacuously
+    rmrs = {}
+    for tag in ("off", "on"):
+        for f in os.listdir(results[tag]):
+            if f.endswith(".rmr"):
+                rmrs[tag] = open(os.path.join(results[tag], f)).read()
+    rmr = rmrs["on"]
+    n_abandoned = rmr.count("abandoned mid-run")
+    assert n_abandoned > 0, \
+        "no mou run was abandoned mid-run, so this test did not exercise screening:\n" \
+        + rmr[-3000:]
+    assert "abandoned mid-run" not in rmrs["off"], \
+        "the UNscreened run abandoned something, which it cannot have done"
+
+    # 1b. and it saved exactly that much work.
+    #
+    # This is the assertion that keeps the test honest. mou writes only SURVIVORS to its
+    # population files, so a correct screened run produces populations identical to an
+    # unscreened one - which is the right answer and also means the membership comparisons
+    # below can pass without screening having changed anything at all. The run COUNT is where
+    # the saving is visible.
+    #
+    # Requiring the difference to equal the abandon count is deliberately strict: it is how an
+    # abandoned run being RESCHEDULED would show up. cancel_runs() clears the waiting queue for
+    # exactly that reason - kill_run() alone would unschedule the run and then hand it back out
+    # when an agent was lost, so preemption would cost more than it saved and this number would
+    # not add up.
+    n_runs = {t: rmrs[t].count("received from") for t in ("off", "on")}
+    assert n_runs["on"] < n_runs["off"], \
+        "screening saved no model runs: off={0} on={1}".format(n_runs["off"], n_runs["on"])
+    assert n_runs["off"] - n_runs["on"] == n_abandoned, \
+        "off made {0} runs, on made {1}, but {2} were abandoned - an abandoned run was " \
+        "rescheduled rather than dropped".format(n_runs["off"], n_runs["on"], n_abandoned)
+
+    # 1c. and they were reported as ABANDONED, not as model failures. An abandoned run and a
+    #     failed one both cost their member, but they tell a user opposite things: one says
+    #     preemption worked, the other says go and debug your model.
+    rec_on, rec_off = "", ""
+    for f in os.listdir(results["on"]):
+        if f.endswith(".rec"):
+            rec_on = open(os.path.join(results["on"], f)).read()
+    for f in os.listdir(results["off"]):
+        if f.endswith(".rec"):
+            rec_off = open(os.path.join(results["off"], f)).read()
+    assert "abandoned mid-run" in rec_on, \
+        "the .rec never says anything was abandoned, so screened runs are being reported as " \
+        "something else:\n" + rec_on[-3000:]
+    assert "NOT model failures" in rec_on, \
+        "abandoned members are not being distinguished from model failures in the .rec"
+    assert "abandoned mid-run" not in rec_off, \
+        "the UNscreened run reported an abandonment, which it cannot have made"
+    for name, text in (("off", rec_off), ("on", rec_on)):
+        assert "runs failed" not in text, \
+            "{0}: members were reported as model FAILURES, but nothing failed in this case - " \
+            "abandoned runs are being mislabelled".format(name)
+
+    # 2. the same files were written
+    off_files = {f for f in os.listdir(results["off"]) if f.endswith(".csv")}
+    on_files = {f for f in os.listdir(results["on"]) if f.endswith(".csv")}
+    assert off_files == on_files, \
+        "different output files were written:\n only off: {0}\n only on: {1}".format(
+            sorted(off_files - on_files), sorted(on_files - off_files))
+
+    # 3. every member present in BOTH agrees exactly, and anything the screened run is missing
+    #    must actually violate - i.e. a member the unscreened run went on to drop anyway. A
+    #    member that survives 'off' and vanishes from 'on' is the failure this test exists for.
+    checked = 0
+    for f in sorted(x for x in off_files if ".obs_pop" in x or ".archive.obs_pop" in x):
+        a = pd.read_csv(os.path.join(results["off"], f), index_col=0)
+        b = pd.read_csv(os.path.join(results["on"], f), index_col=0)
+        a.columns = [c.lower() for c in a.columns]
+        b.columns = [c.lower() for c in b.columns]
+        if "constr" not in a.columns:
+            continue
+        common = [i for i in a.index if i in b.index]
+        assert (a.loc[common] - b.loc[common]).abs().max().max() < 1e-10, \
+            "{0}: a member present in both runs has different values".format(f)
+        for missing in set(a.index) - set(b.index):
+            assert a.loc[missing, "constr"] > 0.5, \
+                "{0}: member '{1}' was screened out but does NOT violate ({2} <= 0.5) - " \
+                "screening may only ever drop what the harvest would have dropped".format(
+                    f, missing, a.loc[missing, "constr"])
+        checked += 1
+    assert checked > 0, "no mou population files were compared, so nothing was actually checked"
+    print("RESULT mou preemption screening PASS ({0} population file(s) compared, "
+          "{1} runs vs {2}, {3} abandoned)".format(checked, n_runs["on"], n_runs["off"],
+                                                   n_abandoned))

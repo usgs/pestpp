@@ -2875,9 +2875,11 @@ vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble
 	performance_log->log_event("processing runs");
 	
 	vector<int> failed_real_indices;
+	vector<int> abandoned_real_indices;
 	try
 	{
-		failed_real_indices = _op.update_from_runs(real_run_ids, run_mgr_ptr, _dp.get_real_names());
+		failed_real_indices = _op.update_from_runs(real_run_ids, run_mgr_ptr,
+			_dp.get_real_names(), &abandoned_real_indices);
 	}
 	catch (const exception& e)
 	{
@@ -2895,19 +2897,44 @@ vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble
 
 	if (failed_real_indices.size() > 0)
 	{
-		stringstream ss;
+		// Abandoned and failed are both dropped and are reported SEPARATELY. A member the
+		// screener gave up on did what it was asked to; calling it a failure sends whoever
+		// reads this hunting a model problem that does not exist.
+		set<int> abandoned(abandoned_real_indices.begin(), abandoned_real_indices.end());
 		vector<string> par_real_names = _dp.get_real_names();
 		vector<string> obs_real_names = _op.get_real_names();
-		ss << "the following par:obs realization runs failed: ";
+		stringstream fss, ass;
+		int n_failed = 0;
 		for (auto& i : failed_real_indices)
 		{
-			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+			if (abandoned.find(i) != abandoned.end())
+				ass << par_real_names[i] << ":" << obs_real_names[i] << ',';
+			else
+			{
+				fss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+				n_failed++;
+			}
 		}
-		performance_log->log_event(ss.str());
-		message(1, "failed realizations: ", failed_real_indices.size());
-		string s = ss.str();
-		message(1, s);
-		performance_log->log_event("dropping failed realizations");
+		if (n_failed > 0)
+		{
+			stringstream ss;
+			ss << "the following par:obs realization runs failed: " << fss.str();
+			performance_log->log_event(ss.str());
+			message(1, "failed realizations: ", n_failed);
+			string s = ss.str();
+			message(1, s);
+		}
+		if (abandoned.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following " << abandoned.size() << " par:obs realization runs were "
+			   << "abandoned mid-run for violating a nominated observation - these are NOT "
+			   << "model failures: " << ass.str();
+			performance_log->log_event(ss.str());
+			string s = ss.str();
+			message(1, s);
+		}
+		performance_log->log_event("dropping failed and abandoned realizations");
 		_dp.drop_rows(failed_real_indices);
 		_op.drop_rows(failed_real_indices);
 	}

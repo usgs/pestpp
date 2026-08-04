@@ -716,3 +716,187 @@ def sqp_drop_violations_test():
             "drop_violations was applied at a stage where a run is structurally required, " \
             "not a candidate: '{0}'. Gradient runs and the current point must never be " \
             "dropped.".format(st.strip())
+
+
+def sqp_preemption_screening_test():
+    """sqp: mid-run screening must change wall-clock and NOTHING else.
+
+    sqp is the riskiest of the three for this, and the reason is structural. ies needed
+    screening SUSPENDED during lambda testing, because those runs are a comparison - each
+    candidate lambda is scored over the same subset, and abandoning runs mid-comparison changed
+    which lambda won. sqp's line search has the same shape: it proposes several candidate
+    steps, scores them against each other, and picks one.
+
+    The difference that makes it defensible is that a violating step is one sqp would refuse
+    anyway - drop_violating_members() is applied at exactly the candidate stages. This test is
+    what turns that argument from plausible into checked: same answer, fewer runs, and nothing
+    discarded that the unscreened run went on to keep.
+    """
+    results = {}
+    for tag, interval in (("off", 0.0), ("on", 0.02)):     # 0.02 min ~ 1.2 s
+        t_d = "sqp_preempt_" + tag
+        if os.path.exists(t_d):
+            shutil.rmtree(t_d)
+        os.makedirs(t_d)
+
+        # slow, so a run is in flight long enough to be asked about
+        with open(os.path.join(t_d, "forward.py"), "w") as f:
+            f.write('import time\n'
+                    'vals={}\n'
+                    'for line in open("par.dat"):\n'
+                    '    k,v=line.split(); vals[k.strip()]=float(v)\n'
+                    'x,y=vals["x"],vals["y"]\n'
+                    'f=(1.0-x)**2 + 100.0*(y-x*x)**2\n'
+                    'with open("obs.dat","w") as fp:\n'
+                    '    fp.write("obs {0:20.10E}\\n".format(f))\n'
+                    '    fp.write("constraint {0:20.10E}\\n".format(x+y))\n'
+                    'time.sleep(3)\n')
+        with open(os.path.join(t_d, "par.dat.tpl"), "w") as f:
+            f.write("ptf ~\nx ~   x        ~\ny ~   y        ~\n")
+        with open(os.path.join(t_d, "obs.dat.ins"), "w") as f:
+            f.write("pif ~\nl1 w !obs!\nl1 w !constraint!\n")
+
+        cwd = os.getcwd()
+        os.chdir(t_d)
+        try:
+            pst = pyemu.Pst.from_io_files("par.dat.tpl", "par.dat", "obs.dat.ins", "obs.dat")
+        finally:
+            os.chdir(cwd)
+
+        par = pst.parameter_data
+        par.loc[:, "partrans"] = "none"
+        par.loc[:, "parlbnd"] = -2.0
+        par.loc[:, "parubnd"] = 2.0
+        par.loc[:, "pargp"] = "decvars"
+        par.loc[:, "parval1"] = 1.0
+
+        obs = pst.observation_data
+        obs.loc["obs", ["obgnme", "obsval", "weight"]] = ["obj_fn", 0.0, 1.0]
+        obs.loc["constraint", ["obgnme", "obsval", "weight"]] = ["l_constraint", 2.0, 1.0]
+        obs.loc[:, "drop_violations"] = False
+        obs.loc["constraint", "drop_violations"] = True
+
+        pst.pestpp_options["opt_dec_var_groups"] = "decvars"
+        pst.pestpp_options["opt_objective_function"] = "obs"
+        pst.pestpp_options["opt_direction"] = "min"
+        pst.pestpp_options["sqp_num_reals"] = 20
+        pst.pestpp_options["random_seed"] = 11
+        pst.pestpp_options["preemption_poll_interval_minutes"] = interval
+        pst.control_data.noptmax = 1
+        pst.model_command = ["python forward.py"]
+        pst.write(os.path.join(t_d, "sqp_pre.pst"), version=2)
+
+        cands = [c for c in (
+            os.path.join("..", "build", "src", "programs", "pestpp-sqp", "pestpp-sqp" + exe),
+            os.path.abspath(exe_path)) if os.path.exists(c)]
+        assert cands, "could not find a pestpp-sqp to test"
+        sqp_exe = max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
+
+        wr = "sqp_preempt_workers"
+        if os.path.exists(wr):
+            shutil.rmtree(wr)
+        os.makedirs(wr)
+        pyemu.os_utils.start_workers(t_d, sqp_exe, "sqp_pre.pst", num_workers=4,
+                                     master_dir=t_d + "_master", worker_root=wr, port=4029)
+        results[tag] = t_d + "_master"
+
+    rmrs = {}
+    for tag in ("off", "on"):
+        for f in os.listdir(results[tag]):
+            if f.endswith(".rmr"):
+                rmrs[tag] = open(os.path.join(results[tag], f)).read()
+
+    # 1. screening fired, and only in the screened run
+    n_abandoned = rmrs["on"].count("abandoned mid-run")
+    assert n_abandoned > 0, \
+        "no sqp run was abandoned mid-run, so this test did not exercise screening:\n" \
+        + rmrs["on"][-3000:]
+    assert "abandoned mid-run" not in rmrs["off"], \
+        "the UNscreened run abandoned something, which it cannot have done"
+
+    # 1c. and they were reported as ABANDONED, not as model failures. An abandoned run and a
+    #     failed one both cost their member, but they tell a user opposite things: one says
+    #     preemption worked, the other says go and debug your model.
+    rec_on, rec_off = "", ""
+    for f in os.listdir(results["on"]):
+        if f.endswith(".rec"):
+            rec_on = open(os.path.join(results["on"], f)).read()
+    for f in os.listdir(results["off"]):
+        if f.endswith(".rec"):
+            rec_off = open(os.path.join(results["off"], f)).read()
+    assert "abandoned mid-run" in rec_on, \
+        "the .rec never says anything was abandoned, so screened runs are being reported as " \
+        "something else:\n" + rec_on[-3000:]
+    assert "NOT model failures" in rec_on, \
+        "abandoned members are not being distinguished from model failures in the .rec"
+    assert "abandoned mid-run" not in rec_off, \
+        "the UNscreened run reported an abandonment, which it cannot have made"
+    for name, text in (("off", rec_off), ("on", rec_on)):
+        assert "runs failed" not in text, \
+            "{0}: members were reported as model FAILURES, but nothing failed in this case - " \
+            "abandoned runs are being mislabelled".format(name)
+
+    # 2. it saved exactly that much work, and no abandoned run was rescheduled
+    n_runs = {t: rmrs[t].count("received from") for t in ("off", "on")}
+    assert n_runs["on"] < n_runs["off"], \
+        "screening saved no model runs: off={0} on={1}".format(n_runs["off"], n_runs["on"])
+    assert n_runs["off"] - n_runs["on"] == n_abandoned, \
+        "off made {0} runs, on made {1}, but {2} were abandoned - an abandoned run was " \
+        "rescheduled rather than dropped".format(n_runs["off"], n_runs["on"], n_abandoned)
+
+    # 3. and the ANSWER is unchanged. This is the part the line-search structure puts at risk:
+    #    if abandoning a candidate mid-comparison changed which step won, the objective
+    #    trajectory would diverge - which is exactly how the ies lambda-testing bug showed up.
+    off_files = {f for f in os.listdir(results["off"]) if f.endswith(".csv")}
+    on_files = {f for f in os.listdir(results["on"]) if f.endswith(".csv")}
+    assert off_files == on_files, \
+        "different output files were written:\n only off: {0}\n only on: {1}".format(
+            sorted(off_files - on_files), sorted(on_files - off_files))
+
+    # The ensembles are written BEFORE drop_violating_members() culls them, so the unscreened
+    # run reports candidates it is about to discard and the screened run never computed them.
+    # Demanding byte-identity would therefore demand that screening evaluate the very steps it
+    # declined to take - the same wrong criterion that cost a day on the ies version of this
+    # test. What must hold instead:
+    #
+    #   - every member present in BOTH runs is identical, to the byte. This is the assertion
+    #     that actually addresses the line-search worry: if abandoning a candidate mid-
+    #     comparison had changed which step won, the survivors would carry different values.
+    #   - anything missing from the screened run VIOLATES, so it is something the unscreened
+    #     run went on to drop anyway.
+    #
+    # .pcs.csv is exempt from the row comparison because it is not an ensemble: it is a
+    # parameter-change summary computed ACROSS the members, so a legitimately different member
+    # set at write time moves every statistic in it. Its shape is still checked.
+    checked = 0
+    for f in sorted(off_files):
+        a = pd.read_csv(os.path.join(results["off"], f), index_col=0)
+        b = pd.read_csv(os.path.join(results["on"], f), index_col=0)
+        a.columns = [c.lower() for c in a.columns]
+        b.columns = [c.lower() for c in b.columns]
+        if ".pcs." in f:
+            assert list(a.columns) == list(b.columns), \
+                "{0}: the change summary has different columns".format(f)
+            continue
+        common_rows = [i for i in a.index if i in b.index]
+        # numeric only: some outputs carry text columns (names, tags) that cannot be subtracted
+        num = set(a.select_dtypes(include="number").columns) & \
+              set(b.select_dtypes(include="number").columns)
+        common_cols = [c for c in a.columns if c in num]
+        if not common_rows or not common_cols:
+            continue
+        d = (a.loc[common_rows, common_cols] - b.loc[common_rows, common_cols]).abs()
+        assert d.max().max() < 1e-10, \
+            "{0}: screening CHANGED THE RESULT - a member present in both runs differs by up " \
+            "to {1}. If the line search picked a different step, this is where it shows." \
+            .format(f, d.max().max())
+        if "constraint" in common_cols:
+            for missing in set(a.index) - set(b.index):
+                assert a.loc[missing, "constraint"] > 2.0, \
+                    "{0}: member '{1}' was screened out but does NOT violate ({2} <= 2.0) - " \
+                    "screening may only ever drop what the harvest would have dropped" \
+                    .format(f, missing, a.loc[missing, "constraint"])
+        checked += 1
+    assert checked > 0, "no sqp output files were compared, so nothing was actually checked"
+    print("RESULT sqp preemption screening PASS ({0} file(s) compared, {1} runs vs {2}, "
+          "{3} abandoned)".format(checked, n_runs["on"], n_runs["off"], n_abandoned))
