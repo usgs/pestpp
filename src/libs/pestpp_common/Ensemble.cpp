@@ -2580,7 +2580,7 @@ map<string,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,cons
                                          int da_cycle, string additional_tag)
 {
 	//add runs to the run manager, keyed by realization name so the caller can change
-	//ensemble membership before harvesting
+	//ensemble membership before processing
 	map<string,int> real_run_ids;
 
 	//get the pars and transform to be in sync with ensemble trans status
@@ -2657,7 +2657,7 @@ map<string,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,cons
 	// path spares it - EnsembleMethod::drop_bad_reals(), MOEA and SeqQuadProgram all say so
 	// explicitly. Screening is only allowed to be an EARLY version of a decision the tool
 	// would have made anyway, so it has to honour the same exception; abandoning base's run
-	// removes a realization no harvest would have removed, which shifts the mean phi and can
+	// removes a realization no process would have removed, which shifts the mean phi and can
 	// flip an iteration from accepting its upgrade to rejecting it.
 	//
 	// Registered HERE, rather than in the three tools' screener callbacks, because this is the
@@ -4460,7 +4460,7 @@ vector<int> ObservationEnsemble::update_from_runs(map<string, int>& real_run_ids
 		}
 
 		// get_run() answers FALSE when the run did not complete, and that answer must be
-		// honoured - it fills `obs` either way, so ignoring it harvests whatever the storage
+		// honoured - it fills `obs` either way, so ignoring it processes whatever the storage
 		// record happens to hold.
 		//
 		// Which is never nothing, and never obviously wrong. RunStorage::add_run() writes only

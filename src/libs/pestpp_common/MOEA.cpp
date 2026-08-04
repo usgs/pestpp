@@ -2764,7 +2764,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 /**
  * @brief Queue a population (plus any chance runs) with the run manager.
  *
- * First half of run_population(). Paired with harvest_population(); a caller that wants to
+ * First half of run_population(). Paired with process_population(); a caller that wants to
  * watch or cancel runs mid-generation drives the run manager itself in between.
  */
 map<string, int> MOEA::queue_population(ParameterEnsemble& _dp, bool allow_chance)
@@ -2818,7 +2818,7 @@ vector<string> MOEA::get_violating_members(ObservationEnsemble& _op)
 		Observations sim;
 		for (int j = 0; j < (int)vnames.size(); j++)
 			sim.insert(vnames[j], m(i, j));
-		// empty valid-name set: every value in a harvested run is real. The same call judges a
+		// empty valid-name set: every value in a processed run is real. The same call judges a
 		// PARTIAL read during preemption by passing the names actually read.
 		if (viol_detector.is_violating(sim, set<string>(), violation_obs))
 			out.push_back(rnames[i]);
@@ -2869,7 +2869,7 @@ void MOEA::drop_violating_members(ParameterEnsemble& _dp, ObservationEnsemble& _
 	}
 }
 
-vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids)
+vector<int> MOEA::process_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
@@ -2953,7 +2953,7 @@ vector<int> MOEA::harvest_population(ParameterEnsemble& _dp, ObservationEnsemble
 }
 
 /**
- * @brief Queue, run and harvest a population - the in-tree composition.
+ * @brief Queue, run and process a population - the in-tree composition.
  */
 vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
 {
@@ -2973,7 +2973,7 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	{
 		throw_moea_error(string("error running ensemble"));
 	}
-	return harvest_population(_dp, _op, allow_chance, real_run_ids);
+	return process_population(_dp, _op, allow_chance, real_run_ids);
 }
 
 /**
@@ -3028,7 +3028,7 @@ int MOEA::initialize_prepare()
 		throw_moea_error(preempt_err);
 
     // Install the preemption screener: the tool supplies the PREDICATE, the run manager owns
-    // the mechanics. The same violation test the harvest-time drop uses, so a run abandoned
+    // the mechanics. The same violation test the process-time drop uses, so a run abandoned
     // mid-flight is one that would have been dropped on arrival anyway - which is what keeps
     // screening a saving in wall-clock rather than a change in results.
     double _poll_min = pest_scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
@@ -3802,7 +3802,7 @@ int MOEA::initialize_prepare()
  * @brief Queue the initial population, after any caller changes to it.
  *
  * Separate from initialize_prepare() so the population can be replaced in between. Records the
- * run ids for initialize_finish(), which is what pairs the harvest with this batch.
+ * run ids for initialize_finish(), which is what pairs the process with this batch.
  */
 map<string, int> MOEA::queue_initial_population()
 {
@@ -3813,24 +3813,24 @@ map<string, int> MOEA::queue_initial_population()
 }
 
 /**
- * @brief Harvest the initial population's runs.
+ * @brief Process the initial population's runs.
  *
- * Separate from initialize_finish() so an API caller can harvest through the same path the
- * in-tree code uses - chance-aware, which the generic ensemble harvest is not. Clears the run
- * ids, which is how initialize_finish() knows the harvest is already done.
+ * Separate from initialize_finish() so an API caller can process through the same path the
+ * in-tree code uses - chance-aware, which the generic ensemble process is not. Clears the run
+ * ids, which is how initialize_finish() knows the process is already done.
  */
-vector<int> MOEA::harvest_initial_population()
+vector<int> MOEA::process_initial_population()
 {
-	vector<int> failed = harvest_population(dp, op, true, init_real_run_ids);
+	vector<int> failed = process_population(dp, op, true, init_real_run_ids);
 	init_real_run_ids.clear();
 	return failed;
 }
 
 /**
- * @brief Second half of initialize(): harvest the initial population and set the search up.
+ * @brief Second half of initialize(): process the initial population and set the search up.
  *
  * Safe to call when nothing was queued - a restart supplies the results instead - which is why
- * the harvest is guarded on init_real_run_ids rather than assumed.
+ * the process is guarded on init_real_run_ids rather than assumed.
  */
 void MOEA::initialize_finish()
 {
@@ -3841,10 +3841,10 @@ void MOEA::initialize_finish()
 	ofstream& frec = file_manager.rec_ofstream();
 	if (init_ran_population)
 	{
-		// empty when an API caller already harvested through harvest_initial_population();
-		// non-empty on the in-tree path, where this call IS the harvest
+		// empty when an API caller already processed through process_initial_population();
+		// non-empty on the in-tree path, where this call IS the process
 		if (init_real_run_ids.size() > 0)
-			harvest_initial_population();
+			process_initial_population();
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
 
@@ -4113,7 +4113,7 @@ void MOEA::initialize_finish()
 }
 
 /**
- * @brief Queue, run and harvest the initial population - the in-tree composition.
+ * @brief Queue, run and process the initial population - the in-tree composition.
  *
  * Kept so every existing caller is unaffected: this must produce byte-identical output to the
  * single function it replaced, which is what the equivalence test asserts. The two halves exist
@@ -4463,7 +4463,7 @@ void MOEA::generate_generation(GenerationContext& ctx)
 /**
  * @brief Run the candidate population (including any chance runs).
  *
- * The in-tree composition of queue_population()/harvest_population(); a caller driving its
+ * The in-tree composition of queue_population()/process_population(); a caller driving its
  * own run_slice() loop calls those two directly instead.
  */
 void MOEA::run_generation(GenerationContext& ctx)

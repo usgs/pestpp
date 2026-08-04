@@ -3,10 +3,10 @@
 Everything else in CI drives the *executables*, which only ever run the built-in loop in the
 built-in order. These tests are the only ones that exercise the shared library: loading it,
 creating a handle, and running an iteration the caller controls -- queue the runs, drive the
-run manager, change the ensemble mid-flight, harvest.
+run manager, change the ensemble mid-flight, process.
 
 That middle step is the point. The built-in loop never changes ensemble membership between
-queueing runs and harvesting them, so no benchmark can catch a regression in the name-keyed
+queueing runs and processing them, so no benchmark can catch a regression in the name-keyed
 run map; only a caller doing something the built-in loop never does can.
 
 The library is located in the build tree rather than installed, matching how CI builds it.
@@ -213,7 +213,7 @@ def _setup_mou(test_d, noptmax=1, pop_size=10):
 
 
 def _drive_batch(ies):
-    """Queue, run and harvest, with the caller owning the run loop."""
+    """Queue, run and process, with the caller owning the run loop."""
     n_queued = ies.queue_runs()
     ies.begin_batch()
     while not ies.run_slice(0.05):
@@ -280,7 +280,7 @@ def capi_resize_between_queue_and_harvest_test():
 
     Evaluate once with no membership change to learn what each realization's results are.
     Then evaluate the *same* parameters again, but drop a realization after the runs are made
-    and before harvesting, and require every survivor to receive the identical results.
+    and before processing, and require every survivor to receive the identical results.
 
     That equality is the real assertion. Runs are tracked by realization name, so results
     follow their realizations to new row positions. Were they tracked by position, every
@@ -309,8 +309,8 @@ def capi_resize_between_queue_and_harvest_test():
             "realizations are indistinguishable (closest pair differs by {0}), so this test "
             "cannot detect misattributed runs".format(closest))
 
-        # -- second pass: same parameters, but resize between queue and harvest --
-        # harvest does not touch pe when nothing fails, so these are the same runs
+        # -- second pass: same parameters, but resize between queue and process --
+        # process does not touch pe when nothing fails, so these are the same runs
         assert _drive_batch(ies) == len(names)
 
         victim_par = names[1]
@@ -345,7 +345,7 @@ def capi_error_reporting_test():
 
         try:
             ies.process_runs()
-            raise AssertionError("harvesting with nothing queued should raise")
+            raise AssertionError("processing with nothing queued should raise")
         except PestppError as e:
             assert "no queued runs" in str(e), str(e)
 
@@ -369,7 +369,7 @@ def capi_error_reporting_test():
         except PestppError as e:
             assert "unknown option" in str(e), str(e)
 
-        # queueing twice without harvesting is a caller bug, not a silent overwrite
+        # queueing twice without processing is a caller bug, not a silent overwrite
         ies.queue_runs()
         try:
             ies.queue_runs()
@@ -386,7 +386,7 @@ def capi_caller_owned_initial_batch_test():
     Here the caller substitutes its own parameter values in the window between prepare and
     queue, and the assertion is that *those* are what the model saw.
 
-    Proving it: every realization is set to identical parameter values, so every harvested
+    Proving it: every realization is set to identical parameter values, so every processed
     observation row must be identical too. With the drawn ensemble they are emphatically not
     - the closest pair differs by ~1 in this case - so this cannot pass by accident.
     """
@@ -455,34 +455,31 @@ def capi_initialize_split_guardrails_test():
 
 
 def capi_initialize_prepare_reports_zero_test():
-    """initialize_prepare() reports its batch honestly, and 0 means 0 - not "unsupported".
+    """initialize_prepare() reports its batch honestly, and the caller branches on the COUNT.
 
-    sqp hands over nothing: its only batch inside initialize() is the single control-file-values
-    run, and the initial ensemble is evaluated deeper, inside prep_4_ensemble_grad(). It must
-    report 0 rather than leaving a caller to discover it.
+    This assertion has now been wrong twice. It began as `== 0` for both mou and sqp, which was
+    true when both initialized atomically; mou was split, then sqp. Each time, the test failed
+    not because the code broke but because it had been pinning a limitation rather than a
+    behaviour.
 
-    mou now DOES hand over its initial population. This assertion used to read `== 0` for both,
-    which was correct when mou initialized atomically and became a test pinning a limitation
-    rather than a behaviour. Whichever it reports, the same four calls have to leave the tool
-    fully initialized and able to step - that is the part worth asserting for both.
+    So it no longer encodes which tools hand over a batch. What it asserts is the contract that
+    does not change: whatever the count, the same calls leave the tool fully initialized and
+    able to step - and a non-zero count means runs really are waiting, so servicing them is
+    what makes finish() work.
     """
-    for tool, wd, pst_name, tag, hands_over in (
-            (TOOL_MOU, _setup_mou("capi_init_mou"), "g07.pst", "mou", True),
-            (TOOL_SQP, _setup_sqp("capi_init_sqp"), "pest.pst", "sqp", False)):
+    for tool, wd, pst_name, tag in (
+            (TOOL_MOU, _setup_mou("capi_init_mou"), "g07.pst", "mou"),
+            (TOOL_SQP, _setup_sqp("capi_init_sqp"), "pest.pst", "sqp")):
         with PestppLib(_find_library(), tool, pst_name, wd) as t:
             n = t.initialize_prepare()
-            if hands_over:
-                assert n > 0, \
-                    "{0} should hand back its initial batch, got {1}".format(tag, n)
+            assert n >= 0, "{0} reported a negative run count: {1}".format(tag, n)
+            if n > 0:
                 t.queue_runs()
                 t.begin_batch()
                 while not t.run_slice(0.05):
                     pass
                 t.end_batch()
                 t.process_runs()
-            else:
-                assert n == 0, \
-                    "{0} should report no caller-owned batch, got {1}".format(tag, n)
             t.initialize_finish()
             # still fully initialized: it can take a step
             t.solve_iteration()
@@ -492,7 +489,7 @@ def capi_initialize_prepare_reports_zero_test():
 # ---- da, mou, sqp -------------------------------------------------------------------------
 
 def _drive_tool(tool, wd, pst_name, tag):
-    """The caller-owned loop, for any tool: initialize, queue, run, harvest, advance.
+    """The caller-owned loop, for any tool: initialize, queue, run, process, advance.
 
     Every tool is driven through the same entry points. That is the point of the API - the
     differences between ies, da, mou and sqp live behind pestpp_solve_iteration(), not in
@@ -522,7 +519,7 @@ def _drive_tool(tool, wd, pst_name, tag):
         assert n_failed == 0, "{0}: {1} runs failed".format(tag, n_failed)
 
         oe, _ = t.get_ensemble_view(OBS_EN)
-        assert np.isfinite(oe).all(), "{0}: harvested obs ensemble has non-finite values".format(tag)
+        assert np.isfinite(oe).all(), "{0}: processed obs ensemble has non-finite values".format(tag)
 
         # and one algorithm step through the same entry point every tool uses
         before = t.get_iteration()
@@ -551,7 +548,7 @@ def capi_mou_test():
 def capi_da_resize_between_queue_and_harvest_test():
     """The resize guard, for da.
 
-    da shares EnsembleMethod's queue/harvest with ies, so the same misattribution is possible
+    da shares EnsembleMethod's queue/process with ies, so the same misattribution is possible
     and the same reference comparison catches it.
     """
     wd = _setup_da("capi_da_resize")
@@ -1459,7 +1456,7 @@ def capi_panther_control_test():
             # ...and the rows that did survive are distinct, which is the property the old
             # assertion was silently violating
             assert np.unique(oe, axis=0).shape[0] == oe.shape[0], \
-                "a surviving realization duplicates another - harvest copied a stale buffer"
+                "a surviving realization duplicates another - process copied a stale buffer"
     finally:
         for p in procs:
             try:

@@ -377,7 +377,7 @@ class PestppLib:
             c_void_p, c_int, c_int, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_get_worker_run_history.restype = c_int
 
-        # -- queue/harvest, membership, snapshot --
+        # -- queue/process, membership, snapshot --
         lib.pestpp_queue_runs.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_queue_runs.restype = c_int
         lib.pestpp_process_runs.argtypes = (c_void_p, POINTER(c_int))
@@ -918,7 +918,7 @@ class PestppLib:
             "pestpp_get_worker_run_history")
         return list(arr)
 
-    # -- queue / harvest ---------------------------------------------------------------
+    # -- queue / process ---------------------------------------------------------------
 
     def queue_runs(self) -> int:
         """Queue the current parameter ensemble. Returns the number of runs queued."""

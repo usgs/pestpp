@@ -1029,7 +1029,15 @@ void SeqQuadProgram::initialize_parcov()
 /**
  * @brief Initialize.
  */
-void SeqQuadProgram::initialize()
+/**
+ * @brief First half of initialize(): everything up to the initial ensemble evaluation.
+ *
+ * Returns how many runs the caller must service, 0 when there is no batch to hand over. That
+ * is the case for the finite-difference gradient path: its runs are gradient PERTURBATIONS,
+ * not candidates, and handing those to a caller would invite exactly the thing
+ * drop_violations refuses to do - dropping one leaves a hole in the Jacobian.
+ */
+int SeqQuadProgram::initialize_prepare()
 {
 	// same nomination ies/da/mou use - a 'drop_violations' column in the external observation
 	// file - read from the scenario so it cannot depend on any construction order
@@ -1040,7 +1048,7 @@ void SeqQuadProgram::initialize()
 		throw_sqp_error(preempt_err);
 
     // Install the preemption screener: the tool supplies the PREDICATE, the run manager owns
-    // the mechanics. The same violation test the harvest-time drop uses, so a run abandoned
+    // the mechanics. The same violation test the process-time drop uses, so a run abandoned
     // mid-flight is one that would have been dropped on arrival anyway - which is what keeps
     // screening a saving in wall-clock rather than a change in results.
     double _poll_min = pest_scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
@@ -1261,7 +1269,11 @@ void SeqQuadProgram::initialize()
 		current_obs.update_without_clear(_oe.get_var_names(), o);
 		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME);	
 		constraints.sqp_report(0,current_ctl_dv_values, current_obs);
-		return;
+		// the control-file-values path is a diagnostic, complete in itself: no batch to hand
+		// over and nothing for the finish half to do
+		init_needs_finish = false;
+		init_grad_needs_finish = false;
+		return 0;
 	}
 
 	message(1, "using the following upgrade vector scale (e.g. 'line search') values:", ppo->get_sqp_alpha_mults());
@@ -1301,14 +1313,27 @@ void SeqQuadProgram::initialize()
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_obs = pest_scenario.get_ctl_observations();
 
+	init_needs_finish = true;
 	if (get_use_ensemble_grad())
 	{
-		prep_4_ensemble_grad();
+		return prep_4_ensemble_grad_prepare();
 	}
-	else
-	{
-		prep_4_fd_grad();
-	}
+	// finite-difference gradients: atomic, for the reason given above
+	init_grad_needs_finish = false;
+	prep_4_fd_grad();
+	return 0;
+}
+
+/**
+ * @brief Second half of initialize(): finish the gradient prep, then set the search up.
+ */
+void SeqQuadProgram::initialize_finish()
+{
+	if (!init_needs_finish)
+		return;
+	init_needs_finish = false;
+	stringstream ss;
+	prep_4_ensemble_grad_finish();
 
 	if (constraints.get_use_chance())
 	{
@@ -1370,6 +1395,35 @@ void SeqQuadProgram::initialize()
 
 	message(0, "initialization complete");
 }
+
+/**
+ * @brief Draw, run and process - the in-tree composition. Byte-identical to what it replaced.
+ */
+void SeqQuadProgram::initialize()
+{
+	int n_runs = initialize_prepare();
+	if (n_runs > 0)
+	{
+		queue_initial_ensemble();
+		performance_log->log_event("making runs");
+		try
+		{
+			drive_run_batch(run_mgr_ptr);
+		}
+		catch (const exception& e)
+		{
+			stringstream ss;
+			ss << "error running initial ensemble: " << e.what();
+			throw_sqp_error(ss.str());
+		}
+		catch (...)
+		{
+			throw_sqp_error(string("error running initial ensemble"));
+		}
+	}
+	initialize_finish();
+}
+
 
 /**
  * @brief Save current dv obs.
@@ -1668,7 +1722,15 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 /**
  * @brief Prep 4 ensemble grad.
  */
-void SeqQuadProgram::prep_4_ensemble_grad()
+/**
+ * @brief First half of prep_4_ensemble_grad(): everything up to the initial ensemble run.
+ *
+ * Returns how many runs the caller must service, 0 when the ensemble was supplied rather than
+ * drawn (or on the noptmax==-2 mean-values path, which is a diagnostic and stays atomic).
+ * Queues NOTHING: the window between this and the queue is the only point at which a caller
+ * can replace the drawn ensemble with its own.
+ */
+int SeqQuadProgram::prep_4_ensemble_grad_prepare()
 {
 	stringstream ss;
 	message(1, "using stochastic gradient approximation (StoSAG)");
@@ -1823,7 +1885,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "mean dv value run failed...bummer");
-			return;
+			init_grad_needs_finish = false;
+			return 0;
 		}
 		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
 		message(1, "saving results from mean dv value run to ", obs_csv);
@@ -1836,7 +1899,10 @@ void SeqQuadProgram::prep_4_ensemble_grad()
         save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean");
         constraints.sqp_report(0,current_ctl_dv_values, current_obs);
 
-		return;
+		// the mean-values path is a diagnostic, complete in itself - there is no initial
+		// ensemble to hand over and nothing for the finish half to do
+		init_grad_needs_finish = false;
+		return 0;
 	}
 
 	oe_org_real_names = oe.get_real_names();
@@ -1850,11 +1916,53 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	dv_base = dv;
 	dv_base.reorder(vector<string>(), act_par_names);
 
+	init_grad_needs_finish = true;
 	if (oe_drawn)
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
-		vector<int> failed = run_ensemble(dv, oe);
+		init_grad_ran_ensemble = true;
+		return (int)oe.shape().first;
+	}
+	// the ensemble was supplied rather than drawn: nothing to run, but the finish half still
+	// has the combine-and-save work below to do
+	init_grad_ran_ensemble = false;
+	return 0;
+}
+
+/**
+ * @brief Queue the initial ensemble, after any caller changes to it.
+ */
+map<string, int> SeqQuadProgram::queue_initial_ensemble()
+{
+	init_real_run_ids = queue_ensemble(dv, vector<int>());
+	return init_real_run_ids;
+}
+
+/**
+ * @brief Process it. Clears the ids, which is how the finish half knows it is already done.
+ */
+vector<int> SeqQuadProgram::process_initial_ensemble()
+{
+	vector<int> failed = process_ensemble(dv, oe, vector<int>(), init_real_run_ids);
+	init_real_run_ids.clear();
+	return failed;
+}
+
+/**
+ * @brief Second half of prep_4_ensemble_grad(): process, drop violators, save the .0. files.
+ */
+void SeqQuadProgram::prep_4_ensemble_grad_finish()
+{
+	if (!init_grad_needs_finish)
+		return;
+	init_grad_needs_finish = false;
+	stringstream ss;
+	if (init_grad_ran_ensemble)
+	{
+		// empty when an API caller already processed; non-empty on the in-tree path
+		if (init_real_run_ids.size() > 0)
+			process_initial_ensemble();
 		if (dv.shape().first == 0)
 			throw_sqp_error("all realizations failed during initial evaluation");
 		// a realization here is a candidate member, so the drop applies
@@ -1900,6 +2008,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	current_obs.update(oe.get_var_names(), oe.get_real_vector(BASE_REAL_NAME));
 
 }
+
+
 
 
 
@@ -5873,7 +5983,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 /**
  * @brief Queue the runs with the run manager (first half of the composed call below).
  *
- * Paired with the harvest half so a caller can drive the run manager itself in between
+ * Paired with the process half so a caller can drive the run manager itself in between
  * and watch or cancel runs while they are in flight.
  */
 map<string, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_candidates)
@@ -5907,7 +6017,7 @@ map<string, int> SeqQuadProgram::queue_candidate_ensemble(ParameterEnsemble& dv_
 /**
  * @brief Collect the queued runs (second half); assumes the runs have been made.
  */
-ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<string, int>& real_run_ids)
+ObservationEnsemble SeqQuadProgram::process_candidate_ensemble(ParameterEnsemble& dv_candidates, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
@@ -6067,7 +6177,7 @@ ObservationEnsemble SeqQuadProgram::harvest_candidate_ensemble(ParameterEnsemble
 }
 
 /**
- * @brief Queue, run and harvest - the in-tree composition.
+ * @brief Queue, run and process - the in-tree composition.
  */
 ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates)
 {
@@ -6087,7 +6197,7 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	{
 		throw_sqp_error(string("error running ensemble"));
 	}
-	ObservationEnsemble _oe = harvest_candidate_ensemble(dv_candidates, real_run_ids);
+	ObservationEnsemble _oe = process_candidate_ensemble(dv_candidates, real_run_ids);
 	// each of these is a candidate STEP; one that violates a nominated constraint is a step
 	// we do not want to take, which is exactly what the user nominated it for
 	drop_violating_members(dv_candidates, _oe, "candidate step evaluation");
@@ -6151,7 +6261,7 @@ void SeqQuadProgram::queue_chance_runs()
 /**
  * @brief Queue the runs with the run manager (first half of the composed call below).
  *
- * Paired with the harvest half so a caller can drive the run manager itself in between
+ * Paired with the process half so a caller can drive the run manager itself in between
  * and watch or cancel runs while they are in flight.
  */
 map<string, int> SeqQuadProgram::queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs)
@@ -6247,7 +6357,7 @@ void SeqQuadProgram::drop_violating_members(ParameterEnsemble& _pe, ObservationE
 	}
 }
 
-vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids)
+vector<int> SeqQuadProgram::process_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids)
 {
 	stringstream ss;
 	performance_log->log_event("processing runs");
@@ -6288,7 +6398,7 @@ vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, Observation
 	if (failed_real_indices.size() > 0)
 	{
 		// abandoned and failed are both dropped, and are reported separately - see the dv
-		// candidate harvest above for why the distinction matters to whoever reads this
+		// candidate process above for why the distinction matters to whoever reads this
 		set<int> abandoned(abandoned_real_indices.begin(), abandoned_real_indices.end());
 		vector<string> par_real_names = _pe.get_real_names();
 		vector<string> obs_real_names = _oe.get_real_names();
@@ -6334,7 +6444,7 @@ vector<int> SeqQuadProgram::harvest_ensemble(ParameterEnsemble &_pe, Observation
 }
 
 /**
- * @brief Queue, run and harvest - the in-tree composition.
+ * @brief Queue, run and process - the in-tree composition.
  */
 vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
 {
@@ -6354,7 +6464,7 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		throw_sqp_error(string("error running ensemble"));
 	}
-	return harvest_ensemble(_pe, _oe, real_idxs, real_run_ids);
+	return process_ensemble(_pe, _oe, real_idxs, real_run_ids);
 }
 
 

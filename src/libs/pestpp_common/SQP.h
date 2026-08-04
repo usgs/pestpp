@@ -153,6 +153,14 @@ public:
 		RunManagerAbstract* _run_mgr_ptr);
 
 	void initialize();
+	/// initialize(), split so a caller can own the initial ensemble evaluation - and so
+	/// replace the drawn ensemble with its own. Returns the number of runs to service; 0 on
+	/// the finite-difference gradient path, which has no candidate batch to hand over.
+	int  initialize_prepare();
+	/// queue / process the initial ensemble, AFTER any caller changes to it
+	map<string, int> queue_initial_ensemble();
+	vector<int> process_initial_ensemble();
+	void initialize_finish();
 	void iterate_2_solution();
 	/// One iteration: the loop body of iterate_2_solution(), including advancing `iter`.
 	/// Available on its own so a caller driving its own loop - the C ABI - runs the same
@@ -177,7 +185,7 @@ public:
 	bool recalc_search_direction_vector(const string& realization, Parameters& dv_vals, Observations& obs_vals, Eigen::VectorXd& grad_vector);
 
 	/// Propose-run-judge cycles. Each runs candidates internally via
-	/// queue_candidate_ensemble()/harvest_candidate_ensemble().
+	/// queue_candidate_ensemble()/process_candidate_ensemble().
 	FilterRec line_search(map<string, Eigen::VectorXd>& search_d_map, Eigen::VectorXd& grad, map<string, double> current_obj_ens, ParameterEnsemble* dvs_subset = nullptr, bool recalc = false);
 	bool trust_region_step(Parameters& current_dv_values, Eigen::VectorXd grad);
 	FilterRec trust_region_step(Eigen::VectorXd& grad, map<string, double> current_obj_ens, map<string, vector<string>>& cnames_en,
@@ -207,7 +215,7 @@ public:
 	template<typename T>
 	void message(int level, const string &_message, T extra);
 
-	// queue -> (drive the run manager) -> harvest. The run_* calls are the in-tree
+	// queue -> (drive the run manager) -> process. The run_* calls are the in-tree
 	// compositions; the halves let a caller run its own run_slice() loop in between.
 	/**
 	 * @brief Members violating a nominated 'drop_violations' observation, by name.
@@ -222,7 +230,7 @@ public:
 	 *   - the control-file and mean-dv runs: those are the current point. Dropping one leaves
 	 *     sqp with no position to step from.
 	 *
-	 * That is why this is called at specific sites rather than inside harvest_ensemble(),
+	 * That is why this is called at specific sites rather than inside process_ensemble(),
 	 * which every batch flows through.
 	 */
 	vector<string> get_violating_members(ObservationEnsemble& _oe);
@@ -239,11 +247,11 @@ public:
 	vector<string> violation_obs;
 
 	map<string, int> queue_ensemble(ParameterEnsemble &_pe, const vector<int> &real_idxs=vector<int>());
-	vector<int> harvest_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids);
+	vector<int> process_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs, map<string, int>& real_run_ids);
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 
 	map<string, int> queue_candidate_ensemble(ParameterEnsemble& dv_candidates);
-	ObservationEnsemble harvest_candidate_ensemble(ParameterEnsemble& dv_candidates, map<string, int>& real_run_ids);
+	ObservationEnsemble process_candidate_ensemble(ParameterEnsemble& dv_candidates, map<string, int>& real_run_ids);
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
 
 	/// Pointer accessors for the live ensembles, matching EnsembleMethod::get_pe_ptr()/
@@ -404,7 +412,16 @@ private:
 
 	SqpFilter filter;
 
-	void prep_4_ensemble_grad();
+	// no composed prep_4_ensemble_grad(): initialize() composes at the outer level, and a
+	// second composition of the same two halves would be free to drift from it
+	int  prep_4_ensemble_grad_prepare();
+	void prep_4_ensemble_grad_finish();
+	/// set between the two halves: the gradient prep is outstanding
+	bool init_needs_finish = false;
+	bool init_grad_needs_finish = false;
+	/// true when an initial ensemble was actually evaluated (not supplied, not the -2 path)
+	bool init_grad_ran_ensemble = false;
+	map<string, int> init_real_run_ids;
 	void prep_4_fd_grad();
 
 	void update_scaling(const Eigen::VectorXd& step, const Eigen::VectorXd& grad);

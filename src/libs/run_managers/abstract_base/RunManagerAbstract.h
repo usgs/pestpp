@@ -142,7 +142,7 @@ public:
 	 * Screening is only a saving when an abandoned run is one the tool would have discarded
 	 * anyway. That holds for batches whose results feed the ensemble directly - the initial
 	 * evaluation, the remaining-realization run - because a violating member is dropped at
-	 * harvest either way.
+	 * process either way.
 	 *
 	 * It does NOT hold for ies lambda testing. Those runs are a COMPARISON: each candidate
 	 * lambda is scored over the same subset, and drop_bad_reals() only removes violators once
@@ -155,7 +155,7 @@ public:
 	 * @brief Runs that must never be abandoned, however badly they are violating.
 	 *
 	 * Screening may only ever be an EARLY version of a decision the tool would have taken at
-	 * harvest. Where the tool would have kept a violating realization, the screen must keep it
+	 * process. Where the tool would have kept a violating realization, the screen must keep it
 	 * too, or the feature stops being a saving and becomes a change of answer.
 	 *
 	 * The case that exists today is 'base'. Every drop path spares it - EnsembleMethod,

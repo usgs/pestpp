@@ -2483,7 +2483,7 @@ def preemption_screening_test():
     A run abandoned mid-flight is one whose partial results already violate a nominated
     observation - and the violation test is a sum of non-negative terms, so a partial sum over
     the observations read so far is a LOWER BOUND on the final sum. Once it is over the
-    threshold, finishing the run cannot bring it back under: the harvest-time drop would have
+    threshold, finishing the run cannot bring it back under: the process-time drop would have
     discarded that member anyway. Screening therefore saves the rest of the model run and
     changes nothing about the answer.
 
@@ -2589,7 +2589,7 @@ def preemption_screening_test():
             "abandoned runs are being mislabelled".format(tag)
 
     # 2. 'base' survived. Screening is only ever allowed to be an EARLY version of a decision
-    #    the tool would have taken at harvest, and no harvest path drops base - EnsembleMethod,
+    #    the tool would have taken at process, and no process path drops base - EnsembleMethod,
     #    MOEA and SeqQuadProgram each spare it explicitly. So an abandoned base is a change of
     #    answer, not a saving.
     #
@@ -2682,5 +2682,5 @@ def preemption_screening_test():
         for missing in set(a.index) - set(b.index):
             assert a.loc[missing, col] > 5.35, \
                 "{0}: realization '{1}' was screened out but does NOT violate " \
-                "({2} <= 5.35) - screening may only ever drop what the harvest would " \
+                "({2} <= 5.35) - screening may only ever drop what the process would " \
                 "have dropped".format(f, missing, a.loc[missing, col])

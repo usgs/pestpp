@@ -147,7 +147,7 @@ def da_prep_4_mf6_freyberg_seq(sync_state_names=True):
         f.write("for k,a in enumerate(arr):\n")
         f.write("    np.savetxt('heads_'+str(k)+'.dat',a,fmt='%15.6E')\n")
 
-    # dont run it so we can harvest the ic values in the arrays for setting the parval1 values
+    # dont run it so we can process the ic values in the arrays for setting the parval1 values
     pyemu.os_utils.run("python forward_run.py",cwd=t_d)
 
     # now write ins and tpl file for these

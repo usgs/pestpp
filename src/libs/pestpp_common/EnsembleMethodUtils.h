@@ -68,8 +68,8 @@ protected:
  * Extracted from L2PhiHandler so that mou and sqp can use it. Neither has a phi handler, but
  * the violation test needs only observed values, simulated values and the inequality treatment
  * - all scenario-level. Keeping ONE definition matters more than the sharing is convenient:
- * the harvest-time drop and the mid-run preemption screen must never disagree about whether a
- * run is violating, or screening cancels a run that harvest would have kept.
+ * the process-time drop and the mid-run preemption screen must never disagree about whether a
+ * run is violating, or screening cancels a run that process would have kept.
  *
  * L2PhiHandler holds one of these and forwards to it, so phi's inequality treatment and the
  * violation test are the same code.
@@ -215,7 +215,7 @@ public:
      * The single-run twin of get_violating_realizations(), for judging a run from a PARTIAL
      * read while it is still executing (docs/api_part1/partial_screening_plan.md). Both go
      * through the same residual computation and the same threshold, because a screen that
-     * disagreed with the harvest-time drop at the margin would cancel a run harvest would
+     * disagreed with the process-time drop at the margin would cancel a run process would
      * have kept.
      *
      * Sound on partial data because the test is a SUM OF NON-NEGATIVE TERMS - absolute
@@ -329,7 +329,7 @@ pair<Parameters,Observations> save_real_par_rei(Pest& pest_scenario, ParameterEn
     OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME,
     int cycle = NetPackage::NULL_DA_CYCLE,map<string,double> base_weights=map<string,double>());
 
-// queue -> (drive the run manager) -> harvest, for a single ensemble. run_ensemble_util() is
+// queue -> (drive the run manager) -> process, for a single ensemble. run_ensemble_util() is
 // the in-tree composition; the halves are available for a caller running its own run loop.
 // the returned map is keyed by realization NAME, so the caller may change ensemble
 // membership between these two calls without the runs being misattributed
@@ -341,7 +341,7 @@ map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& 
 // `abandoned_names`, when given, receives the names of realizations whose runs were CANCELLED
 // rather than having failed - reported separately so a user is not told the model broke when
 // preemption did exactly what it was asked to.
-vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
+vector<int> process_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
 	bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids,
 	vector<string>* abandoned_names = nullptr);
@@ -594,7 +594,7 @@ struct UpgradeContext
 	vector<double> lam_vals, scale_vals;
 	vector<string> pe_filenames;   ///< non-empty only when ies_upgrades_in_memory is false
 
-	// -- filled by queue_upgrade_ensembles(), reused by harvest_upgrade_ensembles() so both
+	// -- filled by queue_upgrade_ensembles(), reused by process_upgrade_ensembles() so both
 	//    halves address the same rows even if membership moved in between
 	vector<int> pe_subset_idxs, oe_subset_idxs;
 
@@ -747,11 +747,11 @@ public:
 	/// batch. They live here rather than in the caller because resolving the subset against
 	/// current membership - and the spill path's different indexing - are the tool's business.
 	vector<map<string, int>> queue_upgrade_ensembles(UpgradeContext& ctx, int cycle);
-	void harvest_upgrade_ensembles(UpgradeContext& ctx, vector<map<string, int>>& run_ids);
+	void process_upgrade_ensembles(UpgradeContext& ctx, vector<map<string, int>>& run_ids);
 	/// Likewise for the remaining-realization batch prepare_subset_completion() sets up. Here
 	/// rather than in the caller because the run manager and performance log are the tool's.
 	map<string, int> queue_remaining_runs(UpgradeContext& ctx, int cycle);
-	void harvest_remaining_runs(UpgradeContext& ctx, map<string, int>& run_ids);
+	void process_remaining_runs(UpgradeContext& ctx, map<string, int>& run_ids);
 	void run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
 		const vector<double>& inflation_factors, const vector<double>& backtrack_factors);
 	UpgradeStatus evaluate_upgrades(UpgradeContext& ctx);
@@ -771,11 +771,11 @@ public:
 
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
 
-	// queue -> (drive the run manager) -> harvest. run_lambda_ensembles() is the in-tree
+	// queue -> (drive the run manager) -> process. run_lambda_ensembles() is the in-tree
 	// composition of the two halves; a caller that wants to watch or cancel runs while they
 	// are in flight calls the halves itself with its own run_slice() loop in between.
 	vector<map<string, int>> queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
-	vector<ObservationEnsemble> harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, vector<map<string, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
+	vector<ObservationEnsemble> process_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, vector<map<string, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 
 	void report_and_save(int cycle);

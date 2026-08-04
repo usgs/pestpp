@@ -1238,12 +1238,12 @@ def api_deferred_solve_state_guards_test():
             assert "deferred solve is open" in str(e), str(e)
         else:
             raise AssertionError("solve() during a deferred solve should raise")
-        # finishing before the runs have been harvested
+        # finishing before the runs have been processed
         ies.queue_runs()
         try:
             ies.finish_solve()
         except PestppError as e:
-            assert "not been harvested" in str(e), str(e)
+            assert "not been processed" in str(e), str(e)
         else:
             raise AssertionError("finish_solve with runs in flight should raise")
         ies.run(); ies.process_runs()
@@ -1613,6 +1613,69 @@ def api_session_cleanup_does_not_need_with_test():
     assert not lib_fin.alive, "...and released the underlying handle with it"
 
 
+def api_deferred_initialize_sqp_test():
+    """sqp's initialize() splits too, and the split must equal the atomic one exactly.
+
+    sqp was the awkward one: its initial ensemble is not evaluated at the top of initialize()
+    but deeper, inside prep_4_ensemble_grad(), which also does the gradient setup that depends
+    on the results. So that function had to split as well, and initialize() composes around it.
+
+    Same claim as mou: splitting changes WHO runs the batch and nothing else. Note the count is
+    legitimately 0 on several paths - finite-difference gradients (whose runs are perturbations,
+    not candidates), the diagnostics, and a supplied rather than drawn ensemble - so this drives
+    whichever path the case takes and asserts equivalence either way.
+    """
+    import filecmp
+
+    def _case(name):
+        d = _mou_case(name, noptmax=1)
+        pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+        for k in [k for k in pst.pestpp_options if k.startswith("mou_")]:
+            pst.pestpp_options.pop(k)
+        pst.pestpp_options["sqp_num_reals"] = 8
+        pst.pestpp_options["random_seed"] = 11
+        pst.write(os.path.join(d, "g07.pst"), version=2)
+        return d
+
+    d_atomic = _case("api_init_sqp_atomic")
+    with Sqp.from_pst("g07.pst", workdir=d_atomic) as sqp:
+        sqp.initialize()
+        atomic_dv = sqp.par_df().copy()
+        atomic_obs = sqp.obs_df().copy()
+
+    d_split = _case("api_init_sqp_split")
+    with Sqp.from_pst("g07.pst", workdir=d_split) as sqp:
+        n = sqp.initialize(defer_runs=True)
+        assert n > 0, \
+            "sqp should hand back its initial ensemble runs on the ensemble-gradient " \
+            "path, got {0}".format(n)
+        drawn = sqp.par_df()
+        assert drawn.shape[0] >= n, (drawn.shape, n)
+        sqp.queue_runs()
+        sqp.run()
+        sqp.process_runs()
+        sqp.finish_initialize()
+        split_dv = sqp.par_df().copy()
+        split_obs = sqp.obs_df().copy()
+
+    assert list(split_dv.index) == list(atomic_dv.index), \
+        "the split path produced a different ensemble:\n atomic: {0}\n split : {1}".format(
+            list(atomic_dv.index), list(split_dv.index))
+    assert np.allclose(split_dv.values, atomic_dv.values, rtol=0, atol=1e-10), \
+        "the split path produced different decision variable values"
+    assert np.allclose(split_obs.values, atomic_obs.values, rtol=0, atol=1e-10), \
+        "the split path produced different observation values"
+
+    for f in sorted(os.listdir(d_atomic)):
+        if not f.endswith(".csv") or not f.startswith("g07."):
+            continue
+        b = os.path.join(d_split, f)
+        if not os.path.exists(b):
+            continue
+        assert filecmp.cmp(os.path.join(d_atomic, f), b, shallow=False), \
+            "{0} differs between the atomic and split initialize".format(f)
+
+
 def api_deferred_initialize_mou_test():
     """mou's initialize() splits, and the split must equal the atomic one exactly.
 
@@ -1724,4 +1787,5 @@ if __name__ == "__main__":
     api_run_observer_thunk_is_retained_test()
     api_session_cleanup_does_not_need_with_test()
     api_deferred_initialize_mou_test()
+    api_deferred_initialize_sqp_test()
     print("all helper tests passed")

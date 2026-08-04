@@ -2969,8 +2969,8 @@ def mou_preemption_screening_test():
 
     The ies version of this test found five bugs, so mou gets the same treatment rather than
     being trusted because it shares the machinery. It does share most of it - the nomination,
-    the ViolationDetector, the screener hook in the panther master - but mou harvests through
-    its OWN update_from_runs() call rather than harvest_ensemble_util(), so the paths that
+    the ViolationDetector, the screener hook in the panther master - but mou processes through
+    its OWN update_from_runs() call rather than process_ensemble_util(), so the paths that
     matter for correctness are NOT the ones ies exercised.
 
     The claim under test is the same: with 'drop_violations' nominated, a screened run and an
@@ -3120,7 +3120,7 @@ def mou_preemption_screening_test():
         for missing in set(a.index) - set(b.index):
             assert a.loc[missing, "constr"] > 0.5, \
                 "{0}: member '{1}' was screened out but does NOT violate ({2} <= 0.5) - " \
-                "screening may only ever drop what the harvest would have dropped".format(
+                "screening may only ever drop what the process would have dropped".format(
                     f, missing, a.loc[missing, "constr"])
         checked += 1
     assert checked > 0, "no mou population files were compared, so nothing was actually checked"

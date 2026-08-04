@@ -4374,7 +4374,7 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 /**
  * @brief Queue one ensemble's runs and hand back the run-id map.
  *
- * First half of run_ensemble_util(). Paired with harvest_ensemble_util(); the caller drives
+ * First half of run_ensemble_util(). Paired with process_ensemble_util(); the caller drives
  * the run manager in between and so can watch or cancel runs while they are in flight.
  */
 map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
@@ -4407,7 +4407,7 @@ map<string, int> queue_ensemble_util(PerformanceLog* performance_log, ofstream& 
  *
  * Second half of run_ensemble_util(); assumes the runs have been made.
  */
-vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe, ObservationEnsemble& _oe,
+vector<int> process_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe, ObservationEnsemble& _oe,
 	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, map<string, int>& real_run_ids,
 	vector<string>* abandoned_names)
 {
@@ -4550,7 +4550,7 @@ vector<int> harvest_ensemble_util(PerformanceLog* performance_log, ofstream& fre
 }
 
 /**
- * @brief Queue, run and harvest one ensemble - the in-tree composition.
+ * @brief Queue, run and process one ensemble - the in-tree composition.
  */
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe,
 	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag,
@@ -4575,7 +4575,7 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 		performance_log->log_event("error running ensemble");
 		throw runtime_error(string("error running ensemble"));
 	}
-	return harvest_ensemble_util(performance_log, frec, _pe, _oe, run_mgr_ptr, check_pe_consistency, real_idxs, real_run_ids, abandoned_names);
+	return process_ensemble_util(performance_log, frec, _pe, _oe, run_mgr_ptr, check_pe_consistency, real_idxs, real_run_ids, abandoned_names);
 }
 
 EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
@@ -4897,9 +4897,9 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
  * @brief Queue the candidate upgrade ensembles with the run manager.
  *
  * First half of the old run_lambda_ensembles(): everything up to, but not including, making
- * the runs. Returns the per-candidate run-id maps that harvest_lambda_ensembles() needs.
+ * the runs. Returns the per-candidate run-id maps that process_lambda_ensembles() needs.
  * Split out so a caller can queue, drive the run manager itself - watching run states or
- * cancelling as it goes - and harvest when it is ready.
+ * cancelling as it goes - and process when it is ready.
  */
 vector<map<string, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
@@ -4954,7 +4954,7 @@ vector<map<string, int>> EnsembleMethod::queue_lambda_ensembles(vector<Parameter
  * them into one observation ensemble per candidate, dropping failed realizations from both
  * the parameter and observation side as it goes.
  */
-vector<ObservationEnsemble> EnsembleMethod::harvest_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
+vector<ObservationEnsemble> EnsembleMethod::process_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, vector<map<string, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
 	ofstream& frec = file_manager.rec_ofstream();
@@ -5062,7 +5062,7 @@ vector<ObservationEnsemble> EnsembleMethod::harvest_lambda_ensembles(vector<Para
 }
 
 /**
- * @brief Queue, run and harvest the candidate ensembles - the in-tree composition.
+ * @brief Queue, run and process the candidate ensembles - the in-tree composition.
  */
 vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
@@ -5083,7 +5083,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	{
 		throw_em_error(string("error running ensembles"));
 	}
-	return harvest_lambda_ensembles(pe_lams, lam_vals, scale_vals, real_run_ids_vec, pe_subset_idxs, oe_subset_idxs);
+	return process_lambda_ensembles(pe_lams, lam_vals, scale_vals, real_run_ids_vec, pe_subset_idxs, oe_subset_idxs);
 }
 
 pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe)
@@ -5519,7 +5519,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
     prep_drop_violations();
 
     // Install the preemption screener: the tool supplies the PREDICATE, the run manager owns
-    // the mechanics. The same violation test the harvest-time drop uses, so a run abandoned
+    // the mechanics. The same violation test the process-time drop uses, so a run abandoned
     // mid-flight is one that would have been dropped on arrival anyway - which is what keeps
     // screening a saving in wall-clock rather than a change in results.
     double _poll_min = pest_scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
@@ -6216,7 +6216,7 @@ void EnsembleMethod::initialize_finish(int cycle)
 	{
 		// Which realizations are gone is recomputed here rather than being handed in, so that
 		// finish() does not care whether the runs were made by run_ensemble() or by an api
-		// caller driving queue/harvest itself. Walking init_pnames in order yields ascending
+		// caller driving queue/process itself. Walking init_pnames in order yields ascending
 		// indices, matching what run_ensemble() used to return.
 		vector<string> cur_pnames = pe.get_real_names();
 		set<string> cur_set(cur_pnames.begin(), cur_pnames.end());
@@ -8019,7 +8019,7 @@ UpgradeStatus EnsembleMethod::check_noniterative_shortcut(UpgradeContext& ctx)
 }
 
 /**
- * @brief Stage 4: hand the candidate ensembles to the run manager and harvest the results.
+ * @brief Stage 4: hand the candidate ensembles to the run manager and process the results.
  *
  * This is the first of the two run-manager round trips in an upgrade solve; the second is in
  * complete_subset_runs(). An API caller driving the run manager itself replaces this stage.
@@ -8059,17 +8059,17 @@ map<string, int> EnsembleMethod::queue_remaining_runs(UpgradeContext& ctx, int c
 		vector<int>(), cycle, ss.str());
 }
 
-void EnsembleMethod::harvest_remaining_runs(UpgradeContext& ctx, map<string, int>& run_ids)
+void EnsembleMethod::process_remaining_runs(UpgradeContext& ctx, map<string, int>& run_ids)
 {
-	ctx.failed_remaining = harvest_ensemble_util(performance_log, file_manager.rec_ofstream(),
+	ctx.failed_remaining = process_ensemble_util(performance_log, file_manager.rec_ofstream(),
 		ctx.remaining_pe, ctx.remaining_oe, run_mgr_ptr,
 		pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(),
 		vector<int>(), run_ids);
 }
 
-void EnsembleMethod::harvest_upgrade_ensembles(UpgradeContext& ctx, vector<map<string, int>>& run_ids)
+void EnsembleMethod::process_upgrade_ensembles(UpgradeContext& ctx, vector<map<string, int>>& run_ids)
 {
-	ctx.oe_lams = harvest_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, run_ids,
+	ctx.oe_lams = process_lambda_ensembles(ctx.pe_lams, ctx.lam_vals, ctx.scale_vals, run_ids,
 		ctx.pe_subset_idxs, ctx.oe_subset_idxs);
 }
 
@@ -8103,7 +8103,7 @@ void EnsembleMethod::run_upgrade_ensembles(UpgradeContext& ctx, int cycle,
 	{
 		throw_em_error(string("error running ensembles"));
 	}
-	harvest_upgrade_ensembles(ctx, run_ids);
+	process_upgrade_ensembles(ctx, run_ids);
 	run_mgr_ptr->set_screening_active(true);
 }
 

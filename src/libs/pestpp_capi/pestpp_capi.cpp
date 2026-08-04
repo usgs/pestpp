@@ -141,14 +141,14 @@ struct ToolAdapter
     virtual void initialize_finish() = 0;
 
     /**
-     * @brief Queue / harvest the tool's current parameter ensemble.
+     * @brief Queue / process the tool's current parameter ensemble.
      *
      * A PAIR, and overridden as a pair or not at all: whatever queues a batch has to be what
-     * harvests it. The default is the ies/da path, which is what pestpp_queue_runs() and
+     * processes it. The default is the ies/da path, which is what pestpp_queue_runs() and
      * pestpp_process_runs() did directly before this hook existed.
      *
      * mou overrides both because its batch is not just the population: queue_population()
-     * batches the CHANCE runs alongside it, and the harvest applies the chance shift. Driving
+     * batches the CHANCE runs alongside it, and the process applies the chance shift. Driving
      * a chance-enabled mou through the generic ensemble path would queue the population and
      * silently omit the chance runs - a quiet wrong answer rather than an error.
      */
@@ -158,10 +158,10 @@ struct ToolAdapter
         return queue_ensemble_util(pl, frec, *par_ensemble(), rm, false, vector<int>(),
                                    da_cycle());
     }
-    virtual vector<int> harvest_runs(PerformanceLog* pl, ofstream& frec, RunManagerAbstract* rm,
+    virtual vector<int> process_runs(PerformanceLog* pl, ofstream& frec, RunManagerAbstract* rm,
                                      map<string, int>& ids)
     {
-        return harvest_ensemble_util(pl, frec, *par_ensemble(), *obs_ensemble(), rm, false,
+        return process_ensemble_util(pl, frec, *par_ensemble(), *obs_ensemble(), rm, false,
                                      vector<int>(), ids);
     }
     /// One iteration/generation. Returns PESTPP_RETRY when the step was rejected and the
@@ -173,7 +173,7 @@ struct ToolAdapter
 
     /// The live ensemble for a pestpp_ensemble_id, or null if this tool has no such thing.
     virtual Ensemble* ensemble(int id) = 0;
-    /// The parameter-side ensemble, used for queue/harvest and the CTL snapshot.
+    /// The parameter-side ensemble, used for queue/process and the CTL snapshot.
     virtual ParameterEnsemble* par_ensemble() = 0;
     virtual ObservationEnsemble* obs_ensemble() = 0;
 
@@ -204,11 +204,11 @@ struct ToolAdapter
     virtual pestpp_status solve_finish(bool defer_runs, int& pending) { (void)defer_runs; pending = 0; return PESTPP_OK; }
     /// Queue the outstanding batch. `only` empty means the algorithm's own choice.
     virtual int  queue_solve_runs(const vector<string>& only) { (void)only; return 0; }
-    /// Harvest it; returns how many runs failed.
-    virtual int  harvest_solve_runs() { return 0; }
+    /// Process it; returns how many runs failed.
+    virtual int  process_solve_runs() { return 0; }
     /// Is a deferred solve open? Used to keep it and the composed advance() apart.
     virtual bool solve_is_open() const { return false; }
-    /// Is a batch queued and awaiting harvest?
+    /// Is a batch queued and awaiting process?
     virtual bool solve_batch_queued() const { return false; }
     /// Candidates awaiting runs, and the factors each was generated with.
     virtual int  candidate_count() const { return 0; }
@@ -394,7 +394,7 @@ struct EnsembleSolveState
         NONE,               ///< nothing outstanding
         CANDIDATES,         ///< candidates generated, awaiting queue
         CANDIDATES_QUEUED,  ///< candidate runs in flight
-        CANDIDATES_RUN,     ///< candidate results harvested, awaiting evaluate
+        CANDIDATES_RUN,     ///< candidate results processed, awaiting evaluate
         REMAINING,          ///< a winner was picked; the rest of the ensemble awaits queue
         REMAINING_QUEUED,
         REMAINING_RUN
@@ -489,18 +489,18 @@ struct EnsembleSolveState
         return 0;
     }
 
-    int harvest()
+    int process()
     {
         if (phase == Phase::CANDIDATES_QUEUED)
         {
-            tool.harvest_upgrade_ensembles(*ctx, lam_run_ids);
+            tool.process_upgrade_ensembles(*ctx, lam_run_ids);
             lam_run_ids.clear();
             phase = Phase::CANDIDATES_RUN;
             return 0;
         }
         if (phase == Phase::REMAINING_QUEUED)
         {
-            tool.harvest_remaining_runs(*ctx, remaining_run_ids);
+            tool.process_remaining_runs(*ctx, remaining_run_ids);
             remaining_run_ids.clear();
             phase = Phase::REMAINING_RUN;
             return (int)ctx->failed_remaining.size();
@@ -536,7 +536,7 @@ struct EnsembleSolveState
         }
         if (phase != Phase::REMAINING_RUN)
             bad_state("pestpp_solve_finish() has nothing to continue: the candidate runs have "
-                      "not been harvested yet");
+                      "not been processed yet");
         UpgradeStatus st = tool.finish_subset_completion(*ctx, cycle, use_mda);
         if (st != UpgradeStatus::CONTINUE)
             return close(st);
@@ -563,7 +563,7 @@ struct IesAdapter : public ToolAdapter
     pestpp_status solve_finish(bool defer_runs, int& pending) override
     { return deferred.finish(defer_runs, pending); }
     int  queue_solve_runs(const vector<string>& only) override { return deferred.queue(only); }
-    int  harvest_solve_runs() override { return deferred.harvest(); }
+    int  process_solve_runs() override { return deferred.process(); }
     bool solve_is_open() const override { return deferred.is_open(); }
     bool solve_batch_queued() const override { return deferred.batch_queued(); }
     int  candidate_count() const override
@@ -694,9 +694,9 @@ struct MouAdapter : public ToolAdapter
     // chance-aware, unlike the generic ensemble path - see ToolAdapter::queue_runs()
     map<string, int> queue_runs(PerformanceLog*, ofstream&, RunManagerAbstract*) override
     { return tool.queue_initial_population(); }
-    vector<int> harvest_runs(PerformanceLog*, ofstream&, RunManagerAbstract*,
+    vector<int> process_runs(PerformanceLog*, ofstream&, RunManagerAbstract*,
                              map<string, int>&) override
-    { return tool.harvest_initial_population(); }
+    { return tool.process_initial_population(); }
     pestpp_status advance() override
     {
         // ONE call into the tool, not a re-implementation of its loop body. Doing the four
@@ -742,11 +742,11 @@ struct MouAdapter : public ToolAdapter
         gphase = GPhase::POP_QUEUED;
         return (int)pop_run_ids.size();
     }
-    int harvest_solve_runs() override
+    int process_solve_runs() override
     {
         if (gphase != GPhase::POP_QUEUED)
             bad_state("no deferred-solve runs are in flight");
-        vector<int> failed = tool.harvest_population(gctx->new_dp, gctx->new_op, true, pop_run_ids);
+        vector<int> failed = tool.process_population(gctx->new_dp, gctx->new_op, true, pop_run_ids);
         pop_run_ids.clear();
         gphase = GPhase::POP_RUN;
         return (int)failed.size();
@@ -756,7 +756,7 @@ struct MouAdapter : public ToolAdapter
         pending = 0;
         if (gphase != GPhase::POP_RUN)
             bad_state("pestpp_solve_finish() has nothing to continue: the population runs have "
-                      "not been harvested yet");
+                      "not been processed yet");
         tool.evaluate_generation(*gctx);
         tool.report_generation(*gctx);
         gctx.reset();
@@ -805,10 +805,18 @@ struct SqpAdapter : public ToolAdapter
     Pest& scenario() override { return scen; }
 
     void initialize() override { tool.initialize(); }
-    // sqp's only batch inside initialize() is a single control-file-values run, not an
-    // ensemble draw, so there is nothing worth handing over; it initializes atomically.
-    int  initialize_prepare() override { tool.initialize(); return 0; }
-    void initialize_finish() override {}
+    // The initial ENSEMBLE evaluation is handed to the caller, when there is one. It returns 0
+    // on the finite-difference gradient path (whose runs are perturbations, not candidates),
+    // on the control-file-values and mean-values diagnostics, and when the ensemble was
+    // supplied rather than drawn - so branch on the count, not on the tool.
+    int  initialize_prepare() override { return tool.initialize_prepare(); }
+    void initialize_finish() override { tool.initialize_finish(); }
+    // sqp's process applies drop_violating_members(); the generic ensemble path does not
+    map<string, int> queue_runs(PerformanceLog*, ofstream&, RunManagerAbstract*) override
+    { return tool.queue_initial_ensemble(); }
+    vector<int> process_runs(PerformanceLog*, ofstream&, RunManagerAbstract*,
+                             map<string, int>&) override
+    { return tool.process_initial_ensemble(); }
     pestpp_status advance() override
     {
         iter++;
@@ -1018,7 +1026,7 @@ struct ScopedWorkingDir
 
 /// Refuse a call that is not legal from inside a run observer.
 ///
-/// The observer runs mid-batch, with ensembles part-harvested and phi not yet recomputed.
+/// The observer runs mid-batch, with ensembles part-processed and phi not yet recomputed.
 /// Reading them there is not merely discouraged, it is meaningless - and writing them is
 /// worse. Rather than document a rule nobody can check, the state is enforced, and the
 /// message names the two calls that are actually useful from in there.
@@ -2107,7 +2115,7 @@ pestpp_status pestpp_get_worker_run_history(pestpp_handle h, int idx, int which,
     CAPI_END()
 }
 
-/* ---- queue / harvest ------------------------------------------------------------------ */
+/* ---- queue / process ------------------------------------------------------------------ */
 
 // extern "C++" on purpose, for the same reason as read_stored_run below: this file's body sits
 // inside an extern "C" block, which would otherwise give this helper C language linkage while
@@ -2313,7 +2321,7 @@ pestpp_status pestpp_solve_prepare(pestpp_handle h, int* n_runs)
         if (s->adapter->solve_is_open())
             bad_state("a deferred solve is already open; finish it before starting another");
         if (s->pending_runs_valid)
-            bad_state("runs are already queued; harvest them before starting a solve");
+            bad_state("runs are already queued; process them before starting a solve");
         pestpp_status outcome = PESTPP_OK;
         int n = s->adapter->solve_prepare(outcome);
         if (n_runs != nullptr)
@@ -2329,7 +2337,7 @@ pestpp_status pestpp_solve_finish(pestpp_handle h, int defer_runs, int* pending_
         if (!s->adapter->solve_is_open())
             bad_state("no deferred solve is open; call pestpp_solve_prepare() first");
         if (s->adapter->solve_batch_queued())
-            bad_state("the queued runs have not been harvested; call pestpp_process_runs()");
+            bad_state("the queued runs have not been processed; call pestpp_process_runs()");
         int pending = 0;
         pestpp_status st = s->adapter->solve_finish(defer_runs != 0, pending);
         if (pending_runs != nullptr)
@@ -2552,7 +2560,7 @@ pestpp_status pestpp_queue_runs_subset(pestpp_handle h, const char* names, int n
         if (!s->adapter->solve_is_open())
             bad_state("no deferred solve is open; call pestpp_solve_prepare() first");
         if (s->pending_runs_valid)
-            bad_state("runs are already queued; harvest them before queueing again");
+            bad_state("runs are already queued; process them before queueing again");
         vector<string> only;
         if ((names != nullptr) && (n > 0))
             only = unpack_names(names, n);
@@ -2570,7 +2578,7 @@ pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued)
 {
     CAPI_BEGIN(h)
         if (s->pending_runs_valid)
-            bad_state("runs are already queued; harvest them before queueing again");
+            bad_state("runs are already queued; process them before queueing again");
         // a deferred solve owns the batch: queue ITS candidates rather than the tool's
         // current ensemble, so the plain call keeps working inside the deferred loop
         if (s->adapter->solve_is_open())
@@ -2582,7 +2590,7 @@ pestpp_status pestpp_queue_runs(pestpp_handle h, int* n_queued)
             return PESTPP_OK;
         }
         // The cycle has to be passed explicitly: it defaults to NULL_DA_CYCLE, so a da handle
-        // driving its own queue/harvest would tag runs with no cycle at all while the in-tree
+        // driving its own queue/process would tag runs with no cycle at all while the in-tree
         // da path tagged them correctly. Invisible on a control file whose first cycle is 0.
         s->pending_runs = s->adapter->queue_runs(s->performance_log.get(),
                                                  s->file_manager->rec_ofstream(),
@@ -2598,19 +2606,19 @@ pestpp_status pestpp_process_runs(pestpp_handle h, int* n_failed)
 {
     CAPI_BEGIN(h)
         if (!s->pending_runs_valid)
-            bad_state("no queued runs to harvest; call pestpp_queue_runs first");
+            bad_state("no queued runs to process; call pestpp_queue_runs first");
         if (s->adapter->solve_is_open())
         {
-            int nfail = s->adapter->harvest_solve_runs();
+            int nfail = s->adapter->process_solve_runs();
             s->pending_runs_valid = false;
             if (n_failed != nullptr)
                 *n_failed = nfail;
             return PESTPP_OK;
         }
-        vector<int> failed = s->adapter->harvest_runs(s->performance_log.get(),
+        vector<int> failed = s->adapter->process_runs(s->performance_log.get(),
                                                       s->file_manager->rec_ofstream(),
                                                       s->run_manager.get(), s->pending_runs);
-        // clear even on the way out, so a failed harvest cannot leave a stale map behind
+        // clear even on the way out, so a failed process cannot leave a stale map behind
         s->pending_runs.clear();
         s->pending_runs_valid = false;
         if (n_failed != nullptr)

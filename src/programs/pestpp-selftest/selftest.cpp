@@ -586,11 +586,11 @@ static void test_subset_names_survive_membership_change()
 }
 
 // A caller running its own run loop can change the ensemble between queueing the runs and
-// harvesting them. The run->realization map is keyed by name so that change is absorbed;
+// processing them. The run->realization map is keyed by name so that change is absorbed;
 // keyed by position, every run after the edit would land on the wrong realization.
 static void test_run_map_survives_resize()
 {
-    cout << "[queued runs are held by name, so a resize between queue and harvest is safe]" << endl;
+    cout << "[queued runs are held by name, so a resize between queue and process is safe]" << endl;
 
     vector<string> all{"R0","R1","R2","R3","R4"};
     // run ids deliberately unlike the positions, so a position/run-id mix-up is visible
@@ -642,7 +642,7 @@ static void test_run_map_survives_resize()
     r = ObservationEnsemble::resolve_run_positions(run_ids, all, 3);
     CHK(r.size() == 3, "resolution stops at the receiving ensemble's row count");
 
-    // rows come back in ascending order, which is what the harvest loop and the failed-index
+    // rows come back in ascending order, which is what the process loop and the failed-index
     // list both assume
     r = ObservationEnsemble::resolve_run_positions(run_ids, reordered, reordered.size());
     ok = true;
@@ -653,7 +653,7 @@ static void test_run_map_survives_resize()
     // nothing survived
     vector<string> none{"X","Y"};
     CHK(ObservationEnsemble::resolve_run_positions(run_ids, none, none.size()).size() == 0,
-        "no surviving realizations -> no runs to harvest");
+        "no surviving realizations -> no runs to process");
 }
 
 /**
@@ -1221,7 +1221,7 @@ static void test_run_storage_partial_update()
  * (see modify_runstor() in benchmarks/ies_test_part4.py). So under the external run manager,
  * status 0 means "fine, here are your values".
  *
- * A harvest that rejected status <= 0 as "did not complete" therefore dropped every realization
+ * A process that rejected status <= 0 as "did not complete" therefore dropped every realization
  * of every external run, which is exactly what happened. update_from_runs() now asks whether
  * the record HOLDS values instead, and that question is only answerable because add_run()
  * initializes the observation block to no_data - it used to leave a hole that read back as
@@ -1270,7 +1270,7 @@ static void test_external_values_are_results()
     rs.get_info(filled, status, info_txt, info_value);
     CHK(status == 0, "writing observations without completing leaves the status at 0");
 
-    // 3. ...and the harvest predicate must call that a RESULT. Same test update_from_runs()
+    // 3. ...and the process predicate must call that a RESULT. Same test update_from_runs()
     //    applies: a record is empty only when every observation is still the sentinel.
     Observations gf;
     Parameters gfp;
@@ -1283,7 +1283,7 @@ static void test_external_values_are_results()
             break;
         }
     CHK(filled_has_values,
-        "a record whose observations were written must be harvested, whatever its status - "
+        "a record whose observations were written must be processed, whatever its status - "
         "this is the external run manager's contract");
     CHK(abs(gf.get_rec("O2") - 123456789.987) < 1.0e-6,
         "the externally written value must read back intact");
@@ -1299,7 +1299,7 @@ static void test_external_values_are_results()
             break;
         }
     CHK(!never_has_values,
-        "a record that was never filled must NOT be harvested - it holds nothing");
+        "a record that was never filled must NOT be processed - it holds nothing");
 
     rs.free_memory();
     remove(stor.c_str());
@@ -1308,9 +1308,9 @@ static void test_external_values_are_results()
 /**
  * @brief The single-run violation test must agree with the ensemble one, exactly.
  *
- * Mid-run screening cancels a run on the strength of is_violating(); the harvest-time drop
+ * Mid-run screening cancels a run on the strength of is_violating(); the process-time drop
  * uses get_violating_realizations(). If the two ever disagree at the margin, screening cancels
- * a run that harvest would have KEPT - which turns a pure optimization into a silent change of
+ * a run that process would have KEPT - which turns a pure optimization into a silent change of
  * results. So they share their arithmetic, and this asserts they still agree.
  *
  * Also asserts the partial-read property the whole scheme rests on: judging only the

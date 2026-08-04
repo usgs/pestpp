@@ -894,7 +894,7 @@ def sqp_preemption_screening_test():
             for missing in set(a.index) - set(b.index):
                 assert a.loc[missing, "constraint"] > 2.0, \
                     "{0}: member '{1}' was screened out but does NOT violate ({2} <= 2.0) - " \
-                    "screening may only ever drop what the harvest would have dropped" \
+                    "screening may only ever drop what the process would have dropped" \
                     .format(f, missing, a.loc[missing, "constraint"])
         checked += 1
     assert checked > 0, "no sqp output files were compared, so nothing was actually checked"

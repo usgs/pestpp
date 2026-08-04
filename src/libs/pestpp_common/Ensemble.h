@@ -258,7 +258,7 @@ public:
 	void transform_ip(transStatus to_tstat);
 	void set_pest_scenario(Pest *_pest_scenario);
 	// keyed by realization NAME, not position, so a caller can add, drop or reorder
-	// realizations between queueing the runs and harvesting them
+	// realizations between queueing the runs and processing them
 	map<string,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),
 	        int da_cycle=NetPackage::NULL_DA_CYCLE, string additional_tag="");
 	void set_fixed_names();
@@ -305,7 +305,7 @@ public:
 	void from_binary(string file_name);
 	// Takes the name-keyed map from add_runs(). Only the INPUT needs to be by name: it has to
 	// survive the caller adding, dropping or reordering realizations between queueing the runs
-	// and harvesting them. The returned failed-run positions are resolved here, against the
+	// and processing them. The returned failed-run positions are resolved here, against the
 	// membership as it stands now, so they stay valid for the caller's drop_rows() calls.
 	//
 	// par_real_names is the parameter ensemble's realization names in current order. It is

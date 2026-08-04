@@ -341,16 +341,22 @@ PESTPP_API pestpp_status pestpp_initialize(pestpp_handle h);
  *
  *     int n;
  *     pestpp_initialize_prepare(h, &n);   // draws the ensembles; runs nothing
- *     if (n) { queue -> begin_batch/run_slice/end_batch -> harvest }
+ *     if (n) { queue -> begin_batch/run_slice/end_batch -> process }
  *     pestpp_initialize_finish(h);        // phi, drop failures, write the .0. files
  *
  * `n_runs` is how many runs the caller must service. 0 is normal and needs no branch beyond
- * skipping the batch: a restart or `ies_obs_restart_csv` supplies results instead of
- * computing them, and mou and sqp initialize atomically and hand over nothing.
+ * skipping the batch: a restart or `ies_obs_restart_csv` supplies results instead of computing
+ * them, and sqp hands over nothing (its initial ensemble is evaluated deeper, inside its
+ * gradient preparation, so there is no single batch to give away at this point).
+ *
+ * ies, da and mou all hand over their initial batch. Branch on the COUNT, never on the tool:
+ * whether a given tool hands one over has already changed once - mou initialized atomically
+ * until it was split - and 0 has always meant "nothing to service", never "unsupported".
  *
  * The window between prepare and queue is the useful part: it is the only point at which a
- * caller can REPLACE the drawn prior ensemble with its own - via pestpp_set_par_snapshot()
- * or a write through the zero-copy view - and have those realizations be what gets run.
+ * caller can REPLACE the drawn prior ensemble or population with its own - via
+ * pestpp_set_par_snapshot() or a write through the zero-copy view - and have those
+ * realizations be what gets run.
  *
  * Calling pestpp_solve_iteration() while a prepare is outstanding is an error: the tool
  * would be half-initialized, its ensembles drawn but failures and phi unprocessed. */
@@ -612,7 +618,7 @@ PESTPP_API pestpp_status pestpp_get_option(pestpp_handle h, const char* key,
 
 /* ---- run management ------------------------------------------------------------------
  *
- * A caller driving its own loop queues runs, drives the run manager in slices, and harvests
+ * A caller driving its own loop queues runs, drives the run manager in slices, and processes
  * when it is ready. Slicing is what makes the run manager observable and interruptible: each
  * slice returns after roughly max_seconds so the caller can inspect or cancel between them.
  *
@@ -812,10 +818,10 @@ PESTPP_API pestpp_status pestpp_get_worker_state(pestpp_handle h, int idx,
 PESTPP_API pestpp_status pestpp_get_worker_run_history(pestpp_handle h, int idx, int which,
                                                        int* run_ids, int max_n, int* n_out);
 
-/* ---- queue / harvest -----------------------------------------------------------------
+/* ---- queue / process -----------------------------------------------------------------
  *
  * The two halves of an evaluation, so a caller can own what happens in between: queue the
- * current parameter ensemble, drive and watch the run manager, then harvest into the
+ * current parameter ensemble, drive and watch the run manager, then process into the
  * observation ensemble.
  *
  * Runs are tracked by realization NAME, so membership may change between the two calls.

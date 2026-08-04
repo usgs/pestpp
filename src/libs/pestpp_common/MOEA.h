@@ -200,8 +200,8 @@ public:
 	int  initialize_prepare();
 	/// queue the initial population, AFTER any caller changes to it
 	map<string, int> queue_initial_population();
-	/// harvest them, chance-aware - the generic ensemble harvest is not
-	vector<int> harvest_initial_population();
+	/// process them, chance-aware - the generic ensemble process is not
+	vector<int> process_initial_population();
 	void initialize_finish();
     void iterate_to_solution();
 	/// One generation: the loop body of iterate_to_solution(), including advancing the
@@ -220,11 +220,11 @@ public:
 	/// The scheduled population size for a generation, holding the last scheduled value for
 	/// anything past the end of the schedule. See the definition for why that matters.
 	int get_scheduled_population_size(int generation);
-	// queue -> (drive the run manager) -> harvest. run_population() is the in-tree
+	// queue -> (drive the run manager) -> process. run_population() is the in-tree
 	// composition; the halves let a caller run its own run_slice() loop in between, which is
 	// what a deferred generation does.
 	map<string, int> queue_population(ParameterEnsemble& _dp, bool allow_chance);
-	vector<int> harvest_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids);
+	vector<int> process_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance, map<string, int>& real_run_ids);
 	void generate_generation(GenerationContext& ctx);
 	void run_generation(GenerationContext& ctx);
 	void evaluate_generation(GenerationContext& ctx);

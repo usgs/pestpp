@@ -219,7 +219,7 @@ def api_vs_exe_ies_test():
     """ies: caller-driven loop must reproduce pestpp-ies exactly.
 
     Stressed with a lambda ladder and a subset - the subset path in particular evaluates only
-    part of the ensemble per lambda, so an adapter that harvested runs in the wrong order or
+    part of the ensemble per lambda, so an adapter that processed runs in the wrong order or
     lost the lambda sequence would show up here immediately.
     """
     def edit(pst):
