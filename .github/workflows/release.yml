@@ -1,17 +1,24 @@
 name: Release Pest++
+
+# Choose the branch on the Actions page: the "Run workflow" dropdown sets the ref and
+# actions/checkout defaults to it. There is deliberately no `branch` input - it would be a
+# second selector free to disagree with the dropdown.
+#
+# The version is not an input either. It is read from src/libs/common/config_os.h, the single
+# place it is defined and the same line cmake/cpack parse. An input would be a second source of
+# truth, and the way that fails is tagging 5.2.29 while shipping an archive named 5.2.28.
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      branch:
-        description: 'Branch to release from.'
-        required: true
-        type: string
-      version:
-        description: 'Release version number.'
-        required: true
-        type: string
-env:
-  PIXI_BETA_WARNING_OFF: true
+      draft:
+        description: 'Create the release as a draft (review before it goes public)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write        # create the release and upload assets
+
 jobs:
   build:
     name: Build ${{ matrix.os }}
@@ -20,48 +27,118 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, macos-14, windows-2022]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     defaults:
       run:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v6
-        with:
-          repository: usgs/pestpp
-          ref: ${{ inputs.branch }}
-
-      - uses: prefix-dev/setup-pixi@v0.9.3
-        with:
-          pixi-version: v0.41.4
 
       - name: Setup windows compiler
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Set ostag
-        id: ostag
+      - name: Read version and ostag
+        id: version
         run: |
-          if [[ $RUNNER_OS == "Linux" ]]; then
-            ostag="linux"
-          elif [[ $RUNNER_OS == "macOS" ]]; then
-            ostag="mac"
-          elif [[ $RUNNER_OS == "Windows" ]]; then
-            ostag="win"
+          # the same line cmake parses, and the same ostag CPACK_SYSTEM_NAME uses
+          version=$(grep -oE '#define PESTPP_VERSION "[^"]+"' src/libs/common/config_os.h \
+                    | grep -oE '"[^"]+"' | tr -d '"')
+          if [[ -z "$version" ]]; then
+            echo "::error::could not read PESTPP_VERSION from src/libs/common/config_os.h"
+            exit 1
           fi
+          if [[ $RUNNER_OS == "Linux" ]]; then ostag="linux"
+          elif [[ $RUNNER_OS == "macOS" ]]; then ostag="mac"
+          else ostag="win"; fi
+          echo "version=$version" >> $GITHUB_OUTPUT
           echo "ostag=$ostag" >> $GITHUB_OUTPUT
+          echo "building pestpp $version for $ostag"
 
-      - name: Build binaries
+      # Same invocation as ci.yml, so a release build is the build CI already exercises
+      - name: Build
         run: |
-          pixi run configure
-          pixi run build-release
+          mkdir build && cd build
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
+              ninja
+          else
+              cmake -DCMAKE_BUILD_TYPE=Release ..
+              make -j2
+          fi
 
-      - name: Make distribution
+      # Cheap gate: about a second, and it will not publish a build whose option registry, run
+      # storage or instruction handling is broken. Run from the BUILD tree, not bin/ - bin/ is
+      # populated by a glob that can serve a stale binary.
+      - name: Self-test
         run: |
-          path=pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
-          cp -r bin $path
-          rm -r $path/*/ || true
+          bin=$(find build -type f \( -name 'pestpp-selftest' -o -name 'pestpp-selftest.exe' \) | head -1)
+          if [[ -z "$bin" ]]; then
+            echo "::error::pestpp-selftest was not built"
+            exit 1
+          fi
+          "$bin"
+
+      # cpack, unchanged from what scripts/build_pestpp_*.sh already do: TGZ on posix, ZIP on
+      # windows. The archive name comes from CPACK_PACKAGE_FILE_NAME - pestpp-<version>-<ostag>
+      # - so a release candidate names itself.
+      - name: Package
+        run: |
+          cd build
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cpack -G ZIP
+          else
+              cpack -G TGZ
+          fi
+          ls -l pestpp-*.tar.gz pestpp-*.zip 2>/dev/null || true
 
       - name: Upload distribution
         uses: actions/upload-artifact@v6
         with:
-          name: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
-          path: pestpp-${{ inputs.version }}-${{ steps.ostag.outputs.ostag }}
+          name: pestpp-${{ steps.version.outputs.version }}-${{ steps.version.outputs.ostag }}
+          path: |
+            build/pestpp-*.tar.gz
+            build/pestpp-*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download all distributions
+        uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Show what will be published
+        run: ls -l dist
+
+      # Tags here are bare version numbers (5.2.26, not v5.2.26), so keep that.
+      # Draft by default: this publishes to a public repo and notifies watchers, and a dispatch
+      # has no undo.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ needs.build.outputs.version }}"
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "::error::release $version already exists - bump PESTPP_VERSION in src/libs/common/config_os.h"
+            exit 1
+          fi
+          draft=""
+          if [[ "${{ inputs.draft }}" == "true" ]]; then draft="--draft"; fi
+          # a version carrying a suffix is a release candidate: mark it prerelease so it is not
+          # served as "latest"
+          prerelease=""
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then prerelease="--prerelease"; fi
+          gh release create "$version" \
+            --target "${{ github.sha }}" \
+            --title "PEST++ $version" \
+            --generate-notes \
+            $draft $prerelease \
+            dist/*

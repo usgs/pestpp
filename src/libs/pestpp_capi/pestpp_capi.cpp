@@ -1453,8 +1453,8 @@ pestpp_status pestpp_get_version(char* buf, int buf_len, int* needed)
     g_create_error.clear();
     try
     {
-        // NB: the PESTPP_VERSION macro carries a trailing semicolon, so it only works as a
-        // bare initializer - string(PESTPP_VERSION) does not compile
+        // May carry a release-candidate suffix ("5.2.29rc1"), so callers must treat this as an
+        // opaque string rather than parsing three numbers out of it.
         string v = PESTPP_VERSION;
         if (needed != nullptr)
             *needed = (int)v.size() + 1;

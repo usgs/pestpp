@@ -5,17 +5,29 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(_DEBUG)
 endif()
 
-# Get PESTPP_VERSION from common source header
+# Get the version from the common source header, which is the single definition of it.
+#
+# The version may carry a release-candidate suffix ("5.2.29rc1"), and that has to be split:
+# project(VERSION) accepts only numeric major.minor.patch, and CPack's version fields are
+# numeric too. The FULL string is what names the package, so an rc archive is distinguishable
+# from the release at a glance.
+#
+# Held in PESTPP_VERSION_FULL rather than PESTPP_VERSION on purpose: project() SETS
+# ${PROJECT_NAME}_VERSION, so a variable of that name is silently overwritten a few lines
+# below with the numeric form - and the suffix would vanish with it.
 file(READ "${CMAKE_SOURCE_DIR}/src/libs/common/config_os.h" _file)
-string(REGEX MATCH "PESTPP_VERSION \"([0-9\.]+)\"" _ ${_file})
-set(PESTPP_VERSION ${CMAKE_MATCH_1})
-if("${PESTPP_VERSION}" STREQUAL "")
+string(REGEX MATCH "PESTPP_VERSION \"([0-9]+\\.[0-9]+\\.[0-9]+[A-Za-z0-9._-]*)\"" _ ${_file})
+set(PESTPP_VERSION_FULL ${CMAKE_MATCH_1})
+if("${PESTPP_VERSION_FULL}" STREQUAL "")
   message(SEND_ERROR
-    "Could not find PESTPP_VERSION in src/libs/common/config_os.h")
+    "Could not find a PESTPP_VERSION of the form \"X.Y.Z\" or \"X.Y.Zrc<n>\" in "
+    "src/libs/common/config_os.h")
 endif()
- 
+string(REGEX REPLACE "^([0-9]+\\.[0-9]+\\.[0-9]+).*$" "\\1"
+  PESTPP_VERSION_NUMERIC "${PESTPP_VERSION_FULL}")
+
 message(STATUS
-  "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION}")
+  "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION_FULL}")
 
 # This logic needs to be considered before project()
 if(MSVC)
@@ -60,7 +72,7 @@ if(WIN32)
 endif()
 
 project(PESTPP
-  VERSION ${PESTPP_VERSION}
+  VERSION ${PESTPP_VERSION_NUMERIC}
   HOMEPAGE_URL "https://github.com/usgs/pestpp/"
   LANGUAGES CXX)
 
@@ -228,6 +240,8 @@ string(TOLOWER ${PROJECT_NAME} CPACK_PACKAGE_NAME)
 set(CPACK_PACKAGE_VERSION_MAJOR ${PESTPP_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PESTPP_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PESTPP_VERSION_PATCH})
+# the FULL version, suffix and all, so a release candidate names itself in the archive
+set(CPACK_PACKAGE_VERSION ${PESTPP_VERSION_FULL})
 set(CPACK_SYSTEM_NAME ${_ostag})
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 include(CPack)
