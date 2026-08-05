@@ -11,10 +11,16 @@ on:
   workflow_dispatch:
     inputs:
       draft:
-        description: 'Create the release as a draft (review before it goes public)'
+        description: 'Create as a draft (not public, and the TAG is not created until you publish)'
         required: false
         type: boolean
         default: true
+      prerelease:
+        description: 'Mark prerelease? auto = yes when the version carries a suffix (5.2.29rc1)'
+        required: false
+        type: choice
+        default: 'auto'
+        options: ['auto', 'yes', 'no']
 
 permissions:
   contents: write        # create the release and upload assets
@@ -130,12 +136,27 @@ jobs:
             echo "::error::release $version already exists - bump PESTPP_VERSION in src/libs/common/config_os.h"
             exit 1
           fi
+          # Draft and prerelease are independent, not a three-way choice: a draft can also be
+          # marked prerelease, and it carries that through to publication.
+          #
+          # A DRAFT HAS NO TAG. GitHub creates the tag only when the release is published, and
+          # the automatic "Source code (zip/tar.gz)" assets are generated FROM the tag - so a
+          # draft shows only the archives uploaded here, and is not a faithful preview.
           draft=""
           if [[ "${{ inputs.draft }}" == "true" ]]; then draft="--draft"; fi
-          # a version carrying a suffix is a release candidate: mark it prerelease so it is not
-          # served as "latest"
+
+          # auto: a version carrying a suffix is a release candidate, so it must not be served
+          # as "latest". Explicit yes/no is there for the cases the pattern cannot know about -
+          # a numbered version that is still not ready, or an rc you deliberately want promoted.
           prerelease=""
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then prerelease="--prerelease"; fi
+          case "${{ inputs.prerelease }}" in
+            yes) prerelease="--prerelease" ;;
+            no)  prerelease="" ;;
+            *)   if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                   prerelease="--prerelease"
+                 fi ;;
+          esac
+          echo "version=$version draft=${draft:-no} prerelease=${prerelease:-no}"
           gh release create "$version" \
             --target "${{ github.sha }}" \
             --title "PEST++ $version" \
