@@ -13,7 +13,7 @@
 // No trailing semicolon. There used to be one, which made this macro expand to `"5.2.28";` -
 // so it happened to work as `string v = PESTPP_VERSION;` and would not compile anywhere else,
 // string(PESTPP_VERSION) included.
-#define PESTPP_VERSION "5.2.29"
+#define PESTPP_VERSION "5.2.30"
 
 #if defined(_WIN32) || defined(_WIN64)
 #define OS_WIN
