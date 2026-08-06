@@ -274,6 +274,15 @@ public:
 	virtual int get_num_good_runs(void);
 	/** @brief Return the number of runs whose failure count has exceeded max_run_fail. */
 	virtual int get_num_failed_runs(void);
+	/** @brief Set the retry limit on a LIVE run manager.
+	 *
+	 * Read on every pass of the scheduling loop rather than cached, so raising or lowering it
+	 * between batches - or from inside a run observer, which executes on the run loop's own
+	 * thread - takes effect on the next decision the manager makes.
+	 */
+	void set_max_n_failure(int _max_n_failure) { max_n_failure = _max_n_failure; }
+	int get_max_n_failure() const { return max_n_failure; }
+
 	/** @brief Return true if the run identified by @p id has failed more than max_n_failure times. */
 	virtual bool n_run_failures_exceeded(int id);
 	virtual int get_nruns(void) {return file_stor.get_nruns();}

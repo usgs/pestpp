@@ -178,6 +178,24 @@ public:
 		const vector<string>& obs_names=vector<string>(),int _timeout_milliseconds=10,int _echo_interval_milliseconds=10,
 		bool _persistent_workers=true, int _min_ping_internal_secs=60);
 
+	/** @brief Live setters for the overdue-run policy.
+	 *
+	 * All three are consulted inside the scheduling loop every pass (see the duration tests in
+	 * RunManagerPanther.cpp), so changing one mid-batch changes what the master does with the
+	 * runs still in flight. That is the point: "this batch is dragging, give up sooner" is a
+	 * decision you can only make once you can see it dragging.
+	 *
+	 * NOT touched here: max_concurrent_runs, which the constructor derives from the initial
+	 * max_n_failure. Re-deriving it on a later change would silently resize the batch, which
+	 * is not what a caller adjusting a retry limit is asking for.
+	 */
+	void set_overdue_resched_fac(double val) { overdue_reched_fac = val; }
+	void set_overdue_giveup_fac(double val) { overdue_giveup_fac = val; }
+	void set_overdue_giveup_minutes(double val) { overdue_giveup_minutes = val; }
+	double get_overdue_resched_fac() const { return overdue_reched_fac; }
+	double get_overdue_giveup_fac() const { return overdue_giveup_fac; }
+	double get_overdue_giveup_minutes() const { return overdue_giveup_minutes; }
+
 	virtual void initialize(const Parameters &model_pars, const Observations &obs, const std::string &_filename = std::string(""));
 	virtual void initialize_restart(const std::string &_filename);
 	virtual void reinitialize(const std::string &_filename = std::string(""));

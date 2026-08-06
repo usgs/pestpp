@@ -1849,6 +1849,67 @@ pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* tstat)
     CAPI_END()
 }
 
+/** Push the run-manager tuning options onto the LIVE run manager.
+ *
+ * RunManagerPanther is deliberately decoupled from PestppOptions - it never reads the scenario,
+ * everything arrives through its constructor - so an option set after pestpp_create() reached
+ * the options object and nothing else. That was silent: the call succeeded, pestpp_get_option
+ * read the new value back, and the run manager went on using the old one.
+ *
+ * Rather than match on key names, every tuning value is re-pushed after any successful set.
+ * It is four assignments, and it cannot drift out of step with the option names the way a
+ * hand-maintained key list would.
+ */
+static void sync_run_manager_options(PestppSession* s)
+{
+    if (s->run_manager == nullptr)
+        return;
+    const PestppOptions& opt = s->adapter->scenario().get_pestpp_options();
+    s->run_manager->set_max_n_failure(opt.get_max_run_fail());
+    // the overdue policy is panther's alone - the serial and external managers have no
+    // concept of a run being late, because nothing is running concurrently to compare against
+    RunManagerPanther* p = dynamic_cast<RunManagerPanther*>(s->run_manager.get());
+    if (p != nullptr)
+    {
+        p->set_overdue_resched_fac(opt.get_overdue_reched_fac());
+        p->set_overdue_giveup_fac(opt.get_overdue_giveup_fac());
+        p->set_overdue_giveup_minutes(opt.get_overdue_giveup_minutes());
+    }
+}
+
+pestpp_status pestpp_get_run_manager_settings(pestpp_handle h, int* max_run_fail,
+                                              double* overdue_resched_fac,
+                                              double* overdue_giveup_fac,
+                                              double* overdue_giveup_minutes)
+{
+    CAPI_BEGIN(h)
+        if (s->run_manager == nullptr)
+            bad_state("no run manager on this session");
+        // read off the RUN MANAGER, not the options - that difference is the whole point of
+        // this call. The options say what was asked for; these say what the manager will use.
+        if (max_run_fail != nullptr)
+            *max_run_fail = s->run_manager->get_max_n_failure();
+        RunManagerPanther* p = dynamic_cast<RunManagerPanther*>(s->run_manager.get());
+        bool wants_overdue = (overdue_resched_fac != nullptr) ||
+                             (overdue_giveup_fac != nullptr) ||
+                             (overdue_giveup_minutes != nullptr);
+        if (wants_overdue)
+        {
+            if (p == nullptr)
+                unsupported("the overdue-run policy exists only for the panther run manager: "
+                            "the serial and external managers run nothing concurrently, so no "
+                            "run can be late relative to another");
+            if (overdue_resched_fac != nullptr)
+                *overdue_resched_fac = p->get_overdue_resched_fac();
+            if (overdue_giveup_fac != nullptr)
+                *overdue_giveup_fac = p->get_overdue_giveup_fac();
+            if (overdue_giveup_minutes != nullptr)
+                *overdue_giveup_minutes = p->get_overdue_giveup_minutes();
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* value)
 {
     CAPI_BEGIN(h)
@@ -1872,6 +1933,8 @@ pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* va
             bad_arg(string("unknown option '") + key + "'");
         if (st == PestppOptions::ARG_STATUS::ARG_INVALID)
             bad_arg(string("invalid value for option '") + key + "': " + value);
+        // the run manager caches its tuning values, so tell it about the change
+        sync_run_manager_options(s);
         return PESTPP_OK;
     CAPI_END()
 }

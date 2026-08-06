@@ -2212,6 +2212,81 @@ def api_robust_requires_paired_parameters_test():
     print("api_robust_requires_paired_parameters_test passed")
 
 
+def api_run_manager_settings_are_live_test():
+    """Run-manager tuning set through the API reaches the RUN MANAGER, not just the options.
+
+    RunManagerPanther is deliberately decoupled from PestppOptions - it never reads the
+    scenario, every value arrives through its constructor - and the API builds it during
+    create(), before a caller can touch anything. So a set_option afterwards used to reach the
+    options object and stop there: the call returned OK, get_option read the new value back,
+    and the master went on using the value it was built with. Nothing anywhere said otherwise.
+
+    These four are consulted inside the scheduling loop on every pass, so changing one mid-run
+    changes what happens to the runs already in flight - which is the point, since "this batch
+    is dragging, give up sooner" is a decision you can only make once you can see it dragging.
+    """
+    d = _case("api_rm_live", noptmax=1, num_reals=5)
+    pst = pyemu.Pst(os.path.join(d, "pest.pst"))
+    pst.pestpp_options["overdue_giveup_fac"] = 2.0
+    pst.pestpp_options["overdue_resched_fac"] = 1.15
+    pst.pestpp_options["overdue_giveup_minutes"] = 3000.0
+    pst.pestpp_options["max_run_fail"] = 3
+    pst.write(os.path.join(d, "pest.pst"), version=2)
+
+    with Ies.from_pst("pest.pst", workdir=d, workers=2, port=4601) as ies:
+        ies.initialize()
+        built = ies.run_manager_settings()
+        assert built["overdue_giveup_fac"] == 2.0, \
+            "the manager should be built with what the control file asked for: {0}".format(built)
+        assert built["max_run_fail"] == 3, built
+
+        # the assertion that matters: the RUN MANAGER changes, not merely the option
+        ies.set_option("overdue_giveup_fac", 99.0)
+        ies.set_option("overdue_resched_fac", 7.5)
+        ies.set_option("overdue_giveup_minutes", 11.0)
+        ies.set_option("max_run_fail", 9)
+        live = ies.run_manager_settings()
+        assert live["overdue_giveup_fac"] == 99.0, \
+            "set_option must reach the run manager, got {0}".format(live)
+        assert live["overdue_resched_fac"] == 7.5, live
+        assert live["overdue_giveup_minutes"] == 11.0, live
+        assert live["max_run_fail"] == 9, live
+        # ...and the options agree, so the two views cannot silently diverge
+        assert float(ies.get_option("overdue_giveup_fac")) == 99.0
+
+        # the construction-bound panther options are refused rather than silently ignored,
+        # which is the honest half of the same problem
+        for key, val in (("panther_persistent_workers", False),
+                         ("panther_master_timeout_milliseconds", 50),
+                         ("panther_ping_interval_secs", 15)):
+            try:
+                ies.set_option(key, val)
+                raise AssertionError("'{0}' is consumed at construction and should be "
+                                     "refused on a running session".format(key))
+            except PestppError as e:
+                assert "init-only" in str(e).lower(), \
+                    "the refusal should say why, got: {0}".format(e)
+        ies.finalize()
+    print("api_run_manager_settings_are_live_test passed")
+
+
+def api_overdue_policy_is_panther_only_test():
+    """A serial session has no overdue policy, and says so rather than inventing numbers."""
+    d = _case("api_rm_serial", noptmax=1, num_reals=5)
+    with Ies.from_pst("pest.pst", workdir=d) as ies:      # serial: no workers
+        ies.initialize()
+        # max_run_fail is shared by every run manager, so it still answers
+        assert ies.run_manager_settings(overdue=False)["max_run_fail"] >= 0
+        try:
+            ies.run_manager_settings()
+            raise AssertionError("the overdue policy should be refused on a serial session")
+        except PestppError as e:
+            assert "panther" in str(e).lower(), \
+                "the refusal should name the manager that has one, got: {0}".format(e)
+        ies.finalize()
+    print("api_overdue_policy_is_panther_only_test passed")
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -2275,6 +2350,8 @@ if __name__ == "__main__":
     api_robust_is_sqp_only_test()
     api_retired_sqp_risk_is_refused_test()
     api_init_only_options_are_refused_live_test()
+    api_run_manager_settings_are_live_test()
+    api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_robust_requires_paired_parameters_test()
     api_stacks_are_mou_and_sqp_only_test()

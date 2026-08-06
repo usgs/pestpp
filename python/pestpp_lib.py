@@ -306,6 +306,10 @@ class PestppLib:
         lib.pestpp_solve_finish.restype = c_int
         lib.pestpp_get_candidate_count.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_get_candidate_count.restype = c_int
+        lib.pestpp_get_run_manager_settings.argtypes = (c_void_p, POINTER(c_int),
+                                                        POINTER(c_double), POINTER(c_double),
+                                                        POINTER(c_double))
+        lib.pestpp_get_run_manager_settings.restype = c_int
         lib.pestpp_get_stack_status.argtypes = (c_void_p, POINTER(c_int), POINTER(c_int),
                                                 POINTER(c_int), POINTER(c_double), POINTER(c_int))
         lib.pestpp_get_stack_status.restype = c_int
@@ -609,6 +613,24 @@ class PestppLib:
         self._check(self.lib.pestpp_get_candidate_count(self.handle, byref(n)),
                     "pestpp_get_candidate_count")
         return n.value
+
+    def get_run_manager_settings(self, overdue: bool = True) -> dict:
+        """What the LIVE run manager is using, not what the options say.
+
+        The overdue policy is panther-only; pass overdue=False on a serial or external session.
+        """
+        mrf = c_int()
+        rs, gf, gm = c_double(), c_double(), c_double()
+        self._check(self.lib.pestpp_get_run_manager_settings(
+            self.handle, byref(mrf),
+            byref(rs) if overdue else None,
+            byref(gf) if overdue else None,
+            byref(gm) if overdue else None), "pestpp_get_run_manager_settings")
+        out = {"max_run_fail": mrf.value}
+        if overdue:
+            out.update({"overdue_resched_fac": rs.value, "overdue_giveup_fac": gf.value,
+                        "overdue_giveup_minutes": gm.value})
+        return out
 
     def get_stack_status(self) -> dict:
         """How chance is being accounted for right now - mou and sqp only.

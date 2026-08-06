@@ -522,6 +522,23 @@ class _Tool:
         """
         return [Candidate(self, i) for i in range(self._lib.get_candidate_count())]
 
+    def run_manager_settings(self, overdue: bool = True) -> dict:
+        """What the LIVE run manager is using - not what :meth:`get_option` reports.
+
+        The run manager takes its tuning values when the session is created, so these two can
+        disagree. :meth:`set_option` now pushes the four below onto the running manager, and
+        this is how you confirm it: ``get_option`` answers "what did I ask for", this answers
+        "what will the master actually do with a run that is running long".
+
+        ``max_run_fail``, ``overdue_resched_fac``, ``overdue_giveup_fac`` and
+        ``overdue_giveup_minutes`` can all be changed mid-run - the scheduling loop re-reads
+        them every pass, so a change reaches the runs already in flight. The remaining panther
+        options are consumed when the manager is built and are refused once it is running.
+
+        ``overdue`` must be False on a serial or external session, which has no overdue policy.
+        """
+        return self._lib.get_run_manager_settings(overdue=overdue)
+
     def set_option(self, key: str, value) -> None:
         """Set a ++ option or a * control data value. An unknown key raises.
 

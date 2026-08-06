@@ -664,6 +664,27 @@ PESTPP_API pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* t
 /* Set a ++ option or a * control data value by name. An unknown key is an ERROR: a set that
    quietly does nothing is the worst outcome here, because the caller goes on believing the
    option took. */
+/* What the LIVE run manager is using, which is not always what the options say.
+ *
+ * The run manager takes its tuning values at construction. pestpp_set_option() now pushes the
+ * four below onto the running manager as well, so the two agree - but reading them from the
+ * manager rather than the options is how you CONFIRM that, and it is the honest answer to
+ * "what will this master actually do with a run that is running long".
+ *
+ * All out-params are optional. The overdue policy belongs to the panther manager alone;
+ * asking for it on a serial or external session is an error rather than a made-up number,
+ * because nothing runs concurrently there for a run to be late against.
+ *
+ * These four ARE settable mid-run, including from inside a run observer - the observer
+ * executes on the run loop's own thread, and the scheduling loop re-reads all four every
+ * pass, so a change lands on the runs already in flight. The other panther options
+ * (panther_persistent_workers, the timeout/echo/ping cadences) are consumed when the manager
+ * is built and are marked init-only; setting one on a running session is refused. */
+PESTPP_API pestpp_status pestpp_get_run_manager_settings(pestpp_handle h, int* max_run_fail,
+                                                         double* overdue_resched_fac,
+                                                         double* overdue_giveup_fac,
+                                                         double* overdue_giveup_minutes);
+
 PESTPP_API pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* value);
 
 /* Read one back. Pass buf=NULL to learn `needed` (including the NUL).
