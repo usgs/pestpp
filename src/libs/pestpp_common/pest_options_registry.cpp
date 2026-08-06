@@ -287,6 +287,10 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ vector<string> v; vector<string> tok; tokenize(value,tok,", "); for(const auto& t:tok){ v.push_back(strip_cp(t)); } o.set_opt_constraint_groups(v); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_opt_constraint_groups({}); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; auto v=o.get_opt_constraint_groups(); for(size_t i=0;i<v.size();++i){if(i)ss<<",";ss<<v[i];} return ss.str(); } },
+    OptionSpec{ "OPT_USE_ROBUST", {}, OptType::BOOL, "opt", true,
+        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_opt_use_robust(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o){ o.set_opt_use_robust(false); },
+        [](const PestppOptions& o)->string{ return o.get_opt_use_robust() ? "1" : "0"; } },
     OptionSpec{ "OPT_RISK", {}, OptType::DOUBLE, "opt", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_opt_risk(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_opt_risk(0.5); },
@@ -1014,7 +1018,7 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o){ o.set_sqp_seek_feas_max_iter(3); },
         [](const PestppOptions& o)->string{ return std::to_string(o.get_sqp_seek_feas_max_iter()); } },
     OptionSpec{ "SQP_RISK", {}, OptType::DOUBLE, "sqp", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_sqp_risk(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ (void)o; (void)value; throw runtime_error("++sqp_risk has been retired. For chance-constrained sqp use ++opt_risk (the same option mou and pestpp-opt use). For robust optimization over paired decision-variable/parameter realizations use ++opt_use_robust(true), which does no risk shifting and cannot be combined with opt_risk."); },
         [](PestppOptions& o){ o.set_sqp_risk(0.50); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_sqp_risk(); return ss.str(); } },
     OptionSpec{ "SQP_POWELL_DAMPING_FACTOR", {}, OptType::DOUBLE, "sqp", false,
@@ -1113,9 +1117,30 @@ set<string> PestppOptions::get_registered_args() const
 // programmatic path passes false so a caller can change an option repeatedly (e.g. between
 // algorithm iterations). Both record provenance in passed_args so tool-default overrides
 // treat the option as user-supplied.
+// Options that have been REMOVED, and what to do instead. Checked before the registry lookup
+// and deliberately OUTSIDE the parse try/catch below, which turns every exception into a bare
+// ARG_INVALID ("invalid value for option 'X'") - useless for a retired option, where the value
+// was never the problem and the caller needs to be told what replaced it.
+static string retired_option_message(const string& key)
+{
+    if (key == "SQP_RISK")
+        return "++sqp_risk has been retired. It was both a risk value AND the switch that "
+               "selected ensemble-based shifting, so it silently overrode opt_risk. Use "
+               "++opt_risk for chance-constrained sqp (the same option mou and pestpp-opt "
+               "use), or ++opt_use_robust(true) for robust optimization over paired "
+               "decision-variable/parameter realizations, which does no risk shifting and "
+               "cannot be combined with opt_risk.";
+    return string();
+}
+
 PestppOptions::ARG_STATUS PestppOptions::assign_registry_impl(string key, const string org_value, bool check_duplicate)
 {
     upper_ip(key);
+    {
+        string retired = retired_option_message(key);
+        if (retired.size() > 0)
+            throw runtime_error(retired);
+    }
     string value = upper_cp(org_value);
     if (value.size() == 0) return ARG_STATUS::ARG_INVALID;
     if (check_duplicate && passed_args.find(key) != passed_args.end()) return ARG_STATUS::ARG_DUPLICATE;

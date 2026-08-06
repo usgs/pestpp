@@ -330,10 +330,12 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		}
 
 		ParameterEnsemble uncertain_ensemble(&pest_scenario, &rand_gen);
-		double opt_risk = pest_scenario.get_pestpp_options().get_opt_risk();
-		double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
-		bool use_chance = (opt_risk != 0.5) || (sqp_risk != 0.5);
-		if (adj_par_names.size() > 0 && use_chance)
+		//the uncertain-parameter draw exists to be PAIRED with the dv realizations, which is
+		//robust optimization's whole construction. A chance-constrained (non-robust) run gets
+		//its uncertainty from the stack instead and wants the uncertain parameters held at
+		//their control values, so the gradient is with respect to decisions alone.
+		bool use_robust = pest_scenario.get_pestpp_options().get_opt_use_robust();
+		if (adj_par_names.size() > 0 && use_robust)
 		{
 			Covariance unc_cov = uncertain_parcov.get(adj_par_names);
 			map<string, double> par_means = pest_scenario.get_ext_file_double_map("PARAMETER DATA EXTERNAL", MEAN_REAL_NAME);
@@ -371,7 +373,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 				file_manager.rec_ofstream());
 		}
 
-		if (dv_names.size() > 0 && adj_par_names.size() > 0 && use_chance)
+		if (dv_names.size() > 0 && adj_par_names.size() > 0 && use_robust)
 		{
 			vector<string> real_names = dv_ensemble.get_real_names();
 			uncertain_ensemble.reorder(real_names, vector<string>());
@@ -499,6 +501,52 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		for (auto& m: missing)
 			ss << m << endl;
 		throw_sqp_error(ss.str());
+	}
+
+	//ROBUST mode is the pairing, so a supplied ensemble that carries only decision variables
+	//has nothing to pair WITH. Left unchecked this is silent and wrong rather than loud: the
+	//uncertain columns get filled from a single replicated row, every realization sees the
+	//same parameter values, and a run that reports itself as robust optimizes against no
+	//uncertainty at all. The drawn path cannot hit this - it concatenates the two draws - so
+	//this only ever fires on a user-supplied ensemble.
+	if (pest_scenario.get_pestpp_options().get_opt_use_robust())
+	{
+		vector<string> missing_unc;
+		Eigen::MatrixXd* dv_mat = dv.get_eigen_ptr_4_mod();
+		for (auto& n : adj_par_names)
+		{
+			auto it = dvmap.find(n);
+			if (it == dvend)
+			{
+				missing_unc.push_back(n);
+				continue;
+			}
+			//present but CONSTANT counts as missing here. from_csv() pads a column the file
+			//did not have - with zeros, not even with the control value - so the name being
+			//in the ensemble proves nothing about whether the user supplied it. A parameter
+			//that takes one value across every realization carries no uncertainty, which is
+			//the thing robust mode exists to propagate.
+			if (dv_mat->rows() > 1)
+			{
+				Eigen::VectorXd col = dv_mat->col(it->second);
+				if ((col.maxCoeff() - col.minCoeff()) == 0.0)
+					missing_unc.push_back(n);
+			}
+		}
+		if (missing_unc.size() > 0)
+		{
+			ss.str("");
+			ss << "++opt_use_robust pairs each decision-variable realization with its own "
+			   << "uncertain parameter realization, but the supplied dv ensemble does not "
+			   << "contain the following uncertain (adjustable, non-decision-variable) "
+			   << "parameters, or contains them with the same value in every realization "
+			   << "(which carries no uncertainty to propagate):" << endl;
+			for (auto& m : missing_unc)
+				ss << m << endl;
+			ss << "add these columns to the dv ensemble, or drop sqp_dv_en and let sqp draw "
+			   << "and pair them." << endl;
+			throw_sqp_error(ss.str());
+		}
 	}
 
 	if (dv_names.size() < pest_scenario.get_ctl_ordered_adj_par_names().size())
@@ -1039,6 +1087,18 @@ void SeqQuadProgram::initialize_parcov()
  */
 int SeqQuadProgram::initialize_prepare()
 {
+	//robust optimization and chance constraints are two different answers to uncertainty and
+	//cannot both be in force: a robust run evaluates every realization against its OWN paired
+	//parameter draw and never shifts, so an opt_risk set alongside it would be silently
+	//ignored. Silent precedence between these two is exactly what retiring sqp_risk removed,
+	//so refuse rather than reintroduce it.
+	if (pest_scenario.get_pestpp_options().get_opt_use_robust() &&
+		(pest_scenario.get_pestpp_options().get_opt_risk() != 0.5))
+		throw_sqp_error("++opt_use_robust and ++opt_risk are mutually exclusive: robust "
+			"optimization evaluates each realization against its own paired parameter draw "
+			"and does no risk shifting, so opt_risk would have no effect. Use one or the "
+			"other - opt_risk for chance constraints, opt_use_robust for robust optimization.");
+
 	// same nomination ies/da/mou use - a 'drop_violations' column in the external observation
 	// file - read from the scenario so it cannot depend on any construction order
 	violation_obs = ViolationDetector::read_nominated(pest_scenario);
@@ -1337,7 +1397,10 @@ void SeqQuadProgram::initialize_finish()
 
 	if (constraints.get_use_chance())
 	{
-		constraints.presolve_chance_report(iter, current_obs, &oe, pest_scenario.get_pestpp_options().get_sqp_risk(), true, "initial chance constraint report");
+		//report against the risk the tool will actually use. This used to pass sqp_risk
+		//explicitly, so an opt_risk run drew and ran a stack, shifted candidates at opt_risk,
+		//and then printed "risk 0.5" from the dv ensemble - contradicting itself.
+		constraints.presolve_chance_report(iter, current_obs, true, "initial chance constraint report");
 	}
 	working_set_tol = pest_scenario.get_pestpp_options().get_sqp_working_set_tol();
 
@@ -3638,27 +3701,9 @@ pair<Mat, bool> SeqQuadProgram::get_constraint_mat(Parameters& _dv_vals, Observa
 	{
 		Parameters decvar = _dv_vals.get_subset(dv_names.begin(), dv_names.end());
 
-		if (constraints.get_use_chance() && (pest_scenario.get_pestpp_options().get_sqp_risk() != 0.5))
-		{
-			Observations base_obs = _obs_vals;
-			if (oe.shape().first > 0)
-			{
-				vector<string> obs_names = oe.get_var_names();
-				Eigen::VectorXd base_vec = oe.get_real_vector(BASE_REAL_NAME);
-				base_obs.update_without_clear(obs_names, base_vec);
-			}
-
-			Observations shifted_obs = constraints.get_chance_shifted_constraints(base_obs, oe, pest_scenario.get_pestpp_options().get_sqp_risk());
-			vector<string> constraint_names = constraints.get_obs_constraint_names();
-			for (auto& name : constraint_names)
-			{
-				if (shifted_obs.find(name) != shifted_obs.end())
-				{
-					_obs_vals.update_rec(name, shifted_obs.get_rec(name));
-				}
-			}
-		}
-
+		//no ensemble-quantile shift here any more: a chance run shifts through the stack
+		//inside get_working_set_constraint_matrix (do_shift=true), and a robust run does not
+		//shift at all.
 		return constraints.get_working_set_constraint_matrix(decvar, _obs_vals, dv, oe, true, lm, curr_ws, (working_set_tol));
 	}
 	else
@@ -5564,18 +5609,11 @@ tuple<FilterRec, SqpFilter> SeqQuadProgram::pick_from_filter(ParameterEnsemble& 
 		obs_map[d] = o;
 	}
 	double viol_pad = pest_scenario.get_pestpp_options().get_sqp_viol_pad();
-	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
+	//one call serves both modes: get_ensemble_violations_map shifts only when use_chance is
+	//on, so a chance run gets the stack shift and a robust run gets none.
 	map<string, map<string, double>> violations, violations_nominal;
-	if (constraints.get_use_chance() && (sqp_risk != 0.5))
-	{
-		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true, &_oe, sqp_risk);
-		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true, &_oe, sqp_risk);
-	}
-	else
-	{
-		violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
-		violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
-	}
+	violations = constraints.get_ensemble_violations_map(dv_candidates, _oe, viol_pad, true);
+	violations_nominal = constraints.get_ensemble_violations_map(dv_candidates, _oe, 0.0, true);
 
 	vector<string> onames = _oe.get_var_names();
 	vector<string> vnames = dv_candidates.get_var_names();
@@ -6488,16 +6526,9 @@ vector<int> SeqQuadProgram::get_subset_idxs(int size, int nreal_subset)
 
 	vector<string> dv_real_names = dv.get_real_names();
 
-	double sqp_risk = pest_scenario.get_pestpp_options().get_sqp_risk();
+	//as above - one call, shifted only when use_chance says so
 	map<string, map<string, double>> violations_nominal;
-	if (constraints.get_use_chance() && (sqp_risk != 0.5))
-	{
-		violations_nominal = constraints.get_ensemble_violations_map(dv, oe, 0.0, true, &oe, sqp_risk);
-	}
-	else
-	{
-		violations_nominal = constraints.get_ensemble_violations_map(dv, oe, 0.0, true);
-	}
+	violations_nominal = constraints.get_ensemble_violations_map(dv, oe, 0.0, true);
 
 	vector<pair<int, double>> idx_vsum_pairs;
 	for (size_t i = 0; i < size; ++i)

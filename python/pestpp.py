@@ -54,6 +54,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, _UNSET,
     PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
+    STACK_PAR_EN, STACK_OBS_EN, NESTED_PAR_EN, MEMBER_STACK_EN,
     TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP,
     RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
     PHI_MEAS, PHI_COMPOSITE, PHI_REGUL, PHI_ACTUAL, PHI_NOISE,
@@ -368,7 +369,9 @@ class _Tool:
         self._finalizer = weakref.finalize(self, _release_session, self._workers, self._lib)
 
     def _q(self):
-        """Capture the library's console output for the duration of a call."""
+        """Capture the library's console output for the duration of a call.
+
+        """
         return _capture_output(self._lib, self._log) if self._quiet else nullcontext()
 
     @property
@@ -1314,8 +1317,200 @@ class Da(_Tool):
         return "pestpp-da"
 
 
-class Mou(_Tool):
-    """Multi-objective optimization under uncertainty. One 'iteration' is a generation."""
+class _ChanceMixin:
+    """Live chance-constraint / risk control, shared by the tools that support it.
+
+    mou and sqp both carry uncertainty through PARAMETER STACKS: an ensemble of the uncertain
+    parameters is run, the resulting spread shifts the constraints and objectives, and `risk`
+    says how conservatively to shift them. So mou does have parameters and realizations - they
+    live here rather than in the population.
+
+    Everything below is asked of the tool, live, so it reflects what `Constraints` will do -
+    including the clamp. That matters: the tool does not use the number you set, it
+    uses the number these accessors report, and the two differ at the edges.
+
+    The four derived flags below are ASKED OF THE TOOL rather than worked out here. The rule
+    that turns options into behaviour is genuinely intricate - robust switches chance off
+    entirely, stacks beat fosm but only when ``opt_std_weights`` is off, risk is clamped - and
+    a second copy of it in python would be a copy that drifts. ``Constraints`` derives it live on every call, so
+    what these report is what the tool will do.
+    """
+
+    @property
+    def stack_status(self) -> dict:
+        """The whole derived chance state in one call - the flags below share this."""
+        return self._lib.get_stack_status()
+
+    @property
+    def use_robust(self) -> bool:
+        """True for ROBUST optimization - ``opt_use_robust``, pestpp-sqp only.
+
+        Each decision-variable realization is paired with its own uncertain parameter
+        realization and the ensemble is optimized as it stands. NOTHING is risk shifted, so
+        :attr:`use_chance` and :attr:`use_fosm` are both False whenever this is True, and the
+        tool refuses ``opt_use_robust`` alongside a non-neutral ``opt_risk``.
+        """
+        return self.stack_status["use_robust"]
+
+    @property
+    def risk(self) -> float:
+        """The risk value the tool will USE - ``opt_risk``, clamped to [0.001, 0.999].
+
+        Read this rather than the option: setting ``opt_risk`` to 1.5 leaves the option at 1.5
+        and the tool using 0.999.
+        """
+        return self.stack_status["risk"]
+
+    @property
+    def use_chance(self) -> bool:
+        """True when chance constraints are active at all - i.e. :attr:`risk` is not 0.5.
+
+        0.5 is risk-neutral and switches the whole machinery off, which is why a run with
+        stacks configured but risk left at 0.5 does no chance work at all.
+        """
+        return self.stack_status["use_chance"]
+
+    @property
+    def use_fosm(self) -> bool:
+        """True when uncertainty comes from FOSM rather than from stacks.
+
+        Stacks win: any of ``opt_stack_size > 0``, ``opt_par_stack`` or ``opt_obs_stack`` set
+        turns FOSM off, unless ``opt_std_weights`` is on. On a robust run it is always off.
+        """
+        return self.stack_status["use_fosm"]
+
+    # -- the stacks themselves -------------------------------------------------------------
+
+    def _stack_df(self, ensemble_id: int, lower: bool, what: str) -> pd.DataFrame:
+        """One stack as a copy. Empty frame when the run does not use stacks."""
+        rows = self._lib.get_ensemble_row_names(ensemble_id)
+        cols = self._lib.get_ensemble_col_names(ensemble_id)
+        if (len(rows) == 0) or (len(cols) == 0):
+            # legitimately empty on a fosm or risk-neutral run - stack_status says which,
+            # and an empty frame with no columns is the honest shape for "there is no stack"
+            return _named(pd.DataFrame(index=rows, columns=cols, dtype=float), "realization",
+                          what)
+        arr, token = self._lib.get_ensemble_view(ensemble_id)
+        try:
+            df = pd.DataFrame(np.array(arr, copy=True), index=rows, columns=cols)
+        finally:
+            self._lib.release_view(token)
+        return _named(_maybe_lower(df, lower), "realization", what)
+
+    def stack_pe(self, lower: bool = False) -> pd.DataFrame:
+        """The PARAMETER stack - the realizations that get run to measure uncertainty.
+
+        Empty unless this is a stack-based chance run; :attr:`stack_status` says why.
+        """
+        return self._stack_df(STACK_PAR_EN, lower, "parnme")
+
+    def stack_oe(self, lower: bool = False) -> pd.DataFrame:
+        """The OBSERVATION stack - the results of running :meth:`stack_pe`.
+
+        This is the ensemble the risk shift is computed from, so it is the one to look at when
+        asking why a constraint was shifted as far as it was.
+        """
+        return self._stack_df(STACK_OBS_EN, lower, "obsnme")
+
+    def nested_pe(self, lower: bool = False) -> pd.DataFrame:
+        """The nested parameter stack. Only filled when chance is evaluated at several points
+        in decision-variable space (``opt_chance_points`` = "all")."""
+        return self._stack_df(NESTED_PAR_EN, lower, "parnme")
+
+    def member_stacks(self) -> list:
+        """Which members have their own observation stack.
+
+        Empty unless ``opt_chance_points`` is "all" - otherwise one stack serves every point
+        and :meth:`stack_oe` is the only stack there is.
+        """
+        if self._lib.get_member_stack_count() == 0:
+            return []
+        return self._lib.get_member_stack_names()
+
+    def member_stack_oe(self, member, lower: bool = False) -> pd.DataFrame:
+        """The observation stack belonging to one member, by name or by index.
+
+        The per-point view of uncertainty: with ``opt_chance_points`` = "all" every population
+        member carries its own stack, so the risk shift differs across the population rather
+        than being one shift applied everywhere.
+
+        Columns are the CONSTRAINTS, not every observation - narrower than :meth:`stack_oe`,
+        which also spans the objective. Rows match :meth:`stack_oe`, since it is the same
+        stack evaluated at a different point in decision-variable space.
+        """
+        names = self.member_stacks()
+        if len(names) == 0:
+            raise RuntimeError(
+                "there are no per-member stacks - " +
+                ("this run is risk neutral" if not self.use_chance else
+                 "this run uses fosm" if self.use_fosm else
+                 'opt_chance_points is not "all", so one stack serves every point'))
+        if isinstance(member, str):
+            if member not in names:
+                raise KeyError(f"no stack for member '{member}'; have {names}")
+            idx = names.index(member)
+        else:
+            idx = int(member)
+            if not (0 <= idx < len(names)):
+                raise IndexError(f"member stack {idx} out of range, have {len(names)}")
+        return self._stack_df(MEMBER_STACK_EN + idx, lower, "obsnme")
+
+    @property
+    def chance_config(self) -> dict:
+        """Every chance/stack option with its live value, plus the DERIVED state.
+
+        Gathered because they are meaningless apart - stacks with risk at 0.5 do nothing, and
+        a risk without stacks silently means FOSM. The derived keys are what the tool will
+        actually do; the rest is what was asked for.
+        """
+        opts = ["opt_risk", "opt_use_robust", "opt_stack_size", "opt_par_stack", "opt_obs_stack",
+                "opt_chance_points", "opt_chance_schedule", "opt_recalc_chance_every",
+                "std_weights"]
+        out = {}
+        for k in opts:
+            try:
+                out[k] = self.get_option(k)
+            except Exception:
+                out[k] = None
+        out["risk (effective)"] = self.risk
+        out["use_chance"] = self.use_chance
+        out["use_fosm"] = self.use_fosm
+        out["use_robust"] = self.use_robust
+        return out
+
+    def set_risk(self, risk: float) -> None:
+        """Set the risk level, live.
+
+        0.5 is risk-neutral and disables chance entirely; above 0.5 is risk-averse for a
+        less-than constraint. Values outside [0.001, 0.999] are accepted by the option and
+        clamped by the tool - :attr:`risk` reports what will actually be used.
+
+        Refused on a robust run: robust optimization does no risk shifting, so there is no
+        risk to set.
+        """
+        if self.use_robust:
+            raise RuntimeError(
+                "this is a robust run (opt_use_robust): it evaluates each realization against "
+                "its own paired parameter draw and does no risk shifting, so opt_risk has no "
+                "effect and the tool refuses the combination")
+        self.set_option("opt_risk", float(risk))
+
+    def set_stack_size(self, n: int) -> None:
+        """Set the parameter stack size, live. Non-zero turns FOSM off in favour of stacks."""
+        self.set_option("opt_stack_size", int(n))
+
+    def recalc_chance_every(self, n: int) -> None:
+        """How often to re-run the stacks. Every iteration is expensive; never is stale."""
+        self.set_option("opt_recalc_chance_every", int(n))
+
+
+class Mou(_ChanceMixin, _Tool):
+    """Multi-objective optimization under uncertainty. One 'iteration' is a generation.
+
+    mou speaks of MEMBERS, DECISION VARIABLES and OBJECTIVES, not realizations, parameters and
+    phi. The shared surface uses the latter because it is shared; the aliases here let mou code
+    read like mou. They are aliases, not copies - ``dv_pop()`` is ``par_df()``.
+    """
     _tool_id = TOOL_MOU
     _has_phi = False
 
@@ -1323,15 +1518,66 @@ class Mou(_Tool):
     def _agent_exe():
         return "pestpp-mou"
 
+    # -- vocabulary ------------------------------------------------------------------------
 
-class Sqp(_Tool):
-    """Sequential quadratic programming."""
+    def dv_pop(self, lower: bool = False) -> pd.DataFrame:
+        """The decision-variable population. Alias of :meth:`par_df`."""
+        return self.par_df(lower=lower)
+
+    def obs_pop(self, lower: bool = False) -> pd.DataFrame:
+        """The observation population. Alias of :meth:`obs_df`."""
+        return self.obs_df(lower=lower)
+
+    @property
+    def population_size(self) -> int:
+        """Alias of :attr:`n_reals`."""
+        return self.n_reals
+
+    @property
+    def members(self) -> np.ndarray:
+        """Alias of :attr:`real_names`."""
+        return self.real_names
+
+    @property
+    def ppd_config(self) -> dict:
+        """The options that define a probabilistic-dominance run, with their live values.
+
+        Gathered in one place because they are meaningless apart: a beta without NSGA_PPD does
+        nothing, and an infill size without an outer repository has nowhere to send its points.
+        """
+        self._require_live("ppd_config")
+        keys = ["mou_env_selector", "mou_ppd_beta", "mou_fit_gamma", "mou_fit_epsilon",
+                "mou_infill_size", "mou_max_archive_size", "mou_generator",
+                "mou_outer_repo_obs_file", "mou_dv_population_file",
+                "mou_obs_population_restart_file"]
+        out = {}
+        for k in keys:
+            try:
+                out[k] = self.get_option(k)
+            except Exception:
+                out[k] = None
+        return out
+
+
+class Sqp(_ChanceMixin, _Tool):
+    """Sequential quadratic programming.
+
+    sqp is a search along a trajectory, not an ensemble method - the ensemble is machinery for
+    estimating a gradient. It has an OBJECTIVE FUNCTION and a CONSTRAINT VIOLATION, which is
+    why ``phi`` is unavailable: phi has no room for the second number, and the two together are
+    what say whether a run worked.
+    """
     _tool_id = TOOL_SQP
     _has_phi = False
 
     @staticmethod
     def _agent_exe():
         return "pestpp-sqp"
+
+    def dv_df(self, lower: bool = False) -> pd.DataFrame:
+        """The decision-variable ensemble. Alias of :meth:`par_df`."""
+        return self.par_df(lower=lower)
+
 
 
 # ---- worker management --------------------------------------------------------------------

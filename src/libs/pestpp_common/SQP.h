@@ -261,6 +261,8 @@ public:
 	/// use - see get_use_ensemble_grad(); otherwise sqp carries a single point.
 	ParameterEnsemble* get_dv_ptr() { return &dv; }
 	ObservationEnsemble* get_oe_ptr() { return &oe; }
+	/// the chance machinery - risk, stacks, and the constraint bookkeeping behind them.
+	Constraints* get_constraints_ptr() { return &constraints; }
 
 protected:
 	// Derived live from the options.  Protected rather than private only so the selftest

@@ -1734,6 +1734,484 @@ def api_deferred_initialize_mou_test():
             "{0} differs between the atomic and split initialize".format(f)
 
 
+def _stack_case(name, risk=0.95, stack_size=10, chance_points="all", tool="mou"):
+    """A case that uses STACKS for chance, built from the tracked g07 template.
+
+    g07's parameters are ALL decision variables, and a stack needs something else to vary -
+    "adjustable but not a decision variable" is what gets drawn. So one parameter is moved to
+    its own group, which is the same shape the rosenbrock chance case uses.
+
+    sqp needs ``sqp_num_reals`` for any of this: without an ensemble it takes the
+    finite-difference gradient path, where chance dies with "no stack runs have been
+    processed". That is a real gap, not a configuration rule.
+    """
+    base = os.path.join(_BENCH, "g07", "template")
+    d = os.path.join(_BENCH, name)
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(base, d)
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    drop = "sqp_" if tool == "mou" else "mou_"
+    for k in [k for k in pst.pestpp_options if k.startswith(drop)]:
+        pst.pestpp_options.pop(k)
+    # the uncertain parameter the stack is drawn over
+    pst.parameter_data.loc["x10", "pargp"] = "uncertain"
+    o = pst.pestpp_options
+    o["opt_dec_var_groups"] = "decvar"
+    o["opt_stack_size"] = stack_size
+    o["opt_chance_points"] = chance_points
+    o["random_seed"] = 11
+    o["opt_risk"] = risk
+    if tool == "mou":
+        o["mou_population_size"] = 10
+        o["mou_generator"] = "de"
+    else:
+        o["sqp_num_reals"] = 8
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    return d
+
+
+def api_chance_stacks_are_reachable_test():
+    """The chance stacks, live, for mou.
+
+    mou and sqp carry uncertainty through a PARAMETER STACK that is actually run, and until now
+    the stack was unreachable: stack_pe/stack_oe are private members of Constraints. That made
+    the one thing a surrogate-assisted or bayesian-optimization workflow needs - the per-member
+    uncertainty behind each objective value - invisible from python.
+
+    The shapes are the assertion that matters. stack_oe must have one row per stack realization
+    and one column per observation, and each per-member stack must match it, because they are
+    the same stack evaluated at a different point in decision variable space.
+    """
+    d = _stack_case("api_chance_stacks", risk=0.95, stack_size=10)
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+
+        st = mou.stack_status
+        assert st["use_chance"], "risk is 0.95, so chance must be on: {0}".format(st)
+        assert not st["use_fosm"], \
+            "opt_stack_size is set, so stacks must beat fosm: {0}".format(st)
+        assert abs(st["risk"] - 0.95) < 1.0e-8, st
+        assert st["stack_size"] == 10, \
+            "the drawn stack should have 10 realizations, got {0}".format(st["stack_size"])
+
+        # the derived flags must agree with the status dict they are drawn from
+        assert mou.risk == st["risk"] and mou.use_chance == st["use_chance"] \
+            and mou.use_fosm == st["use_fosm"] and mou.use_robust == st["use_robust"]
+
+        pe, oe = mou.stack_pe(), mou.stack_oe()
+        assert pe.shape[0] == 10, "stack_pe should have 10 realizations, got {0}".format(pe.shape)
+        assert oe.shape[0] == 10, "stack_oe should have 10 realizations, got {0}".format(oe.shape)
+        assert list(oe.columns) == [n.upper() for n in mou.pst.obs_names], \
+            "stack_oe should span the observations: {0}".format(list(oe.columns))
+        assert not oe.isnull().values.any(), "the stack was run, so it should hold values"
+
+        # opt_chance_points="all" means every member carries its own stack
+        names = mou.member_stacks()
+        assert len(names) > 0, "opt_chance_points is 'all', so there should be member stacks"
+        one = mou.member_stack_oe(names[0])
+        assert one.shape[0] == oe.shape[0], \
+            "a member stack has the same realizations as the stack it came from: {0} vs {1}"\
+            .format(one.shape, oe.shape)
+        # but NOT the same columns: the per-member stacks carry the CONSTRAINTS only, while
+        # the single stack spans the objective too. Worth pinning - it is invisible on a case
+        # where every observation happens to be a constraint.
+        assert set(one.columns) < set(oe.columns), \
+            "a member stack should be a strict column subset of the single stack: {0} vs {1}"\
+            .format(list(one.columns), list(oe.columns))
+        # name and index address the same stack - the ids walk the same sorted map
+        assert (mou.member_stack_oe(0).values == one.values).all(), \
+            "member_stack_oe by index and by name disagree"
+
+        try:
+            mou.member_stack_oe("not-a-member")
+            raise AssertionError("a bad member name should raise")
+        except KeyError:
+            pass
+        try:
+            mou.member_stack_oe(len(names))
+            raise AssertionError("an out of range member index should raise")
+        except IndexError:
+            pass
+
+        # lower= must reach the columns, as everywhere else in the friendly layer
+        assert list(mou.stack_oe(lower=True).columns) == [c.lower() for c in oe.columns]
+
+        mou.finalize()
+    print("api_chance_stacks_are_reachable_test passed")
+
+
+def api_empty_stack_says_why_test():
+    """An empty stack is an ANSWER, not a failure - and the reason is retrievable.
+
+    A fosm run and a risk-neutral run both leave every stack empty forever, and neither is an
+    error. But "empty" alone is indistinguishable from "not drawn yet", and those want opposite
+    responses, so the status flags have to separate them. This asserts the fosm case: chance is
+    on, the stacks are empty anyway, and use_fosm says why.
+    """
+    # risk on, but no stack configured -> fosm, and the stacks stay empty
+    d = _stack_case("api_chance_fosm", risk=0.95, stack_size=0, chance_points="single")
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        st = mou.stack_status
+        assert st["use_chance"], "risk is still 0.95, so chance is on: {0}".format(st)
+        assert st["use_fosm"], \
+            "with no stack configured this must fall back to fosm: {0}".format(st)
+        assert mou.stack_pe().empty and mou.stack_oe().empty, \
+            "a fosm run draws no stack, so both stacks must be empty"
+        assert mou.member_stacks() == [], "fosm has no per-member stacks either"
+        # and asking for one names the reason rather than raising something opaque
+        try:
+            mou.member_stack_oe(0)
+            raise AssertionError("there are no member stacks, so this should raise")
+        except RuntimeError as e:
+            assert "fosm" in str(e).lower(), \
+                "the error should say WHY there are no stacks, got: {0}".format(e)
+        mou.finalize()
+
+    # risk neutral: chance off entirely, whatever else is configured
+    d = _stack_case("api_chance_neutral", risk=0.5, stack_size=10)
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        st = mou.stack_status
+        assert not st["use_chance"], \
+            "risk 0.5 is risk neutral and switches chance off: {0}".format(st)
+        assert mou.stack_oe().empty, "a risk neutral run draws no stack"
+        assert mou.risk == 0.5
+        mou.finalize()
+    print("api_empty_stack_says_why_test passed")
+
+
+def api_risk_is_clamped_and_live_test():
+    """set_risk() lands where the tool reads it, and the tool clamps what it uses.
+
+    The clamp is the point: opt_risk stays at whatever was set, while the value the tool
+    actually uses is bounded to [0.001, 0.999]. Reading the option instead of `risk` gives a
+    number the tool never uses, which is why `risk` is derived on the C++ side rather than
+    recomputed here.
+    """
+    d = _stack_case("api_chance_clamp", risk=0.95, stack_size=10)
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        mou.set_risk(1.5)
+        # get_option is string-valued by contract, so this is the raw text of what was set
+        assert float(mou.get_option("opt_risk")) == 1.5, "the option should hold what was set"
+        assert mou.risk == 0.999, \
+            "the tool clamps to 0.999, got {0}".format(mou.risk)
+        mou.set_risk(0.0)
+        assert mou.risk == 0.001, "clamped at the bottom too, got {0}".format(mou.risk)
+        mou.set_risk(0.5)
+        assert not mou.use_chance, "0.5 switches chance back off"
+        mou.finalize()
+    print("api_risk_is_clamped_and_live_test passed")
+
+
+def api_stacks_are_mou_and_sqp_only_test():
+    """ies and da have no chance machinery, and say so rather than returning empties."""
+    d = _case("api_chance_not_ies", noptmax=1)
+    with Ies.from_pst("pest.pst", workdir=d) as ies:
+        ies.initialize()
+        # the friendly layer does not put the mixin on ies at all, so this is an attribute
+        # error rather than a runtime one - the surface simply is not there
+        assert not hasattr(ies, "stack_oe"), \
+            "ies should not carry the chance surface at all"
+        # and the ABI underneath refuses rather than inventing an empty stack
+        try:
+            ies._lib.get_stack_status()
+            raise AssertionError("ies has no constraints, so this should refuse")
+        except PestppError as e:
+            assert "chance" in str(e).lower() or "constraint" in str(e).lower(), \
+                "the refusal should name what is missing, got: {0}".format(e)
+        ies.finalize()
+    print("api_stacks_are_mou_and_sqp_only_test passed")
+
+
+def api_sqp_chance_stacks_are_reachable_test():
+    """The same stack surface on sqp, driven by the SAME option as mou and pestpp-opt.
+
+    sqp used to reach chance through ``sqp_risk``, which was both a risk value and a switch
+    selecting a different mechanism, and which silently overrode ``opt_risk``. It is retired -
+    there is one risk option now, and ``use_robust`` names the other mechanism explicitly.
+    """
+    d = _stack_case("api_chance_sqp", risk=0.95, stack_size=8, chance_points="SINGLE",
+                    tool="sqp")
+    with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+        sqp.initialize()
+
+        st = sqp.stack_status
+        assert not st["use_robust"], "this is a chance run, not a robust one: {0}".format(st)
+        assert st["use_chance"] and not st["use_fosm"], \
+            "opt_risk with a stack means stack-based chance: {0}".format(st)
+        assert abs(st["risk"] - 0.95) < 1.0e-8, st
+
+        pe, oe = sqp.stack_pe(), sqp.stack_oe()
+        assert pe.shape[0] == 8, "stack_pe should hold 8 realizations, got {0}".format(pe.shape)
+        assert oe.shape[0] == 8, "stack_oe should hold 8 realizations, got {0}".format(oe.shape)
+        assert not oe.isnull().values.any(), \
+            "the stack runs were made, so the obs stack should hold values"
+        assert sqp.member_stacks() == [], \
+            "SINGLE chance points means no per-member stacks"
+        sqp.finalize()
+    print("api_sqp_chance_stacks_are_reachable_test passed")
+
+
+def api_robust_does_no_risk_shifting_test():
+    """opt_use_robust turns the chance machinery OFF rather than choosing a flavour of it.
+
+    This is the assertion the whole refactor rests on. Robust optimization pairs each
+    decision-variable realization with its own uncertain parameter realization and optimizes
+    the ensemble as it stands - so there is nothing to shift, no stack to draw, and no runs to
+    spend on one. If any of those were still happening, every downstream "shift or not" branch
+    would need to know about robust mode; because they are not, none of them do.
+    """
+    d = _stack_case("api_robust_sqp", risk=0.5, stack_size=8, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["opt_use_robust"] = True
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+
+    with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+        sqp.initialize()
+        st = sqp.stack_status
+        assert st["use_robust"], "opt_use_robust was set: {0}".format(st)
+        assert not st["use_chance"], \
+            "robust does no risk shifting, so chance must be off: {0}".format(st)
+        assert not st["use_fosm"], "robust does not fall back to fosm either: {0}".format(st)
+        assert st["stack_size"] == 0, \
+            "a robust run should not draw a stack at all, got {0}".format(st["stack_size"])
+        assert sqp.stack_pe().empty and sqp.stack_oe().empty, \
+            "no stack means both stack ensembles are empty"
+
+        # the pairing: the dv ensemble carries the uncertain parameter alongside the dec vars
+        cols = set(sqp.par_df().columns)
+        assert "X10" in cols, \
+            "robust pairs each dv realization with an uncertain parameter draw, so the "\
+            "uncertain parameter should be in the ensemble: {0}".format(sorted(cols))
+
+        # and set_risk is refused rather than silently doing nothing
+        try:
+            sqp.set_risk(0.95)
+            raise AssertionError("set_risk should be refused on a robust run")
+        except RuntimeError as e:
+            assert "robust" in str(e).lower(), e
+        sqp.finalize()
+    print("api_robust_does_no_risk_shifting_test passed")
+
+
+def api_robust_and_risk_are_mutually_exclusive_test():
+    """Setting both is refused, rather than one silently winning.
+
+    Silent precedence between the two mechanisms is exactly what retiring sqp_risk removed, so
+    reintroducing it here would defeat the point: a robust run ignores opt_risk completely, and
+    a user who sets both has asked for two different things.
+    """
+    d = _stack_case("api_robust_conflict", risk=0.95, stack_size=8, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["opt_use_robust"] = True     # ...alongside opt_risk 0.95
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    try:
+        with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+            sqp.initialize()
+        raise AssertionError("opt_use_robust with a non-neutral opt_risk should be refused")
+    except PestppError as e:
+        assert "mutually exclusive" in str(e).lower(), \
+            "the refusal should say why, got: {0}".format(e)
+    print("api_robust_and_risk_are_mutually_exclusive_test passed")
+
+
+def api_robust_is_sqp_only_test():
+    """mou and pestpp-opt reject the flag instead of accepting one that does nothing."""
+    d = _stack_case("api_robust_mou", risk=0.5, stack_size=0, chance_points="SINGLE",
+                    tool="mou")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["opt_use_robust"] = True
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    try:
+        with Mou.from_pst("g07.pst", workdir=d) as mou:
+            mou.initialize()
+        raise AssertionError("mou should reject opt_use_robust")
+    except PestppError as e:
+        msg = str(e).lower()
+        assert ("not supported" in msg) and ("sqp" in msg), \
+            "the refusal should name the tool that does support it, got: {0}".format(e)
+    print("api_robust_is_sqp_only_test passed")
+
+
+def api_retired_sqp_risk_is_refused_test():
+    """A control file still saying sqp_risk gets told what to use instead.
+
+    There is no behaviour-preserving translation - the mode sqp_risk selected did shift, and
+    robust mode does not - so guessing on the user's behalf would silently change results.
+    """
+    d = _stack_case("api_retired_sqp_risk", risk=0.5, stack_size=8, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["sqp_risk"] = 0.95
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    try:
+        with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+            sqp.initialize()
+        raise AssertionError("a retired option should be refused")
+    except PestppError as e:
+        msg = str(e).lower()
+        assert "retired" in msg, "the error should say it is retired, got: {0}".format(e)
+        assert ("opt_risk" in msg) and ("opt_use_robust" in msg), \
+            "the error should name BOTH replacements, got: {0}".format(e)
+    print("api_retired_sqp_risk_is_refused_test passed")
+
+
+def api_init_only_options_are_refused_live_test():
+    """init-only options are refused once the tool is running, not silently ignored.
+
+    opt_use_robust decides how the dv ensemble is BUILT. Accepting it afterwards would leave a
+    robust ensemble being evaluated as a chance run, or the reverse - a disagreement between
+    the options and the object that no later call could detect.
+    """
+    d = _stack_case("api_init_only", risk=0.95, stack_size=8, chance_points="SINGLE",
+                    tool="sqp")
+    with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+        # before initialize the option is settable - it has not been consumed yet
+        sqp.set_option("opt_use_robust", False)
+        sqp.initialize()
+        for key in ("opt_use_robust", "sqp_num_reals"):
+            try:
+                sqp.set_option(key, 4 if key == "sqp_num_reals" else True)
+                raise AssertionError("'{0}' is init-only and should be refused".format(key))
+            except PestppError as e:
+                assert "init-only" in str(e).lower(), \
+                    "the refusal should say why, got: {0}".format(e)
+        # a live option still works, so this is not a blanket freeze
+        sqp.set_option("sqp_subset_size", 3)
+        sqp.finalize()
+    print("api_init_only_options_are_refused_live_test passed")
+
+
+def _sqp_dv_file(d, pst, path, include_uncertain, n=8, seed=11):
+    """Write a dv ensemble file, with or without the uncertain parameter columns."""
+    rng = np.random.default_rng(seed)
+    names = [p.upper() for p in pst.par_names]
+    keep = names if include_uncertain else [n_ for n_ in names if n_ != "X10"]
+    lo = dict(zip(names, pst.parameter_data.parlbnd.values))
+    hi = dict(zip(names, pst.parameter_data.parubnd.values))
+    df = pd.DataFrame({c: rng.uniform(lo[c], hi[c], n) for c in keep},
+                      index=["real{0}".format(i) for i in range(n)])
+    full = os.path.join(d, path)
+    if path.lower().endswith(".csv"):
+        df.to_csv(full)
+    else:
+        pyemu.ParameterEnsemble(pst=pst, df=df).to_binary(full)
+    return path
+
+
+def api_sqp_ensemble_sources_test():
+    """sqp reaches the same state from every way of supplying its ensembles.
+
+    Four independent choices, and they have to compose: the dv ensemble may be DRAWN or read
+    from CSV or from BINARY, and the stack may be DRAWN or read from a par-stack file. A tool
+    that only works when everything is drawn is a tool that cannot be restarted or driven from
+    a previous run's output, so the combinations are the contract, not the individual paths.
+    """
+    for dv_src in ("drawn", "csv", "jcb"):
+        for stack_src in ("drawn", "file"):
+            name = "api_src_{0}_{1}".format(dv_src, stack_src)
+            d = _stack_case(name, risk=0.95, stack_size=8, chance_points="SINGLE", tool="sqp")
+            pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+            if dv_src != "drawn":
+                pst.pestpp_options["sqp_dv_en"] = _sqp_dv_file(
+                    d, pst, "dv.csv" if dv_src == "csv" else "dv.jcb", include_uncertain=False)
+            if stack_src == "file":
+                rng = np.random.default_rng(7)
+                names = [p.upper() for p in pst.par_names]
+                pd.DataFrame({c: rng.uniform(-1.0, 1.0, 6) for c in names},
+                             index=["s{0}".format(i) for i in range(6)]).to_csv(
+                    os.path.join(d, "par_stack.csv"))
+                pst.pestpp_options["opt_par_stack"] = "par_stack.csv"
+            pst.write(os.path.join(d, "g07.pst"), version=2)
+
+            with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+                sqp.initialize()
+                st = sqp.stack_status
+                assert st["use_chance"] and not st["use_fosm"], \
+                    "{0}: opt_risk with a stack means stack chance: {1}".format(name, st)
+                # a file-supplied stack brings its OWN row count - it is not opt_stack_size
+                want = 6 if stack_src == "file" else 8
+                assert st["stack_size"] == want, \
+                    "{0}: expected a {1}-realization stack, got {2}".format(
+                        name, want, st["stack_size"])
+                assert sqp.stack_oe().shape[0] == want, \
+                    "{0}: the obs stack should match".format(name)
+                assert not sqp.stack_oe().isnull().values.any(), \
+                    "{0}: the stack was run, so it should hold values".format(name)
+                sqp.finalize()
+    print("api_sqp_ensemble_sources_test passed")
+
+
+def api_robust_requires_paired_parameters_test():
+    """A supplied dv ensemble must carry the uncertain parameters when robust is on.
+
+    Robust optimisation IS the pairing, so an ensemble of decision variables alone has nothing
+    to pair with. Unchecked this fails silently rather than loudly: the uncertain columns get
+    filled from one replicated row, every realization sees identical parameter values, and the
+    run reports itself robust while optimising against no uncertainty whatsoever. Measured
+    before the guard existed, the uncertain parameter came back with a single distinct value
+    across every non-base realization.
+
+    The drawn path cannot hit this - it concatenates the two draws - so this is specifically
+    about user-supplied ensembles.
+    """
+    # drawn: sqp pairs for you, and the uncertain parameter is in the ensemble
+    d = _stack_case("api_robust_drawn", risk=0.5, stack_size=0, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["opt_use_robust"] = True
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+        sqp.initialize()
+        df = sqp.par_df()
+        assert "X10" in df.columns, "the drawn path should pair the uncertain parameter in"
+        assert df["X10"].nunique() > 1, \
+            "a paired draw must actually VARY across realizations, got {0} distinct".format(
+                df["X10"].nunique())
+        sqp.finalize()
+
+    # supplied WITH the uncertain columns: accepted, and it still varies
+    for ext in ("csv", "jcb"):
+        d = _stack_case("api_robust_paired_" + ext, risk=0.5, stack_size=0,
+                        chance_points="SINGLE", tool="sqp")
+        pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+        pst.pestpp_options["opt_use_robust"] = True
+        pst.pestpp_options["sqp_dv_en"] = _sqp_dv_file(d, pst, "dv." + ext,
+                                                       include_uncertain=True)
+        pst.write(os.path.join(d, "g07.pst"), version=2)
+        with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+            sqp.initialize()
+            assert sqp.par_df()["X10"].nunique() > 1, \
+                "{0}: the supplied pairing should be used as given".format(ext)
+            sqp.finalize()
+
+    # supplied WITHOUT them: refused, naming the parameter and both ways out
+    d = _stack_case("api_robust_unpaired", risk=0.5, stack_size=0, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["opt_use_robust"] = True
+    pst.pestpp_options["sqp_dv_en"] = _sqp_dv_file(d, pst, "dv_only.csv",
+                                                   include_uncertain=False)
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    try:
+        with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+            sqp.initialize()
+        raise AssertionError("a dv-only ensemble under robust should be refused")
+    except PestppError as e:
+        msg = str(e)
+        assert "X10" in msg.upper(), \
+            "the error should name the missing parameter, got: {0}".format(e)
+        assert "sqp_dv_en" in msg, \
+            "the error should say how to fix it, got: {0}".format(e)
+    print("api_robust_requires_paired_parameters_test passed")
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -1788,4 +2266,16 @@ if __name__ == "__main__":
     api_session_cleanup_does_not_need_with_test()
     api_deferred_initialize_mou_test()
     api_deferred_initialize_sqp_test()
+    api_chance_stacks_are_reachable_test()
+    api_empty_stack_says_why_test()
+    api_risk_is_clamped_and_live_test()
+    api_sqp_chance_stacks_are_reachable_test()
+    api_robust_does_no_risk_shifting_test()
+    api_robust_and_risk_are_mutually_exclusive_test()
+    api_robust_is_sqp_only_test()
+    api_retired_sqp_risk_is_refused_test()
+    api_init_only_options_are_refused_live_test()
+    api_sqp_ensemble_sources_test()
+    api_robust_requires_paired_parameters_test()
+    api_stacks_are_mou_and_sqp_only_test()
     print("all helper tests passed")

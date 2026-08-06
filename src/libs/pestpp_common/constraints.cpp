@@ -303,7 +303,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
 	//check for a stack size arg - if positive, then use stacks for chances. stack_size is
 	//seeded from the option but is later re-set to the loaded stack's actual row count, so it
-	//stays a member; get_use_fosm()/get_use_stosag()/get_std_weights() are now live-derived (see the getters).
+	//stays a member; get_use_fosm()/get_use_robust()/get_std_weights() are now live-derived (see the getters).
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
 	//initialize the stack containers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
@@ -551,8 +551,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//------------------------------------------
 	// raw (unclamped) risk, for one-time validation and the reset-note logging; the live
 	// value used everywhere else comes from get_risk() (which clamps).
-	double raw_risk = get_use_stosag() ? pest_scenario.get_pestpp_options().get_sqp_risk()
-									   : pest_scenario.get_pestpp_options().get_opt_risk();
+	double raw_risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (get_use_chance())
 	{
 		pfm.log_event("initializing chance constraints/objectives");
@@ -622,13 +621,6 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
 				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}
-		}
-		else if (get_use_stosag() && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
-		{
-			// StoSAG mode: no stack setup needed, will use existing ensemble for risk shifting
-			f_rec << "  using chance constraints/objectives with risk = " << get_risk() << endl;
-			f_rec << "  using existing ensemble for constraint shifting, no separate stack needed" << endl;
-			// No stack operations needed - the ensemble will be provided by SQP when needed
 		}
 		//otherwise, stack time baby!
 		else
@@ -1542,15 +1534,6 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 				new_constraint_val = current_obs.get_rec(name);
 			shifted_obs.insert(name, new_constraint_val);
 		}
-	}
-	else if (get_use_stosag() && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
-	{
-		for (auto& name : ctl_ord_obs_constraint_names)
-		{
-			shifted_obs.insert(name, current_obs.get_rec(name));
-		}
-		f_rec << "  warning: get_chance_shifted_constraints called without ensemble in StoSAG mode - returning unshifted constraints" << endl;
-		f_rec << "  consider using ensemble-based overload for proper risk shifting" << endl;
 	}
 	else
 	{
@@ -3428,10 +3411,6 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		}
 		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
-	}
-	else if (get_use_stosag() && pest_scenario.get_pestpp_options().get_opt_stack_size() < 0)
-	{
-		//do nothing -- we don't need stacks here
 	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
 	//with the current dec var values.

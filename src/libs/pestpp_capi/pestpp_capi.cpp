@@ -223,6 +223,13 @@ struct ToolAdapter
     /// the weights ensemble together, and only the tool can do that coherently.
     virtual EnsembleMethod* ensemble_method() { return nullptr; }
 
+    /// The chance machinery, or null for the tools that have none (ies and da).
+    ///
+    /// Returning the Constraints object rather than each stack separately keeps the resolving
+    /// in one place: the stack ids mean the same thing for mou and sqp, so neither adapter
+    /// needs to know about them.
+    virtual Constraints* constraints() { return nullptr; }
+
     /// The scenario THIS TOOL WAS BUILT ON, which is not always the one the session parsed.
     ///
     /// da is the reason this exists. Its parameter and observation sets are cycle dependent,
@@ -782,6 +789,7 @@ struct MouAdapter : public ToolAdapter
     }
     ParameterEnsemble* par_ensemble() override { return tool.get_dp_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_op_ptr(); }
+    Constraints* constraints() override { return tool.get_constraints_ptr(); }
     void phi_summary(int, double&, double&, double&, double&) override
     { unsupported("mou optimizes objectives rather than minimizing a phi"); }
     void phi_vector(int, vector<string>&, vector<double>&) override
@@ -843,6 +851,7 @@ struct SqpAdapter : public ToolAdapter
     }
     ParameterEnsemble* par_ensemble() override { return tool.get_dv_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    Constraints* constraints() override { return tool.get_constraints_ptr(); }
     void phi_summary(int, double&, double&, double&, double&) override
     { unsupported("sqp has an objective function, not a phi over realizations"); }
     void phi_vector(int, vector<string>&, vector<double>&) override
@@ -1582,11 +1591,59 @@ pestpp_status pestpp_should_terminate(pestpp_handle h, int* out)
     CAPI_END()
 }
 
+// extern "C++" for the reason spelled out at the top of the block near read_stored_run:
+// stack_empty_reason returns a std::string BY VALUE, and this file's body sits inside an
+// extern "C" block, which would otherwise hand it C language linkage while it uses the C++
+// ABI's hidden-return-pointer convention.
+extern "C++" {
 namespace {
+
+/** The chance machinery, or a diagnosis of why this tool has none. */
+Constraints* pick_constraints(PestppSession* s)
+{
+    Constraints* c = s->adapter->constraints();
+    if (c == nullptr)
+        unsupported(string("tool '") + s->adapter->name() + "' has no chance stacks; only mou "
+                    "and sqp carry constraints and the chance machinery");
+    return c;
+}
+
+/** Say why a stack is empty, in terms of the setting that made it so.
+ *
+ * An empty stack is not an error - a FOSM run and a risk-neutral run are both legitimate, and
+ * both leave every stack empty forever. But "empty" on its own is indistinguishable from "the
+ * stack has not been drawn yet", and those want opposite responses from a caller, so the three
+ * cases are separated here rather than left for the caller to infer.
+ */
+string stack_empty_reason(Constraints* c)
+{
+    if (!c->get_use_chance())
+        return "this run is risk neutral (risk is 0.5), so no chance stack is ever drawn";
+    if (c->get_use_fosm())
+        return "this run uses FOSM rather than stacks for chance, so the stacks stay empty; "
+               "set opt_stack_size or opt_par_stack/opt_obs_stack to use stacks instead";
+    return "the stack has not been drawn yet - it is filled during initialization";
+}
 
 /** Resolve an ensemble id to the live object on the tool. */
 Ensemble* pick_ensemble(PestppSession* s, int id)
 {
+    // checked BEFORE the candidate range because member stack ids are the higher of the two
+    // and would otherwise be read as absurdly large candidate indices
+    if (id >= PESTPP_MEMBER_STACK_EN)
+    {
+        int idx = id - PESTPP_MEMBER_STACK_EN;
+        Constraints* c = pick_constraints(s);
+        map<string, ObservationEnsemble>* m = c->get_stack_oe_map_ptr();
+        if (m->empty())
+            bad_state("there are no per-member chance stacks: " + stack_empty_reason(c) +
+                      ". Per-member stacks also need opt_chance_points to be 'all'");
+        if ((idx < 0) || (idx >= (int)m->size()))
+            bad_arg("no such member stack; there are " + std::to_string(m->size()));
+        auto it = m->begin();
+        std::advance(it, idx);
+        return &it->second;
+    }
     // candidates are ordinary ensemble ids so that views, names and snapshots all work on
     // them unchanged - see PESTPP_CANDIDATE_EN
     if (id >= PESTPP_CANDIDATE_EN)
@@ -1602,6 +1659,22 @@ Ensemble* pick_ensemble(PestppSession* s, int id)
                     std::to_string(s->adapter->candidate_count()));
         }
         return c;
+    }
+    // the chance stacks live on Constraints rather than on the tool, so they resolve here
+    // instead of through adapter->ensemble() - the ids mean the same thing for mou and sqp
+    if ((id >= PESTPP_STACK_PAR_EN) && (id <= PESTPP_NESTED_PAR_EN))
+    {
+        Constraints* c = pick_constraints(s);
+        Ensemble* st = nullptr;
+        switch (id)
+        {
+        case PESTPP_STACK_PAR_EN:  st = c->get_stack_pe_ptr();  break;
+        case PESTPP_STACK_OBS_EN:  st = c->get_stack_oe_ptr();  break;
+        case PESTPP_NESTED_PAR_EN: st = c->get_nested_pe_ptr(); break;
+        }
+        // an empty stack is returned rather than refused: it is the honest answer for a FOSM
+        // or risk-neutral run, and pestpp_get_stack_status() is how a caller asks why
+        return st;
     }
     if ((id < PESTPP_PAR_EN) || (id > PESTPP_WEIGHTS_EN))
         bad_arg("unknown ensemble id");
@@ -1662,6 +1735,45 @@ pestpp_status pack_names(const vector<string>& names, char* buf, int buf_len, in
 }
 
 } // namespace
+} // extern "C++"
+
+pestpp_status pestpp_get_stack_status(pestpp_handle h, int* use_chance, int* use_fosm,
+                                      int* use_robust, double* risk, int* stack_size)
+{
+    CAPI_BEGIN(h)
+        Constraints* c = pick_constraints(s);
+        // read live off the options rather than from anything latched at initialize(), so a
+        // risk set through the API since then is reflected here
+        if (use_chance  != nullptr) *use_chance  = c->get_use_chance() ? 1 : 0;
+        if (use_fosm    != nullptr) *use_fosm    = c->get_use_fosm() ? 1 : 0;
+        if (use_robust  != nullptr) *use_robust  = c->get_use_robust() ? 1 : 0;
+        if (risk        != nullptr) *risk        = c->get_risk();
+        // the stack as it actually stands, which is 0 until it is drawn and need not equal
+        // opt_stack_size - a stack loaded from a file brings its own row count
+        if (stack_size  != nullptr) *stack_size  = c->get_stack_oe_ptr()->shape().first;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_member_stack_count(pestpp_handle h, int* count)
+{
+    CAPI_BEGIN(h)
+        if (count == nullptr) bad_arg("null out-param");
+        *count = (int)pick_constraints(s)->get_stack_oe_map_ptr()->size();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_member_stack_names(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        // same order as the PESTPP_MEMBER_STACK_EN ids, because both walk the same sorted map
+        vector<string> names;
+        for (auto& kv : *pick_constraints(s)->get_stack_oe_map_ptr())
+            names.push_back(kv.first);
+        return pack_names(names, buf, buf_len, count);
+    CAPI_END()
+}
 
 pestpp_status pestpp_get_ensemble_view(pestpp_handle h, int ensemble_id,
                                        double** data, int* nrow, int* ncol,
@@ -1741,6 +1853,14 @@ pestpp_status pestpp_set_option(pestpp_handle h, const char* key, const char* va
 {
     CAPI_BEGIN(h)
         if ((key == nullptr) || (value == nullptr)) bad_arg("null argument");
+        // INIT-ONLY options are consumed while the tool builds itself - ensemble files,
+        // ensemble sizes, the localizer, opt_use_robust. Setting one afterwards writes a value
+        // nothing will ever read again, or worse describes an ensemble that is already built
+        // differently. Refuse instead of accepting silently.
+        if (s->initialized &&
+            s->adapter->scenario().get_pestpp_options_ptr()->is_init_only(key))
+            bad_state(string("option '") + key + "' is init-only: it is consumed during "
+                      "initialization and cannot be changed on a running tool");
         PestppOptions::ARG_STATUS st =
             s->adapter->scenario().get_pestpp_options_ptr()->set_option(key, value);
         // fall through to the control data section, which exposes the same interface. noptmax

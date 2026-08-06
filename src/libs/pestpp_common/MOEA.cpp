@@ -3018,6 +3018,14 @@ void MOEA::finalize()
  */
 int MOEA::initialize_prepare()
 {
+	//robust optimization is a pestpp-sqp construction - it pairs each decision-variable
+	//realization with its own parameter realization. mou has no such pairing, so accepting
+	//the flag here would silently do nothing.
+	if (pest_scenario.get_pestpp_options().get_opt_use_robust())
+		throw_moea_error("++opt_use_robust is not supported by pestpp-mou - it is a "
+			"pestpp-sqp option. Use ++opt_risk with a parameter stack for chance-constrained "
+			"optimization under uncertainty.");
+
 	// same nomination the ies/da tools use - a 'drop_violations' column in the external
 	// observation file - read straight from the scenario so it cannot depend on the
 	// construction order of anything else

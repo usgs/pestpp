@@ -299,6 +299,12 @@ pair<double,double> sequentialLP::postsolve_decision_var_report(Parameters &upgr
 void sequentialLP::initialize_and_check()
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
+
+	//robust optimization is a pestpp-sqp construction - see the note in MOEA::initialize_prepare
+	if (pest_scenario.get_pestpp_options().get_opt_use_robust())
+		throw_sequentialLP_error("++opt_use_robust is not supported by pestpp-opt - it is a "
+			"pestpp-sqp option. Use ++opt_risk for chance-constrained optimization under "
+			"uncertainty.");
 	//TODO: handle restart condition
 
 	if (pest_scenario.get_control_info().pestmode != ControlInfo::PestMode::ESTIMATION)

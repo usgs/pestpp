@@ -388,6 +388,11 @@ public:
 	void set_opt_constraint_groups(vector<string> _grps) { opt_constraint_groups = _grps; }
 	double get_opt_risk()const { return opt_risk; }
 	void set_opt_risk(double _risk) { opt_risk = _risk; }
+	//robust optimization: pair each decision-variable realization with its own uncertain
+	//parameter realization and optimize over that ensemble. pestpp-sqp only, and mutually
+	//exclusive with opt_risk - a robust run does no risk shifting at all.
+	bool get_opt_use_robust()const { return opt_use_robust; }
+	void set_opt_use_robust(bool _flag) { opt_use_robust = _flag; }
 	double get_opt_direction()const { return opt_direction; }
 	void set_opt_direction(double _direction) { opt_direction = _direction; }
 	double get_opt_iter_tol()const { return opt_iter_tol; }
@@ -909,6 +914,7 @@ private:
 	vector<string> opt_external_var_groups;
 	vector<string> opt_constraint_groups;
 	double opt_risk;
+	bool opt_use_robust;
 	double opt_direction;
 	double opt_iter_tol;
 	int opt_recalc_fosm_every;

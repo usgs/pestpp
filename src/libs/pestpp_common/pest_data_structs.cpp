@@ -745,6 +745,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 		}
 	}
 
+	else if (key == "OPT_USE_ROBUST")
+	{
+		opt_use_robust = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "OPT_RISK")
 	{
 		convert_ip(value, opt_risk);
@@ -1910,8 +1914,14 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	}
 	else if (key == "SQP_RISK")
 	{
-		convert_ip(value, sqp_risk);
-		return true;
+		//retired: sqp_risk used to be BOTH a risk value and the switch that selected
+		//ensemble-based shifting, so it silently overrode opt_risk. There is no
+		//behaviour-preserving translation - the robust mode that replaced it does not
+		//shift at all - so this asks rather than guesses.
+		throw runtime_error("++sqp_risk has been retired. For chance-constrained sqp use "
+			"++opt_risk (the same option mou and pestpp-opt use). For robust optimization "
+			"over paired decision-variable/parameter realizations use ++opt_use_robust(true), "
+			"which does no risk shifting and cannot be combined with opt_risk.");
 	}
 	else if (key == "SQP_POWELL_DAMPING_FACTOR")
 	{
@@ -2098,6 +2108,7 @@ void PestppOptions::summary_legacy(ostream& os) const
 		os << v << ",";
 	os << endl;
 	os << "opt_risk: " << opt_risk << endl;
+	os << "opt_use_robust: " << opt_use_robust << endl;
 	os << "opt_iter_derinc_fac: " << opt_iter_derinc_fac << endl;
 	os << "opt_direction: " << opt_direction << endl;
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
@@ -2368,6 +2379,7 @@ void PestppOptions::set_defaults_legacy()
 	set_opt_ext_var_groups(vector<string>());
 	set_opt_constraint_groups(vector<string>());
 	set_opt_risk(0.5);
+	set_opt_use_robust(false);
 	set_opt_direction(1.0);
 	set_opt_iter_tol(0.001);
 	set_opt_recalc_fosm_every(1);

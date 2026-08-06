@@ -133,20 +133,27 @@ public:
 	double get_max_constraint_change(Observations& current_obs, Observations& upgrade_obs);
 	
 	//the chance-related flags are now derived live from the options so a runtime change to
-	//opt_risk/sqp_risk/opt_std_weights/opt_*_stack propagates instead of being latched at
+	//opt_risk/opt_use_robust/opt_std_weights/opt_*_stack propagates instead of being latched at
 	//initialize() (the old cached use_chance stayed false forever if opt_risk started at 0.5).
 	bool get_std_weights() const { return pest_scenario.get_pestpp_options().get_opt_std_weights(); }
-	bool get_use_stosag() const { return pest_scenario.get_pestpp_options().get_sqp_risk() != 0.5; }
+	//ROBUST optimization (pestpp-sqp only): each decision-variable realization is paired with
+	//its own uncertain parameter realization and the ensemble is optimized as it stands. No
+	//risk shifting happens at all, which is why it switches the whole chance machinery off
+	//below rather than selecting a different flavour of it.
+	bool get_use_robust() const { return pest_scenario.get_pestpp_options().get_opt_use_robust(); }
 	double get_risk() const
 	{
-		double r = get_use_stosag() ? pest_scenario.get_pestpp_options().get_sqp_risk()
-									: pest_scenario.get_pestpp_options().get_opt_risk();
+		double r = pest_scenario.get_pestpp_options().get_opt_risk();
 		return std::min(0.999, std::max(0.001, r));   // clamp to a practical range (was done in place)
 	}
-	bool get_use_chance() const { return get_risk() != 0.5; }
+	//a robust run never shifts, so use_chance is false for it however opt_risk is set. That
+	//single fact is what lets every downstream "shift or not" branch stay as it is: shifting
+	//is already conditional on use_chance, and should_update_chance() already returns false
+	//when it is off, so no stack or fosm runs get queued either.
+	bool get_use_chance() const { return (!get_use_robust()) && (get_risk() != 0.5); }
 	bool get_use_fosm() const
 	{
-		if (get_use_stosag()) return false;
+		if (get_use_robust()) return false;
 		const PestppOptions& o = pest_scenario.get_pestpp_options();
 		bool has_stacks = (o.get_opt_stack_size() > 0) || (!o.get_opt_par_stack().empty()) || (!o.get_opt_obs_stack().empty());
 		return !((!get_std_weights()) && has_stacks);
@@ -189,6 +196,20 @@ public:
 	vector<string> get_working_set_ineq_names(vector<string>& cnames);
 
 	string mou_population_observation_constraint_summary(int iter, ObservationEnsemble& oe, string tag, const vector<string>& obs_obj_names);
+
+	//the chance stacks. All three are EMPTY unless this is a stack-based chance run: a FOSM run
+	//(get_use_fosm()) never fills them, and a run with get_use_chance() false never draws them at
+	//all. So empty means "this run does not work that way", not "not yet computed" - callers that
+	//want to tell those apart have to ask get_use_chance()/get_use_fosm() first.
+	//stack_pe is the parameter stack that gets run; stack_oe holds its results, one row per stack
+	//realization, and is what the risk shift is computed from.
+	ParameterEnsemble* get_stack_pe_ptr() { return &stack_pe; }
+	ObservationEnsemble* get_stack_oe_ptr() { return &stack_oe; }
+	//the nested stack, only filled when chance points are evaluated at more than one location
+	ParameterEnsemble* get_nested_pe_ptr() { return &nested_pe; }
+	//per-point stacks, keyed by the dec-var point (a population member name for mou) they were
+	//evaluated at. Empty when the single stack above is used for every point.
+	map<string, ObservationEnsemble>* get_stack_oe_map_ptr() { return &stack_oe_map; }
 
 private:
 	Pest& pest_scenario;

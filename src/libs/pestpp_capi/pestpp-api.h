@@ -132,13 +132,33 @@ typedef enum {
 
    PAR/OBS mean the tool's parameter and result ensembles: pe/oe for ies and da, the decision
    variable population dp and its results op for mou, dv/oe for sqp. NOISE and WEIGHTS exist
-   only for ies and da; asking mou or sqp for them is an error rather than an empty array. */
+   only for ies and da; asking mou or sqp for them is an error rather than an empty array.
+
+   STACK_PAR/STACK_OBS/NESTED_PAR are the CHANCE STACKS, and exist only for mou and sqp. They
+   are empty rather than an error when the run is not stack-based - see the stack section
+   below for how to tell "no stack because FOSM" from "no stack because no chance" from
+   "stack not drawn yet". */
 typedef enum {
-    PESTPP_PAR_EN     = 0,
-    PESTPP_OBS_EN     = 1,
-    PESTPP_NOISE_EN   = 2,
-    PESTPP_WEIGHTS_EN = 3
+    PESTPP_PAR_EN        = 0,
+    PESTPP_OBS_EN        = 1,
+    PESTPP_NOISE_EN      = 2,
+    PESTPP_WEIGHTS_EN    = 3,
+    PESTPP_STACK_PAR_EN  = 4,
+    PESTPP_STACK_OBS_EN  = 5,
+    PESTPP_NESTED_PAR_EN = 6
 } pestpp_ensemble_id;
+
+/* The PER-MEMBER chance stacks, addressed as PESTPP_MEMBER_STACK_EN + i for i in
+   [0, pestpp_get_member_stack_count()). mou evaluates chance at several points in decision
+   variable space when opt_chance_points is "all", and then each population member has its own
+   observation stack; pestpp_get_member_stack_name() says which member index i belongs to.
+
+   Like the candidate ids these are ordinary ensemble ids on purpose - views, row and column
+   names and the snapshot calls all work on them unchanged.
+
+   When chance is evaluated at a single point the count is 0 and PESTPP_STACK_OBS_EN is the
+   only stack there is. */
+#define PESTPP_MEMBER_STACK_EN 2000
 
 /* The candidate ensembles of a DEFERRED SOLVE, addressed as PESTPP_CANDIDATE_EN + i for i in
    [0, pestpp_get_candidate_count()). They are ordinary ensemble ids on purpose: views, row and
@@ -575,6 +595,47 @@ PESTPP_API pestpp_status pestpp_should_terminate(pestpp_handle h, int* out);
  *
  * Tokens are small and cheap, but they are held until released or until the handle is
  * destroyed, so release them. */
+
+/* ---------------------------------------------------------------------------------------- *
+ *  CHANCE STACKS - mou and sqp only
+ *
+ *  Both tools can account for uncertainty in the constraints and objectives, by one of two
+ *  mechanisms that are configured through the same options and are NOT interchangeable:
+ *
+ *    FOSM    - a linear propagation through a jacobian. Cheap, no extra model runs, and the
+ *              stacks below stay EMPTY.
+ *    STACKS  - an ensemble of parameter realizations that is actually run. The stacks below
+ *              hold it.
+ *
+ *  Which one is in force is derived from the options every time it is asked, not latched at
+ *  initialization, so changing opt_risk or opt_stack_size through pestpp_set_option() takes
+ *  effect on the next chance calculation. pestpp_get_stack_status() reports the derivation
+ *  rather than the raw options, which is the difference that matters: risk is CLAMPED to
+ *  [0.001, 0.999], and a stack-based run is one with stacks configured AND opt_std_weights
+ *  off, neither of which is readable from any single option.
+ *
+ *  An empty stack is never an error - it is the correct answer for FOSM and for a risk
+ *  neutral run. Ask pestpp_get_stack_status() to tell those apart from "not drawn yet". */
+
+/* All out-params are optional; pass NULL for the ones you do not want.
+ *
+ * use_robust reports ROBUST optimization (opt_use_robust, pestpp-sqp only), where each
+ * decision-variable realization is paired with its own parameter realization and NOTHING is
+ * risk shifted - so use_chance and use_fosm are both 0 whenever use_robust is 1, and
+ * opt_use_robust is refused alongside a non-neutral opt_risk. risk is the clamped, in-force
+ * value, and is 0.5 exactly when chance is off. stack_size is the stack AS IT STANDS - 0 before it is drawn,
+ * and not necessarily opt_stack_size, since a stack loaded from a file brings its own rows. */
+PESTPP_API pestpp_status pestpp_get_stack_status(pestpp_handle h, int* use_chance, int* use_fosm,
+                                                 int* use_robust, double* risk, int* stack_size);
+
+/* How many per-member stacks exist - 0 unless opt_chance_points is "all". */
+PESTPP_API pestpp_status pestpp_get_member_stack_count(pestpp_handle h, int* count);
+
+/* The member names owning each per-member stack, packed PESTPP_NAME_LEN wide, in the same
+   order as the PESTPP_MEMBER_STACK_EN + i ids. */
+PESTPP_API pestpp_status pestpp_get_member_stack_names(pestpp_handle h, char* buf, int buf_len,
+                                                       int* count);
+
 PESTPP_API pestpp_status pestpp_get_ensemble_view(pestpp_handle h, int ensemble_id,
                                                   double** data, int* nrow, int* ncol,
                                                   int* view_token);

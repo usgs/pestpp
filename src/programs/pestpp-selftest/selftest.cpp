@@ -12,7 +12,7 @@
  *  - apply_tool_defaults (centralized per-tool defaults)
  *  - Constraints chance/risk flags derived live from options (the flagship proof that a
  *    post-construction option change actually propagates: opt_risk, sqp_risk/STOSAG,
- *    opt_std_weights and their effect on use_chance/use_stosag/use_fosm/get_risk)
+ *    opt_std_weights and their effect on use_chance/use_robust/use_fosm/get_risk)
  */
 #include <iostream>
 #include <sstream>
@@ -162,7 +162,6 @@ static void test_constraints_live()
     OutputFileWriter ofw(fm, p);
     Constraints c(p, &fm, ofw, pfm);   // getters read only options; no initialize() needed
     PestppOptions* o = p.get_pestpp_options_ptr();
-    o->set_option("SQP_RISK", "0.5");   // keep use_stosag false so opt_risk drives it
 
     o->set_option("OPT_RISK", "0.5");
     CHK(!c.get_use_chance(), "opt_risk 0.5 -> use_chance false");
@@ -181,18 +180,29 @@ static void test_constraints_live()
     o->set_option("OPT_STACK_SIZE", "50");
     CHK(!c.get_use_fosm(), "opt_stack_size>0 -> use_fosm false (live)");
 
-    // the STOSAG path: sqp_risk (not opt_risk) drives use_stosag, and use_stosag in turn
-    // drives use_chance and forces use_fosm off - all live from the options (Stage 5)
-    o->set_option("OPT_RISK", "0.5");        // opt_risk neutral so sqp_risk is the sole driver
-    o->set_option("SQP_RISK", "0.5");
-    CHK(!c.get_use_stosag(), "sqp_risk 0.5 -> use_stosag false");
-    CHK(!c.get_use_chance(), "both risks 0.5 -> use_chance false");
-    o->set_option("SQP_RISK", "0.9");
-    CHK(c.get_use_stosag(), "sqp_risk 0.9 -> use_stosag TRUE (live)");
-    CHK(c.get_risk() == 0.9, "get_risk follows sqp_risk when use_stosag (live)");
-    CHK(c.get_use_chance(), "sqp_risk drives use_chance even with opt_risk 0.5 (live)");
-    CHK(!c.get_use_fosm(), "use_stosag -> use_fosm false (live)");
-    o->set_option("SQP_RISK", "0.5");        // reset: stosag off
+    // ROBUST optimization: opt_use_robust switches the whole chance machinery OFF rather than
+    // selecting a different flavour of it. That single fact is what lets every downstream
+    // "shift or not" branch stay as it is, so it is the one worth pinning.
+    o->set_option("OPT_RISK", "0.95");
+    o->set_option("OPT_USE_ROBUST", "false");
+    CHK(!c.get_use_robust(), "opt_use_robust false -> get_use_robust false");
+    CHK(c.get_use_chance(), "opt_risk 0.95, not robust -> use_chance true");
+    o->set_option("OPT_USE_ROBUST", "true");
+    CHK(c.get_use_robust(), "opt_use_robust true -> get_use_robust TRUE (live)");
+    CHK(!c.get_use_chance(), "robust -> use_chance FALSE however opt_risk is set");
+    CHK(!c.get_use_fosm(), "robust -> use_fosm false");
+    CHK(c.get_risk() == 0.95, "get_risk still reports opt_risk, clamped, under robust");
+    o->set_option("OPT_USE_ROBUST", "false");   // reset
+
+    // sqp_risk is retired: it used to be both a risk value and the switch that selected
+    // ensemble shifting, so it silently overrode opt_risk. It must now be refused rather
+    // than quietly accepted - there is no behaviour-preserving translation.
+    {
+        bool threw = false;
+        try { o->set_option("SQP_RISK", "0.9"); }
+        catch (const std::exception&) { threw = true; }
+        CHK(threw, "retired sqp_risk is refused rather than silently accepted");
+    }
 
     // opt_std_weights propagates live and gates use_fosm when stacks are present (Stage 5)
     o->set_option("OPT_RISK", "0.9");
@@ -365,7 +375,7 @@ static void test_sqp_controls()
     CHK(o.is_init_only("SQP_WORKING_SET_TOL"), "sqp_working_set_tol is init-only (adaptive after seeding)");
     // the per-iteration knobs stay live
     CHK(!o.is_init_only("SQP_SUBSET_SIZE"), "sqp_subset_size is live");
-    CHK(!o.is_init_only("SQP_RISK"), "sqp_risk is live");
+    CHK(o.is_init_only("OPT_USE_ROBUST"), "opt_use_robust is init-only");
     CHK(!o.is_init_only("SQP_MAX_CONSEC_INFEAS_IES"), "sqp_max_consec_infeas_ies is live");
 
     o.mark_options_initialized();

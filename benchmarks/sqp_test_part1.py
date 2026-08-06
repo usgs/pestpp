@@ -292,7 +292,7 @@ def basic_sqp_rosenbrock_chance_test():
 
         pst.pestpp_options["opt_obj_func"] = "obs"
         pst.pestpp_options["opt_dec_var_groups"] = "decvar"
-        pst.pestpp_options["sqp_risk"] = 0.95
+        pst.pestpp_options["opt_risk"] = 0.95   # sqp_risk retired; one risk option now
         pst.pestpp_options["sqp_num_reals"] = n_reals
         pst.pestpp_options["sqp_subset_size"] = 5
         pst.pestpp_options["opt_stack_size"] = stack_size
@@ -473,7 +473,7 @@ def basic_sqp_rosenbrock_chance_test():
 
 #     n_reals = 10
 #     stack_size = 15
-#     pst.pestpp_options["sqp_risk"] = 0.95
+#     pst.pestpp_options["opt_risk"] = 0.95   # sqp_risk retired; one risk option now
 #     pst.pestpp_options["sqp_num_reals"] = n_reals
 #     pst.pestpp_options["sqp_subset_size"] = 5
 #     pst.pestpp_options["opt_stack_size"] = stack_size

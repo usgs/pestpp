@@ -49,9 +49,15 @@ PESTPP_INVALID_STATE = 7
 
 TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP = 0, 1, 2, 3
 PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN = 0, 1, 2, 3
+#: the chance stacks, mou and sqp only. Empty - not an error - on a fosm or risk-neutral run;
+#: get_stack_status() is how you tell those apart from "not drawn yet"
+STACK_PAR_EN, STACK_OBS_EN, NESTED_PAR_EN = 4, 5, 6
 #: candidate ensembles of a deferred solve are ordinary ensemble ids, CANDIDATE_EN + i, so
 #: views, names and snapshots all work on them unchanged
 CANDIDATE_EN = 1000
+#: per-member chance stacks, MEMBER_STACK_EN + i, likewise ordinary ensemble ids. Only when
+#: opt_chance_points is "all" - otherwise one stack serves every point and the count is 0
+MEMBER_STACK_EN = 2000
 TSTAT = {0: "ctl", 1: "num", 2: "model"}
 
 RUN_QUEUED, RUN_RUNNING, RUN_COMPLETED, RUN_FAILED, RUN_TIMED_OUT, RUN_CANCELLED = range(6)
@@ -300,6 +306,13 @@ class PestppLib:
         lib.pestpp_solve_finish.restype = c_int
         lib.pestpp_get_candidate_count.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_get_candidate_count.restype = c_int
+        lib.pestpp_get_stack_status.argtypes = (c_void_p, POINTER(c_int), POINTER(c_int),
+                                                POINTER(c_int), POINTER(c_double), POINTER(c_int))
+        lib.pestpp_get_stack_status.restype = c_int
+        lib.pestpp_get_member_stack_count.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_get_member_stack_count.restype = c_int
+        lib.pestpp_get_member_stack_names.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_member_stack_names.restype = c_int
         lib.pestpp_get_candidate_info.argtypes = (
             c_void_p, c_int, POINTER(c_double), POINTER(c_double))
         lib.pestpp_get_candidate_info.restype = c_int
@@ -596,6 +609,34 @@ class PestppLib:
         self._check(self.lib.pestpp_get_candidate_count(self.handle, byref(n)),
                     "pestpp_get_candidate_count")
         return n.value
+
+    def get_stack_status(self) -> dict:
+        """How chance is being accounted for right now - mou and sqp only.
+
+        Derived from the options at the moment it is asked, not latched at initialize(), so a
+        risk set through set_option() since then is reflected. Keys: use_chance, use_fosm,
+        use_robust, risk (clamped to [0.001, 0.999]), stack_size (the stack AS IT STANDS, 0
+        before it is drawn).
+        """
+        chance, fosm, robust, size = c_int(), c_int(), c_int(), c_int()
+        risk = c_double()
+        self._check(self.lib.pestpp_get_stack_status(self.handle, byref(chance), byref(fosm),
+                                                     byref(robust), byref(risk), byref(size)),
+                    "pestpp_get_stack_status")
+        return {"use_chance": bool(chance.value), "use_fosm": bool(fosm.value),
+                "use_robust": bool(robust.value), "risk": risk.value,
+                "stack_size": size.value}
+
+    def get_member_stack_count(self) -> int:
+        """How many per-member stacks exist - 0 unless opt_chance_points is "all"."""
+        n = c_int()
+        self._check(self.lib.pestpp_get_member_stack_count(self.handle, byref(n)),
+                    "pestpp_get_member_stack_count")
+        return n.value
+
+    def get_member_stack_names(self) -> list[str]:
+        """The members owning each per-member stack, in MEMBER_STACK_EN + i order."""
+        return self._get_storage_names(self.lib.pestpp_get_member_stack_names)
 
     def get_candidate_info(self, idx: int) -> tuple[float, float]:
         """(inflation, backtrack) factors candidate `idx` was generated with."""

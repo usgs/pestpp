@@ -246,6 +246,8 @@ public:
 	/// caller reading or writing it does not want.
 	ParameterEnsemble* get_dp_ptr() { return &dp; }
 	ObservationEnsemble* get_op_ptr() { return &op; }
+	/// the chance machinery - risk, stacks, and the constraint bookkeeping behind them.
+	Constraints* get_constraints_ptr() { return &constraints; }
 	ParameterEnsemble* get_dp_archive_ptr() { return &dp_archive; }
 	ObservationEnsemble* get_op_archive_ptr() { return &op_archive; }
 
