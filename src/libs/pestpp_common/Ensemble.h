@@ -218,6 +218,13 @@ class ParameterEnsemble : public Ensemble
 {
 
 public:
+	//appends rows AND their per-realization fixed values. The base-class append_other_rows()
+	//lives on Ensemble and cannot see the side channel, so appending through it silently
+	//reverts every appended realization to control values - which is what the mou Pareto
+	//archive was doing to its members' paired parameters.
+	void append_rows_with_fixed(ParameterEnsemble& other, const vector<string>& rnames);
+	void carry_fixed_from(ParameterEnsemble& other, const vector<string>& rnames);
+
 	enum transStatus { CTL, NUM, MODEL };
 	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
 	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);

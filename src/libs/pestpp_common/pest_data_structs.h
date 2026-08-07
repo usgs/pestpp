@@ -1172,6 +1172,21 @@ private:
 };
 ostream& operator<< (ostream& os, const SVDInfo& val);
 
+/** @brief A distinct, reproducible seed for a NAMED random stream.
+ *
+ * Every stream in pest++ is seeded from ++random_seed, which makes a run reproducible - but
+ * several tools kept two generators and handed BOTH the same seed, so the "independent"
+ * stream emitted exactly the same sequence as the primary one. Two streams that are secretly
+ * one stream cannot be reasoned about: whatever consumes them is correlated in a way nothing
+ * in the code says.
+ *
+ * This mixes the stream's name into the user's seed, so the streams are distinct from each
+ * other and from run to run only when the user changes the seed. Same seed in, same run out.
+ * The PRIMARY stream of each tool deliberately keeps the raw seed, so existing runs reproduce
+ * exactly as before.
+ */
+unsigned int derived_random_seed(unsigned int base_seed, const std::string& stream_name);
+
 double draw_standard_normal(std::mt19937& rand_gen);
 vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
 vector<int> uniform_int_draws(int num_reals, int lower_bound, int upper_bound, std::mt19937& rand_gen);

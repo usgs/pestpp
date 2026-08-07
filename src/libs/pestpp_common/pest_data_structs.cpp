@@ -3002,6 +3002,22 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }
 
+unsigned int derived_random_seed(unsigned int base_seed, const std::string& stream_name)
+{
+	//FNV-1a over the stream name, then mixed with the base seed. Any deterministic mix would
+	//do; what matters is that it depends on BOTH, so one seed controls every stream and no two
+	//named streams collide.
+	unsigned int h = 2166136261u;
+	for (char c : stream_name)
+	{
+		h ^= (unsigned char)c;
+		h *= 16777619u;
+	}
+	h ^= base_seed + 0x9e3779b9u + (h << 6) + (h >> 2);
+	return h;
+}
+
+
 double draw_standard_normal(std::mt19937& rand_gen)
 {	
 	using std::sqrt;

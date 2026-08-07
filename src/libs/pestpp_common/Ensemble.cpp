@@ -4167,6 +4167,96 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
  * @param pars Description.
  * @param to_model Description.
  */
+/**
+ * @brief Append rows from another ParameterEnsemble, INCLUDING their fixed-parameter values.
+ *
+ * Ensemble::append_other_rows() moves the matrix and the row names and nothing else - it lives
+ * on the base class and knows nothing of the per-realization side channel, which is a
+ * ParameterEnsemble member. Appending through it therefore drops whatever fixed values a
+ * realization carried, and the realization quietly reverts to control values everywhere it is
+ * later reported.
+ *
+ * That is what happened to mou's Pareto archive: the population files showed each member's
+ * paired uncertain parameters correctly while the archive - the file that IS the answer -
+ * showed the control value for every one of them.
+ */
+void ParameterEnsemble::append_rows_with_fixed(ParameterEnsemble& other, const vector<string>& rnames)
+{
+	Eigen::MatrixXd mat = other.get_eigen(rnames, vector<string>());
+	append_other_rows(rnames, mat);
+	carry_fixed_from(other, rnames);
+}
+
+
+/**
+ * @brief Copy the per-realization fixed values for @p rnames out of @p other.
+ *
+ * Split from append_rows_with_fixed() because an ensemble can acquire rows without appending:
+ * the matrix constructor builds one from an Eigen block and row names alone, which is how mou
+ * SEEDS its archive - and that path carried no side channel either.
+ */
+void ParameterEnsemble::carry_fixed_from(ParameterEnsemble& other, const vector<string>& rnames)
+{
+	FixedParInfo& src = other.get_fixed_info();
+	vector<string> src_names = src.get_fixed_names();
+	if (src_names.size() == 0)
+		return;
+	//union the names rather than substitute: set_fixed_names() clears the map, so replacing
+	//would discard whatever this ensemble already held for its existing rows
+	map<string, map<string, double>> keep = pfinfo.get_fixed_info_map();
+	vector<string> all_names = pfinfo.get_fixed_names();
+	set<string> have(all_names.begin(), all_names.end());
+	for (auto& n : src_names)
+		if (have.find(n) == have.end())
+			all_names.push_back(n);
+	pfinfo.set_fixed_names(all_names);
+	if (keep.size() > 0)
+		pfinfo.add_realizations(keep);
+	map<string, map<string, double>> add;
+	for (auto& pname : src_names)
+	{
+		map<string, double> per_real;
+		for (auto& rname : rnames)
+		{
+			double v;
+			if (src.get_fixed_value(pname, rname, v))
+				per_real[rname] = v;
+		}
+		if (per_real.size() > 0)
+			add[pname] = per_real;
+	}
+	if (add.size() > 0)
+		pfinfo.add_realizations(add);
+
+	//Every row must now have an entry. Setting the names changes the contract: with no names,
+	//get_real_fixed_values() short-circuits and returns nothing for anybody, which is why the
+	//archive never complained before. With names, it iterates them and THROWS on a realization
+	//it has never seen - and rows reach the archive by paths that carry no side channel at all.
+	//Fill those from the control file, in model space, the way the fixed-parameter draw does.
+	vector<string> now_names = pfinfo.get_fixed_names();
+	if (now_names.size() > 0)
+	{
+		Parameters ctl = pest_scenario_ptr->get_ctl_parameters();
+		ParameterInfo* pinfo = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod();
+		for (auto& rname : real_names)
+		{
+			double v;
+			if (pfinfo.get_fixed_value(now_names[0], rname, v))
+				continue;
+			map<string, double> fill;
+			for (auto& pname : now_names)
+			{
+				double cv = ctl.get_rec(pname);
+				cv *= pinfo->get_parameter_rec_ptr(pname)->scale;
+				cv += pinfo->get_parameter_rec_ptr(pname)->offset;
+				fill[pname] = cv;
+			}
+			pfinfo.add_realization(rname, fill);
+		}
+	}
+}
+
+
 void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars, bool to_model)
 {
 	

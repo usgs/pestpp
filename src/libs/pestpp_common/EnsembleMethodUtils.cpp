@@ -4584,9 +4584,12 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	file_manager(_file_manager),output_file_writer(_output_file_writer), performance_log(_performance_log),
 	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario)
 {
+	//the PRIMARY stream keeps the raw seed, so runs reproduce exactly as they always have
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
-
-	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+	//...the subset stream does NOT. It used to be seeded identically to rand_gen above, which
+	//made it the same sequence, not an independent one.
+	subset_rand_gen = std::mt19937(derived_random_seed(
+		pest_scenario.get_pestpp_options().get_random_seed(), "subset"));
 	pe.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario_ptr(&pest_scenario);
 	pe.set_rand_gen(&rand_gen);

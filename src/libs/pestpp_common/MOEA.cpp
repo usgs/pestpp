@@ -2582,8 +2582,9 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
         message(2, ss.str());
         Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
         op_archive.append_other_rows(keep, other);
-        other = _dp.get_eigen(keep, vector<string>());
-        dp_archive.append_other_rows(keep, other);
+        //carries the per-realization parameter values too, so an archived solution still
+        //reports what it was actually run with
+        dp_archive.append_rows_with_fixed(_dp, keep);
         other.resize(0, 0);
         message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
         DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_SUM_TAG);
@@ -2669,8 +2670,7 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
     message(2, ss.str());
     Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
     op_archive.append_other_rows(keep, other);
-    other = _dp.get_eigen(keep, vector<string>());
-    dp_archive.append_other_rows(keep, other);
+    dp_archive.append_rows_with_fixed(_dp, keep);
     other.resize(0, 0);
     message(2, "spea fitness calculation for archive of size ", op_archive.shape().first);
     map<string, double> fit = objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true,
@@ -3605,7 +3605,10 @@ int MOEA::initialize_prepare()
 
 	file_manager.open_ofile_ext(lineage_tag);
 	ofstream& lin = file_manager.get_ofstream(lineage_tag);
-	lin << "child,parent_1,parent_2,parent_3" << endl;
+	lin << "child";
+	for (int i = 0; i < MAX_LINEAGE_PARENTS; i++)
+		lin << ",parent_" << (i + 1);
+	lin << endl;
 
 	if (use_robust)
 	{
@@ -4024,6 +4027,10 @@ void MOEA::initialize_finish()
 		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
 			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
 		dp_archive.set_trans_status(dp.get_trans_status());
+		//the matrix constructor above carries rows and names only, so the members that SEED the
+		//archive would otherwise report control values for anything held in the side channel -
+		//which for a robust run is the paired uncertain parameters
+		dp_archive.carry_fixed_from(dp, dompair.first);
 		ss.str("");
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
 		message(2, ss.str());
@@ -4373,6 +4380,29 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
  * @return Description.
  */
 /**
+ * @brief Write one lineage row, padded to a fixed width.
+ *
+ * Every row is CHILD plus exactly MAX_LINEAGE_PARENTS fields, blank where a generator has
+ * fewer parents than that. Ragged rows are worse than missing ones here: a reader that trusts
+ * the header silently mislabels every column of the longer rows rather than failing.
+ *
+ * Extra parents beyond the header width are dropped rather than widening the row, because a
+ * row wider than its header is the exact failure this exists to prevent.
+ */
+void MOEA::write_lineage(ofstream& lin, const string& child, const vector<string>& parents)
+{
+	lin << child;
+	for (int i = 0; i < MAX_LINEAGE_PARENTS; i++)
+	{
+		lin << ",";
+		if (i < (int)parents.size())
+			lin << parents[i];
+	}
+	lin << endl;
+}
+
+
+/**
  * @brief Build the uncertain-parameter stack that members are paired with.
  *
  * Same sources as the chance machinery - opt_par_stack for a file, opt_stack_size to draw -
@@ -4439,6 +4469,13 @@ void MOEA::initialize_unc_stack()
 
 	if (unc_stack.shape().first == 0)
 		throw_moea_error("the uncertain parameter stack is empty");
+	//seeded from the user's seed like everything else, but as its own sequence
+	int base_seed = pest_scenario.get_pestpp_options().get_random_seed();
+	robust_rand_gen = std::mt19937(derived_random_seed(base_seed, "mou_robust_pairing"));
+	ss.str("");
+	ss << "robust optimization: pairing stream seeded " << derived_random_seed(base_seed,
+		"mou_robust_pairing") << " (derived from ++random_seed " << base_seed << ")";
+	message(2, ss.str());
 	//every uncertain parameter must be in the stack - a member paired against a stack that
 	//does not carry one of them would silently run it at its control value in every member,
 	//which is no uncertainty at all
@@ -4507,12 +4544,13 @@ void MOEA::assign_par_reals(ParameterEnsemble& _pop)
 	Eigen::MatrixXd stack_mat = *unc_stack.get_eigen_ptr();
 
 	uniform_int_distribution<int> pick(0, (int)unc_stack.shape().first - 1);
+	//drawn from the dedicated robust stream - see the member declaration
 	ofstream& prl = file_manager.get_ofstream(parreal_tag);
 
 	_pop.get_fixed_info().set_fixed_names(all_fixed);
 	for (auto& rname : real_names)
 	{
-		int idx = pick(rand_gen);
+		int idx = pick(robust_rand_gen);
 		map<string, double> rvals;
 		//carry forward whatever was already held for this realization
 		for (auto& fname : all_fixed)
@@ -5676,7 +5714,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 		current_pso_lineage_map[real_name] = new_name;
 		new_names.push_back(new_name);
 		primary_parent_map[new_name] = real_name;
-		lin << new_name << "," << real_name << ",," << endl;
+		write_lineage(lin, new_name, vector<string>{real_name});
 
 	}
 	cur_velocity.set_real_names(new_names);
@@ -5931,7 +5969,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
             new_member_names.push_back(new_name);
             i_newreal++;
             //write the lineage info
-            lin << new_name << "," << current_name << endl;
+            write_lineage(lin, new_name, vector<string>{current_name});
             primary_parent_map[new_name] = current_name;
         }
     }
@@ -6073,10 +6111,12 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		new_name = get_new_member_name("de");
 		new_member_names.push_back(new_name);
         primary_parent_map[new_name] = real_names[selected[0]];
-		lin << new_name;
-		for (auto idx : selected)
-			lin << "," << real_names[idx];
-		lin << endl;
+		{
+			vector<string> _par;
+			for (auto idx : selected)
+				_par.push_back(real_names[idx]);
+			write_lineage(lin, new_name, _par);
+		}
 		new_reals.row(i) = y;
 		i++;
 	}
@@ -6158,10 +6198,12 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 		imember++;
 		new_name = get_new_member_name("pm");
 		new_member_names.push_back(new_name);
-		lin << new_name;
-		for (auto idx : selected)
-			lin << "," << real_names[idx];
-		lin << endl;
+		{
+			vector<string> _par;
+			for (auto idx : selected)
+				_par.push_back(real_names[idx]);
+			write_lineage(lin, new_name, _par);
+		}
 		primary_parent_map[new_name] = real_names[selected[0]];
 	}
 
@@ -6318,7 +6360,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
 		new_name = get_new_member_name("sbx");
-		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
+		write_lineage(lin, new_name, vector<string>{real_names[p1_idx], real_names[p2_idx]});
 		new_member_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
 		i_member++;
@@ -6326,7 +6368,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 			break;
 		new_reals.row(i_member) = children.second;
 		new_name = get_new_member_name("sbx");
-		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
+		write_lineage(lin, new_name, vector<string>{real_names[p1_idx], real_names[p2_idx]});
 		new_member_names.push_back(new_name);
 		primary_parent_map[new_name] = real_names[p1_idx];
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;

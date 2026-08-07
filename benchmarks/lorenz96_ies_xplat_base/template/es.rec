@@ -14,7 +14,7 @@ in directory: "/Users/jwhite/Dev/pestpp/benchmarks/template96_pst_ies"
 on host: "m5max.local"
 on a(n) apple operating system
 with release configuration
-started at 08/06/26 21:13:12
+started at 08/07/26 07:21:53
 
 ...reading external file 'es.pargp_data.csv'
 ...header line: PARGPNME,INCTYP,DERINC,DERINCLB,FORCEN,DERINCMUL,DERMTHD,SPLITTHRESH,SPLITRELDIFF,SPLITACTION
@@ -8448,6 +8448,6 @@ obgnme    2000       2000  9.55e+04         0  9.55e+04  9.55e+04       100     
 
 
 pestpp-ies analysis complete...
-started at 08/06/26 21:13:12
-finished at 08/06/26 21:13:13
+started at 08/07/26 07:21:53
+finished at 08/07/26 07:21:53
 took 0 minutes

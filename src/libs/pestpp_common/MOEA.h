@@ -279,6 +279,14 @@ private:
 	string pi_pop_file_tag = "pi_pop";
 	string obs_pop_file_tag = "obs_pop";
 	string lineage_tag = "lineage.csv";
+	//The lineage file is one row per new member, and every generator writes to it - but they
+	//have different numbers of parents: simplex 1, pm 1, sbx 2, pso 1 (padded), de 4. They
+	//used to write exactly as many fields as they had parents against a fixed 4-name header,
+	//so the file was RAGGED: a de row carried five values under four names, which shifts every
+	//column by one when read with a header, and df["child"] silently returns parent_1.
+	//write_lineage() pads instead, so a row is always CHILD + MAX_LINEAGE_PARENTS fields.
+	static const int MAX_LINEAGE_PARENTS = 4;
+	void write_lineage(std::ofstream& lin, const string& child, const vector<string>& parents);
 
 	//---- robust optimization (opt_use_robust) ----------------------------------------------
 	//Each new member is paired with ONE realization of the uncertain parameters, drawn at
@@ -298,6 +306,10 @@ private:
 	vector<string> unc_stack_real_names;         ///< stack realization names, for the record
 	string parreal_tag = "par_real.csv";         ///< which realization each member drew
 	bool use_robust = false;
+	//its OWN stream, so which realization a member draws does not depend on how many random
+	//numbers the generators happened to consume first - otherwise changing the generator mix
+	//silently changes the pairing, and the pairing is the experiment
+	std::mt19937 robust_rand_gen;
 	void initialize_unc_stack();
 	void assign_par_reals(ParameterEnsemble& _pop);
 	chancePoints chancepoints;
