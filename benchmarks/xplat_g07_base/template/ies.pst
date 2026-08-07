@@ -1,0 +1,28 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 2
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+random_seed                    111958
+num_tpl_ins_threads            1
+ies_num_reals                  20
+ies_no_noise                   True
+ies_include_base               True
+ies_subset_size                5
+ies_lambda_mults               0.1,1.0,10.0
+ies_bad_phi_sigma              1000.0
+* parameter groups external
+ies.pargp_data.csv
+* parameter data external
+ies.par_data.csv
+* observation data external
+ies.obs_data.csv
+* model command line
+python forward_g07.py
+* model input external
+ies.tplfile_data.csv
+* model output external
+ies.insfile_data.csv

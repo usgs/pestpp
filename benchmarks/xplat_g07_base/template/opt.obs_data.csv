@@ -1,0 +1,11 @@
+obsnme,obsval,weight,obgnme
+g1,-0.4000000000000057,1.0,l_constraint
+g2,1.1000000000000014,1.0,l_constraint
+g3,-0.8000000000000007,1.0,l_constraint
+g4,-2.240000000000009,1.0,l_constraint
+g5,-0.3100000000000023,1.0,l_constraint
+g6,0.5000000000000036,1.0,l_constraint
+g7,-5.799999999999997,1.0,l_constraint
+g8,-51.12000000000001,1.0,l_constraint
+obj,25.61,0.0,obj_fn
+obj2,350.32,0.0,obj_fn_2

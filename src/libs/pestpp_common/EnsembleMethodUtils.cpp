@@ -10532,14 +10532,17 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 
 	else if (how == "RANDOM")
     {
-		//std::uniform_int_distribution<int> uni(0, size - 1);
 		int idx;
 		for (int i = 0; i < 1000000000; i++)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			//idx = uni(subset_rand_gen);
-            idx = uniform_int_draws(1,0,size-1,rand_gen)[0];
+			//drawn from the SUBSET stream, not the primary one. subset_rand_gen existed and was
+			//seeded but never read - this line used rand_gen - so choosing a subset consumed
+			//from the same sequence the ensemble draws come from. Changing ies_subset_size
+			//therefore shifted every random number drawn after it, which is not something a
+			//size argument should do.
+            idx = uniform_int_draws(1,0,size-1,subset_rand_gen)[0];
             if ((idx < 0) || (idx > (size-1)))
             {
                 continue;

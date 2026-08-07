@@ -1,0 +1,27 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 2
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+random_seed                    111958
+num_tpl_ins_threads            1
+opt_dec_var_groups             decvar
+mou_population_size            20
+mou_generator                  de
+mou_env_selector               nsga
+mou_objectives                 obj,obj2
+* parameter groups external
+mou.pargp_data.csv
+* parameter data external
+mou.par_data.csv
+* observation data external
+mou.obs_data.csv
+* model command line
+python forward_g07.py
+* model input external
+mou.tplfile_data.csv
+* model output external
+mou.insfile_data.csv

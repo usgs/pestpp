@@ -2280,6 +2280,445 @@ def version_flag_test():
             print("{0} {1} -> '{2}'".format(exe_name, flag, version_str))
 
 
+# ------------------------------------------------------------------------------------------
+#  CROSS-PLATFORM REPRODUCIBILITY: g07 through ies / da / sqp / mou / opt
+#
+#  One analytic python model, five control files, one committed baseline.  The model is
+#  evaluated through the EXTERNAL ('/e') run manager, which hands the whole batch of runs to a
+#  single process: for a model this cheap the entire cost is process launches, and /e removes
+#  all but one per batch.
+#
+#  Why five tools and not one: a platform difference in ies says nothing about mou's dominance
+#  sorting or sqp's line search.  Those are separate code paths and each is a place where a
+#  compiler, a libm, or an unstable sort can diverge.
+# ------------------------------------------------------------------------------------------
+
+XPLAT_G07_BASE = "xplat_g07_base"
+XPLAT_G07_TOOLS = ["ies", "da", "sqp", "mou", "opt"]
+#: the seed is set EXPLICITLY rather than left to default, so a change to the default cannot
+#: silently rebase this test
+XPLAT_G07_SEED = 111958
+XPLAT_G07_NOPTMAX = 2
+XPLAT_G07_NREALS = 20
+
+
+def _g07_model_source():
+    """the '/e' model: evaluate g07 for EVERY run in the run-storage file, in one pass.
+
+    It never learns which tool invoked it - a batch of ies realizations, sqp line-search
+    candidates and opt finite-difference perturbations are all just rows of the par block. That
+    is what lets one model serve all five tools.
+    """
+    return r"""
+import os, glob
+import numpy as np
+import pyemu
+
+
+def g07_evaluate(X):
+    # X is (n_run, 10).  Returns a dict of observation name -> (n_run,) array.
+    #
+    # obj/g1..g8 are the standard g07 problem.  obj2 is an ADDED second objective - the squared
+    # distance from the origin - which trades off against obj and gives pestpp-mou a genuine
+    # two-objective front to sort.  With one objective mou degenerates to a constrained EA and
+    # never exercises dominance/crowding/archive, which is most of what could differ by
+    # platform.  The other four tools carry obj2 as a zero-weight observation, unaffected.
+    x = [X[:, i] for i in range(10)]
+    obj = (x[0]**2 + x[1]**2 + x[0]*x[1] - 14*x[0] - 16*x[1] + (x[2] - 10)**2
+           + 4*(x[3] - 5)**2 + (x[4] - 3)**2 + 2*(x[5] - 1)**2 + 5*x[6]**2
+           + 7*(x[7] - 11)**2 + 2*(x[8] - 10)**2 + (x[9] - 7)**2 + 45)
+    obj2 = sum(xi**2 for xi in x)
+    out = {"obj": obj, "obj2": obj2}
+    out["g1"] = -105 + 4*x[0] + 5*x[1] - 3*x[6] + 9*x[7]
+    out["g2"] = 10*x[0] - 8*x[1] - 17*x[6] + 2*x[7]
+    out["g3"] = -8*x[0] + 2*x[1] + 5*x[8] - 2*x[9] - 12
+    out["g4"] = 3*(x[0]-2)**2 + 4*(x[1]-3)**2 + 2*x[2]**2 - 7*x[3] - 120
+    out["g5"] = 5*x[0]**2 + 8*x[1] + (x[2]-6)**2 - 2*x[3] - 40
+    out["g6"] = x[0]**2 + 2*(x[1]-2)**2 - 2*x[0]*x[1] + 14*x[4] - 6*x[5]
+    out["g7"] = 0.5*(x[0] - 8)**2 + 2*(x[1]-4)**2 + 3*x[4]**2 - x[5] - 30
+    out["g8"] = -3*x[0] + 6*x[1] + 12*(x[8] - 8)**2 - 7*x[9]
+    return out
+
+
+def forward_g07_ensemble(rns_file=None):
+    if rns_file is None:
+        best, nbest = None, -1
+        for c in [f for f in glob.glob("*.rns") if "fail" not in f.lower()]:
+            h, _, _ = pyemu.helpers.RunStor.file_info(c)
+            if h["n_runs"] > nbest:
+                best, nbest = c, h["n_runs"]
+        rns_file = best
+    header, par_names, obs_names = pyemu.helpers.RunStor.file_info(rns_file)
+    npar, nobs, nrun = len(par_names), len(obs_names), int(header["n_runs"])
+    run_start, run_size = int(header["run_start"]), int(header["run_size"])
+    par_off = 1 + 1001 + 8            # r_status(int8) + info_txt(1001) + info_val(float64)
+    obs_off = par_off + npar * 8
+
+    par = np.empty((nrun, npar))
+    with open(rns_file, "rb") as f:
+        for i in range(nrun):
+            f.seek(run_start + i * run_size + par_off)
+            par[i, :] = np.fromfile(f, dtype=np.float64, count=npar)
+
+    pmap = {n.lower(): j for j, n in enumerate(par_names)}
+    X = np.column_stack([par[:, pmap["x{0}".format(k)]] for k in range(1, 11)])
+    sim = g07_evaluate(X)
+
+    omap = {n.lower(): j for j, n in enumerate(obs_names)}
+    obs = np.zeros((nrun, nobs))
+    for name, vals in sim.items():
+        j = omap.get(name)
+        if j is not None:
+            obs[:, j] = vals
+
+    # obs values, run_status=1 (completed), and the trailing buffer byte
+    with open(rns_file, "r+b") as f:
+        for i in range(nrun):
+            base = run_start + i * run_size
+            f.seek(base); f.write(np.int8(1).tobytes())
+            f.seek(base + obs_off); f.write(obs[i].astype(np.float64).tobytes())
+            f.seek(base + obs_off + nobs * 8); f.write(np.int8(0).tobytes())
+    print("forward_g07_ensemble: solved {0} runs from {1}".format(nrun, rns_file))
+
+
+def forward_g07_single():
+    # the CLASSIC path: read par.dat written from the template file, write obs.dat for the
+    # instruction file.  Some tools run the model DIRECTLY rather than through the run manager -
+    # pestpp-opt does it for "running the model once with optimal decision variables" - and that
+    # run reads and writes files, not the run-storage.  Without this the direct runs fail with
+    # "output file './obs.dat' not found" and the tool carries on with a missing result.
+    if not os.path.exists("par.dat"):
+        return
+    vals = {}
+    for line in open("par.dat"):
+        t = line.strip().split()
+        if len(t) >= 2:
+            try:
+                vals[t[0].strip().lower()] = float(t[1])
+            except ValueError:
+                pass
+    if len(vals) < 10:
+        return
+    X = np.array([[vals["x{0}".format(k)] for k in range(1, 11)]])
+    sim = g07_evaluate(X)
+    with open("obs.dat", "w") as f:
+        for name in ["obj", "obj2"] + ["g{0}".format(i) for i in range(1, 9)]:
+            f.write("{0}  {1:20.12E}\n".format(name, float(sim[name][0])))
+
+
+if __name__ == "__main__":
+    # BOTH, unconditionally: the batch when there is one, and the single-run files when the
+    # tool wrote par.dat.  One script that serves the external run manager and a direct run
+    # means no tool needs a different model command.
+    forward_g07_single()
+    forward_g07_ensemble()
+"""
+
+
+def _g07_truth_obs():
+    """observation values for the ies/da twin: the model run at a chosen 'truth' parameter set.
+
+    Without a twin, ies fits whatever the template happened to carry and the comparison measures
+    nothing in particular.  Computed here with the SAME expressions the /e model uses, so the
+    twin is self-consistent and there is no model error to confound a platform difference.
+    """
+    import numpy as np
+    truth = np.array([[2.2, 2.3, 8.7, 5.1, 1.0, 1.4, 1.3, 9.8, 8.2, 8.4]])
+    x = [truth[:, i] for i in range(10)]
+    obj = (x[0]**2 + x[1]**2 + x[0]*x[1] - 14*x[0] - 16*x[1] + (x[2] - 10)**2
+           + 4*(x[3] - 5)**2 + (x[4] - 3)**2 + 2*(x[5] - 1)**2 + 5*x[6]**2
+           + 7*(x[7] - 11)**2 + 2*(x[8] - 10)**2 + (x[9] - 7)**2 + 45)
+    vals = {"obj": obj, "obj2": sum(xi**2 for xi in x),
+            "g1": -105 + 4*x[0] + 5*x[1] - 3*x[6] + 9*x[7],
+            "g2": 10*x[0] - 8*x[1] - 17*x[6] + 2*x[7],
+            "g3": -8*x[0] + 2*x[1] + 5*x[8] - 2*x[9] - 12,
+            "g4": 3*(x[0]-2)**2 + 4*(x[1]-3)**2 + 2*x[2]**2 - 7*x[3] - 120,
+            "g5": 5*x[0]**2 + 8*x[1] + (x[2]-6)**2 - 2*x[3] - 40,
+            "g6": x[0]**2 + 2*(x[1]-2)**2 - 2*x[0]*x[1] + 14*x[4] - 6*x[5],
+            "g7": 0.5*(x[0] - 8)**2 + 2*(x[1]-4)**2 + 3*x[4]**2 - x[5] - 30,
+            "g8": -3*x[0] + 6*x[1] + 12*(x[8] - 8)**2 - 7*x[9]}
+    return {k: float(v[0]) for k, v in vals.items()}
+
+
+def _g07_build_template(t_d="xplat_g07_template"):
+    """the shared template: tpl/ins, the /e model, and a base control file all five tools start
+    from.  Built once so the shared half cannot drift between the five .pst files."""
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+
+    pnames = ["x{0}".format(i) for i in range(1, 11)]
+    onames = ["obj", "obj2"] + ["g{0}".format(i) for i in range(1, 9)]
+
+    with open(os.path.join(t_d, "par.tpl"), "w") as f:
+        f.write("ptf ~\n")
+        for p in pnames:
+            f.write("{0} ~  {0}   ~\n".format(p))
+    with open(os.path.join(t_d, "obs.ins"), "w") as f:
+        f.write("pif ~\n")
+        for o in onames:
+            # 'w' skips the leading name field; obs.dat is written as "<name>  <value>"
+            f.write("l1 w !{0}!\n".format(o))
+    # a placeholder output file so pst_from_io_files can parse; the /e model never writes it
+    with open(os.path.join(t_d, "obs.dat"), "w") as f:
+        for o in onames:
+            f.write("{0}  0.0\n".format(o))
+    with open(os.path.join(t_d, "par.dat"), "w") as f:
+        for p in pnames:
+            f.write("{0}  1.0\n".format(p))
+    with open(os.path.join(t_d, "forward_g07.py"), "w") as f:
+        f.write(_g07_model_source())
+
+    pst = pyemu.helpers.pst_from_io_files(
+        [os.path.join(t_d, "par.tpl")], [os.path.join(t_d, "par.dat")],
+        [os.path.join(t_d, "obs.ins")], [os.path.join(t_d, "obs.dat")], pst_path=".")
+
+    par = pst.parameter_data
+    par.loc[:, "partrans"] = "none"
+    par.loc[:, "parchglim"] = "relative"
+    par.loc[:, "pargp"] = "decvar"
+    par.loc[:, "parlbnd"] = -10.0
+    par.loc[:, "parubnd"] = 10.0
+    par.loc[:, "parval1"] = [2.0, 2.0, 8.0, 5.0, 1.0, 1.0, 1.0, 9.0, 8.0, 8.0]
+
+    truth = _g07_truth_obs()
+    obs = pst.observation_data
+    obs.loc[:, "obsval"] = [truth[o] for o in obs.obsnme]
+    obs.loc[:, "weight"] = 1.0
+    obs.loc["obj", "obgnme"] = "obj_fn"
+    obs.loc["obj2", "obgnme"] = "obj_fn_2"
+    for i in range(1, 9):
+        obs.loc["g{0}".format(i), "obgnme"] = "l_constraint"
+
+    pst.model_command = ["python forward_g07.py"]
+    pst.control_data.noptmax = XPLAT_G07_NOPTMAX
+    return pst, t_d
+
+
+def _g07_pst_for(tool, t_d):
+    """tool-specific options on top of the shared control file, written as <tool>.pst."""
+    pst = pyemu.Pst(os.path.join(t_d, "_base.pst"))
+    o = pst.pestpp_options
+    o.clear()
+    o["random_seed"] = XPLAT_G07_SEED
+    o["num_tpl_ins_threads"] = 1          # thread count must not reorder anything
+
+    if tool == "da":
+        # pestpp-da REQUIRES cycle information - it will not infer a single cycle from its
+        # absence, it refuses ("the following non-zero weighted observations do not have cycle
+        # information").  Assigning everything to cycle 0 gives the single-cycle, ies-shaped
+        # path, which is the only one the API exposes and all this test needs.
+        pst.observation_data.loc[:, "cycle"] = 0
+        pst.parameter_data.loc[:, "cycle"] = 0
+
+    if tool in ("ies", "da"):
+        # a calibration twin: fit obj/g1..g8 to the truth.  obj2 carries no weight - it exists
+        # for mou and would otherwise pull the fit toward the origin
+        pst.observation_data.loc["obj2", "weight"] = 0.0
+        o["ies_num_reals"] = XPLAT_G07_NREALS
+        o["ies_no_noise"] = True          # otherwise the noise draw enters the comparison
+        o["ies_include_base"] = True      # deterministic, and anchors the ensemble
+        o["ies_subset_size"] = 5          # pinned: RANDOM subset selection is the default
+        o["ies_lambda_mults"] = [0.1, 1.0, 10.0]
+        o["ies_bad_phi_sigma"] = 1000.0   # nothing dropped for phi reasons
+    elif tool == "sqp":
+        # the objective observation must carry ZERO weight: OptObjFunc::initialize() refuses an
+        # objective that is also a non-zero weighted observation (the message blames chance
+        # constraints, but the check is unconditional).  Weight is a calibration concept and
+        # the objective here is identified by name, not by weight.
+        pst.observation_data.loc["obj", "weight"] = 0.0
+        pst.observation_data.loc["obj2", "weight"] = 0.0
+        o["opt_dec_var_groups"] = "decvar"
+        o["opt_obj_func"] = "obj"
+        o["opt_direction"] = "min"
+        o["sqp_num_reals"] = XPLAT_G07_NREALS
+        o["sqp_subset_size"] = 5
+        o["par_sigma_range"] = 20
+    elif tool == "mou":
+        # mou reads the objective DIRECTION from the observation group name - the prefix must be
+        # one of {l_, less, g_, greater}.  sqp and pestpp-opt take the opposite view: they
+        # identify the objective by name (opt_obj_func) and treat every l_/g_ group as a
+        # CONSTRAINT, so an objective in an l_ group there would be double-counted.  The two
+        # conventions genuinely conflict, which is why the groups are set per tool rather than
+        # shared.
+        pst.observation_data.loc["obj", "obgnme"] = "l_obj"
+        pst.observation_data.loc["obj2", "obgnme"] = "l_obj2"
+        o["opt_dec_var_groups"] = "decvar"
+        o["mou_population_size"] = XPLAT_G07_NREALS
+        o["mou_generator"] = "de"
+        o["mou_env_selector"] = "nsga"
+        # both objectives minimized; the constraints stay constraints
+        o["mou_objectives"] = "obj,obj2"
+    elif tool == "opt":
+        pst.observation_data.loc["obj", "weight"] = 0.0     # as for sqp, see above
+        pst.observation_data.loc["obj2", "weight"] = 0.0
+        o["opt_dec_var_groups"] = "decvar"
+        o["opt_obj_func"] = "obj"
+        o["opt_direction"] = "min"
+    else:
+        raise Exception("unknown tool " + tool)
+
+    pst_name = "{0}.pst".format(tool)
+    pst.write(os.path.join(t_d, pst_name), version=2)
+    return pst_name
+
+
+def _g07_exe(tool):
+    """locate pestpp-<tool>, both in the CI layout this file already assumes and in a local
+    checkout, where the repo's own bin/ is the only copy."""
+    suffix = ".exe" if "windows" in platform.platform().lower() else ""
+    name = "pestpp-{0}{1}".format(tool, suffix)
+    if "windows" in platform.platform().lower():
+        plat = "win"
+    elif "darwin" in platform.platform().lower() or "macos" in platform.platform().lower():
+        plat = "mac"
+    else:
+        plat = "linux"
+    # ../bin/<plat> is the one that matters in CI: the build has INSTALL_LOCAL ON by default,
+    # so a plain `make` populates <workspace>/bin/<plat>, and the test runs from <workspace>/
+    # benchmarks.  The others cover a local checkout and anything already on PATH.
+    cands = [os.path.join("..", "bin", plat, name),
+             os.path.join(os.path.dirname(exe_path), name),
+             os.path.join("..", "bin", name)]
+    for c in cands:
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    onpath = shutil.which(name)
+    if onpath is not None:
+        return onpath
+    raise Exception("could not find '{0}'; looked in {1} and on PATH".format(name, cands))
+
+
+def _g07_run(t_d, m_d, tool, pst_name):
+    """run one tool from the template through the EXTERNAL run manager."""
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d, m_d)
+    pyemu.os_utils.run("{0} {1} /e".format(_g07_exe(tool), pst_name), cwd=m_d)
+    return m_d
+
+
+#: what each tool writes that is worth comparing.  '{n}' is filled with noptmax.
+XPLAT_G07_ARTIFACTS = {
+    "ies": ["{tool}.{n}.par.csv", "{tool}.{n}.obs.csv", "{tool}.phi.actual.csv"],
+    # da names its ensembles by CYCLE and iteration - da.<cycle>.<iter>.par.csv - so the
+    # single-cycle run this uses writes da.0.<n>.*, not da.<n>.*
+    "da":  ["{tool}.0.{n}.par.csv", "{tool}.0.{n}.obs.csv", "{tool}.phi.actual.csv"],
+    "sqp": ["{tool}.{n}.par.csv", "{tool}.{n}.obs.csv"],
+    # the UNNUMBERED files are mou's final state; only some iterations get numbered copies
+    # (mou.<n>.obs_pop.csv in particular is not written), so the final four are the stable set
+    "mou": ["{tool}.dv_pop.csv", "{tool}.obs_pop.csv",
+            "{tool}.archive.dv_pop.csv", "{tool}.archive.obs_pop.csv"],
+    "opt": ["{tool}.{n}.par"],
+}
+
+
+def _g07_artifact_names(tool):
+    return [a.format(tool=tool, n=XPLAT_G07_NOPTMAX) for a in XPLAT_G07_ARTIFACTS[tool]]
+
+
+def basic_xplat_g07_setup(base_d=XPLAT_G07_BASE):
+    """build the g07 cross-platform BASE CASE and freeze it.
+
+    RUN THIS ONCE, DELIBERATELY, on a reference machine, and commit base_d.  It is deliberately
+    NOT called from __main__ - the lorenz96 fixture calls its own setup there, so every run
+    regenerates the reference and compares itself against it, and has therefore never detected a
+    cross-platform difference in its life.  Keep these two entry points apart.
+    """
+    t_d = "xplat_g07_template"
+    pst, t_d = _g07_build_template(t_d)
+    pst.write(os.path.join(t_d, "_base.pst"), version=2)
+
+    if os.path.exists(base_d):
+        shutil.rmtree(base_d)
+    os.makedirs(base_d)
+
+    for tool in XPLAT_G07_TOOLS:
+        pst_name = _g07_pst_for(tool, t_d)
+        m_d = _g07_run(t_d, "xplat_g07_{0}".format(tool), tool, pst_name)
+        tdir = os.path.join(base_d, tool)
+        os.makedirs(tdir)
+        for fn in _g07_artifact_names(tool):
+            src = os.path.join(m_d, fn)
+            assert os.path.exists(src), "{0}: expected artifact '{1}' not written".format(tool, fn)
+            shutil.copy2(src, os.path.join(tdir, fn))
+    shutil.copytree(t_d, os.path.join(base_d, "template"))
+    pd.DataFrame({"seed": [XPLAT_G07_SEED], "noptmax": [XPLAT_G07_NOPTMAX],
+                  "num_reals": [XPLAT_G07_NREALS],
+                  "tools": [",".join(XPLAT_G07_TOOLS)]}).to_csv(
+        os.path.join(base_d, "config.csv"), index=False)
+    print("g07 cross-platform base case written to '{0}'".format(base_d))
+    return base_d
+
+
+def basic_xplat_g07_test(base_d=XPLAT_G07_BASE, rtol=1.0e-6, atol=1.0e-8):
+    """re-run all five tools from the frozen template and compare against the committed base.
+
+    Tolerances are TIGHT on purpose: the model is analytic with no iterative solver, so genuine
+    cross-platform divergence should live in the last bits.  A loose tolerance here would pass
+    through exactly the algorithmic differences this exists to catch.
+    """
+    assert os.path.exists(base_d), \
+        "no base case at '{0}' - run basic_xplat_g07_setup() on a reference machine first".format(base_d)
+    t_d = os.path.join(base_d, "template")
+    cfg = pd.read_csv(os.path.join(base_d, "config.csv")).iloc[0]
+    print("g07 cross-platform check vs '{0}' (seed={1}, noptmax={2}, rtol={3}, atol={4})".format(
+        base_d, cfg["seed"], cfg["noptmax"], rtol, atol))
+
+    def _load(path):
+        df = pd.read_csv(path, index_col=0)
+        # order is not part of the contract; an unstable sort must not read as divergence
+        df.index = [str(i).lower() for i in df.index]
+        df = df.sort_index()
+        return df[sorted(df.columns)]
+
+    n_fail_total = 0
+    for tool in XPLAT_G07_TOOLS:
+        m_d = _g07_run(t_d, "xplat_g07_{0}_test".format(tool), tool, "{0}.pst".format(tool))
+        for fn in _g07_artifact_names(tool):
+            ref_p, new_p = os.path.join(base_d, tool, fn), os.path.join(m_d, fn)
+            assert os.path.exists(new_p), "{0}: '{1}' not written by this run".format(tool, fn)
+            if not fn.endswith(".csv"):
+                # opt's .par is a pest-format parameter file, not a csv
+                ref = _load_par_file(ref_p)
+                new = _load_par_file(new_p)
+            else:
+                ref, new = _load(ref_p), _load(new_p)
+            new = new.reindex(index=ref.index, columns=ref.columns)
+            assert not new.isnull().values.any(), \
+                "{0}/{1}: row or column mismatch vs the base case".format(tool, fn)
+            a, b = ref.values.astype(float), new.values.astype(float)
+            absd = np.abs(a - b)
+            n_fail = int((absd > (atol + rtol * np.abs(a))).sum())
+            i, j = np.unravel_index(np.argmax(absd), absd.shape) if absd.size else (0, 0)
+            print("  {0:<4s} {1:<34s} max|diff|={2:.3e}  {3}/{4} over tol".format(
+                tool, fn, absd.max() if absd.size else 0.0, n_fail, absd.size))
+            n_fail_total += n_fail
+    assert n_fail_total == 0, \
+        "{0} element(s) exceeded tolerance across the five tools - see above".format(n_fail_total)
+    print("PASS: all five tools match the g07 base case within tolerance")
+
+
+#: run as its OWN ci job rather than inside the bulk basic_tests collection: it drives five
+#: tools and takes about as long as everything else in this file put together, so a failure
+#: should name itself rather than showing up as "basic_tests.py failed".  nose skips a function
+#: marked this way during bulk collection but still runs it when named explicitly, which is what
+#: the ci entry does (basic_tests.py:basic_xplat_g07_test).
+basic_xplat_g07_test.__test__ = False
+
+
+def _load_par_file(path):
+    """read a pest-format .par file into a one-column frame indexed by parameter name."""
+    rows = {}
+    with open(path) as f:
+        f.readline()                       # header line
+        for line in f:
+            t = line.strip().split()
+            if len(t) >= 2:
+                rows[t[0].lower()] = float(t[1])
+    return pd.DataFrame({"value": pd.Series(rows)}).sort_index()
+
+
 if __name__ == "__main__":
     #parse_pst_test()
     #basic_test()

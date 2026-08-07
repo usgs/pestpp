@@ -1,0 +1,28 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 2
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+random_seed                    111958
+num_tpl_ins_threads            1
+opt_dec_var_groups             decvar
+opt_obj_func                   obj
+opt_direction                  min
+sqp_num_reals                  20
+sqp_subset_size                5
+par_sigma_range                20
+* parameter groups external
+sqp.pargp_data.csv
+* parameter data external
+sqp.par_data.csv
+* observation data external
+sqp.obs_data.csv
+* model command line
+python forward_g07.py
+* model input external
+sqp.tplfile_data.csv
+* model output external
+sqp.insfile_data.csv

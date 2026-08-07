@@ -41,6 +41,10 @@ jobs:
           # output. The only tests that can catch an adapter quietly taking a different path
           # through a tool; everything else judges the api against itself
           - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "api_vs_exe_tests.py"}
+          # cross-platform reproducibility: one analytic model (g07) driven through ies, da,
+          # sqp, mou and opt via the external run manager, compared against a committed
+          # baseline.  Its own entry so a divergence names the tool it came from.
+          - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "basic_tests.py:basic_xplat_g07_test"}
           - { test_dir: "pestpp-opt_benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "../benchmarks/opt_test.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_base.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "../benchmarks/ies_test_part1.py"}
@@ -71,6 +75,10 @@ jobs:
               env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "pestpp_api_tests.py"}
             - os: macos-latest
               env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "api_vs_exe_tests.py"}
+            # the reproducibility check earns its place on all three platforms - that is the
+            # entire point of it
+            - os: macos-latest
+              env: { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "basic_tests.py:basic_xplat_g07_test"}
     env: ${{ matrix.env }}
 
     steps:

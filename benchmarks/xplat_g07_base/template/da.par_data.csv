@@ -1,0 +1,11 @@
+parnme,partrans,parchglim,parval1,parlbnd,parubnd,pargp,scale,offset,dercom,cycle
+x1,none,relative,2.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x10,none,relative,2.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x2,none,relative,8.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x3,none,relative,5.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x4,none,relative,1.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x5,none,relative,1.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x6,none,relative,1.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x7,none,relative,9.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x8,none,relative,8.0,-10.0,10.0,decvar,1.0,0.0,1,0
+x9,none,relative,8.0,-10.0,10.0,decvar,1.0,0.0,1,0

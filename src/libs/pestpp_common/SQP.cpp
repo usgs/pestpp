@@ -256,11 +256,9 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	constraints(_pest_scenario, &_file_manager, _output_file_writer, *_performance_log),
 	jco(_file_manager,_output_file_writer)
 {
-	//as in ies/da: the primary stream keeps the raw seed, the subset stream gets its own
-	//sequence rather than a duplicate of it
+	//sqp keeps ONE stream: its subset selection is deterministic (get_subset_idxs ranks by
+	//constraint violation sum), so a second generator here would be seeded and never read
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
-	subset_rand_gen = std::mt19937(derived_random_seed(
-		pest_scenario.get_pestpp_options().get_random_seed(), "subset"));
 	dv.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario_ptr(&pest_scenario);
 	dv.set_rand_gen(&rand_gen);
