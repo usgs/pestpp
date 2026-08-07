@@ -30,7 +30,6 @@
 #include "RestartController.h"
 #include "PerformanceLog.h"
 #include "debug.h"
-#include "DifferentialEvolution.h"
 #include "RunManagerExternal.h"
 
 #include "linear_analysis.h"

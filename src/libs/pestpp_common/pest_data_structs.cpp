@@ -353,6 +353,12 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 			continue;
 		}
 			
+		//a RETIRED option is refused by name, before the catch-all below turns every
+		//exception into ARG_INVALID.  "invalid value" is actively misleading here: the value
+		//was never the problem, and the caller needs to be told what replaced the option.
+		string retired_msg = PestppOptions::get_retired_message(spair.first);
+		if (retired_msg.size() > 0)
+			throw runtime_error(retired_msg);
 		try
 		{
 			stat = assign_value_by_key(spair.first, spair.second);
@@ -644,36 +650,36 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 		cout << "++MAT_INV is deprecated (JtQJ is the only form now supported) and no longer supported...ignoring" << endl;
 	}
 
+	//retired with the pestpp-glm differential evolution implementation - see
+	//retired_option_message() in pest_options_registry.cpp, which carries the same refusal for
+	//the registry path.  Both paths must agree: self_verify() compares them option by option.
 	else if (key == "GLOBAL_OPT")
 	{
-	if (value == "DE") global_opt = OPT_DE;
-	else if (value == "MOEA") global_opt = OPT_MOEA;
-	else
-		throw runtime_error(value + "is not a supported global optimization option");
+		throw runtime_error("++global_opt has been retired - use pestpp-mou");
 	}
 	else if (key == "MOEA_NAME")
 	{
-	convert_ip(value, moea_name);
+		throw runtime_error("++moea_name has been retired - use ++mou_generator in pestpp-mou");
 	}
 	else if (key == "DE_F")
 	{
-		convert_ip(value, de_f);
+		throw runtime_error("++de_f has been retired with the pestpp-glm differential evolution implementation - use pestpp-mou");
 	}
 	else if (key == "DE_CR")
 	{
-		convert_ip(value, de_cr);
+		throw runtime_error("++de_cr has been retired with the pestpp-glm differential evolution implementation - use pestpp-mou");
 	}
 	else if (key == "DE_POP_SIZE")
 	{
-		convert_ip(value, de_npopulation);
+		throw runtime_error("++de_pop_size has been retired with the pestpp-glm differential evolution implementation - use pestpp-mou");
 	}
 	else if (key == "DE_MAX_GEN")
 	{
-		convert_ip(value, de_max_gen);
+		throw runtime_error("++de_max_gen has been retired with the pestpp-glm differential evolution implementation - use pestpp-mou");
 	}
 	else if (key == "DE_DITHER_F")
 	{
-		de_dither_f = pest_utils::parse_string_arg_to_bool(value);
+		throw runtime_error("++de_dither_f has been retired with the pestpp-glm differential evolution implementation - use pestpp-mou");
 	}
 	else if ((key == "OPT_OBJ_FUNC") || (key == "OPT_OBJECTIVE_FUNCTION"))
 	{

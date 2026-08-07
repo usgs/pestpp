@@ -1121,8 +1121,30 @@ set<string> PestppOptions::get_registered_args() const
 // and deliberately OUTSIDE the parse try/catch below, which turns every exception into a bare
 // ARG_INVALID ("invalid value for option 'X'") - useless for a retired option, where the value
 // was never the problem and the caller needs to be told what replaced it.
-static string retired_option_message(const string& key)
+string PestppOptions::get_retired_message(const string& name)
 {
+    //case-normalized here rather than at the call sites: the '++' parser leaves keys exactly as
+    //written (its upper_ip is commented out), while the registry uppercases internally - so the
+    //two callers hand this different spellings of the same option.
+    string key = upper_cp(name);
+    //the pestpp-glm differential evolution implementation was removed - pestpp-mou has carried a
+    //maintained DE generator for a long time - and these options went with it.  They are refused
+    //by NAME here rather than left to be accepted and ignored, which is what ++global_opt(MOEA),
+    //++moea_name and the whole ++de_* family were doing: parsed, stored, read by nothing.
+    if (key == "GLOBAL_OPT")
+        return "++global_opt has been retired. Its only values were DE - whose implementation has been removed from pestpp-glm - and MOEA, which never did anything. Use pestpp-mou, which is the maintained global/multi-objective optimizer.";
+    if (key == "MOEA_NAME")
+        return "++moea_name has been retired; it was read by nothing. Use pestpp-mou and select the generator with ++mou_generator (de, sbx, pm, pso or smp).";
+    if (key == "DE_F")
+        return "++de_f has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou: ++mou_generator(de) and ++mou_de_f.";
+    if (key == "DE_CR")
+        return "++de_cr has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou: ++mou_generator(de) and ++mou_crossover_probability.";
+    if (key == "DE_DITHER_F")
+        return "++de_dither_f has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou: ++mou_generator(de) and ++mou_de_f.";
+    if (key == "DE_POP_SIZE")
+        return "++de_pop_size has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou: ++mou_population_size.";
+    if (key == "DE_MAX_GEN")
+        return "++de_max_gen has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou and set noptmax to the number of generations.";
     if (key == "SQP_RISK")
         return "++sqp_risk has been retired. It was both a risk value AND the switch that "
                "selected ensemble-based shifting, so it silently overrode opt_risk. Use "
@@ -1137,7 +1159,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_registry_impl(string key, const 
 {
     upper_ip(key);
     {
-        string retired = retired_option_message(key);
+        string retired = get_retired_message(key);
         if (retired.size() > 0)
             throw runtime_error(retired);
     }

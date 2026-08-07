@@ -50,8 +50,6 @@
 #include "RestartController.h"
 #include "PerformanceLog.h"
 #include "debug.h"
-#include "DifferentialEvolution.h"
-
 #include "linear_analysis.h"
 #include "logger.h"
 #include "covariance.h"
@@ -449,11 +447,9 @@ int main(int argc, char* argv[]) {
 		}
 
 
-		// Differential Evolution
-		if (pest_scenario.get_pestpp_options().get_global_opt() ==  PestppOptions::OPT_DE)
-		{
-		    throw runtime_error("DE-based global optimization is deprecated in pestpp-glm. please use pestpp-mou");
-		}
+		// (the differential evolution block that used to live here is gone: the
+		// implementation was removed, and ++global_opt is now refused when the control file is
+		// PARSED, which is both earlier and a better place to say so)
 
 
 		//Define model Run for Base Parameters (uses base parameter transformations)

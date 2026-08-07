@@ -256,6 +256,13 @@ public:
 	// mark_options_initialized(), a set_option on such an option is recorded as a warning
 	// rather than silently taking no effect.
 	bool is_init_only(const std::string& name) const;
+	/** @brief Why an option was retired, or "" if it is still live.
+	 *
+	 * Public because BOTH parse paths need it and neither can recover it from an exception:
+	 * parse_plusplus_line() catches everything and records ARG_INVALID, so a '++' line would
+	 * otherwise report "invalid value" for an option whose value was never the problem.
+	 */
+	static std::string get_retired_message(const std::string& name);
 	std::string get_option_scope(const std::string& name) const;
 	void mark_options_initialized() { options_initialized = true; }
 	void reset_options_initialized() { options_initialized = false; init_only_change_warnings.clear(); }

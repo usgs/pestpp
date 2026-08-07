@@ -4,7 +4,6 @@
 add_library(pestpp_com
   constraints.cpp
   covariance.cpp
-  DifferentialEvolution.cpp
   eigen_tools.cpp
   Ensemble.cpp
   EnsembleMethodUtils.cpp

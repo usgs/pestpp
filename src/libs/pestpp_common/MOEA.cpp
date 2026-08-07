@@ -41,10 +41,23 @@ static void drive_run_batch(RunManagerAbstract* run_mgr_ptr, double slice_sec = 
 
 //util functions
 typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
-// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+// Compare two (name, value) pairs by value, with a deterministic tie-break on the NAME.
+//
+// The name tie-break is not cosmetic, and it is needed for two separate reasons:
+//
+//  1. std::sort is UNSTABLE, so with a value-only comparator equal values come out in an order
+//     that depends on the implementation and the optimizer.  This is the same defect already
+//     fixed in SQP's FilterRec, where it ordered differently on libstdc++ vs MSVC.
+//  2. This comparator is also used as the ordering for `sortedset` (std::set) below.  There, two
+//     pairs with equal values compare EQUIVALENT, so the set silently DROPS one of them - a
+//     member disappears from the crowding/fitness ordering depending on insertion order.
+//
+// Ties are the common case here, not the rare one: every boundary member gets CROWDING_EXTREME.
 Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
 {
-	return elem1.second < elem2.second;
+	if (elem1.second != elem2.second)
+		return elem1.second < elem2.second;
+	return elem1.first < elem2.first;
 };
 
 typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
