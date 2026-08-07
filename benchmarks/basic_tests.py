@@ -2599,15 +2599,26 @@ def _g07_run(t_d, m_d, tool, pst_name):
 
 
 #: what each tool writes that is worth comparing.  '{n}' is filled with noptmax.
+#  Iteration 0 is included on purpose, and it is the single most useful thing here when a
+#  divergence is gross rather than last-bit: iteration 0 is the INITIAL ENSEMBLE, before any
+#  algorithm has run.  If it already differs, the draw diverged (covariance decomposition, RNG
+#  consumption) and nothing downstream is worth reading.  If it MATCHES and iteration 2 does
+#  not, the arithmetic is fine and the algorithm took a different path - a different lambda
+#  won, a different subset was picked, a comparison flipped.  Without iteration 0 you cannot
+#  tell those apart and every investigation starts from scratch.
 XPLAT_G07_ARTIFACTS = {
-    "ies": ["{tool}.{n}.par.csv", "{tool}.{n}.obs.csv", "{tool}.phi.actual.csv"],
+    "ies": ["{tool}.0.par.csv", "{tool}.0.obs.csv",
+            "{tool}.{n}.par.csv", "{tool}.{n}.obs.csv", "{tool}.phi.actual.csv"],
     # da names its ensembles by CYCLE and iteration - da.<cycle>.<iter>.par.csv - so the
     # single-cycle run this uses writes da.0.<n>.*, not da.<n>.*
-    "da":  ["{tool}.0.{n}.par.csv", "{tool}.0.{n}.obs.csv", "{tool}.phi.actual.csv"],
-    "sqp": ["{tool}.{n}.par.csv", "{tool}.{n}.obs.csv"],
+    "da":  ["{tool}.0.0.par.csv", "{tool}.0.0.obs.csv",
+            "{tool}.0.{n}.par.csv", "{tool}.0.{n}.obs.csv", "{tool}.phi.actual.csv"],
+    "sqp": ["{tool}.0.par.csv", "{tool}.0.obs.csv",
+            "{tool}.{n}.par.csv", "{tool}.{n}.obs.csv"],
     # the UNNUMBERED files are mou's final state; only some iterations get numbered copies
     # (mou.<n>.obs_pop.csv in particular is not written), so the final four are the stable set
-    "mou": ["{tool}.dv_pop.csv", "{tool}.obs_pop.csv",
+    "mou": ["{tool}.0.dv_pop.csv", "{tool}.0.obs_pop.csv",
+            "{tool}.dv_pop.csv", "{tool}.obs_pop.csv",
             "{tool}.archive.dv_pop.csv", "{tool}.archive.obs_pop.csv"],
     "opt": ["{tool}.{n}.par"],
 }
@@ -2673,6 +2684,7 @@ def basic_xplat_g07_test(base_d=XPLAT_G07_BASE, rtol=1.0e-6, atol=1.0e-8):
         return df[sorted(df.columns)]
 
     n_fail_total = 0
+    failed = {t: [] for t in XPLAT_G07_TOOLS}
     for tool in XPLAT_G07_TOOLS:
         m_d = _g07_run(t_d, "xplat_g07_{0}_test".format(tool), tool, "{0}.pst".format(tool))
         for fn in _g07_artifact_names(tool):
@@ -2684,18 +2696,89 @@ def basic_xplat_g07_test(base_d=XPLAT_G07_BASE, rtol=1.0e-6, atol=1.0e-8):
                 new = _load_par_file(new_p)
             else:
                 ref, new = _load(ref_p), _load(new_p)
+            missing_rows = [r for r in ref.index if r not in set(new.index)]
+            missing_cols = [c for c in ref.columns if c not in set(new.columns)]
+            extra_rows = [r for r in new.index if r not in set(ref.index)]
             new = new.reindex(index=ref.index, columns=ref.columns)
-            assert not new.isnull().values.any(), \
-                "{0}/{1}: row or column mismatch vs the base case".format(tool, fn)
+            assert not new.isnull().values.any(), (
+                "{0}/{1}: shape/name mismatch vs the base case - this is NOT a numerical "
+                "divergence but a different set of realizations or columns.\n"
+                "    missing rows ({2}): {3}\n    extra rows ({4}): {5}\n    missing cols: {6}"
+                .format(tool, fn, len(missing_rows), missing_rows[:8], len(extra_rows),
+                        extra_rows[:8], missing_cols[:8]))
             a, b = ref.values.astype(float), new.values.astype(float)
             absd = np.abs(a - b)
-            n_fail = int((absd > (atol + rtol * np.abs(a))).sum())
-            i, j = np.unravel_index(np.argmax(absd), absd.shape) if absd.size else (0, 0)
-            print("  {0:<4s} {1:<34s} max|diff|={2:.3e}  {3}/{4} over tol".format(
-                tool, fn, absd.max() if absd.size else 0.0, n_fail, absd.size))
+            over = absd > (atol + rtol * np.abs(a))
+            n_fail = int(over.sum())
+            if absd.size:
+                i, j = np.unravel_index(np.argmax(absd), absd.shape)
+                worst = "at ({0},{1}) ref={2:.12g} new={3:.12g}".format(
+                    ref.index[i], ref.columns[j], a[i, j], b[i, j])
+                reld = absd.max() / (abs(a[i, j]) + atol)
+            else:
+                worst, reld = "(empty)", 0.0
+            print("  {0:<4s} {1:<32s} max|diff|={2:.3e} rel={3:.3e} {4}/{5} over tol  {6}".format(
+                tool, fn, absd.max() if absd.size else 0.0, reld, n_fail, absd.size, worst))
+
+            if n_fail > 0:
+                # A count alone cannot tell you what happened.  What a person chasing a
+                # platform-only divergence needs is: WHERE, HOW BIG, and above all whether it is
+                # one element or everything - a single realization drifting is a different
+                # problem from every element moving.
+                rows = sorted(set(ref.index[k] for k in np.where(over)[0]))
+                cols = sorted(set(ref.columns[k] for k in np.where(over)[1]))
+                spread = "localized" if (len(rows) == 1 or len(cols) == 1) else "systemic"
+                print("       {0} element(s) across {1} row(s) and {2} col(s)  [{3}]".format(
+                    n_fail, len(rows), len(cols), spread))
+                order = np.argsort(absd, axis=None)[::-1][:5]
+                for k in order:
+                    r, c = np.unravel_index(k, absd.shape)
+                    if not over[r, c]:
+                        break
+                    print("         {0:<18s} {1:<10s} ref={2: .12g}  new={3: .12g}  diff={4:.3e}".format(
+                        str(ref.index[r])[:18], str(ref.columns[c])[:10], a[r, c], b[r, c], absd[r, c]))
+                # and a machine-readable copy, because the CI log is not somewhere you can
+                # subtract two numbers
+                dd = os.path.join("xplat_g07_diffs", tool)
+                if not os.path.exists(dd):
+                    os.makedirs(dd)
+                pd.DataFrame({"ref": a[over], "new": b[over], "abs_diff": absd[over],
+                              "row": [ref.index[k] for k in np.where(over)[0]],
+                              "col": [ref.columns[k] for k in np.where(over)[1]]}).to_csv(
+                    os.path.join(dd, fn.replace(os.sep, "_") + ".diff.csv"), index=False)
+                failed[tool].append(fn)
             n_fail_total += n_fail
+
+    if n_fail_total > 0:
+        # The single most useful discriminator, and it is free: parameters and observations fail
+        # for DIFFERENT reasons.  If the parameters match and only the observations moved, the
+        # forward model produced different numbers - a numpy/python/libm difference - and pest++
+        # is not implicated at all.  If the parameters moved, the algorithm took a different
+        # path, and the observations following is just the consequence.
+        print("")
+        print("DIVERGENCE SUMMARY")
+        for tool in XPLAT_G07_TOOLS:
+            if not failed[tool]:
+                continue
+            fns = failed[tool]
+            par_side = [f for f in fns if ("par" in f or "dv_pop" in f)]
+            obs_side = [f for f in fns if ("obs" in f or "phi" in f)]
+            if par_side and not obs_side:
+                verdict = "parameters only - the algorithm diverged before the model was called"
+            elif obs_side and not par_side:
+                verdict = ("observations only, parameters IDENTICAL - suspect the forward model "
+                           "(numpy/python/libm), not pest++")
+            else:
+                verdict = "both parameters and observations - algorithmic divergence"
+            print("  {0:<4s} {1}".format(tool, verdict))
+            print("       failing: {0}".format(", ".join(fns)))
+        print("  per-element diffs written under 'xplat_g07_diffs/'")
+        print("  baseline seed={0}; re-running here should reproduce EXACTLY - if it does not, "
+              "the divergence is run-to-run, not cross-platform".format(cfg["seed"]))
+
     assert n_fail_total == 0, \
-        "{0} element(s) exceeded tolerance across the five tools - see above".format(n_fail_total)
+        "{0} element(s) exceeded tolerance across the five tools - see the divergence summary above".format(
+            n_fail_total)
     print("PASS: all five tools match the g07 base case within tolerance")
 
 

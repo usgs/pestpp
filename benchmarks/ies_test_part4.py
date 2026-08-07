@@ -2896,7 +2896,11 @@ def tenpar_mean_iter_test_sched():
     print(phidf2.loc[:,"mean"])
     print(phidf2.shape)
     assert phidf2.shape[0] == 10 #hard coded to noptmax above
-    assert phidf2.shape[1] == 29 #restart with 40 reals + summary stats
+    # 31, not 29, since ies subset selection was moved onto its own random stream
+    # (subset_rand_gen, which had been declared and seeded but never read - the draw
+    # came from rand_gen).  A different subset means a different set of realizations
+    # survives the restart.  Verified identical on macos, linux and windows.
+    assert phidf2.shape[1] == 31 #restart + summary stats
     
     pst.pestpp_options.pop("save_dense")
 
