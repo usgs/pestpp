@@ -2021,22 +2021,96 @@ def api_robust_and_risk_are_mutually_exclusive_test():
     print("api_robust_and_risk_are_mutually_exclusive_test passed")
 
 
-def api_robust_is_sqp_only_test():
-    """mou and pestpp-opt reject the flag instead of accepting one that does nothing."""
-    d = _stack_case("api_robust_mou", risk=0.5, stack_size=0, chance_points="SINGLE",
+def api_mou_robust_pairs_and_records_test():
+    """mou supports opt_use_robust: each member gets one stack realization, and it is recorded.
+
+    This test replaced one asserting mou REJECTED the flag - which it did until robust support
+    landed. CI caught the staleness on all three platforms, which is the useful kind of failure.
+
+    Three things have to hold together, and only the third is hard to get right:
+
+      1. `dp` stays decision-variable only. The pairing rides the per-realization FixedParInfo
+         side channel instead, so the generators cannot cross and mutate parameter realizations
+         into arithmetic averages that are draws from nothing.
+      2. Every generation is recorded, INCLUDING generation 0 - the initial population is the
+         one every later generation descends from, and leaving it unpaired would mean the run
+         started from members carrying no uncertainty at all.
+      3. The values actually reach the model. A record can look perfect while every member runs
+         at its control value, so the stack here is tagged with unmistakable marker values and
+         the model's own input file is read back.
+    """
+    d = _stack_case("api_mou_robust", risk=0.5, stack_size=0, chance_points="SINGLE",
+                    tool="mou")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    names = [p_.upper() for p_ in pst.par_names]
+    ctl_x10 = float(pst.parameter_data.loc["x10", "parval1"])
+    # markers nothing else in g07 comes near, so a hit cannot be coincidence
+    markers = [1000.0 * (i + 1) for i in range(5)]
+    rng = np.random.default_rng(3)
+    cols = {c: rng.uniform(-1.0, 1.0, 5) for c in names}
+    cols["X10"] = np.array(markers)
+    pd.DataFrame(cols, index=["s{0}".format(i) for i in range(5)]).to_csv(
+        os.path.join(d, "unc_stack.csv"))
+    pst.parameter_data.loc["x10", "parubnd"] = 1.0e30     # the markers must be legal values
+    pst.pestpp_options["opt_use_robust"] = True
+    pst.pestpp_options["opt_risk"] = 0.5
+    pst.pestpp_options["opt_par_stack"] = "unc_stack.csv"
+    pst.pestpp_options["mou_population_size"] = 6
+    pst.control_data.noptmax = 2
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        for _ in mou.iterations():
+            pass
+        mou.finalize()
+
+    rec = os.path.join(d, "g07.par_real.csv")
+    assert os.path.exists(rec), "robust mou should write the par-real record"
+    df = pd.read_csv(rec)
+    assert list(df.columns) == ["member", "generation", "par_real"], list(df.columns)
+    assert df.member.is_unique, "member names are globally unique, so the record joins cleanly"
+    gens = sorted(df.generation.unique())
+    assert 0 in gens, \
+        "generation 0 must be paired too - it is what every later generation descends from: "\
+        "{0}".format(gens)
+    assert len(gens) >= 2, "each generation's new members should be recorded: {0}".format(gens)
+
+    # 3. the values reached the model: par.dat is what it was handed on the final run
+    par_dat = os.path.join(d, "par.dat")
+    assert os.path.exists(par_dat), "expected the model input file to be left behind"
+    vals = [float(x) for x in open(par_dat).read().split("\n")[1:] if x.strip()]
+    x10 = vals[9]                                  # par.tpl writes x1..x10 in order
+    assert any(abs(x10 - m) < 1.0e-6 for m in markers), \
+        "x10 reached the model as {0}, which is not one of the stack realizations {1} - the "\
+        "pairing is being recorded but not applied".format(x10, markers)
+    assert abs(x10 - ctl_x10) > 1.0e-6, \
+        "x10 is still at its control value, so no uncertainty was propagated"
+    print("api_mou_robust_pairs_and_records_test passed")
+
+
+def api_mou_robust_needs_a_stack_test():
+    """Robust mou without a stack is refused, naming both ways to supply one.
+
+    The pairing IS the mechanism, so there is nothing sensible to do without realizations to
+    pair with - and silently running every member at its control value would look like a
+    working robust run while propagating no uncertainty whatsoever.
+    """
+    d = _stack_case("api_mou_robust_nostack", risk=0.5, stack_size=0, chance_points="SINGLE",
                     tool="mou")
     pst = pyemu.Pst(os.path.join(d, "g07.pst"))
     pst.pestpp_options["opt_use_robust"] = True
+    pst.pestpp_options["opt_risk"] = 0.5
     pst.write(os.path.join(d, "g07.pst"), version=2)
     try:
         with Mou.from_pst("g07.pst", workdir=d) as mou:
             mou.initialize()
-        raise AssertionError("mou should reject opt_use_robust")
+        raise AssertionError("robust mou with no stack should be refused")
     except PestppError as e:
         msg = str(e).lower()
-        assert ("not supported" in msg) and ("sqp" in msg), \
-            "the refusal should name the tool that does support it, got: {0}".format(e)
-    print("api_robust_is_sqp_only_test passed")
+        assert "opt_stack_size" in msg and "opt_par_stack" in msg, \
+            "the refusal should name both ways to supply a stack, got: {0}".format(e)
+    print("api_mou_robust_needs_a_stack_test passed")
 
 
 def api_retired_sqp_risk_is_refused_test():
@@ -2454,7 +2528,8 @@ if __name__ == "__main__":
     api_sqp_chance_stacks_are_reachable_test()
     api_robust_does_no_risk_shifting_test()
     api_robust_and_risk_are_mutually_exclusive_test()
-    api_robust_is_sqp_only_test()
+    api_mou_robust_pairs_and_records_test()
+    api_mou_robust_needs_a_stack_test()
     api_retired_sqp_risk_is_refused_test()
     api_init_only_options_are_refused_live_test()
     api_sqp_needs_an_ensemble_gradient_test()

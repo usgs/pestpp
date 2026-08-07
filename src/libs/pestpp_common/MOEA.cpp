@@ -2044,8 +2044,19 @@ void MOEA::throw_moea_error(const string& message)
 	performance_log->log_event("MOEA error: " + message);
 	cout << endl << "   ************   " << endl << "    MOEA error: " << message << endl << endl;
 	file_manager.rec_ofstream() << endl << "   ************   " << endl << "    MOEA error: " << message << endl << endl;
-	file_manager.close_file("rec");
-	performance_log->~PerformanceLog();
+	//flush rather than close, and do NOT destroy the performance log.
+	//
+	//This used to close_file("rec") and then explicitly call performance_log->~PerformanceLog()
+	//before throwing. Under the executables that is invisible - the process exits moments later.
+	//Under the API it is not: a caller that CATCHES this error and carries on is left with a
+	//FileManager whose "rec" ofstream has been deleted and erased from the map, so the next
+	//rec_ofstream() throws PestFileErrorAccess. When that next call happens during teardown, the
+	//exception escapes a destructor and the process is terminated outright - no error, no stack,
+	//just gone. That is what it did on windows while linux and macos happened to survive it.
+	//
+	//The explicit destructor call was pure undefined behaviour for no gain besides: the object is
+	//owned elsewhere and destroyed again later, and PerformanceLog's destructor is empty anyway.
+	file_manager.rec_ofstream().flush();
 	throw runtime_error("MOEA error: " + message);
 }
 

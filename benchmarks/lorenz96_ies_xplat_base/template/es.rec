@@ -14,7 +14,7 @@ in directory: "/Users/jwhite/Dev/pestpp/benchmarks/template96_pst_ies"
 on host: "m5max.local"
 on a(n) apple operating system
 with release configuration
-started at 08/06/26 14:49:56
+started at 08/06/26 21:13:12
 
 ...reading external file 'es.pargp_data.csv'
 ...header line: PARGPNME,INCTYP,DERINC,DERINCLB,FORCEN,DERINCMUL,DERMTHD,SPLITTHRESH,SPLITRELDIFF,SPLITACTION
@@ -292,7 +292,7 @@ SQP_RESTART_OBS_EN:
 SQP_SEARCH_METHOD: LINE
 SQP_SOLVE_METHOD: NULL
 SQP_CMA_BOUND_HANDLING: reject
-SQP_NUM_REALS: -1
+SQP_NUM_REALS: 50
 SQP_NUM_REFINED_SEARCH_PTS: 1
 SQP_SUBSET_SIZE: -10
 SQP_UPDATE_HESSIAN: 1
@@ -8448,6 +8448,6 @@ obgnme    2000       2000  9.55e+04         0  9.55e+04  9.55e+04       100     
 
 
 pestpp-ies analysis complete...
-started at 08/06/26 14:49:56
-finished at 08/06/26 14:49:57
+started at 08/06/26 21:13:12
+finished at 08/06/26 21:13:13
 took 0 minutes
