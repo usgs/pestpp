@@ -142,7 +142,6 @@ public:
 	void to_uncertainty_file(const string &filename);
 
 	vector<Eigen::VectorXd> draw(int ndraws);
-	vector<double> standard_normal(default_random_engine gen);
 	void cholesky();
 
 

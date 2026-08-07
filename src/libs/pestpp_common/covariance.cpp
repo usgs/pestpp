@@ -2082,13 +2082,6 @@ vector<Eigen::VectorXd> Covariance::draw(int ndraws)
  *
  * @return Description.
  */
-vector<double> Covariance::standard_normal(default_random_engine gen)
-{
-	normal_distribution<double> stanard_normal(0.0, 1.0);
-	vector<double> sn_vec;
-	for (auto &name : row_names)
-	{
-		sn_vec.push_back(stanard_normal(gen));
-	}
-	return sn_vec;
-}
+// Covariance::standard_normal() removed: it used std::normal_distribution, which is
+// implementation-defined and therefore not reproducible across platforms, and it had no
+// callers.  Deleted rather than left available for someone to adopt.

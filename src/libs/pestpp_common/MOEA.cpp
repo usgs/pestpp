@@ -4543,14 +4543,17 @@ void MOEA::assign_par_reals(ParameterEnsemble& _pop)
 	map<string, int> vmap = unc_stack.get_var_map();
 	Eigen::MatrixXd stack_mat = *unc_stack.get_eigen_ptr();
 
-	uniform_int_distribution<int> pick(0, (int)unc_stack.shape().first - 1);
-	//drawn from the dedicated robust stream - see the member declaration
+	//uniform_int_draws() rather than std::uniform_int_distribution, which is
+	//implementation-defined: the record of which realization each member drew is the whole
+	//point here, so it has to be the same record on every platform.  Drawn from the dedicated
+	//robust stream - see the member declaration.
+	int n_stack_reals = (int)unc_stack.shape().first;
 	ofstream& prl = file_manager.get_ofstream(parreal_tag);
 
 	_pop.get_fixed_info().set_fixed_names(all_fixed);
 	for (auto& rname : real_names)
 	{
-		int idx = pick(robust_rand_gen);
+		int idx = uniform_int_draws(1, 0, n_stack_reals - 1, robust_rand_gen)[0];
 		map<string, double> rvals;
 		//carry forward whatever was already held for this realization
 		for (auto& fname : all_fixed)
@@ -4635,7 +4638,7 @@ ParameterEnsemble MOEA::generate_population()
         vector<int> ireals;
 	    for (int i=0;i<real_names.size();i++)
 	        ireals.push_back((i));
-        shuffle(ireals.begin(),ireals.end(),rand_gen);
+        portable_shuffle(ireals, rand_gen);   // std::shuffle is not portable - see the helper
         string name1,name2;
         Eigen::MatrixXd new_fixed(real_names.size(),fixed_names.size());
         new_fixed.setZero();
@@ -5644,7 +5647,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 		while (true)
 		{
 			working = nondom_solutions;
-			shuffle(working.begin(), working.end(), rand_gen);
+			portable_shuffle(working, rand_gen);
 			r = uniform_draws(nondom_solutions.size(), 0.0, 1.0, rand_gen);
 			for (int i = 0; i < r.size(); i++)
 				if (fitness[working[i]] >= r[i] - FLOAT_EPSILON)
@@ -6083,7 +6086,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		cr_vals = uniform_draws(_dp.shape().second, 0.0, 1.0, rand_gen);
 		
 		//get the R values for this member;
-		shuffle(r_int_vec.begin(), r_int_vec.end(), rand_gen);
+		portable_shuffle(r_int_vec, rand_gen);
 		r = r_int_vec[0];
 
 		//only change dec vars
@@ -6249,7 +6252,7 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 	{
 		working_count = member_count;//copy member count index to working count
 		// sampled with replacement
-		shuffle(working_count.begin(), working_count.end(), rand_gen); //randomly shuffle working count
+		portable_shuffle(working_count, rand_gen); //randomly shuffle working count
 		//just take the first two since this should change each time thru
 		p1_idx = working_count[0];
 		if (selected_members.find(p1_idx) != selected_members.end())

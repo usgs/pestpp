@@ -1191,6 +1191,28 @@ double draw_standard_normal(std::mt19937& rand_gen);
 vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
 vector<int> uniform_int_draws(int num_reals, int lower_bound, int upper_bound, std::mt19937& rand_gen);
 
+/** @brief Shuffle in place, reproducibly on every platform.
+ *
+ * std::shuffle must NOT be used anywhere results are compared across platforms.  std::mt19937
+ * is specified bit-for-bit by the standard, but std::shuffle is not: libc++, libstdc++ and the
+ * MSVC CRT consume the engine differently, so identical engine state yields a COMPLETELY
+ * different permutation - not a last-bit difference, a different answer.  That is what made
+ * pestpp-mou irreproducible across platforms while pestpp-ies, which draws its subset through
+ * uniform_int_draws(), was fine.
+ *
+ * Fisher-Yates over the raw integer stream via uniform_int_draws(): integer arithmetic only, so
+ * the same seed gives the same permutation everywhere.
+ */
+template <typename T>
+void portable_shuffle(std::vector<T>& vals, std::mt19937& rand_gen)
+{
+	for (size_t i = vals.size(); i > 1; --i)
+	{
+		int j = uniform_int_draws(1, 0, (int)i - 1, rand_gen)[0];
+		std::swap(vals[i - 1], vals[(size_t)j]);
+	}
+}
+
 
 
 
