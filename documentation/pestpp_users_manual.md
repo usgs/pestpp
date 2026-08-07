@@ -5264,6 +5264,21 @@ where C_dd is the sample covariance matrix of the decision-variable ensemble, C_
 
 To handle potential ill-conditioning when ensemble members exhibit high correlation or near-singularity, the pseudoinverse of C_dd is computed using singular value decomposition (SVD) with user-controlled truncation thresholds (via *svd_eigthresh* and *max_sing*), following the approach described by Dehdari and Oliver (2012).
 
+This ensemble gradient is the **only** gradient PESTPP-SQP computes. Unlike other members of
+the PEST++ suite, it does not fall back on finite-difference derivatives, and it does not use a
+Jacobian for the search direction - so the general remarks on finite-difference derivatives in
+section 3.3 do not apply to it. A PESTPP-SQP run therefore always needs an ensemble: either
+*sqp_num_reals* realizations for it to draw (50 by default), or an existing ensemble supplied
+through *sqp_dv_en*. Setting *sqp_num_reals* to zero without supplying *sqp_dv_en* leaves no
+means of estimating a gradient, and the run stops with a message saying so rather than
+proceeding.
+
+One practical consequence is worth stating: because the gradient is estimated from a sample,
+its quality depends on the ensemble size in the way any Monte Carlo estimate does. Too few
+realizations relative to the number of decision variables gives a poorly conditioned C_dd and a
+correspondingly noisy search direction - which is what the SVD truncation above exists to
+contain, and why the default is 50 rather than a handful.
+
 For computational efficiency, PESTPP-SQP supports subset selection: at each iteration, a subset of ensemble members is selected for the line search by ranking members according to their total constraint violation and retaining those with the lowest violation, with the base realization always included. The full ensemble is used for gradient and Hessian estimation. This is particularly valuable for large-scale problems where evaluating all ensemble members at every candidate step would be cost-prohibitive.
 
 The ensemble also naturally supports optimization under uncertainty through chance constraints. Because each ensemble member includes both decision variables and uncertain (adjustable) parameters, the ensemble collectively represents a distribution of possible model outcomes. PESTPP-SQP offers two distinct, mutually exclusive ways to account for that uncertainty. With *opt_risk* it uses **chance constraints**, exactly as PESTPP-MOU and PESTPP-OPT do: a stack of the uncertain parameters is run at a decision-variable point and the resulting distribution shifts each constraint to a user-specified reliability level. Chance constraints can be evaluated at either a single representative point or across all members, depending on the *opt_chance_points* setting. With *opt_use_robust* it instead performs **robust optimization**: each decision-variable realization is paired with its own uncertain-parameter realization, and the ensemble is optimized as it stands. Robust optimization does no risk shifting at all - the uncertainty is carried by the pairing rather than applied as a constraint offset - so it needs no stack and makes no chance runs.
@@ -5417,7 +5432,7 @@ Variables discussed in section 5.3.6 that control parallel run management are no
 
 | Variable                        | Type | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 |-------------------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| *sqp_num_reals(-1)*                   | integer  | Number of ensemble realizations. Values >0 enable ensemble-gradient mode. -1 (default) enables ensemble mode only if *sqp_dv_en* is also provided. |
+| *sqp_num_reals(50)*                   | integer  | Number of decision-variable realizations used to estimate the stochastic gradient. Must be positive: PESTPP-SQP implements the ensemble gradient only, so a value of 0 or less leaves it with no way to compute a search direction and the run is refused. Ignored when *sqp_dv_en* supplies an ensemble, which brings its own size. |
 | *sqp_dv_en()*                         | text     | Initial decision-variable ensemble file (CSV/JCO/JCB). If omitted, draws from prior parameter covariance. |
 | *sqp_restart_obs_en()*                | text     | Observation ensemble for warm-starting (CSV/JCO/JCB); must be matched to the DV ensemble. |
 | *sqp_alpha_mults(0.001,0.005,0.01,0.1,0.5,1.0)* | list of reals | Line-search scale multipliers applied to the KKT search direction. |

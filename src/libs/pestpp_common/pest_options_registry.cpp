@@ -917,7 +917,7 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](const PestppOptions& o)->string{ return o.get_sqp_cma_bound_handling(); } },
     OptionSpec{ "SQP_NUM_REALS", {}, OptType::INT, "sqp", true,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_sqp_num_reals(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_sqp_num_reals(-1); },
+        [](PestppOptions& o){ o.set_sqp_num_reals(50); },
         [](const PestppOptions& o)->string{ return std::to_string(o.get_sqp_num_reals()); } },
     OptionSpec{ "SQP_NUM_REFINED_SEARCH_PTS", {}, OptType::INT, "sqp", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_sqp_num_refined_search_pts(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },

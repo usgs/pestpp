@@ -2398,7 +2398,7 @@ void PestppOptions::set_defaults_legacy()
 	set_sqp_search_method("LINE");
 	set_sqp_solve_method("NULL");
 	set_sqp_cma_bound_handling("reject");
-	set_sqp_num_reals(-1);
+	set_sqp_num_reals(50);
 	set_sqp_num_refined_search_pts(1.0);
 	set_sqp_subset_size(-10);
 	set_sqp_update_hessian(true);

@@ -1092,6 +1092,16 @@ int SeqQuadProgram::initialize_prepare()
 	//parameter draw and never shifts, so an opt_risk set alongside it would be silently
 	//ignored. Silent precedence between these two is exactly what retiring sqp_risk removed,
 	//so refuse rather than reintroduce it.
+	//pestpp-sqp implements the ENSEMBLE gradient only - there is no finite-difference path
+	//(see the throw in iterate_2_solution()). Catching it here means a user who switches the
+	//ensemble off is told so directly, instead of failing later inside whatever machinery
+	//happens to run first - which, with chance enabled, was a confusing complaint about stack
+	//runs never having been processed.
+	if (!get_use_ensemble_grad())
+		throw_sqp_error("pestpp-sqp requires an ensemble gradient: set ++sqp_num_reals (the "
+			"default is 50) to a positive value, or supply an ensemble with ++sqp_dv_en. "
+			"Finite-difference gradients are not implemented.");
+
 	if (pest_scenario.get_pestpp_options().get_opt_use_robust() &&
 		(pest_scenario.get_pestpp_options().get_opt_risk() != 0.5))
 		throw_sqp_error("++opt_use_robust and ++opt_risk are mutually exclusive: robust "
@@ -1358,16 +1368,24 @@ int SeqQuadProgram::initialize_prepare()
 		echo = true;
 
 	initialize_parcov();
-	if (use_cma && ppo->get_sqp_num_reals() > 0)
+	//sqp_num_reals now DEFAULTS to a usable size rather than the -1 that used to mean "not
+	//given", so the sentinel can no longer distinguish a user's choice from the default. Ask
+	//pp_args - the arguments actually passed - which is the same test initialize_dv() uses
+	//before truncating a supplied ensemble.
+	bool user_set_num_reals = (pp_args.find("SQP_NUM_REALS") != pp_args.end());
+	if (use_cma && (!user_set_num_reals) && (ppo->get_sqp_dv_en().size() > 0))
+	{
+		//a supplied ensemble carries its own size, and CMA's population must match it. Sizing
+		//CMA from the DEFAULT here would silently disagree with the ensemble actually in hand.
+		message(1, "WARNING: an ensemble was supplied via sqp_dv_en without an explicit "
+			"sqp_num_reals, so CMA has no population size to adopt - disabling CMA");
+		use_cma = false;
+	}
+	else if (use_cma && ppo->get_sqp_num_reals() > 0)
 	{
 		cma = CovMatAdap(&pest_scenario, &rand_gen, &file_manager);
 		cma.initialize(dv_names.size(), ppo->get_sqp_num_reals());
 		cma.set_covariance(parcov.get_matrix());
-	}
-	else if (use_cma && (ppo->get_sqp_num_reals() <= 0) && (ppo->get_sqp_dv_en().size() > 0))
-	{
-		message(1, "WARNING: CMA requires sqp_num_reals > 0, disabling CMA for finite-difference mode");
-		use_cma = false;
 	}
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();

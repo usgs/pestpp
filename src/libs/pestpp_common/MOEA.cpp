@@ -3018,13 +3018,17 @@ void MOEA::finalize()
  */
 int MOEA::initialize_prepare()
 {
-	//robust optimization is a pestpp-sqp construction - it pairs each decision-variable
-	//realization with its own parameter realization. mou has no such pairing, so accepting
-	//the flag here would silently do nothing.
-	if (pest_scenario.get_pestpp_options().get_opt_use_robust())
-		throw_moea_error("++opt_use_robust is not supported by pestpp-mou - it is a "
-			"pestpp-sqp option. Use ++opt_risk with a parameter stack for chance-constrained "
-			"optimization under uncertainty.");
+	//robust optimization and chance constraints are neighbouring approaches to optimization
+	//under uncertainty, and they consume the same stack - but they are not composable. A
+	//robust run pairs each member with ONE realization and shifts nothing; a chance run
+	//evaluates against the whole stack and shifts by a risk quantile. Asking for both leaves
+	//opt_risk silently ignored, which is the trap retiring sqp_risk removed.
+	use_robust = pest_scenario.get_pestpp_options().get_opt_use_robust();
+	if (use_robust && (pest_scenario.get_pestpp_options().get_opt_risk() != 0.5))
+		throw_moea_error("++opt_use_robust and ++opt_risk are mutually exclusive: robust "
+			"optimization evaluates each member against its own paired parameter realization "
+			"and does no risk shifting, so opt_risk would have no effect. Use one or the "
+			"other - opt_risk for chance constraints, opt_use_robust for robust optimization.");
 
 	// same nomination the ies/da tools use - a 'drop_violations' column in the external
 	// observation file - read straight from the scenario so it cannot depend on the
@@ -3592,6 +3596,17 @@ int MOEA::initialize_prepare()
 	ofstream& lin = file_manager.get_ofstream(lineage_tag);
 	lin << "child,parent_1,parent_2,parent_3" << endl;
 
+	if (use_robust)
+	{
+		initialize_unc_stack();
+		//the record: which stack realization each member was evaluated against. Member names
+		//are globally unique and the archive appends rather than renames, so this joins back
+		//to any archived solution for the whole run.
+		file_manager.open_ofile_ext(parreal_tag);
+		ofstream& prl = file_manager.get_ofstream(parreal_tag);
+		prl << "member,generation,par_real" << endl;
+	}
+
 	//initialize the constraints using ctl file pars and obs
 	//throughout the process, we can update these pars and obs
 	//to control where in dec var space the stack/fosm estimates are
@@ -3605,7 +3620,14 @@ int MOEA::initialize_prepare()
 	population_obs_restart_file = ppo->get_mou_obs_population_restart_file();
 	
 	initialize_dv_population();
-	
+
+	//generation 0 needs pairing too, or the initial population - the one every later
+	//generation descends from - would run with the uncertain parameters at their control
+	//values, i.e. carrying no uncertainty at all. Done here rather than inside
+	//initialize_dv_population() because a supplied mou_dv_population_file is READ there, and
+	//reading calls set_fixed_names(), which clears the side channel this writes to.
+	assign_par_reals(dp);
+
 	initialize_obs_restart_population();
 	
 	try
@@ -4339,6 +4361,178 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
  *
  * @return Description.
  */
+/**
+ * @brief Build the uncertain-parameter stack that members are paired with.
+ *
+ * Same sources as the chance machinery - opt_par_stack for a file, opt_stack_size to draw -
+ * because they already mean "an ensemble of the uncertain parameters". They are read here
+ * rather than inherited from Constraints, which does not build a stack when chance is off,
+ * and chance is always off under robust.
+ *
+ * The stack is converted to MODEL space once, here, because that is the space the side channel
+ * is written in: ParameterEnsemble::add_runs() calls replace_fixed() AFTER transforming the
+ * run's parameters to model space and with to_model=true, so whatever is stored goes into the
+ * model's input verbatim. Values left in control space would be handed to the model unscaled.
+ */
+void MOEA::initialize_unc_stack()
+{
+	stringstream ss;
+	//the uncertain parameters are the adjustable ones that are not decision variables - the
+	//same split sqp makes
+	set<string> dvset(dv_names.begin(), dv_names.end());
+	unc_names.clear();
+	for (auto& name : act_par_names)
+		if (dvset.find(name) == dvset.end())
+			unc_names.push_back(name);
+	if (unc_names.size() == 0)
+		throw_moea_error("++opt_use_robust needs uncertain parameters to pair members with, "
+			"but every adjustable parameter is a decision variable. Put the uncertain "
+			"parameters in a group that is not listed in ++opt_dec_var_groups.");
+	message(1, "robust optimization: number of uncertain parameters: ", unc_names.size());
+
+	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+	string par_stack_file = ppo->get_opt_par_stack();
+	int stack_size = ppo->get_opt_stack_size();
+	unc_stack = ParameterEnsemble(&pest_scenario, &rand_gen);
+	if (par_stack_file.size() > 0)
+	{
+		string ext = pest_utils::lower_cp(par_stack_file).substr(par_stack_file.size() - 3,
+			par_stack_file.size());
+		message(1, "robust optimization: loading uncertain parameter stack from ", par_stack_file);
+		try
+		{
+			if (ext.compare("csv") == 0)
+				unc_stack.from_csv(par_stack_file, true);
+			else
+				unc_stack.from_binary(par_stack_file, true);
+		}
+		catch (const exception& e)
+		{
+			throw_moea_error("error processing ++opt_par_stack '" + par_stack_file + "': "
+				+ string(e.what()));
+		}
+	}
+	else if (stack_size > 0)
+	{
+		message(1, "robust optimization: drawing uncertain parameter stack of size ", stack_size);
+		Covariance parcov;
+		parcov.try_from(pest_scenario, file_manager);
+		unc_stack.draw(stack_size, pest_scenario.get_ctl_parameters(), parcov, performance_log,
+			pest_scenario.get_pestpp_options().get_ies_verbose_level(),
+			file_manager.rec_ofstream());
+	}
+	else
+		throw_moea_error("++opt_use_robust needs a stack of uncertain parameter realizations "
+			"to pair members with: set ++opt_stack_size to draw one, or ++opt_par_stack to "
+			"supply one.");
+
+	if (unc_stack.shape().first == 0)
+		throw_moea_error("the uncertain parameter stack is empty");
+	//every uncertain parameter must be in the stack - a member paired against a stack that
+	//does not carry one of them would silently run it at its control value in every member,
+	//which is no uncertainty at all
+	unc_stack.update_var_map();
+	map<string, int> vmap = unc_stack.get_var_map();
+	vector<string> missing;
+	for (auto& name : unc_names)
+		if (vmap.find(name) == vmap.end())
+			missing.push_back(name);
+	if (missing.size() > 0)
+	{
+		ss.str("");
+		ss << "the following uncertain parameters are missing from the ++opt_use_robust stack: ";
+		for (auto& m : missing)
+			ss << m << ",";
+		throw_moea_error(ss.str());
+	}
+
+	unc_stack.transform_ip(ParameterEnsemble::transStatus::CTL);
+	unc_stack_real_names = unc_stack.get_real_names();
+	ss.str("");
+	ss << "robust optimization: stack holds " << unc_stack.shape().first
+	   << " realizations of " << unc_names.size() << " uncertain parameters";
+	message(1, ss.str());
+}
+
+
+/**
+ * @brief Pair every member of @p _pop with one randomly drawn stack realization.
+ *
+ * WITH REPLACEMENT and independently per member, so two members may share a realization and
+ * the stack size need not relate to the population size.
+ *
+ * Called after the generators have finished, never during them - see the note on the
+ * FixedParInfo members in MOEA.h for why the values must not be ensemble columns.
+ *
+ * Note what this means for selection: each member is evaluated under a DIFFERENT realization,
+ * so a comparison between two members compares two (decision, uncertainty) pairs rather than
+ * two decisions. That is the noisy-fitness formulation, it is the cheap one - population-size
+ * runs per generation, as now - and the record written here is what makes it interpretable
+ * afterwards.
+ */
+void MOEA::assign_par_reals(ParameterEnsemble& _pop)
+{
+	if (!use_robust)
+		return;
+	vector<string> real_names = _pop.get_real_names();
+	if (real_names.size() == 0)
+		return;
+
+	//preserve anything already in the channel (a control file's genuine fixed parameters)
+	//rather than substituting for it: set_fixed_names() clears the map, and add_realization()
+	//throws unless EVERY name it holds is supplied for every realization
+	map<string, map<string, double>> existing = _pop.get_fixed_info().get_fixed_info_map();
+	vector<string> all_fixed = _pop.get_fixed_info().get_fixed_names();
+	set<string> already(all_fixed.begin(), all_fixed.end());
+	for (auto& name : unc_names)
+		if (already.find(name) == already.end())
+			all_fixed.push_back(name);
+
+	//control-space -> model space, once per stack realization: scale and offset, exactly as
+	//the fixed-parameter draw path does before storing
+	ParameterInfo* pinfo = pest_scenario.get_ctl_parameter_info_ptr_4_mod();
+	unc_stack.update_var_map();
+	map<string, int> vmap = unc_stack.get_var_map();
+	Eigen::MatrixXd stack_mat = *unc_stack.get_eigen_ptr();
+
+	uniform_int_distribution<int> pick(0, (int)unc_stack.shape().first - 1);
+	ofstream& prl = file_manager.get_ofstream(parreal_tag);
+
+	_pop.get_fixed_info().set_fixed_names(all_fixed);
+	for (auto& rname : real_names)
+	{
+		int idx = pick(rand_gen);
+		map<string, double> rvals;
+		//carry forward whatever was already held for this realization
+		for (auto& fname : all_fixed)
+		{
+			if (existing.find(fname) != existing.end())
+			{
+				map<string, double>& per_real = existing.at(fname);
+				if (per_real.find(rname) != per_real.end())
+					rvals[fname] = per_real.at(rname);
+			}
+		}
+		for (auto& uname : unc_names)
+		{
+			double val = stack_mat(idx, vmap.at(uname));
+			val *= pinfo->get_parameter_rec_ptr(uname)->scale;
+			val += pinfo->get_parameter_rec_ptr(uname)->offset;
+			rvals[uname] = val;
+		}
+		//anything still unaccounted for would trip add_realization()'s completeness check;
+		//fall back to the control value rather than let it throw
+		for (auto& fname : all_fixed)
+			if (rvals.find(fname) == rvals.end())
+				rvals[fname] = pest_scenario.get_ctl_parameters().get_rec(fname);
+
+		_pop.get_fixed_info().add_realization(rname, rvals);
+		prl << rname << "," << iter << "," << unc_stack_real_names[idx] << endl;
+	}
+	prl.flush();
+}
+
+
 ParameterEnsemble MOEA::generate_population()
 {
 	//int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
@@ -4407,7 +4601,12 @@ ParameterEnsemble MOEA::generate_population()
         }
         new_pop.get_fixed_info().update_realizations(fixed_names,real_names,new_fixed);
     }
-	
+
+	//robust optimization: pair each new member with one stack realization. AFTER the
+	//generators, so the values are never genetic material, and after the fixed-par
+	//shuffle above, which permutes a DISJOINT set of names (the control file's fixed
+	//parameters) and must not be allowed to permute these.
+	assign_par_reals(new_pop);
 
 	return new_pop;
 }

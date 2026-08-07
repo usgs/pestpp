@@ -279,6 +279,27 @@ private:
 	string pi_pop_file_tag = "pi_pop";
 	string obs_pop_file_tag = "obs_pop";
 	string lineage_tag = "lineage.csv";
+
+	//---- robust optimization (opt_use_robust) ----------------------------------------------
+	//Each new member is paired with ONE realization of the uncertain parameters, drawn at
+	//random from a stack. Robust optimization and chance constraints are neighbouring
+	//approaches to optimization under uncertainty and both consume the same stack, but they
+	//use it differently: a chance run evaluates a member against the whole stack and shifts
+	//the constraints by a risk quantile, while a robust run evaluates it against its one
+	//realization and shifts nothing.
+	//
+	//The pairing rides the per-realization FixedParInfo side channel rather than becoming
+	//columns of dp. That is deliberate: as dp columns the generators would CROSS AND MUTATE
+	//the parameter realizations, blending two parents' draws into an arithmetic average that
+	//is a draw from nothing - silently, while the record still claimed each member carried a
+	//genuine realization.
+	ParameterEnsemble unc_stack;                 ///< the uncertain-parameter stack, MODEL space
+	vector<string> unc_names;                    ///< adjustable pars that are NOT decision vars
+	vector<string> unc_stack_real_names;         ///< stack realization names, for the record
+	string parreal_tag = "par_real.csv";         ///< which realization each member drew
+	bool use_robust = false;
+	void initialize_unc_stack();
+	void assign_par_reals(ParameterEnsemble& _pop);
 	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;

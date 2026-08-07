@@ -7,14 +7,14 @@
 
 
 
-version: 5.2.27
-binary compiled on Jun 24 2026 at 11:17:21
+version: 5.2.30
+binary compiled on Aug  6 2026 at 08:51:26
 using control file: "es.pst"
 in directory: "/Users/jwhite/Dev/pestpp/benchmarks/template96_pst_ies"
 on host: "m5max.local"
 on a(n) apple operating system
 with release configuration
-started at 06/25/26 10:24:54
+started at 08/06/26 14:49:56
 
 ...reading external file 'es.pargp_data.csv'
 ...header line: PARGPNME,INCTYP,DERINC,DERINCLB,FORCEN,DERINCMUL,DERMTHD,SPLITTHRESH,SPLITRELDIFF,SPLITACTION
@@ -70,268 +70,260 @@ PEST Control Information
     nrelpar = 3
 
 
-    PEST++ OPTIONS: 
+    PEST++ OPTIONS (registry): 
 
-...general options (used in multiple tools): 
-svd_pack: redsvd
-lambda_scale_fac: 0.75,1,1.1,
-forgive_unknown_args: 0
-max_run_fail: 1
-panther_poll_interval: 1
-parameter_covariance: 
-observation_covariance: 
-hotstart_resfile: 
-overdue_resched_fac: 1.15
-overdue_giveup_fac: 100
-overdue_giveup_minutes: 1e+30
-condor_submit_file: 
-tie_by_group: 0
-par_sigma_range: 4
-enforce_tied_bounds: 0
-debug_parse_only: 0
-check_tplins: 1
-fill_tpl_zeros: 0
-tpl_force_decimal: 0
-additional_ins_delimiters: 
-random_seed: 358183147
-num_tpl_ins_threads: 1
-save_binary: 0
-save_dense: 0
-ensemble_output_precision: 20
-panther_echo: 1
-panther_agent_restart_on_error: 0
-panther_agent_no_ping_timeout_secs: -1
-panther_debug_loop: 0
-debug_check_par_en_consistency: 0
-panther_agent_freeze_on_fail: 0
-panther_transfer_on_finish: 
-panther_transfer_on_fail: 
-panther_timeout_milliseconds: -999
-panther_echo_interval_milliseconds: 1000
-panther_persistent_workers: 1
-
-...pestpp-glm specific options:
-max_n_super: 1000000
-super_eigthresh: 1e-06
-n_iter_base: 1000000
-n_iter_super: 0
-super_relparmax: 0.1
-max_super_frz_iter: 20
-max_reg_iter: 20
-lambdas: 0.1,1,10,100,1000,
-iteration_summary: 0
-der_forgive: 1
-uncertainty: 1
-forecasts: 
-base_jacobian: 
-glm_num_reals: 0
-jac_scale: 1
-glm_normal_form: DIAG
-glm_debug_der_fail: 0
-glm_debug_lamb_fail: 0
-glm_debug_real_fail: 0
-glm_accept_mc_phi: 0
-glm_rebase_super: 0
-glm_iter_mc: 0
-glm_high_2nd_iter_phi: 0
-
-...pestpp-swp options:
-sweep_parameter_csv_file: 
-sweep_output_csv_file: sweep_out.csv
-sweep_chunk: 500
-sweep_forgive: 0
-sweep_base_run: 0
-sweep_include_regul_phi: 0
-
-...pestpp-opt options:
-opt_objective_function: 
-opt_coin_log: 1
-opt_skip_final: 0
-opt_std_weights: 0
-opt_stack_size: 0
-opt_par_stack: 
-opt_obs_stack: 
-opt_decision_variable_groups: 
-opt_external_variable_groups: 
-opt_constraint_groups: 
-opt_risk: 0.5
-opt_iter_derinc_fac: 1
-opt_direction: 1
-opt_iter_tol: 0.001
-opt_recalc_fosm_every: 1
-opt_chance_points: SINGLE
-opt_chance_schedule: 
-
-...pestpp-sqp options:
-sqp_dv_en: 
-sqp_obs_restart_en: 
-sqp_search_method: LINE
-sqp_solve_method: NULL
-sqp_num_reals: -1
-sqp_num_refined_search_pts: 1
-sqp_subset_size: -10
-sqp_update_hessian: 1
-sqp_hessian_update_method: BFGS
-sqp_alpha_mults:
-  0.001
-  0.005
-  0.01
-  0.1
-  0.5
-  1
-sqp_filter_tol: 0.001
-sqp_working_set_tol: 0.1
-sqp_cma_c1: -1
-sqp_cma_cmu: -1
-sqp_cma_cc: -1
-sqp_cma_parent_num: -1
-sqp_cma_stepsize_control: 0
-sqp_cma_reinflation_factor: -1
-sqp_max_consec_infeas_ies: 3
-sqp_max_reinflation_cond_num: 500
-sqp_scale_down_factor: 1
-sqp_hess_max_cond_num: 1e+08
-sqp_save_cov_every: -1
-sqp_enforce_bounds: 0
-sqp_viol_pad: 0.0001
-sqp_reset_hessian_every: -1
-sqp_rescale_search_dir: 1
-sqp_seek_feas_max_iter: 3
-sqp_risk: 0.5
-sqp_powell_damping_factor: 0.2
-sqp_debug_hessian: 0
-sqp_debug_cmaes: 0
-sqp_debug_stosag_grad: 0
-
-...pestpp-mou options:
-mou_generator: PSO
-mou_population_size: 100
-mou_dv_population_file: 
-mou_obs_population_restart_file: 
-mou_objectives: 
-mou_max_archive_size: 500
-mou_risk_objective: 0
-mou_verbose_level: 1
-mou_env_selector: NSGA
-mou_mating_selector: TOURNAMENT
-mou_crossover_prob: 0.75
-mou_mutation_prob: -999
-mou_de_f: 0.8
-mou_save_population_every: -1
-mou_pso_omega: 0.7
-mou_pso_inertia (IINER, FINERT, INITER): 
- 0.7  0.4  0 
-mou_pso_social_const: 
- 2
-mou_pso_cognitive: 
- 2
-mou_pso_alpha: 1
-mou_pso_rramp: -500
-mou_pso_rfit: 2
-mou_pso_vmax_factor: 0.8
-mou_pso_dv_bound_handling: CLAMP
-mou_ppd_beta: 0.5
-mou_fit_gamma: 0.25
-mou_fit_epsilon: 0.05
-mou_population_schedule: 
-mou_simplex_reflections:10
-mou_simplex_factors: 
- 0.5
- 0.6
- 0.7
- 0.8
-mou_simplex_mutation: 0
-mou_use_multigen:0
-mou_shuffle_fixed_pars: 0
-mou_debug_dv_handling: 0
-
-...shared pestpp-ies/pestpp-da options:
-(note: 'da' args override 'ies' args when using pestpp-da)
-ies_parameter_ensemble: initial_x_ens.csv
-ies_observation_ensemble: 
-ies_weights_ensemble: 
-ies_restart_parameter_ensemble: 
-ies_restart_observation_ensemble: 
-ies_use_approximate_solution: 1
-ies_lambda_mults: 0.1,1,10,
-ies_initial_lambda: 0
-ies_use_approx: 1
-ies_subset_size: -10
-ies_reg_factor: 0
-ies_verbose_level: 1
-ies_use_prior_scaling: 0
-ies_num_reals: 50
-ies_bad_phi: 1.79769e+308
-ies_bad_phi_sigma: 1.79769e+308
-ies_include_base: 0
-ies_use_empirical_prior: 0
-ies_group_draws: 1
-ies_enforce_bounds: 1
-ies_localizer: 
-ies_accept_phi_fac: 1.05
-ies_lambda_inc_fac: 10
-ies_lambda_dec_fac: 0.75
-ies_save_lambda_ensembles: 0
-ies_subset_how: RANDOM
-ies_localize_how: PARAMETERS
-ies_num_threads: -1
-ies_debug_fail_subset: 0
-ies_debug_fail_remainder: 0
-ies_debug_bad_phi: 0
-ies_debug_upgrade_only: 0
-ies_debug_high_subset_phi: 0
-ies_debug_high_upgrade_phi: 0
-ies_csv_by_reals: 1
-ies_autoadaloc: 0
-ies_autoadaloc_sigma_dist: 1
-ies_enforce_chglim: 0
-ies_center_on: 
-ies_no_noise: 0
-ies_drop_conflicts: 0
-ies_save_rescov:0
-ies_pdc_sigma_distance: -1
-ies_use_mda: 0
-ies_mda_init_fac: 10
-ies_mda_dec_fac: 0.5
-ies_localization_type: LOCAL
-ies_upgrades_in_memory: 1
-ies_ordered_binary: 1
-ies_multimodal_alpha: 0
-ies_multimodal_weight_exponent: 0
-ies_multimodal_phi_weight: 0.5
-ies_localizer_forgive_extra: 0
-ies_phi_factors_file: 
-ies_phi_factors_by_real: 0
-ies_n_iter_reinflate: 
-0,
-ies_reinflate_factor: 
-1,
-ies_updatebyreals: 0
-ies_autoadaloc_indicator_pars: 
-
-ies_run_realname: ies_reinflate_num_reals: 
-0,ies_use_phi_lambda_iters: 0
-
-pestpp-sen options: 
-gsa_method: MORRIS
-gsa_morris_pooled_obs: 0
-gsa_morris_obs_sen: 1
-gsa_morris_p: 4
-gsa_morris_r: 4
-gsa_morris_delta: 0.6666
-gsa_sobol_samples: 4
-gsa_sobol_par_dist: norm
-
-pestpp-da options (those not shared with pestpp-ies):
-da_parameter_cycle_table: 
-da_observation_cycle_table: 
-da_hotstart_cycle: 0
-da_stop_cycle: 1000000000
-da_use_simulated_states: 0
-da_noptmax_schedule: 
-
-
-
+MAX_N_SUPER: 1000000
+SUPER_EIGTHRESH: 1e-06
+N_ITER_BASE: 1000000
+N_ITER_SUPER: 0
+SVD_PACK: redsvd
+SUPER_RELPARMAX: 0.1
+MAX_SUPER_FRZ_ITER: 20
+MAX_RUN_FAIL: 1
+MAX_REG_ITER: 20
+LAMBDAS: 0.1,1,10,100,1000
+LAMBDA_SCALE_FAC: 0.75,1,1.1
+ITERATION_SUMMARY: 0
+DER_FORGIVE: 1
+UNCERTAINTY: 1
+PREDICTIONS: 
+PARCOV: 
+OBSCOV: 
+BASE_JACOBIAN: 
+HOTSTART_RESFILE: 
+GLM_NUM_REALS: 0
+GLM_ACCEPT_MC_PHI: 0
+GLM_REBASE_SUPER: 0
+OVERDUE_RESCHED_FAC: 1.15
+OVERDUE_GIVEUP_FAC: 100
+OVERDUE_GIVEUP_MINUTES: 1e+30
+YAMR_POLL_INTERVAL: 1
+CONDOR_SUBMIT_FILE: 
+SWEEP_PARAMETER_CSV_FILE: 
+SWEEP_OUTPUT_CSV_FILE: sweep_out.csv
+SWEEP_CHUNK: 500
+SWEEP_FORGIVE: 0
+SWEEP_BASE_RUN: 0
+SWEEP_INCLUDE_REGUL_PHI: 0
+TIE_BY_GROUP: 0
+JAC_SCALE: 1
+GLM_NORMAL_FORM: diag
+GLM_DEBUG_DER_FAIL: 0
+GLM_DEBUG_LAMB_FAIL: 0
+GLM_DEBUG_REAL_FAIL: 0
+GLM_DEBUG_HIGH_2ND_ITER_PHI: 0
+GLM_HP_LAMBDAS: 0
+GLM_PANTHER_LAMBDAS: 0
+UPGRADE_AUGMENT: (deprecated)
+UPGRADE_BOUNDS: (deprecated)
+AUTO_NORM: (deprecated)
+MAT_INV: (deprecated)
+GLOBAL_OPT: none
+MOEA_NAME: 
+DE_F: 0.7
+DE_CR: 0.6
+DE_POP_SIZE: 40
+DE_MAX_GEN: 100
+DE_DITHER_F: 1
+OPT_OBJ_FUNC: 
+OPT_COIN_LOG: 1
+OPT_SKIP_FINAL: 0
+OPT_STD_WEIGHTS: 0
+OPT_STACK_SIZE: 0
+OPT_PAR_STACK: 
+OPT_OBS_STACK: 
+OPT_DEC_VAR_GROUPS: 
+OPT_EXT_VAR_GROUPS: 
+OPT_CONSTRAINT_GROUPS: 
+OPT_USE_ROBUST: 0
+OPT_RISK: 0.5
+OPT_ITER_DERINC_FAC: 1
+OPT_DIRECTION: 1.000000
+OPT_ITER_TOL: 0.001
+OPT_RECALC_FOSM_EVERY: 1
+OPT_INCLUDE_BND_PI: 1
+GSA_METHOD: MORRIS
+GSA_MORRIS_POOLED_OBS: 0
+GSA_MORRIS_OBS_SEN: 1
+GSA_MORRIS_P: 4.000000
+GSA_MORRIS_R: 4.000000
+GSA_MORRIS_DELTA: 0.6666
+GSA_SOBOL_SAMPLES: 4
+GSA_SOBOL_PAR_DIST: norm
+ENFORCE_TIED_BOUNDS: 0
+DEBUG_PARSE_ONLY: 0
+PAR_SIGMA_RANGE: 4
+ENSEMBLE_OUTPUT_PRECISION: 20
+IES_PAR_EN: initial_x_ens.csv
+IES_OBS_EN: 
+IES_RESTART_PARAMETER_ENSEMBLE: 
+IES_RESTART_OBSERVATION_ENSEMBLE: 
+IES_WEIGHTS_ENSEMBLE: 
+IES_USE_APPROXIMATE_SOLUTION: 1
+IES_LAMBDA_MULTS: 0.1,1,10
+IES_INIT_LAM: 0
+IES_SUBSET_SIZE: -10
+IES_REG_FACTOR: 0
+IES_VERBOSE_LEVEL: 1
+IES_USE_PRIOR_SCALING: 0
+IES_NUM_REALS: 50
+IES_BAD_PHI: 1.79769e+308
+PREEMPTION_POLL_INTERVAL_MINUTES: 0
+IES_BAD_PHI_SIGMA: 1.79769e+308
+IES_INCLUDE_BASE: 0
+IES_USE_EMPIRICAL_PRIOR: 0
+IES_GROUP_DRAWS: 1
+IES_ENFORCE_BOUNDS: 1
+IES_SAVE_BINARY: 0
+IES_LOCALIZER: 
+IES_ACCEPT_PHI_FAC: 1.05
+IES_LAMBDA_INC_FAC: 10
+IES_LAMBDA_DEC_FAC: 0.75
+IES_SAVE_LAMBDA_EN: 0
+IES_SUBSET_HOW: RANDOM
+IES_LOCALIZE_HOW: PARAMETERS
+IES_NUM_THREADS: -1
+IES_DEBUG_FAIL_SUBSET: 0
+IES_DEBUG_FAIL_REMAINDER: 0
+IES_DEBUG_BAD_PHI: 0
+IES_DEBUG_UPGRADE_ONLY: 0
+IES_DEBUG_HIGH_SUBSET_PHI: 0
+IES_DEBUG_HIGH_UPGRADE_PHI: 0
+IES_CSV_BY_REALS: 1
+IES_AUTOADALOC: 0
+IES_AUTOADALOC_SIGMA_DIST: 1
+IES_ENFORCE_CHGLIM: 0
+IES_CENTER_ON: 
+IES_NO_NOISE: 0
+IES_DROP_CONFLICTS: 0
+IES_SAVE_RESCOV: 0
+IES_PDC_SIGMA_DISTANCE: -1
+IES_USE_MDA: 0
+IES_MDA_INIT_FAC: 10
+IES_MDA_DEC_FAC: 0.5
+IES_LOC_TYPE: LOCAL
+IES_UPGRADES_IN_MEMORY: 1
+IES_ORDERED_BINARY: 1
+IES_MULTIMODAL_ALPHA: 0
+IES_MULTIMODAL_WEIGHT_EXPONENT: 0
+IES_MULTIMODAL_PHI_WEIGHT: 0.5
+IES_LOCALIZER_FORGIVE_MISSING: 0
+IES_PHI_FACTOR_FILE: 
+IES_PHI_FACTORS_BY_REAL: 0
+IES_N_ITER_MEAN: 0
+IES_REINFLATE_FACTOR: 1
+IES_UPDATE_BY_REALS: 0
+SAVE_DENSE: 0
+IES_AUTOADALOC_INDICATOR_PARS: 
+IES_RUN_REALNAME: 
+IES_REINFLATE_NUM_REALS: 0
+IES_USE_PHI_LAMBDA_ITERS: 0
+DA_PARAMETER_CYCLE_TABLE: 
+DA_OBSERVATION_CYCLE_TABLE: 
+DA_WEIGHT_CYCLE_TABLE: 
+DA_HOTSTART_CYCLE: 0
+DA_STOP_CYCLE: 1000000000
+DA_USE_SIMULATED_STATES: 0
+DA_NOPTMAX_SCHEDULE: 
+PANTHER_AGENT_RESTART_ON_ERROR: 0
+PANTHER_AGENT_NO_PING_TIMEOUT_SECS: -1
+ADDITIONAL_INS_DELIMITERS: 
+RANDOM_SEED: 358183147
+GLM_ITER_MC: 0
+PANTHER_DEBUG_LOOP: 0
+DEBUG_CHECK_PAR_EN_CONSISTENCY: 0
+PANTHER_AGENT_FREEZE_ON_FAIL: 0
+SAVE_ALL_RUNS: 0
+CHECK_TPLINS: 1
+FILL_TPL_ZEROS: 0
+TPL_FORCE_DECIMAL: 0
+FORGIVE_UNKNOWN_ARGS: 0
+PANTHER_ECHO: 1
+NUM_TPL_INS_THREADS: 1
+PANTHER_TRANSFER_ON_FINISH: 
+PANTHER_TRANSFER_ON_FAIL: 
+PANTHER_MASTER_TIMEOUT_MILLISECONDS: -999
+PANTHER_MASTER_ECHO_INTERVAL_MILLISECONDS: 1000
+PANTHER_PERSISTENT_WORKERS: 1
+PANTHER_PING_INTERVAL_SECS: 60
+MOU_GENERATOR: PSO
+MOU_POPULATION_SIZE: 100
+MOU_DV_POPULATION_FILE: 
+MOU_OBS_POPULATION_RESTART_FILE: 
+MOU_OBJECTIVES: 
+MOU_MAX_ARCHIVE_SIZE: 500
+OPT_CHANCE_POINTS: SINGLE
+MOU_RISK_OBJECTIVE: 0
+MOU_VERBOSE_LEVEL: 1
+MOU_ENV_SELECTOR: NSGA
+MOU_MATING_SELECTOR: TOURNAMENT
+MOU_CROSSOVER_PROBABILITY: 0.75
+MOU_MUTATION_PROBABILITY: -999
+MOU_DE_F: 0.8
+MOU_SAVE_POPULATION_EVERY: -1
+MOU_PSO_OMEGA: 0.7
+MOU_PSO_SOCIAL_CONST: 2
+MOU_PSO_COGNITIVE_CONST: 2
+MOU_PSO_ALPHA: 1
+MOU_PSO_RRAMP: -500
+MOU_PSO_RFIT: 2
+MOU_PSO_INERTIA: 0.7,0.4,0
+MOU_PSO_VMAX_FACTOR: 0.8
+MOU_PSO_DV_BOUND_HANDLING: CLAMP
+MOU_OUTER_REPO_OBS_FILE: 
+MOU_MAX_NN_SEARCH: 100
+MOU_HYPERVOLUME_EXTREME: 1e+10
+MOU_INFILL_SIZE: 100
+MOU_RESAMPLE_EVERY: -1
+MOU_RESAMPLE_COMMAND: 
+MOU_PPD_BETA: 0.5
+MOU_FIT_GAMMA: 0.25
+MOU_FIT_EPSILON: 0.05
+MOU_POPULATION_SCHEDULE: 
+OPT_CHANCE_SCHEDULE: 
+MOU_SIMPLEX_REFLECTIONS: 10
+MOU_SIMPLEX_FACTORS: 0.5,0.6,0.7,0.8
+MOU_SIMPLEX_MUTATION: 0
+MOU_USE_MULTIGEN_POPULATION: 0
+MOU_SHUFFLE_FIXED_PARS: 0
+MOU_DEBUG_DV_HANDLING: 0
+SQP_DV_EN: 
+SQP_RESTART_OBS_EN: 
+SQP_SEARCH_METHOD: LINE
+SQP_SOLVE_METHOD: NULL
+SQP_CMA_BOUND_HANDLING: reject
+SQP_NUM_REALS: -1
+SQP_NUM_REFINED_SEARCH_PTS: 1
+SQP_SUBSET_SIZE: -10
+SQP_UPDATE_HESSIAN: 1
+SQP_HESSIAN_UPDATE_METHOD: BFGS
+SQP_FILTER_TOL: 0.001
+SQP_WORKING_SET_TOL: 0.1
+SQP_CMA_REINFLATION_FACTOR: -1
+SQP_ALPHA_MULTS: 0.001,0.005,0.01,0.1,0.5,1
+SQP_CMA_C1: -1
+SQP_CMA_CMU: -1
+SQP_CMA_CC: -1
+SQP_CMA_PARENT_NUM: -1
+SQP_CMA_STEPSIZE_CONTROL: 0
+SQP_MAX_CONSEC_INFEAS_IES: 3
+SQP_MAX_REINFLATION_COND_NUM: 500
+SQP_SCALE_DOWN_FACTOR: 1
+SQP_HESS_MAX_COND_NUM: 1e+08
+SQP_SAVE_COV_EVERY: -1
+SQP_ENFORCE_BOUNDS: 0
+SQP_VIOL_PAD: 0.0001
+SQP_RESET_HESSIAN_EVERY: -1
+SQP_USE_ENSEMBLE_APPROX_HESSIAN: 1
+SQP_RESCALE_SEARCH_DIR: 1
+SQP_SEEK_FEAS_MAX_ITER: 3
+SQP_RISK: 0.5
+SQP_POWELL_DAMPING_FACTOR: 0.2
+SQP_DEBUG_ENABLE_CONSTRAINT_WEIGHTED_JCO: 1
+SQP_DEBUG_HESSIAN: 0
+SQP_DEBUG_CMA: 0
+SQP_DEBUG_STOSAG_GRAD: 0
+SQP_USE_IES_INFEAS: 0
 Model command line(s):- 
     python forward_model.py
 
@@ -8456,6 +8448,6 @@ obgnme    2000       2000  9.55e+04         0  9.55e+04  9.55e+04       100     
 
 
 pestpp-ies analysis complete...
-started at 06/25/26 10:24:54
-finished at 06/25/26 10:24:55
+started at 08/06/26 14:49:56
+finished at 08/06/26 14:49:57
 took 0 minutes

@@ -2287,6 +2287,113 @@ def api_overdue_policy_is_panther_only_test():
     print("api_overdue_policy_is_panther_only_test passed")
 
 
+def api_missing_par_columns_get_control_values_test():
+    """A parameter absent from a supplied ensemble gets its parval1, not zero.
+
+    ParameterEnsemble::from_csv sets var_names to EVERY control-file parameter and then
+    read_csv_by_reals does resize()+setZero(), so a parameter the csv did not mention is not
+    absent from the ensemble - it is present, and it is ZERO. fill_fixed() had long since fixed
+    this for FIXED parameters; adjustable ones got nothing.
+
+    Zero is a perfectly plausible parameter value, so nothing downstream could notice: the
+    model simply ran with it. On a log-transformed parameter it is not even plausible - it is
+    out of bounds and becomes NaN once transformed.
+
+    Only two callers forgive a missing column, and the second is the one that matters:
+    sqp_dv_en, and opt_par_stack - which mou, sqp AND pestpp-opt all use to supply a chance
+    stack. A stack realization silently carrying 0 feeds straight into the risk shift.
+
+    Measured on this case before the fix: every stack realization had X10 = 0.0, against a
+    parval1 of 5.07.
+    """
+    d = _stack_case("api_fill_stack", risk=0.95, stack_size=6, chance_points="SINGLE",
+                    tool="mou")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    names = [p_.upper() for p_ in pst.par_names]
+    drop = "X10"                                # the uncertain parameter the stack is over
+    parval = float(pst.parameter_data.loc[drop.lower(), "parval1"])
+    assert parval != 0.0, "this test is meaningless if parval1 is itself zero"
+
+    rng = np.random.default_rng(5)
+    keep = [n for n in names if n != drop]
+    pd.DataFrame({c: rng.uniform(-1.0, 1.0, 6) for c in keep},
+                 index=["s{0}".format(i) for i in range(6)]).to_csv(
+        os.path.join(d, "par_stack.csv"))
+    pst.pestpp_options["opt_par_stack"] = "par_stack.csv"
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+
+    with Mou.from_pst("g07.pst", workdir=d) as mou:
+        mou.initialize()
+        pe = mou.stack_pe()
+        assert drop in pe.columns, \
+            "the column exists either way - that is what made this invisible"
+        vals = pe[drop].values
+        assert not (vals == 0.0).any(), \
+            "{0} was left at the allocation zero rather than its control value".format(drop)
+        assert np.allclose(vals, parval), \
+            "{0} should take parval1 ({1}) in every realization, got {2}".format(
+                drop, parval, sorted(set(vals))[:4])
+        # the fill must not blanket-overwrite; the columns the file supplied still hold real
+        # values. Note they are CONSTANT here and legitimately so - a stack replaces the
+        # decision-variable entries of every realization with the current dv values, so only
+        # the uncertain parameter actually varies down a stack column.
+        supplied = pe[keep[0]].values
+        assert not (supplied == 0.0).all(), \
+            "a column the file supplied should not have been zeroed"
+        mou.finalize()
+    print("api_missing_par_columns_get_control_values_test passed")
+
+
+def api_sqp_needs_an_ensemble_gradient_test():
+    """sqp runs out of the box, and refuses clearly when it cannot form a gradient.
+
+    PESTPP-SQP implements the ensemble gradient ONLY - `iterate_2_solution()` throws "only
+    ensemble gradient currently implemented" for anything else, and the finite-difference entry
+    point it names exists solely as a commented-out call, declared and defined nowhere. With
+    sqp_num_reals defaulting to -1, that made the DEFAULT configuration the unimplemented one:
+    running sqp without setting sqp_num_reals or sqp_dv_en failed outright.
+
+    The default is now 50, so a plain run works. Switching the ensemble off explicitly is still
+    a legitimate thing to ask for and still cannot be served, so it is refused during prepare -
+    with a message naming what to set, rather than failing later in whatever machinery happens
+    to run first. With chance enabled that used to surface as a complaint about stack runs
+    never having been processed, which points nowhere near the actual problem.
+    """
+    # no sqp ensemble options at all: the default has to be a workable one
+    d = _stack_case("api_sqp_default_grad", risk=0.5, stack_size=0, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options.pop("sqp_num_reals", None)
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+        assert int(sqp.get_option("sqp_num_reals")) == 50, \
+            "sqp_num_reals should default to 50, got {0}".format(
+                sqp.get_option("sqp_num_reals"))
+        sqp.initialize()
+        assert sqp.n_reals > 1, \
+            "the default should give sqp a real ensemble to work from, got {0}".format(
+                sqp.n_reals)
+        sqp.finalize()
+
+    # explicitly switched off: refused, and the message says what to set
+    d = _stack_case("api_sqp_no_grad", risk=0.5, stack_size=0, chance_points="SINGLE",
+                    tool="sqp")
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
+    pst.pestpp_options["sqp_num_reals"] = 0
+    pst.write(os.path.join(d, "g07.pst"), version=2)
+    try:
+        with Sqp.from_pst("g07.pst", workdir=d) as sqp:
+            sqp.initialize()
+        raise AssertionError("sqp with no ensemble gradient should be refused")
+    except PestppError as e:
+        msg = str(e).lower()
+        assert "sqp_num_reals" in msg and "sqp_dv_en" in msg, \
+            "the refusal should name both ways to fix it, got: {0}".format(e)
+        assert "finite-difference" in msg, \
+            "the refusal should say finite differences are not implemented, got: {0}".format(e)
+    print("api_sqp_needs_an_ensemble_gradient_test passed")
+
+
 if __name__ == "__main__":
     api_smoke_test()
     api_iterations_respect_noptmax_test()
@@ -2350,6 +2457,8 @@ if __name__ == "__main__":
     api_robust_is_sqp_only_test()
     api_retired_sqp_risk_is_refused_test()
     api_init_only_options_are_refused_live_test()
+    api_sqp_needs_an_ensemble_gradient_test()
+    api_missing_par_columns_get_control_values_test()
     api_run_manager_settings_are_live_test()
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()

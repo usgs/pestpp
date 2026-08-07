@@ -2895,9 +2895,68 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 		drop_cols(tied_names);
 	}
 
+	//...and the adjustable ones the file did not carry either. Done after the tied columns are
+	//dropped so the count reported is the count that survives into the run.
+	fill_missing_from_ctl(header_info, fixed_names);
+
 	tstat = transStatus::CTL;
 	org_real_names = real_names;
 	update_var_map();
+}
+
+/**
+ * @brief Give ADJUSTABLE parameters absent from a user-supplied ensemble their control-file value.
+ *
+ * fill_fixed() above does this for fixed parameters and has for a long time. Adjustable ones
+ * got nothing, and "nothing" is not neutral here: ParameterEnsemble::from_csv() sets var_names
+ * to EVERY control-file parameter and read_csv_by_reals() then does
+ *
+ *     reals.resize(num_reals, var_names.size());
+ *     reals.setZero();
+ *
+ * so a parameter the csv did not mention is not absent - it is present, and it is ZERO. The
+ * caller is warned that the column is missing (or refused outright, when forgive is false) but
+ * the value it silently acquired was never the control value. Zero is a perfectly plausible
+ * number, so nothing downstream could tell; the model simply ran with it. On a LOG parameter it
+ * is not even plausible - it is out of bounds, and becomes NaN when transformed.
+ *
+ * This is a no-op on the binary path, where var_names comes from the file itself, so a missing
+ * parameter really is an absent column and the tools fill it from the control file already.
+ *
+ * @param header_info The columns the file actually supplied.
+ * @param fixed_names Already handled by fill_fixed(); skipped so the two do not double-count.
+ */
+void ParameterEnsemble::fill_missing_from_ctl(const map<string, int> &header_info, vector<string>& fixed_names)
+{
+	unordered_set<string> already(fixed_names.begin(), fixed_names.end());
+	map<string, int> var_map;
+	for (int i = 0; i < var_names.size(); i++)
+		var_map[var_names[i]] = i;
+
+	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+	vector<string> filled;
+	for (auto& name : var_names)
+	{
+		if (header_info.find(name) != header_info.end())
+			continue;                       // the file supplied it
+		if (already.find(name) != already.end())
+			continue;                       // fill_fixed() has it
+		if (pars.find(name) == pars.end())
+			continue;                       // not a control-file parameter; leave it alone
+		Eigen::VectorXd vec(reals.rows());
+		vec.setOnes();
+		reals.col(var_map[name]) = (pars.get_rec(name) * vec);
+		filled.push_back(name);
+	}
+	if (filled.size() > 0)
+	{
+		//named rather than counted: which parameter reverted to its control value decides
+		//whether the ensemble still means what the caller thought it meant
+		cout << "filled " << filled.size() << " adjustable par(s) not listed in user-supplied "
+			 << "par ensemble with `parval1` values from control file:" << endl;
+		for (auto& name : filled)
+			cout << "  " << name << endl;
+	}
 }
 
 /**

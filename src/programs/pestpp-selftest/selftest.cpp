@@ -467,12 +467,16 @@ static void test_tool_objects_track_live_options()
         "every per-iteration control above changed post-init WITHOUT a warning");
 
     // by contrast, the gradient mode is driven by an init-only option: the value still
-    // propagates to the accessor, but the change is surfaced rather than silently taken
-    CHK(!sqp.p_use_ensemble_grad(), "no ensemble requested -> fd gradient");
+    // propagates to the accessor, but the change is surfaced rather than silently taken.
+    // sqp_num_reals DEFAULTS to 50 - an ensemble gradient is the only mode sqp implements, so
+    // the default has to select it - and switching it off takes an explicit 0
+    CHK(sqp.p_use_ensemble_grad(), "sqp_num_reals defaults to 50 -> ensemble gradient");
+    o->set_option("SQP_NUM_REALS", "0");
+    CHK(!sqp.p_use_ensemble_grad(), "sqp_num_reals 0 -> no ensemble gradient (a refused run)");
     o->set_option("SQP_NUM_REALS", "20");
     CHK(sqp.p_use_ensemble_grad(), "sqp_num_reals -> ensemble gradient (derived, not cached)");
-    CHK(o->get_init_only_change_warnings().size() == 1,
-        "changing the init-only sqp_num_reals post-init IS flagged");
+    CHK(o->get_init_only_change_warnings().size() == 2,
+        "each post-init change of the init-only sqp_num_reals IS flagged");
 }
 
 
