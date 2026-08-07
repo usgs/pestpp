@@ -196,6 +196,13 @@ jobs:
         run: |
           python3 scripts/check_public_surface.py
 
+      # std::mt19937 is portable; the <random> distributions and std::shuffle are NOT, and a
+      # single std::shuffle is enough to make a tool irreproducible across platforms.
+      - name: rng portability check
+        shell: bash -l {0}
+        run: |
+          python3 scripts/check_rng_portability.py
+
       # Put the model binaries (mfnwt, mf6, ...) on PATH for the forward runs.
       #
       # These entries are ABSOLUTE on purpose. This step used to add "../../test_bin/<plat>",
