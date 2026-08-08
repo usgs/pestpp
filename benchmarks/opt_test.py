@@ -121,11 +121,11 @@ else:
     bin_path = os.path.join("..","..","..","..","pestpp","bin")
     
 if "windows" in platform.platform().lower():
-    exe_path = os.path.join(bin_path, "win", "pestpp-opt.exe")
+    exe_path = os.path.join(bin_path, "pestpp-opt.exe")
 elif "darwin" in platform.platform().lower() or "mac" in platform.platform().lower():
-    exe_path = os.path.join(bin_path,  "mac", "pestpp-opt")
+    exe_path = os.path.join(bin_path, "pestpp-opt")
 else:
-    exe_path = os.path.join(bin_path, "linux", "pestpp-opt")
+    exe_path = os.path.join(bin_path, "pestpp-opt")
 
 
 def std_weights_test():
