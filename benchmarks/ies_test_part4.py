@@ -2911,7 +2911,10 @@ def tenpar_mean_iter_test_sched():
     print(phidf2.loc[:,"mean"])
     print(phidf2.shape)
     assert phidf2.shape[0] == 10 #hard coded to noptmax above
-    assert phidf2.shape[1] == 29 #restart with 40 reals + summary stats
+    # 31, not 29 - same reason as the first restart assertion above: ies subset selection
+    # moved onto its own random stream, so a different set of realizations survives.
+    # Measured identical on macos, linux and windows.
+    assert phidf2.shape[1] == 31 #restart + summary stats
     
 
 
