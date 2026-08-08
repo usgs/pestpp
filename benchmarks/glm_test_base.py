@@ -26,11 +26,11 @@ else:
     bin_path = os.path.join("..", "..", "..", "..", "pestpp", "bin")
 
 if "windows" in platform.platform().lower():
-    exe_path = os.path.join(bin_path, "pestpp-glm.exe")
+    exe_path = os.path.join(bin_path, "win", "pestpp-glm.exe")
 elif "darwin" in platform.platform().lower() or "mac" in platform.platform().lower():
-    exe_path = os.path.join(bin_path, "pestpp-glm")
+    exe_path = os.path.join(bin_path, "mac", "pestpp-glm")
 else:
-    exe_path = os.path.join(bin_path, "pestpp-glm")
+    exe_path = os.path.join(bin_path, "linux", "pestpp-glm")
 port = 4016
 
 

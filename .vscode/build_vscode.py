@@ -11,18 +11,26 @@ parser.add_argument("--buildtype", type=str, default="release")
 parser.add_argument("action")
 args = parser.parse_args()
 
-print(f"os platform: {platform.system().lower()}")
+os_platform = platform.system().lower()
+print(f"os platform: {os_platform}")
+if "linux" in os_platform:
+    _ostag = "linux"
+elif "darwin" in os_platform:
+    _ostag = "mac"
+elif "windows" in os_platform:
+    _ostag = "win"
+else:
+    _ostag = "unknown"
 
-# Remove all files from bin folder. This used to clear bin/<ostag> and its parent; the
-# per-platform sub-directory no longer exists (see the note on local_install in CMakeLists.txt),
-# and looking for it here would have made this quietly stop cleaning anything at all.
-bin_dir = pl.Path.cwd() / "bin"
+# Remove all files from bin folder
+bin_dir = pl.Path.cwd() / f"bin/{_ostag}"
 print(f"bin_dir = {bin_dir}")
 if bin_dir.is_dir():
-    for path in bin_dir.iterdir():
-        if path.is_file():
-            print(f"removing...'{path}'")
-            path.unlink()
+    for on_dir in [bin_dir, bin_dir.parent]:
+        for path in on_dir.iterdir():
+            if path.is_file():
+                print(f"removing...'{path}'")
+                path.unlink()
 
 command = [
     "pixi",

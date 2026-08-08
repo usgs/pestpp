@@ -38,11 +38,11 @@ else:
 
         
 if "windows" in platform.platform().lower():
-    exe_path = os.path.join(bin_path, "pestpp-ies.exe")
+    exe_path = os.path.join(bin_path, "win", "pestpp-ies.exe")
 elif "darwin" in platform.platform().lower() or "macos" in platform.platform().lower() :
-    exe_path = os.path.join(bin_path, "pestpp-ies")
+    exe_path = os.path.join(bin_path,  "mac", "pestpp-ies")
 else:
-    exe_path = os.path.join(bin_path, "pestpp-ies")
+    exe_path = os.path.join(bin_path, "linux", "pestpp-ies")
 
 noptmax = 4
 num_reals = 20
@@ -1238,7 +1238,10 @@ def mf6_v5_glm_test():
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
     m_d = os.path.join(model_d,"master_glm")
-    pyemu.os_utils.start_workers(t_d, "pestpp-glm", "freyberg6_run_glm.pst", 
+    # resolved, not a bare name: a bare "pestpp-glm" is found only through the ../bin/<plat>
+    # entry pyemu puts on PATH at import, so it silently runs whatever pestpp-glm happens to be
+    # installed on the machine rather than the one just built
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "freyberg6_run_glm.pst",
                                  num_workers=15, master_dir=m_d,worker_root=model_d,
                                  port=port)
 
@@ -1509,7 +1512,7 @@ def prep_ends():
     pst.pestpp_options["ies_par_en"] = "prior.jcb"
 
     pst.write(os.path.join(new_d,"freyberg6_run_ies.pst"),version=2)
-    pyemu.os_utils.run("pestpp-ies freyberg6_run_ies.pst",cwd=new_d)
+    pyemu.os_utils.run("{0} freyberg6_run_ies.pst".format(exe_path),cwd=new_d)
 
     build_and_draw_prior(new_d,num_reals=5000)
     pst.control_data.noptmax = -1
@@ -1518,7 +1521,7 @@ def prep_ends():
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
 
-    pyemu.os_utils.start_workers(new_d,"pestpp-ies","freyberg6_run_ies.pst",num_workers=15,worker_root=model_d,master_dir=m_d)
+    pyemu.os_utils.start_workers(new_d,exe_path,"freyberg6_run_ies.pst",num_workers=15,worker_root=model_d,master_dir=m_d)
 
 
 def build_and_draw_prior(t_d="ends",num_reals=500):
@@ -1941,7 +1944,7 @@ def tenpar_uniform_invest():
     pst.pestpp_options["ies_par_en"] = "geoprior.csv"
     pst.control_data.noptmax = 10
     pst.write(os.path.join(new_d,"pest.pst"))
-    pyemu.os_utils.run("pestpp-ies pest.pst",cwd=new_d)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
 
     for i,val in enumerate(np.linspace(1,5,pe.shape[0])):
         print(val)
@@ -1954,7 +1957,7 @@ def tenpar_uniform_invest():
     pst.pestpp_options["ies_par_en"] = "uniprior.csv"
     pst.control_data.noptmax = 10
     pst.write(os.path.join(new_d,"pest.pst"))
-    pyemu.os_utils.run("pestpp-ies pest.pst",cwd=new_d)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
 
 
 def sweep_large_xfer_test():

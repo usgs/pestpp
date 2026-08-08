@@ -192,26 +192,41 @@ option(INSTALL_LOCAL "Install local executables in ./bin" ON)
 if(INSTALL_LOCAL)
   set(_OPTION_INSTALL_LOCAL_ALL ALL)
 endif()
-# There used to be an extra command here that re-copied everything install() had just written
-# into a bin/${_ostag}/ sub-directory (`cd bin && rm -rf mac && mkdir mac && cp pestpp-* mac/`),
-# carrying a "please remove soon" note. It is gone: install() already places every executable
-# and the shared library directly in bin/, so the sub-directory duplicated ~58 MB of binaries on
-# every build and bought nothing but a path prefix the benchmark scripts hard-coded.
+# bin/${_ostag}/ is NOT optional and must not be "cleaned up" away. pyemu puts
+# os.path.abspath("../bin/<plat>") on PATH at import time (pyemu/utils/os_utils.py), so every
+# benchmark script that starts a tool by bare name - `start_workers(t_d, "pestpp-mou", ...)` -
+# resolves it through this directory. That includes the cloned pestpp-*_benchmarks repos, which
+# are not ours to edit. Deleting this layout breaks them; it was tried, and it did.
 #
-# It was also the only step in the build that ever failed. Re-reading ten multi-megabyte files
-# tens of milliseconds after writing them made `cp` race the flush of its own source: on one
-# macOS runner all eight files above ~5 MB died with `fcopyfile failed: Input/output error`
-# while the two below ~4 MB survived - a clean size ordering, not a random fault. That left
-# bin/mac/ full of truncated binaries, which then failed to exec.
+# What IS fixed here is how the copy is made. It used to be a shell command run straight after
+# install():
+#     cd bin && rm -rf ${_ostag} && mkdir ${_ostag} && cp pestpp-* ${_ostag}/
+# which re-read ten multi-megabyte files tens of milliseconds after install() wrote them. On one
+# macOS runner every file above ~5 MB died with `cp: fcopyfile failed: Input/output error` while
+# the two below ~4 MB survived - a clean size ordering, not a random fault - leaving bin/mac/
+# full of truncated binaries that then failed to exec. The `rm -rf` also blanked the directory
+# for the length of the copy, so anything running concurrently saw it empty.
 #
-# The shared library needs no special handling any more either. Its install() rule writes
-# pestpp-api.<so|dll|dylib> into bin/ under exactly the name $<TARGET_FILE:pestpp_capi> has, so
-# the copy_if_different that used to shadow it into the sub-directory is now redundant.
+# Copying each target from the BUILD TREE avoids both: the build-tree binary was written at link
+# time rather than milliseconds ago, copy_if_different is one defined operation per file with no
+# glob, and nothing is ever removed, so the directory is never momentarily empty.
+set(_local_install_bin "${PESTPP_SOURCE_DIR}/bin/${_ostag}")
+set(_local_install_copies
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${_local_install_bin}")
+foreach(_tgt
+    pestpp-glm pestpp-ies pestpp-opt pestpp-sen pestpp-swp
+    pestpp-mou pestpp-sqp pestpp-da pestpp-selftest pestpp_capi)
+  list(APPEND _local_install_copies
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "$<TARGET_FILE:${_tgt}>" "${_local_install_bin}/")
+endforeach()
+
 add_custom_target(local_install
   ${_OPTION_INSTALL_LOCAL_ALL}
   "${CMAKE_COMMAND}"
     -D CMAKE_INSTALL_PREFIX=${PESTPP_SOURCE_DIR}
     -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_install.cmake"
+  ${_local_install_copies}
   DEPENDS
     pestpp-glm
     pestpp-ies
