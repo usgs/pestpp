@@ -138,7 +138,15 @@ void SqpFilter::report(ofstream& frec, int iter)
 	vector<FilterRec> sorted_pairs(obj_viol_pairs.begin(), obj_viol_pairs.end());
 	sort(sorted_pairs.begin(), sorted_pairs.end(),
 		[](const FilterRec& a, const FilterRec& b) {
-			return a.obj_val > b.obj_val;
+			// tie-break on real_name: std::sort is UNSTABLE, so a value-only comparator orders
+			// equal values differently by implementation.  FilterRec::operator< was already
+			// given this exact tie-break ("ordered them differently on libstdc++ vs MSVC");
+			// these ad-hoc lambdas bypassed it and reintroduced the same defect.
+			// Descending, so the tie-break descends too - otherwise it is not a strict weak
+			// ordering.
+			if (a.obj_val != b.obj_val)
+				return a.obj_val > b.obj_val;
+			return a.real_name > b.real_name;
 		});
 
 	double omin = 1.0e+300, omax = -1e+300, vmin = 1e+300, vmax = -1e+300;
@@ -5769,7 +5777,11 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 			sort(filterset.begin(), filterset.end(),
 				[](const FilterRec& a, const FilterRec& b)
 				{
-					return a.viol_val < b.viol_val;
+					// deterministic total order - see the note at the top of this file's
+					// sorted_pairs sort
+					if (a.viol_val != b.viol_val)
+						return a.viol_val < b.viol_val;
+					return a.real_name < b.real_name;
 				});
 
 			for (const auto& fr : filterset)
@@ -5793,7 +5805,9 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 					sort(filterset.begin(), filterset.end(),
 						[](const FilterRec& a, const FilterRec& b)
 						{
-							return a.obj_val < b.obj_val;
+							if (a.obj_val != b.obj_val)
+								return a.obj_val < b.obj_val;
+							return a.real_name < b.real_name;
 						});
 				}
 				else
@@ -5801,7 +5815,9 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 					sort(filterset.begin(), filterset.end(),
 						[](const FilterRec& a, const FilterRec& b)
 						{
-							return a.obj_val > b.obj_val;
+							if (a.obj_val != b.obj_val)
+								return a.obj_val > b.obj_val;
+							return a.real_name > b.real_name;
 						});
 				}
 
@@ -5836,7 +5852,9 @@ FilterRec SeqQuadProgram::pick_upgrade_and_update_current(ParameterEnsemble& dv_
 				sort(filterset.begin(), filterset.end(),
 					[](const FilterRec& a, const FilterRec& b)
 					{
-						return a.viol_val < b.viol_val;
+						if (a.viol_val != b.viol_val)
+							return a.viol_val < b.viol_val;
+						return a.real_name < b.real_name;
 					});
 
 				auto it = filterset.begin();
@@ -6872,7 +6890,6 @@ void CovMatAdap::clear_archives()
 void CovMatAdap::update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear)
 {
 	map<string, double> unique_obj_map;
-	set<double> seen_values;
 	ParameterEnsemble curr_pe = pe;
 	
 	if (clear) 
@@ -6914,7 +6931,13 @@ void CovMatAdap::update_archives(const ParameterEnsemble& pe, map<string, double
 		vector<pair<string, double>> sorted_obj_map_vec(sorted_obj_map.begin(), sorted_obj_map.end());
 		sort(sorted_obj_map_vec.begin(), sorted_obj_map_vec.end(),
 			[](const pair<string, double>& a, const pair<string, double>& b) {
-				return a.second < b.second;
+				// This list is TRUNCATED to lambda below, so a tie at the cutoff decides which
+				// members survive into the CMA archive - and the archive shapes the covariance
+				// that draws the NEXT population.  With an unstable sort and no tie-break, a
+				// last-bit difference in one objective value forks the whole run.
+				if (a.second != b.second)
+					return a.second < b.second;
+				return a.first < b.first;
 			});
 
 		vector<string> sorted_names_from_obj;

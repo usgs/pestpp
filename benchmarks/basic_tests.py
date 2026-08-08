@@ -2613,8 +2613,11 @@ XPLAT_G07_ARTIFACTS = {
     # single-cycle run this uses writes da.0.<n>.*, not da.<n>.*
     "da":  ["{tool}.0.0.par.csv", "{tool}.0.0.obs.csv",
             "{tool}.0.{n}.par.csv", "{tool}.0.{n}.obs.csv", "{tool}.phi.actual.csv"],
-    "sqp": ["{tool}.0.par.csv", "{tool}.0.obs.csv",
-            "{tool}.{n}.par.csv", "{tool}.{n}.obs.csv"],
+    # sqp is deliberately limited to ITERATION 0 - see _g07_sqp_sanity() for the reason and
+    # for what is checked instead.  Its iteration-0 ensemble IS bit-reproducible across
+    # platforms (measured at 8.9e-16, well inside tolerance); its later iterations are not, and
+    # cannot be made so by anything this test can do.
+    "sqp": ["{tool}.0.par.csv", "{tool}.0.obs.csv"],
     # the UNNUMBERED files are mou's final state; only some iterations get numbered copies
     # (mou.<n>.obs_pop.csv in particular is not written), so the final four are the stable set
     "mou": ["{tool}.0.dv_pop.csv", "{tool}.0.obs_pop.csv",
@@ -2662,6 +2665,66 @@ def basic_xplat_g07_setup(base_d=XPLAT_G07_BASE):
     return base_d
 
 
+def _g07_sqp_sanity(m_d, base_d):
+    """What is checked for sqp INSTEAD of a bit-level comparison of its final ensemble.
+
+    sqp amplifies a last-bit difference into total divergence within two iterations, so its
+    final ensemble is not bit-reproducible across platforms and no amount of RNG or comparator
+    work will make it so.  Measured on one machine, with the same binary and seed, perturbing
+    only the forward model by a relative 1e-15 - the size of the libm difference the other
+    tools already show between platforms:
+
+        perturbation   iteration-2 par ensemble max|diff|   elements over 1e-6
+        none           0.000e+00                            0 / 210
+        1e-15          4.670e+00                            210 / 210
+        1e-12          4.595e+00                            210 / 210
+
+    1e-15 and 1e-12 give the SAME magnitude: the response is saturated, which is the signature
+    of a discrete decision flipping rather than error accumulating.  The decision is in
+    get_subset_idxs(), which ranks realizations by constraint violation sum and takes the
+    lowest few; those are the realizations that get search directions.  Two near-equal sums
+    rank the other way and the subset changes:
+
+        iteration 1 subset:  0 6 7 10 17 BASE  /  0 6 7 10 17 BASE   (identical)
+        iteration 2 subset:  4 5 9 14 19 BASE  /  0 4 9 16 18 BASE   (2 in common)
+
+    Those are not TIES - the sort already tie-breaks exact equality.  They are values that
+    differ by one part in 10^15 and genuinely compare differently.
+
+    So this checks properties that hold whichever trajectory sqp took:
+      - it ran to completion and wrote a well-formed final ensemble of the right shape;
+      - every value is finite (a diverged run is still not allowed to produce NaN);
+      - it did not get WORSE - the best objective at the end is no worse than at the start.
+
+    That is weaker than the other four tools get, and it is the honest amount.  Full details
+    in docs/xplat_g07/sqp_divergence_findings.md.
+    """
+    ref0 = pd.read_csv(os.path.join(base_d, "sqp", "sqp.0.par.csv"), index_col=0)
+    fin_par = os.path.join(m_d, "sqp.{0}.par.csv".format(XPLAT_G07_NOPTMAX))
+    fin_obs = os.path.join(m_d, "sqp.{0}.obs.csv".format(XPLAT_G07_NOPTMAX))
+    assert os.path.exists(fin_par) and os.path.exists(fin_obs), \
+        "sqp did not write a final ensemble - it failed rather than diverged"
+    par = pd.read_csv(fin_par, index_col=0)
+    obs = pd.read_csv(fin_obs, index_col=0)
+    assert par.shape[1] == ref0.shape[1], \
+        "sqp final ensemble has {0} columns, expected {1}".format(par.shape[1], ref0.shape[1])
+    assert par.shape[0] > 0 and obs.shape[0] == par.shape[0], \
+        "sqp final par/obs ensembles disagree: {0} vs {1} rows".format(par.shape[0], obs.shape[0])
+    assert np.isfinite(par.values.astype(float)).all(), "sqp final par ensemble holds non-finite values"
+    assert np.isfinite(obs.values.astype(float)).all(), "sqp final obs ensemble holds non-finite values"
+
+    obs0 = pd.read_csv(os.path.join(base_d, "sqp", "sqp.0.obs.csv"), index_col=0)
+    ocol = [c for c in obs.columns if c.lower() == "obj"]
+    assert ocol, "no 'obj' column in the sqp obs ensemble"
+    best_start, best_end = float(obs0[ocol[0]].min()), float(obs[ocol[0]].min())
+    assert best_end <= best_start + 1.0e-6, \
+        ("sqp's best objective got WORSE: {0:.6g} at iteration 0 -> {1:.6g} at the end. The "
+         "trajectory is allowed to differ by platform; going backwards is not."
+         .format(best_start, best_end))
+    print("  sqp  [not bit-compared: amplifies last-bit noise - see docstring]"
+          "  shape ok, finite, best obj {0:.6g} -> {1:.6g}".format(best_start, best_end))
+
+
 def basic_xplat_g07_test(base_d=XPLAT_G07_BASE, rtol=1.0e-6, atol=1.0e-8):
     """re-run all five tools from the frozen template and compare against the committed base.
 
@@ -2687,6 +2750,8 @@ def basic_xplat_g07_test(base_d=XPLAT_G07_BASE, rtol=1.0e-6, atol=1.0e-8):
     failed = {t: [] for t in XPLAT_G07_TOOLS}
     for tool in XPLAT_G07_TOOLS:
         m_d = _g07_run(t_d, "xplat_g07_{0}_test".format(tool), tool, "{0}.pst".format(tool))
+        if tool == "sqp":
+            _g07_sqp_sanity(m_d, base_d)
         for fn in _g07_artifact_names(tool):
             ref_p, new_p = os.path.join(base_d, tool, fn), os.path.join(m_d, fn)
             assert os.path.exists(new_p), "{0}: '{1}' not written by this run".format(tool, fn)
