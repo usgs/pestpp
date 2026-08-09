@@ -9,6 +9,7 @@ add_library(pestpp_com
   EnsembleMethodUtils.cpp
   EnsembleSmoother.cpp
   FileManager.cpp
+  GLM.cpp
   Jacobian_1to1.cpp
   Jacobian.cpp
   linear_analysis.cpp
