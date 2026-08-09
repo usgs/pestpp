@@ -13,6 +13,7 @@ import os
 import platform
 import shutil
 import sys
+import time
 
 import numpy as np
 import pandas as pd
@@ -2344,6 +2345,41 @@ def api_run_manager_settings_are_live_test():
     print("api_run_manager_settings_are_live_test passed")
 
 
+def api_release_workers_test():
+    """Releasing through the friendly layer also reconciles the processes IT started.
+
+    The API spawns its own agents and holds them for teardown, which the executables never did.
+    So a release that the master honours leaves Python holding handles to processes that are
+    already gone - harmless on posix, noisier on Windows, and either way the bookkeeping is a
+    lie. The assertion here is that the tracked list shrinks to match, and that it shrinks IN
+    PLACE, because the finalizer registered at construction holds that exact list object.
+    """
+    d = _case("api_release_workers", noptmax=1, num_reals=5)
+    with Ies.from_pst("pest.pst", workdir=d, workers=2, port=4623) as ies:
+        ies.initialize()
+        tracked = ies._workers                 # the object the finalizer holds
+        n_started = len(tracked)
+        assert n_started == 2, n_started
+
+        deadline = time.time() + 120
+        while len(ies.get_workers()) < 2 and time.time() < deadline:
+            time.sleep(0.2)
+        assert len(ies.get_workers()) == 2, \
+            "workers never connected: {0}".format(len(ies.get_workers()))
+
+        n = ies.release_workers()              # no argument means every one
+        assert n == 2, "expected to release both workers, released {0}".format(n)
+        assert len(ies.get_workers()) == 0, \
+            "master still reports workers after releasing all: {0}".format(len(ies.get_workers()))
+
+        assert ies._workers is tracked, \
+            "release rebound the worker list; the finalizer still holds the old one"
+        assert len(tracked) == 0, \
+            "released agents were not reaped from the tracked list: {0} left".format(len(tracked))
+        ies.finalize()
+    print("api_release_workers_test passed")
+
+
 def api_overdue_policy_is_panther_only_test():
     """A serial session has no overdue policy, and says so rather than inventing numbers."""
     d = _case("api_rm_serial", noptmax=1, num_reals=5)
@@ -2535,6 +2571,7 @@ if __name__ == "__main__":
     api_sqp_needs_an_ensemble_gradient_test()
     api_missing_par_columns_get_control_values_test()
     api_run_manager_settings_are_live_test()
+    api_release_workers_test()
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_robust_requires_paired_parameters_test()

@@ -1046,7 +1046,8 @@ static void reject_if_observing(PestppSession* s, const char* fn)
     bad_state(string("'") + fn + "' cannot be called from inside a run observer: the batch is "
               "mid-flight, so the ensembles and phi it would read are part-updated. Only the "
               "run-management calls are legal there - pestpp_get_run_states, "
-              "pestpp_get_run_time_stats, pestpp_cancel_runs and pestpp_get_worker_*");
+              "pestpp_get_run_time_stats, pestpp_cancel_runs, pestpp_release_workers and "
+              "pestpp_get_worker_*");
 }
 
 /* capi_error is caught first so a throw site's chosen status survives; everything else is a
@@ -2246,6 +2247,26 @@ pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids, int n, int
         int c = panther(s)->cancel_runs(vector<int>(run_ids, run_ids + n));
         if (n_cancelled != nullptr)
             *n_cancelled = c;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_release_workers(pestpp_handle h, const int* worker_idxs, int n,
+                                     int* n_released)
+{
+    CAPI_BEGIN_OBSERVER_SAFE(h)
+        // worker_idxs == nullptr with n == 0 means "all of them", the same convention
+        // pestpp_cancel_runs uses. A null pointer with a positive n is a caller bug.
+        if ((worker_idxs == nullptr) && (n != 0))
+            bad_arg("pestpp_release_workers: null worker_idxs requires n == 0 (meaning all)");
+        if (n < 0)
+            bad_arg("pestpp_release_workers: n cannot be negative");
+        vector<int> idxs;
+        if (worker_idxs != nullptr)
+            idxs.assign(worker_idxs, worker_idxs + n);
+        int c = panther(s)->release_workers(idxs);
+        if (n_released != nullptr)
+            *n_released = c;
         return PESTPP_OK;
     CAPI_END()
 }

@@ -392,6 +392,8 @@ class PestppLib:
         lib.pestpp_get_run_states.restype = c_int
         lib.pestpp_cancel_runs.argtypes = (c_void_p, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_cancel_runs.restype = c_int
+        lib.pestpp_release_workers.argtypes = (c_void_p, POINTER(c_int), c_int, POINTER(c_int))
+        lib.pestpp_release_workers.restype = c_int
         lib.pestpp_get_worker_count.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_get_worker_count.restype = c_int
         lib.pestpp_get_worker_state.argtypes = (
@@ -989,6 +991,24 @@ class PestppLib:
         n = c_int()
         self._check(self.lib.pestpp_cancel_runs(self.handle, arr, len(run_ids), byref(n)),
                     "pestpp_cancel_runs")
+        return n.value
+
+    def release_workers(self, worker_idxs: list[int] | None = None) -> int:
+        """Hand workers back. None (or an empty list) releases every one.
+
+        A worker holding a run is released too and its run is rescheduled - put back at the
+        front of the queue for someone else - not failed and not cancelled. Returns how many
+        were actually released, which is the authority: asking for eight and getting three is
+        a normal outcome, not an error.
+        """
+        if worker_idxs:
+            arr = (c_int * len(worker_idxs))(*worker_idxs)
+            count = len(worker_idxs)
+        else:
+            arr, count = None, 0
+        n = c_int()
+        self._check(self.lib.pestpp_release_workers(self.handle, arr, count, byref(n)),
+                    "pestpp_release_workers")
         return n.value
 
     def get_worker_count(self) -> int:

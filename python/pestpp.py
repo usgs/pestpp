@@ -27,6 +27,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import time
 import weakref
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
@@ -991,6 +992,47 @@ class _Tool:
     def cancel_runs(self, run_ids) -> int:
         """Give up on these runs. Returns how many were actually cancelled."""
         return self._lib.cancel_runs(list(run_ids))
+
+    def release_workers(self, worker_idxs=None, reap_timeout: float = 5.0) -> int:
+        """Hand workers back so their compute can go elsewhere. Returns how many actually went.
+
+        `worker_idxs` are rows of get_workers(); None releases every worker. Releasing is a
+        request, not a command, so the returned count is the authority - asking for eight and
+        getting three is a normal outcome.
+
+        A worker that is MID-RUN is released too, and its run is rescheduled: put back at the
+        front of the queue for another worker to pick up, not failed and not counted against
+        max_n_failure. Use cancel_runs() when the judgement is about the run; use this when it
+        is about the machine.
+
+        Legal from inside a run observer, which is the case that motivates it - watching a
+        batch drain, seeing workers go idle with a couple of runs left, and handing the idle
+        ones back without waiting for the batch to end.
+        """
+        n = self._lib.release_workers(list(worker_idxs) if worker_idxs else None)
+        if n:
+            self._reap_released_workers(n, reap_timeout)
+        return n
+
+    def _reap_released_workers(self, n_released: int, timeout: float) -> None:
+        """Forget worker processes that have exited, so teardown does not chase ghosts.
+
+        There is no mapping from a run-manager worker index to one of OUR subprocesses: agents
+        connect in whatever order they happen to come up, and some of them may not be ours at
+        all. What IS reliable is that a released agent exits, so wait briefly for up to
+        n_released of them to do so and drop the ones that have. Anything still alive stays
+        tracked and is still terminated at teardown - the safe direction to be wrong in.
+
+        Mutates the list IN PLACE: the finalizer registered in __init__ holds this exact list
+        object, so rebinding it would leave teardown working from a stale copy.
+        """
+        deadline = time.monotonic() + max(0.0, timeout)
+        while True:
+            alive = [p for p in self._workers if p.poll() is None]
+            if (len(self._workers) - len(alive) >= n_released) or (time.monotonic() >= deadline):
+                self._workers[:] = alive
+                return
+            time.sleep(0.05)
 
     # -- data ------------------------------------------------------------------------------
 

@@ -788,8 +788,9 @@ typedef int (*pestpp_run_observer_fn)(const pestpp_run_progress* progress, void*
  *
  * 1. The observer is called with the tool's state MID-BATCH. Only the run-management calls
  *    are legal from inside it - pestpp_get_run_states, pestpp_get_run_time_stats,
- *    pestpp_cancel_runs, pestpp_get_worker_*. Anything touching ensembles, phi or options is
- *    refused with PESTPP_INVALID_STATE rather than allowed to read a half-updated ensemble.
+ *    pestpp_cancel_runs, pestpp_release_workers, pestpp_get_worker_*. Anything touching
+ *    ensembles, phi or options is refused with PESTPP_INVALID_STATE rather than allowed to
+ *    read a half-updated ensemble.
  *    That allowlist is exactly what preemption needs, which is why it is a list and not a ban.
  * 2. It is called on the thread that called into the library, never a worker thread.
  * 3. It must not throw across the boundary. One that does is unregistered rather than being
@@ -936,6 +937,20 @@ PESTPP_API pestpp_status pestpp_get_run_states(pestpp_handle h,
    cancelled is written to n_cancelled (a run that already finished cannot be cancelled). */
 PESTPP_API pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids, int n,
                                             int* n_cancelled);
+
+/* Hand workers back so their compute can go elsewhere. Indices address the same ordering
+   pestpp_get_worker_state() uses, so release(idx) frees the worker get_worker_state(idx) just
+   described. Pass worker_idxs=NULL with n=0 to release every worker. The count actually
+   released is written to n_released; asking for 8 and getting 3 is visible rather than silent.
+
+   A BUSY worker is released too, and its run is RESCHEDULED - put back at the front of the
+   queue for another worker to pick up. It is not failed, not cancelled, and nothing is charged
+   against max_n_failure. Use pestpp_cancel_runs() when the judgement is about the run; use
+   this when it is about the machine.
+
+   Legal from inside a run observer, like the other worker calls. PANTHER only. */
+PESTPP_API pestpp_status pestpp_release_workers(pestpp_handle h, const int* worker_idxs, int n,
+                                                int* n_released);
 
 /* Workers. get_worker_count() first, then index 0..n-1. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_worker_count(pestpp_handle h, int* n);

@@ -1465,6 +1465,217 @@ def capi_panther_control_test():
                 pass
 
 
+def capi_panther_release_workers_test():
+    """Releasing a BUSY worker reschedules its run instead of giving up on it.
+
+    This is the whole point of release, and the property that separates it from cancel: the
+    machine goes away, the work does not. So the assertion that matters is not "the worker
+    disappeared" but "the run the worker was holding still finishes, on somebody else, with no
+    failure charged against it".
+
+    Deliberately releases exactly ONE worker while it is mid-run. Releasing all of them would
+    leave the batch with nothing to run on and prove nothing about rescheduling.
+    """
+    wd = _setup("capi_panther_release", noptmax=1, num_reals=8)
+    worker_root = os.path.join(_BENCH, "capi_release_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    n_workers = 3
+    procs = []
+    agent_exe = _find_agent_exe()
+    rel_port = port + 7
+
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=rel_port) as ies:
+            for i in range(n_workers):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(rel_port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+
+            ies.initialize()
+            names = ies.get_ensemble_row_names(PAR_EN)
+            n_queued = ies.queue_runs()
+
+            ies.begin_batch()
+            released, held_run_id, n_before = 0, None, 0
+            deadline = time.time() + 300
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    break
+                if released:
+                    continue
+                # find a worker that is actually holding a run right now
+                n_before = ies.get_worker_count()
+                for i in range(n_before):
+                    w = ies.get_worker_state(i)
+                    if w["current_run_id"] >= 0 and w["state"].lower().startswith("active"):
+                        held_run_id = w["current_run_id"]
+                        released = ies.release_workers([i])
+                        break
+            ies.end_batch()
+
+            assert released == 1, "expected to release exactly one worker, released {0}".format(released)
+            assert held_run_id is not None, "never caught a worker mid-run to release"
+            assert ies.get_worker_count() < n_before, \
+                "worker count did not drop after release: {0} -> {1}".format(
+                    n_before, ies.get_worker_count())
+
+            states = {r["run_id"]: r for r in ies.get_run_states()}
+            held = states[held_run_id]
+            # the point of the whole feature
+            assert held["status"] == "completed", (
+                "the released worker's run ended as '{0}', not completed - release gave up on "
+                "it instead of rescheduling it".format(held["status"]))
+            assert held["n_failures"] == 0, (
+                "release charged {0} failure(s) against run {1}; releasing a worker is not a "
+                "judgement on its run".format(held["n_failures"], held_run_id))
+
+            ies.process_runs()
+            oe, _ = ies.get_ensemble_view(OBS_EN)
+            assert oe.shape[0] == len(names), (
+                "released worker lost a realization: {0} of {1}".format(oe.shape[0], len(names)))
+            assert len(states) == n_queued, (len(states), n_queued)
+    finally:
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
+
+def capi_release_all_then_cancel_test():
+    """Releasing EVERY worker parks the batch; cancelling the rest is what ends it.
+
+    Two separate contracts, and they are easy to conflate:
+
+      - no workers left, runs still outstanding -> the run manager STAYS in the batch. It does
+        not error, does not fail the runs, and does not declare itself finished. The work is
+        still owed, and a worker starting up later can still connect and do it.
+      - the caller cancels the remaining runs -> NOW the batch is over, because nothing is owed
+        any more.
+
+    So "no workers" must never be mistaken for "done". The batch ends when there is no work
+    left, not when there is nobody left to do it.
+    """
+    wd = _setup("capi_release_all", noptmax=1, num_reals=8)
+    worker_root = os.path.join(_BENCH, "capi_release_all_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    n_workers = 2
+    procs = []
+    agent_exe = _find_agent_exe()
+    rel_port = port + 9
+
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=rel_port) as ies:
+            for i in range(n_workers):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(rel_port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+
+            ies.initialize()
+            n_queued = ies.queue_runs()
+            ies.begin_batch()
+
+            # get the batch genuinely under way before pulling the rug
+            done, deadline = False, time.time() + 300
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    done = True
+                    break
+                if ies.get_worker_count() == n_workers and \
+                        ies.get_run_time_stats()["running"] > 0:
+                    break
+            assert not done, "batch finished before any worker could be released"
+
+            released = ies.release_workers()          # all of them
+            assert released == n_workers, (released, n_workers)
+            assert ies.get_worker_count() == 0, ies.get_worker_count()
+
+            # The overdue policy is about a WORKER that is taking too long on a model, not about
+            # wall-clock elapsing while nothing is running. Crank it down to 1.2 seconds now
+            # that there are no workers: if the giveup threshold were being applied to queued
+            # work, everything below would be timed out within a second or two instead of
+            # waiting. Set AFTER the release deliberately - while workers were running, a
+            # threshold this small is supposed to bite.
+            ies.set_option("overdue_giveup_minutes", 0.02)
+            ies.set_option("overdue_giveup_fac", 1.0001)
+
+            # CONTRACT 1: with nobody to run them, the batch stays open.
+            outstanding = [r for r in ies.get_run_states() if r["status"] != "completed"]
+            assert outstanding, "nothing was left outstanding, so this proves nothing"
+            parked_until = time.time() + 15
+            while time.time() < parked_until:
+                assert not ies.run_slice(0.05), (
+                    "run manager reported ALL_DONE with {0} run(s) outstanding and no workers - "
+                    "'nobody left to do it' was mistaken for 'nothing left to do'"
+                    .format(len(outstanding)))
+            still = [r for r in ies.get_run_states() if r["status"] != "completed"]
+            assert len(still) == len(outstanding), (
+                "outstanding runs changed with no workers connected: {0} -> {1}"
+                .format(len(outstanding), len(still)))
+            for r in still:
+                assert r["status"] != "failed", \
+                    "run {0} was failed just because its worker went away".format(r["run_id"])
+                # 15s of waiting against a 1.2s giveup threshold: if the overdue policy applied
+                # to anything other than a worker actively running a model, this would be
+                # timed_out many times over
+                assert r["status"] != "timed_out", (
+                    "run {0} was timed out while NO worker was running it - the overdue policy "
+                    "reached queued work".format(r["run_id"]))
+                # The run the released worker was holding must be back in the need-to-run pile,
+                # not merely "not running": with zero workers connected the only honest status
+                # for outstanding work is QUEUED. Asserting the positive rather than a set of
+                # negatives is what makes this a statement about requeueing.
+                assert r["status"] == "queued", (
+                    "run {0} is '{1}' after its worker was released; it should be back in the "
+                    "queue".format(r["run_id"], r["status"]))
+
+            # CONTRACT 2: cancel what is left and the batch ends.
+            n_cancelled = ies.cancel_runs([r["run_id"] for r in still])
+            assert n_cancelled == len(still), (n_cancelled, len(still))
+            ended, deadline = False, time.time() + 60
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    ended = True
+                    break
+            assert ended, "batch did not end after every remaining run was cancelled"
+            ies.end_batch()
+
+            states = ies.get_run_states()
+            assert len(states) == n_queued, (len(states), n_queued)
+            assert set(r["status"] for r in states) <= {"completed", "cancelled"}, \
+                set(r["status"] for r in states)
+    finally:
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
+
+def capi_release_workers_refused_serial_test():
+    """Release is a PANTHER call, and the serial manager says so rather than pretending."""
+    wd = _setup("capi_release_serial")
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, run_manager=RM_SERIAL) as ies:
+        assert not ies.supports_live_control(), "serial manager claimed live control"
+        try:
+            ies.release_workers()
+        except PestppError as e:
+            assert "panther" in str(e).lower(), \
+                "refusal should say it needs a panther master, got: {0}".format(e)
+        else:
+            raise AssertionError("serial run manager accepted release_workers()")
+
+
 def capi_service_runs_yourself_test():
     """The caller writes the queued runs' results back - no run manager evaluates them.
 
@@ -1590,6 +1801,9 @@ if __name__ == "__main__":
     capi_tool_ensemble_availability_test()
     capi_run_storage_read_test()
     capi_panther_control_test()
+    capi_panther_release_workers_test()
+    capi_release_all_then_cancel_test()
+    capi_release_workers_refused_serial_test()
     capi_partial_results_test()
     capi_service_runs_yourself_test()
     capi_service_runs_failure_test()

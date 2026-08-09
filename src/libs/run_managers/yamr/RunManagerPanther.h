@@ -244,7 +244,22 @@ public:
 	const std::set<int>& get_cancelled_run_ids() const { return user_cancelled_runs; }
 	bool run_was_abandoned(int run_id) const override
 	{ return user_cancelled_runs.find(run_id) != user_cancelled_runs.end(); }
-	
+
+	/// Hand workers back so their compute can go elsewhere. Indices address the same ordering
+	/// get_worker_states() returns; an EMPTY vector means every connected worker. Returns how
+	/// many were actually released.
+	///
+	/// A BUSY worker is released too, and its run goes back to the FRONT of the queue for
+	/// another worker to pick up. The run is NOT failed, NOT cancelled, and nothing is charged
+	/// against max_n_failure - releasing a worker is a statement about the machine, not a
+	/// judgement on the run it happened to be holding. Contrast cancel_runs(), which is the
+	/// judgement on the run and deliberately keeps it from being requeued.
+	///
+	/// Release is only meaningful while a batch is in flight; between batches there is nothing
+	/// running to reschedule, but idle workers are still released.
+	int release_workers(const std::vector<int>& worker_idxs);
+	int release_worker(int worker_idx) { return release_workers(std::vector<int>{ worker_idx }); }
+
 private:
 	std::string port;
 	static const int BACKLOG;
@@ -321,6 +336,9 @@ private:
 	void kill_run(list<AgentInfoRec>::iterator agent_info_iter, const std::string &reason="UNKNOWN");
 	void kill_runs(int run_id, bool update_failure_map, const std::string &reason = "UNKNOWN");
 	void kill_all_active_runs();
+	/// The body of release_workers(), with no idle-thread handshake. Call only with the idle
+	/// thread parked - release_workers() is what decides whether it needs parking.
+	int release_workers_unlocked(const std::vector<int>& worker_idxs);
 	void close_agent(int i_sock);
 	void close_agent(list<AgentInfoRec>::iterator agent_info_iter);
 

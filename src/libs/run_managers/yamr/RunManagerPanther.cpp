@@ -3310,3 +3310,95 @@ int RunManagerPanther::cancel_runs(const vector<int>& run_ids)
 	}
 	return n_cancelled;
 }
+
+int RunManagerPanther::release_workers(const vector<int>& worker_idxs)
+{
+	// BETWEEN batches the idle thread owns these containers: run_idle_async() calls
+	// init_agents(), listen() and ping(), any of which can add or erase an agent, and ping()
+	// can close one outright. Releasing from this thread at the same time is a data race that
+	// shows up as socket_to_iter_map.at() throwing out_of_range from close_agent() - on the
+	// idle thread, where nothing catches it, so the process aborts.
+	//
+	// pause_idle()/resume_idle() is the handshake the scheduling loop already uses for exactly
+	// this. Resume ONLY if we paused: called from inside a run observer the batch is in flight,
+	// the idle thread is already parked, and resuming would restart pings mid-schedule.
+	bool pause_needed = (idle_thread != nullptr) && currently_idle.get();
+	if (pause_needed)
+		pause_idle();
+
+	int n_released = release_workers_unlocked(worker_idxs);
+
+	if (pause_needed)
+		resume_idle();
+	return n_released;
+}
+
+int RunManagerPanther::release_workers_unlocked(const vector<int>& worker_idxs)
+{
+	// Resolve every index to a socket BEFORE releasing anything. close_agent() erases from
+	// agent_info_set, so positional indices resolved as we go would slide onto the wrong
+	// worker the moment the first one is released.
+	vector<int> socks;
+	if (worker_idxs.empty())
+	{
+		for (auto& agent : agent_info_set)
+			socks.push_back(agent.get_socket_fd());
+	}
+	else
+	{
+		vector<int> ordered;   // same ordering get_worker_states() reports
+		for (auto& agent : agent_info_set)
+			ordered.push_back(agent.get_socket_fd());
+		set<int> seen;
+		for (int idx : worker_idxs)
+		{
+			if ((idx < 0) || (idx >= (int)ordered.size()))
+				continue;      // out of range is skipped, not fatal: the caller learns from the count
+			if (!seen.insert(idx).second)
+				continue;      // the same index twice must not release two different workers
+			socks.push_back(ordered[idx]);
+		}
+	}
+
+	int n_released = 0;
+	for (int i_sock : socks)
+	{
+		auto sock_iter = socket_to_iter_map.find(i_sock);
+		if (sock_iter == socket_to_iter_map.end())
+			continue;
+		list<AgentInfoRec>::iterator agent_info_iter = sock_iter->second;
+		int run_id = agent_info_iter->get_run_id();
+		bool was_running = (agent_info_iter->get_state() == AgentInfoRec::State::ACTIVE);
+
+		stringstream ss;
+		ss << "releasing agent: " << agent_info_iter->get_hostname() << ":"
+			<< agent_info_iter->get_port();
+		if (was_running)
+			ss << ", rescheduling its run_id:" << run_id;
+		report(ss.str(), false);
+
+		// Ask the agent to stop rather than just dropping the socket. An agent started with
+		// panther_agent_restart_on_error treats a vanished master as an error and RECONNECTS
+		// (PantherAgent::terminate_or_restart), so a bare close would hand back a worker that
+		// immediately comes home again. TERMINATE is honoured both while idle and mid-run, and
+		// mid-run it also stops the model thread instead of orphaning it.
+		try
+		{
+			NetPackage netpack(NetPackage::PackType::TERMINATE, 0, 0, "");
+			char data;
+			netpack.send(i_sock, &data, 0);
+		}
+		catch (...)
+		{
+			// A worker that has already gone away still counts as released - the point is that
+			// it is no longer ours, and close_agent() below reschedules its run either way.
+		}
+
+		// close_agent() puts an ACTIVE run back on the FRONT of waiting_runs and records no
+		// failure against it, which is exactly what release means: the machine goes, the work
+		// does not.
+		close_agent(i_sock);
+		n_released++;
+	}
+	return n_released;
+}
