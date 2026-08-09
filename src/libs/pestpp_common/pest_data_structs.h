@@ -1215,7 +1215,15 @@ void portable_shuffle(std::vector<T>& vals, std::mt19937& rand_gen)
 {
 	for (size_t i = vals.size(); i > 1; --i)
 	{
-		int j = uniform_int_draws(1, 0, (int)i - 1, rand_gen)[0];
+		// The draw is inlined rather than calling uniform_int_draws(1, 0, i-1, rand_gen),
+		// which returns a std::vector BY VALUE: shuffling an n-element vector then costs n
+		// heap allocations, and this sits inside mou's innermost generator loops. A profile
+		// of a stuck pestpp-mou showed the allocation, not the algorithm, dominating.
+		//
+		// Bit-identical to that call by construction - it computes
+		// (rand_gen() % (upper - lower + 1)) + lower, which with lower=0, upper=i-1 is
+		// exactly rand_gen() % i - so permutations, and therefore results, do not change.
+		int j = (int)(rand_gen() % (unsigned int)i);
 		std::swap(vals[i - 1], vals[(size_t)j]);
 	}
 }

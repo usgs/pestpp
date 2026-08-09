@@ -666,7 +666,7 @@ def secondary_marker_test():
 
 def sen_basic_test():
     model_d = "sen_invest"
-    t_d = scratch_template(os.path.join(model_d, "template"))
+    t_d = os.path.join(model_d, "template")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
@@ -2014,7 +2014,7 @@ def large_fake_test():
     if os.path.exists(root_d):
         shutil.rmtree(root_d)
     os.makedirs(root_d)
-    t_d = scratch_template(os.path.join(root_d,"template"))
+    t_d = os.path.join(root_d,"template")
     os.makedirs(t_d)
 
     npar = 10000

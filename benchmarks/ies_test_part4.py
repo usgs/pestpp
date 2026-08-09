@@ -1036,7 +1036,7 @@ def multimodal_test():
     # can be "circle" or "h"
     func = "circle"
     model_d = "mm1"
-    test_d = scratch_template(os.path.join(model_d, "template"))
+    test_d = os.path.join(model_d, "template")
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     os.makedirs(test_d)
@@ -1393,7 +1393,7 @@ def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, phi_weight_li
         phi_weight_list = [0.0,0.25, 0.5, 0.75,1.0]
 
     model_d = "mm_beta_exp"
-    test_d = scratch_template(os.path.join(model_d, "template"))
+    test_d = os.path.join(model_d, "template")
     if os.path.exists(model_d):
         shutil.rmtree(model_d)
     os.makedirs(test_d)
@@ -3393,7 +3393,7 @@ def poly_n_iter_mean_invest(b_d="poly",use_ineq=False,n_iter_mean=3):
     if os.path.exists(b_d):
         shutil.rmtree(b_d)
     os.makedirs(b_d)
-    t_d = scratch_template(os.path.join(b_d,"template"))
+    t_d = os.path.join(b_d,"template")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
@@ -3673,7 +3673,7 @@ def hosaki_invest(b_d="hosaki",use_ineq=False,n_iter_mean=3,bad_phi_sigma=None):
     #os.makedirs(b_d)
     if not os.path.exists(b_d):
         os.makedirs(b_d)
-    t_d = scratch_template(os.path.join(b_d,"template"))
+    t_d = os.path.join(b_d,"template")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
@@ -5325,7 +5325,7 @@ def chenoliver_test():
     
     
 def large_invest():
-    t_d = scratch_template(os.path.join("temp","template"))
+    t_d = os.path.join("temp","template")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)

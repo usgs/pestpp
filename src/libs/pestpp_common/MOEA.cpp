@@ -3110,7 +3110,13 @@ int MOEA::initialize_prepare()
 	member_count = 0;
 
 	warn_min_members = 20;
-	error_min_members = 4;
+	// 5, not 4: at exactly 4 the generators cannot make progress. selection() can only supply
+	// n-1 distinct members under tournament mating - a pass needs two unselected members but
+	// adds one - so a population of 4 cannot yield the 4 distinct parents the differential
+	// evolution generator asks for, and it retries without ever accepting a candidate. That is
+	// what hung pestpp-mou on CI for 82 minutes rather than failing. Below this we already say
+	// "too few members to continue"; 4 belongs on that side of the line.
+	error_min_members = 5;
 
 	initialize_population_schedule();
 
@@ -6261,8 +6267,35 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 	set<int> selected_members;
 	string s1, s2;
 	int tries = 0;
-	while (selected_members.size() < num_to_select)
+
+	// How many DISTINCT members this population can actually supply.
+	//
+	// A pass needs TWO unselected members to do anything - p1 and p2 must both be fresh, and
+	// the shuffle makes them distinct - but the tournament path only ever adds ONE of them.
+	// So once a single unselected member is left, no pass can proceed: asking for N distinct
+	// from a population of N never returns. That is not hypothetical, it hung pestpp-mou for
+	// 82 minutes on CI - a population of exactly 4, which error_min_members permits, with
+	// num_to_select == 4 - and it would have run forever.
+	//
+	// A population of 1 is worse still: working_count[1] below is then an out-of-bounds read.
+	int n_members = (int)member_count.size();
+	int n_distinct = (_mattype == MouMateType::TOURNAMENT)
+		? min(num_to_select, n_members - 1)   // tournament tops out one short of the population
+		: min(num_to_select, n_members);
+	if (n_members < 2)
+		n_distinct = 0;                       // nothing to hold a tournament between
+	n_distinct = max(n_distinct, 0);
+
+	while ((int)selected_members.size() < n_distinct)
 	{
+		// FIRST, not last. This used to sit at the bottom of the loop, below two `continue`s,
+		// so on the one path that actually spins - both draws already selected - it was never
+		// reached and the guard could not fire. A bound that the stuck case skips is not a
+		// bound.
+		tries++;
+		if (tries > 1000000000)
+			throw_moea_error("selection process appears to be stuck in an infinite loop...");
+
 		working_count = member_count;//copy member count index to working count
 		// sampled with replacement
 		portable_shuffle(working_count, rand_gen); //randomly shuffle working count
@@ -6285,7 +6318,7 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 		else if (_mattype == MouMateType::RANDOM)
 		{
 			selected_members.emplace(p1_idx);
-			if (selected_members.size() == num_to_select)
+			if ((int)selected_members.size() == n_distinct)
 				break;
 			selected_members.emplace(p2_idx);
 		}
@@ -6293,11 +6326,22 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 		{
 			throw_moea_error("selector error: unrecognized MouMatingType, should be 'random' or 'tournament'");
 		}
-		tries++;
-		if (tries > 1000000000)
-			throw_moea_error("selection process appears to be stuck in an infinite loop...");
 	}
 	vector<int> members(selected_members.begin(), selected_members.end());
+
+	// Callers index selected[0..num_to_select-1] unconditionally, so the contract is a
+	// fixed-LENGTH result - clamping the count alone would just move the hang to an
+	// out-of-bounds read. Where the population cannot supply that many distinct members, pad
+	// by sampling from the ones it did supply, with replacement, which is what the comment
+	// above has always claimed this does. A repeated parent gives the DE generator a zero
+	// difference term, and its own (x - y) check already treats that as a candidate to skip.
+	while ((int)members.size() < num_to_select)
+	{
+		if (members.empty())
+			members.push_back(0);             // degenerate: a single-member population
+		else
+			members.push_back(members[uniform_int_draws(1, 0, (int)members.size() - 1, rand_gen)[0]]);
+	}
 	return members;
 }
 
