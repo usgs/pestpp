@@ -336,17 +336,53 @@ private:
 	void kill_run(list<AgentInfoRec>::iterator agent_info_iter, const std::string &reason="UNKNOWN");
 	void kill_runs(int run_id, bool update_failure_map, const std::string &reason = "UNKNOWN");
 	void kill_all_active_runs();
-	/// The body of release_workers(), with no idle-thread handshake. Call only with the idle
-	/// thread parked - release_workers() is what decides whether it needs parking.
-	int release_workers_unlocked(const std::vector<int>& worker_idxs);
 	void close_agent(int i_sock);
 	void close_agent(list<AgentInfoRec>::iterator agent_info_iter);
 
 	void run_idle_async();
 	void start_run_idle_async();
 	void end_run_idle_async();
-	void pause_idle();
-	void resume_idle();
+	/// report_it=false for the short pauses taken by query/control calls: those can be polled
+	/// in a loop, and a line per pause would bury the .rmr file in noise.
+	void pause_idle(bool report_it = true);
+	void resume_idle(bool report_it = true);
+
+	/// Parks the idle thread for as long as this object lives.
+	///
+	/// BETWEEN batches run_idle_async() owns agent_info_set, socket_to_iter_map and
+	/// active_runid_to_iterset_map - it calls init_agents(), listen() and ping(), and ping()
+	/// closes agents outright. Nothing locks those containers; the only coordination in this
+	/// class is the currently_idle/idling handshake, so anything that reads or writes them from
+	/// another thread has to take it. Getting it wrong aborts the process rather than failing:
+	/// the throw lands on the idle thread, whose handler rethrows, and an exception leaving a
+	/// std::thread entry point is std::terminate().
+	///
+	/// Three cases where it must NOT pause, all of them silent bugs if missed:
+	///   - no idle thread exists, so resuming would START one that was never meant to run;
+	///   - the caller IS the idle thread (listen() -> process_message() -> cancel_runs()), so
+	///     waiting for `idling` to clear would wait on a flag only this thread can clear;
+	///   - the thread is already parked because a batch is in flight, so resuming would restart
+	///     pings mid-schedule.
+	class ScopedIdlePause
+	{
+	public:
+		explicit ScopedIdlePause(RunManagerPanther& _rm) : rm(_rm), paused(false)
+		{
+			if ((rm.idle_thread != nullptr)
+				&& (rm.idle_thread->get_id() != std::this_thread::get_id())
+				&& rm.currently_idle.get())
+			{
+				rm.pause_idle(false);
+				paused = true;
+			}
+		}
+		~ScopedIdlePause() { if (paused) rm.resume_idle(false); }
+		ScopedIdlePause(const ScopedIdlePause&) = delete;
+		ScopedIdlePause& operator=(const ScopedIdlePause&) = delete;
+	private:
+		RunManagerPanther& rm;
+		bool paused;
+	};
     int get_current_sleep_timeout_milliseconds(const int org_timeout_milliseconds);
 
     std::ofstream &f_rmr;

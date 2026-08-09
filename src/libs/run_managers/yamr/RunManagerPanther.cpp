@@ -1208,7 +1208,7 @@ void RunManagerPanther::end_run_idle_async()
 /**
  * @brief Pause idle.
  */
-void RunManagerPanther::pause_idle()
+void RunManagerPanther::pause_idle(bool report_it)
 {
 	if(!idle_thread)
 	{
@@ -1235,7 +1235,8 @@ void RunManagerPanther::pause_idle()
 		w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 	}
 
-	report("Panther idle ping thread paused prior to scheduling runs.", false);
+	if (report_it)
+		report("Panther idle ping thread paused prior to scheduling runs.", false);
 	if(timed_out)
 	{
 		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
@@ -1246,7 +1247,7 @@ void RunManagerPanther::pause_idle()
 /**
  * @brief Resume idle.
  */
-void RunManagerPanther::resume_idle()
+void RunManagerPanther::resume_idle(bool report_it)
 {
 	// Start up the thread if it has not already been started
 	start_run_idle_async();
@@ -1255,7 +1256,8 @@ void RunManagerPanther::resume_idle()
 	currently_idle.set(true);
 
 	// Don't bother waiting for acknowledgement here, as none of the management code relies on it; we can happily go off and do other processing while the thread gets around to resuming idle pings
-	report("Panther idle ping thread resumed.", false);
+	if (report_it)
+		report("Panther idle ping thread resumed.", false);
 }
 
 /**
@@ -3251,6 +3253,9 @@ vector<PantherRunState> RunManagerPanther::get_run_states()
  */
 vector<PantherWorkerState> RunManagerPanther::get_worker_states()
 {
+	// Reads agent_info_set, which the idle thread adds to and erases from between batches.
+	// Cheap to be right about: a reader that loses this race walks an erased list node.
+	ScopedIdlePause idle_guard(*this);
 	vector<PantherWorkerState> states;
 	for (auto& agent : agent_info_set)
 	{
@@ -3284,6 +3289,11 @@ vector<PantherWorkerState> RunManagerPanther::get_worker_states()
  */
 int RunManagerPanther::cancel_runs(const vector<int>& run_ids)
 {
+	// kill_runs() reaches into the agent containers, so this needs the same handshake as
+	// release_workers(). Note the guard is deliberately a no-op when the caller IS the idle
+	// thread: listen() -> process_message() -> cancel_runs() is a real path (mid-run screening
+	// abandons a run from there), and pausing from inside the idle thread would stall it.
+	ScopedIdlePause idle_guard(*this);
 	int n_cancelled = 0;
 	for (int run_id : run_ids)
 	{
@@ -3313,28 +3323,10 @@ int RunManagerPanther::cancel_runs(const vector<int>& run_ids)
 
 int RunManagerPanther::release_workers(const vector<int>& worker_idxs)
 {
-	// BETWEEN batches the idle thread owns these containers: run_idle_async() calls
-	// init_agents(), listen() and ping(), any of which can add or erase an agent, and ping()
-	// can close one outright. Releasing from this thread at the same time is a data race that
-	// shows up as socket_to_iter_map.at() throwing out_of_range from close_agent() - on the
-	// idle thread, where nothing catches it, so the process aborts.
-	//
-	// pause_idle()/resume_idle() is the handshake the scheduling loop already uses for exactly
-	// this. Resume ONLY if we paused: called from inside a run observer the batch is in flight,
-	// the idle thread is already parked, and resuming would restart pings mid-schedule.
-	bool pause_needed = (idle_thread != nullptr) && currently_idle.get();
-	if (pause_needed)
-		pause_idle();
+	// Park the idle thread: this closes sockets and erases agents, which is exactly what
+	// run_idle_async() is doing between batches. See ScopedIdlePause.
+	ScopedIdlePause idle_guard(*this);
 
-	int n_released = release_workers_unlocked(worker_idxs);
-
-	if (pause_needed)
-		resume_idle();
-	return n_released;
-}
-
-int RunManagerPanther::release_workers_unlocked(const vector<int>& worker_idxs)
-{
 	// Resolve every index to a socket BEFORE releasing anything. close_agent() erases from
 	// agent_info_set, so positional indices resolved as we go would slide onto the wrong
 	// worker the moment the first one is released.
