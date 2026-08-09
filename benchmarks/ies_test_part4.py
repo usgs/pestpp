@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pyemu
 
 
+from fixture_utils import scratch_template
 # the old path system before moving to separate benchmarks repo
 # intel = False
 # if "windows" in platform.platform().lower():
@@ -317,7 +318,7 @@ def freyberg_aal_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_aal_test")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     m = flopy.modflow.Modflow.load("freyberg.nam", model_ws=template_d, load_only=[], check=False)
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
@@ -359,7 +360,7 @@ def freyberg_combined_aal_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_combined_aal_test")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     m = flopy.modflow.Modflow.load("freyberg.nam", model_ws=template_d, load_only=[], check=False)
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
@@ -453,7 +454,7 @@ def freyberg_aal_invest():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_aal_glm_jco")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     jco_file = os.path.join(test_d, "pest_aal_jco.jcb")
     if not os.path.exists(jco_file):
         pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
@@ -688,7 +689,7 @@ def freyberg_svd_draws_invest():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_svd_draws_test")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     m = flopy.modflow.Modflow.load("freyberg.nam", model_ws=template_d, load_only=[], check=False)
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
@@ -724,7 +725,7 @@ def freyberg_center_on_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_center_on1")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     # print("loading pst")
@@ -769,7 +770,7 @@ def freyberg_pdc_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_pdc")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     # print("loading pst")
@@ -799,7 +800,7 @@ def freyberg_rcov_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_rcov")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     # print("loading pst")
@@ -1035,7 +1036,7 @@ def multimodal_test():
     # can be "circle" or "h"
     func = "circle"
     model_d = "mm1"
-    test_d = os.path.join(model_d, "template")
+    test_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     os.makedirs(test_d)
@@ -1392,7 +1393,7 @@ def mm_weight_beta_experiment(num_reals_list=None, beta_list=None, phi_weight_li
         phi_weight_list = [0.0,0.25, 0.5, 0.75,1.0]
 
     model_d = "mm_beta_exp"
-    test_d = os.path.join(model_d, "template")
+    test_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(model_d):
         shutil.rmtree(model_d)
     os.makedirs(test_d)
@@ -3106,7 +3107,7 @@ def tenpar_mean_iter_sched_phifac_test():
 def twopar_freyberg_resp_surface_invest():
     model_d = "twopar_freyberg"
     resp_d = os.path.join(model_d, "master_resp_surface")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst_path = os.path.join(template_d,"freyberg.pst")
     pst = pyemu.Pst(pst_path)
     # if os.path.exists(resp_d):
@@ -3160,7 +3161,7 @@ def twopar_freyberg_resp_surface_invest():
 def plot_twopar_resp_results():
     model_d = "twopar_freyberg"
     resp_d = os.path.join(model_d, "master_resp_surface")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst_path = os.path.join(template_d,"freyberg.pst")
     pst = pyemu.Pst(pst_path)
     #m_ds = [os.path.join(model_d,d) for d in os.listdir(model_d) if os.path.isdir(os.path.join(model_d,d)) and d.startswith("master") and "resp" not in d]
@@ -3392,7 +3393,7 @@ def poly_n_iter_mean_invest(b_d="poly",use_ineq=False,n_iter_mean=3):
     if os.path.exists(b_d):
         shutil.rmtree(b_d)
     os.makedirs(b_d)
-    t_d = os.path.join(b_d,"template")
+    t_d = scratch_template(os.path.join(b_d,"template"))
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
@@ -3672,7 +3673,7 @@ def hosaki_invest(b_d="hosaki",use_ineq=False,n_iter_mean=3,bad_phi_sigma=None):
     #os.makedirs(b_d)
     if not os.path.exists(b_d):
         os.makedirs(b_d)
-    t_d = os.path.join(b_d,"template")
+    t_d = scratch_template(os.path.join(b_d,"template"))
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
@@ -4249,7 +4250,7 @@ def freyberg_mean_invest():
     import flopy
     model_d = "ies_freyberg"
     
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     # print("loading pst")
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     pst.pestpp_options = {"ies_num_reals": 30}
@@ -4283,7 +4284,7 @@ def freyberg_stacked_pe_invest():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_stacked_pe")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     # print("loading pst")
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     pst.pestpp_options = {"ies_num_reals": 100}
@@ -4467,7 +4468,7 @@ def tenpar_reg_factor_test():
 def freyberg_regfac_invest():
     import flopy
     model_d = "ies_freyberg"
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     #reg_factors = np.arange(-2.0,-0.01,0.1)
@@ -4694,7 +4695,7 @@ def tenpar_relaxation_invest():
 def freyberg_relaxation_invest():
     import flopy
     model_d = "ies_freyberg"
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     #reg_factors = np.arange(-2.0,-0.01,0.1)
@@ -5324,7 +5325,7 @@ def chenoliver_test():
     
     
 def large_invest():
-    t_d = os.path.join("temp","template")
+    t_d = scratch_template(os.path.join("temp","template"))
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)

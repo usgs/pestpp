@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import pyemu
 
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
@@ -508,8 +509,7 @@ def invest():
 def eval_synth():
     model_d = "ies_synth"
     test_d = os.path.join(model_d,"master")
-    template_d = os.path.join(model_d,"template")
-
+    template_d = scratch_template(os.path.join(model_d,"template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     print("loading pst")
@@ -532,8 +532,7 @@ def test_chenoliver():
     """chen and oliver test"""
     model_d = "ies_chenoliver"
     test_d = os.path.join(model_d,"master1")
-    template_d = os.path.join(model_d,"template")
-
+    template_d = scratch_template(os.path.join(model_d,"template"))
     # build the prior cov matrix
     x = np.zeros((1,1)) + 0.5
     cov = pyemu.Cov(x=x,names=["par"])
@@ -677,8 +676,7 @@ def eval_kirishima():
 
     model_d = "ies_kirishima"
     test_d = os.path.join(model_d, "master")
-    template_d = os.path.join(model_d, "template")
-
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     print("loading pst")
@@ -703,8 +701,7 @@ def test_freyberg_ineq():
     """freyberg ineq test"""
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_ineq")
-    template_d = os.path.join(model_d, "template")
-
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     print("loading pst")
@@ -745,7 +742,7 @@ def tenpar_fixed_test2():
     """tenpar fixed test 2"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_fixed2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     pst.control_data.noptmax = 1
     if os.path.exists(test_d):
@@ -802,7 +799,7 @@ def tenpar_fixed_test3():
     """tenpar fixed test 2"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_fixed3")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     pst.control_data.noptmax = 2
     if os.path.exists(test_d):
@@ -863,7 +860,7 @@ def tenpar_fixed_test3():
         prev = oe.loc[:,"k_01"].values
 
     test_d = os.path.join(model_d, "master_fixed3")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     pst.control_data.noptmax = 2
     if os.path.exists(test_d):
@@ -935,7 +932,7 @@ def tenpar_fixed_test():
     """tenpar fixed test"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_fixed")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     pst.parameter_data.loc[:, "partrans"] = "log"
     pst.control_data.noptmax = 1
@@ -1046,7 +1043,7 @@ def tenpar_tight_tol_test():
     """tenpar tight tol test"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_tighttol")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     
     if os.path.exists(test_d):
@@ -1071,7 +1068,7 @@ def tenpar_weight_pareto():
 
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_weight_pareto")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d,"pest.pst"))
     
     #if os.path.exists(test_d):
@@ -1172,7 +1169,7 @@ def setup_rosenbrock():
     if not os.path.exists(test_d):
         os.mkdir(test_d)
 
-    template_d = os.path.join(test_d,"template")
+    template_d = scratch_template(os.path.join(test_d,"template"))
     if os.path.exists(template_d):
         shutil.rmtree(template_d)
     os.mkdir(template_d)
@@ -1388,7 +1385,7 @@ def tenpar_incr_num_reals_test():
     """tenpar incr num reals test"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_incr_num_reals2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 10
     if os.path.exists(test_d):
@@ -1421,7 +1418,7 @@ def tenpar_subset_how_test():
     """tenpar subet how"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_subset_how")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 10
     if os.path.exists(test_d):
@@ -1574,7 +1571,7 @@ def tenpar_localizer_test3():
 def tenpar_restart_similar_test():
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_similar_base")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -1635,7 +1632,7 @@ def tenpar_restart_similar_test():
 def tenpar_restart_similar_test2():
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_similar_base2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):

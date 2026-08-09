@@ -8,6 +8,7 @@ import pandas as pd
 import platform
 import pyemu
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 plat = "unknown"
 if "linux" in platform.platform().lower():
@@ -51,7 +52,7 @@ port = 4021
 
 def nonascii_path_test(model_d="ies_10par_xsec"):
     pyemu.Ensemble.reseed()
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template_\u0187")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -104,7 +105,7 @@ def nonascii_path_test(model_d="ies_10par_xsec"):
 
 def basic_test(model_d="ies_10par_xsec"):
     pyemu.Ensemble.reseed()
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -235,7 +236,7 @@ def basic_test(model_d="ies_10par_xsec"):
 def glm_save_binary_test():
     model_d = "ies_10par_xsec"
 
-    t_d = os.path.join(model_d, "template")
+    t_d = scratch_template(os.path.join(model_d, "template"))
     m_d = os.path.join(model_d, "master_save_binary")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -251,7 +252,7 @@ def glm_save_binary_test():
 
 def sweep_forgive_test():
     model_d = "ies_10par_xsec"
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_sweep_forgive")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -286,7 +287,7 @@ def sweep_forgive_test():
 def inv_regul_test():
     model_d = "ies_10par_xsec"
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_inv_regul")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -304,7 +305,7 @@ def inv_regul_test():
 def tie_by_group_test():
     model_d = "ies_10par_xsec"
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_tie_by_group")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -428,7 +429,7 @@ def tie_by_group_test():
 def unc_file_test():
     model_d = "ies_10par_xsec"
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_uncfile")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -491,7 +492,7 @@ def unc_file_test():
 def parchglim_test():
     model_d = "ies_10par_xsec"
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_parchglim")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -606,7 +607,7 @@ def sen_plusplus_test():
     model_d = "ies_10par_xsec"
 
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_sen_plusplus")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -623,7 +624,7 @@ def sen_plusplus_test():
                            worker_root=model_d,port=port)
 
 def secondary_marker_test():
-    t_d = os.path.join("secondary_marker_test","template")
+    t_d = scratch_template(os.path.join("secondary_marker_test","template"))
     tpl_file = os.path.join(t_d,"par.dat.tpl")
 
     with open(tpl_file,'w') as f:
@@ -665,7 +666,7 @@ def secondary_marker_test():
 
 def sen_basic_test():
     model_d = "sen_invest"
-    t_d = os.path.join(model_d, "template")
+    t_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
@@ -916,7 +917,7 @@ def tplins1_test():
 def ext_stdcol_test():
     model_d = "ies_10par_xsec"
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_ext_stdcol")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -985,7 +986,7 @@ def ext_stdcol_test():
 def mf6_v5_ies_test():
     model_d = "mf6_freyberg"
 
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_ies_glm_loc")
     #if os.path.exists(m_d):
     #    shutil.rmtree(m_d)
@@ -1170,7 +1171,7 @@ def mf6_v5_sen_test():
 
     model_d = "mf6_freyberg"
 
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_sen")
     if os.path.exists(m_d):
        shutil.rmtree(m_d)
@@ -1214,7 +1215,7 @@ def mf6_v5_sen_test():
 def mf6_v5_opt_stack_test():
     model_d = "mf6_freyberg"
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_opt_stack")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -1232,7 +1233,7 @@ def mf6_v5_glm_test():
     model_d = "mf6_freyberg"
     
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_glm")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -1256,7 +1257,7 @@ def cmdline_test():
     model_d = "mf6_freyberg"
 
     
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     pst_name = "freyberg6_run_glm.pst"
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
     pst.pestpp_options = {}
@@ -1294,7 +1295,7 @@ def cmdline_test():
     
 def fr_fail_test():
     model_d = "ies_10par_xsec"
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -1342,7 +1343,7 @@ def sen_grp_test():
     
     model_d = "ies_10par_xsec"
 
-    t_d = os.path.join(model_d, "template")
+    t_d = scratch_template(os.path.join(model_d, "template"))
     m_d = os.path.join(model_d, "master_sen_group")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -1365,7 +1366,7 @@ def sen_grp_test():
 def agnostic_path_test():
     model_d = "ies_10par_xsec"
 
-    t_d = os.path.join(model_d, "template")
+    t_d = scratch_template(os.path.join(model_d, "template"))
     m_d = os.path.join(model_d, "test_path")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -1385,7 +1386,7 @@ def agnostic_path_test():
 
 def fr_timeout_test():
     model_d = "ies_10par_xsec"
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -1494,7 +1495,7 @@ def ins_missing_e_test():
 
 def prep_ends():
     model_d = "mf6_freyberg"
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "ends")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -1578,7 +1579,7 @@ def build_and_draw_prior(t_d="ends",num_reals=500):
 
 def run():
     model_d = "mf6_freyberg"
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     pst_name = "freyberg6_run_ies_glm_noloc_standard.pst"
     pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=15,
                                  worker_root=model_d, port=4004)
@@ -1586,7 +1587,7 @@ def run():
 def sweep_bin_test():
 
     model_d = "ies_10par_xsec"
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_sweep_bin")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -1654,7 +1655,7 @@ def sweep_bin_test():
 def tenpar_collapse_invest():
     model_d = "ies_10par_xsec"
     pyemu.Ensemble.reseed()
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -1909,7 +1910,7 @@ def plot_collapse_invest():
 def tenpar_uniform_invest():
     model_d = "ies_10par_xsec"
     pyemu.Ensemble.reseed()
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template_geo")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -1963,7 +1964,7 @@ def tenpar_uniform_invest():
 def sweep_large_xfer_test():
 
     model_d = "ies_10par_xsec"
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_sweep_xfer")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -2013,7 +2014,7 @@ def large_fake_test():
     if os.path.exists(root_d):
         shutil.rmtree(root_d)
     os.makedirs(root_d)
-    t_d = os.path.join(root_d,"template")
+    t_d = scratch_template(os.path.join(root_d,"template"))
     os.makedirs(t_d)
 
     npar = 10000
@@ -2081,7 +2082,7 @@ def large_fake_test():
 def mf6_v5_ies_nonpersistent_test():
     model_d = "mf6_freyberg"
 
-    t_d = os.path.join(model_d,"template")
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_ies_glm_loc")
     #if os.path.exists(m_d):
     #    shutil.rmtree(m_d)
@@ -2146,7 +2147,7 @@ def parse_pst_test():
 def save_failed_runs_test():
     """test that a .rnf file is created when runs fail"""
     model_d = "ies_10par_xsec"
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_save_fails")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -2199,8 +2200,7 @@ def _save_all_runs_case(exe_name, base_d, pst_name, setup_fn, work_suffix):
 
 def save_all_runs_ies_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-ies"""
-    base_d = os.path.join("g07", "template")
-
+    base_d = scratch_template(os.path.join("g07", "template"))
     def setup(pst, d):
         pst.pestpp_options["ies_num_reals"] = 5
 
@@ -2209,20 +2209,19 @@ def save_all_runs_ies_test():
 
 def save_all_runs_glm_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-glm"""
-    base_d = os.path.join("g07", "template")
+    base_d = scratch_template(os.path.join("g07", "template"))
     _save_all_runs_case("pestpp-glm", base_d, "g07.pst", lambda pst, d: None, "glm")
 
 
 def save_all_runs_sen_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-sen"""
-    base_d = os.path.join("g07", "template")
+    base_d = scratch_template(os.path.join("g07", "template"))
     _save_all_runs_case("pestpp-sen", base_d, "g07.pst", lambda pst, d: None, "sen")
 
 
 def save_all_runs_swp_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-swp"""
-    base_d = os.path.join("g07", "template")
-
+    base_d = scratch_template(os.path.join("g07", "template"))
     def setup(pst, d):
         pe = pyemu.ParameterEnsemble.from_uniform_draw(pst, num_reals=6)
         pe.to_csv(os.path.join(d, "sweep_in.csv"))
@@ -2233,14 +2232,13 @@ def save_all_runs_swp_test():
 
 def save_all_runs_sqp_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-sqp"""
-    base_d = os.path.join("g07", "template")
+    base_d = scratch_template(os.path.join("g07", "template"))
     _save_all_runs_case("pestpp-sqp", base_d, "g07.pst", lambda pst, d: None, "sqp")
 
 
 def save_all_runs_opt_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-opt"""
-    base_d = os.path.join("g07", "template")
-
+    base_d = scratch_template(os.path.join("g07", "template"))
     def setup(pst, d):
         # neutral risk (no chance constraints) and zero-weight objective obs
         pst.pestpp_options["opt_risk"] = 0.5
@@ -2252,8 +2250,7 @@ def save_all_runs_opt_test():
 
 def save_all_runs_mou_test():
     """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-mou"""
-    base_d = os.path.join("g07", "template")
-
+    base_d = scratch_template(os.path.join("g07", "template"))
     def setup(pst, d):
         pst.pestpp_options["mou_objectives"] = ["obj"]
         pst.pestpp_options["mou_population_size"] = 10
@@ -2805,7 +2802,7 @@ def basic_xplat_g07_test(base_d=XPLAT_G07_BASE, rtol=1.0e-6, atol=1.0e-8):
     """
     assert os.path.exists(base_d), \
         "no base case at '{0}' - run basic_xplat_g07_setup() on a reference machine first".format(base_d)
-    t_d = os.path.join(base_d, "template")
+    t_d = scratch_template(os.path.join(base_d, "template"))
     cfg = pd.read_csv(os.path.join(base_d, "config.csv")).iloc[0]
     print("g07 cross-platform check vs '{0}' (seed={1}, noptmax={2}, rtol={3}, atol={4})".format(
         base_d, cfg["seed"], cfg["noptmax"], rtol, atol))
@@ -3164,7 +3161,7 @@ def preemption_screening_test():
     ies_exe = max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
     agent_exe = ies_exe
 
-    base_t = os.path.join("ies_10par_xsec", "template")
+    base_t = scratch_template(os.path.join("ies_10par_xsec", "template"))
     results = {}
     worker_root = os.path.join("preempt_screen_workers")
 

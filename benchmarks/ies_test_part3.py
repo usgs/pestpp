@@ -8,6 +8,7 @@ import platform
 import matplotlib.pyplot as plt
 import pyemu
 
+from fixture_utils import scratch_template
 tests = """0) 10par_xsec "standard user mode" - draw reals from par-bounds prior and obs noise from weights
 0a) 10par_xsec same as 0) but with multple lambda 
 1) 10par_xsec start with existing par csv and obs csv - using empirical parcov and obscov
@@ -83,7 +84,7 @@ def clues_longnames_test():
     """clue long names tests"""
     model_d = "ies_clues"
     test_d = os.path.join(model_d, "master_longnames")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 10
     if os.path.exists(test_d):
@@ -154,7 +155,7 @@ def freyberg_dist_local_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_dist_local1")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     par = pst.parameter_data
     pt = par.loc[par.partrans=="log","parnme"]
@@ -281,7 +282,7 @@ def freyberg_dist_local_invest():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_dist_local2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     m = flopy.modflow.Modflow.load("freyberg.nam", model_ws=template_d, load_only=[], check=False)
     #if os.path.exists(test_d):
     #   shutil.rmtree(test_d)
@@ -552,7 +553,7 @@ def freyberg_local_threads_test():
     import flopy
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_local_threads")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     m = flopy.modflow.Modflow.load("freyberg.nam",model_ws=template_d,load_only=[],check=False)
     if os.path.exists(test_d):
        shutil.rmtree(test_d)

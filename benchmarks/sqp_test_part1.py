@@ -8,6 +8,7 @@ import pandas as pd
 import platform
 import pyemu
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
@@ -95,7 +96,7 @@ def _run_sqp_serial(w_d, pst_name):
 
 def _prep_freyberg_sqp_pst():
     model_d = "freyberg_sqp"
-    t_d = os.path.join(model_d, "template")
+    t_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(t_d, "freyberg_run_mou.pst"))
 
     for key in ["mou_dv_population_file", "mou_objectives", "mou_population_size",

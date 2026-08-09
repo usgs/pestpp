@@ -7,6 +7,7 @@ import pandas as pd
 import platform
 import pyemu
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
@@ -41,8 +42,7 @@ def basic_sqp_test():
         #prep_for_travis(model_d)
         local=False
     
-    t_d = os.path.join(model_d,"template")
-
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_sqp1")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -238,8 +238,7 @@ def sqp_subset_size_test():
 
 def rosenbrock_setup(version,initial_decvars=1.6,constraints=False,constraint_exp="one_linear"):
     model_d = "rosenbrock"
-    t_d = os.path.join(model_d, "template")
-
+    t_d = scratch_template(os.path.join(model_d, "template"))
     if version == "2par":
         if constraints is True:
             if "two_linear" in constraint_exp:
@@ -432,8 +431,7 @@ def dewater_basic_test():
         #prep_for_travis(model_d)
         local=False
     
-    t_d = os.path.join(model_d,"template")
-
+    t_d = scratch_template(os.path.join(model_d,"template"))
     case = "dewater_pest.base"
     pst = pyemu.Pst(os.path.join(t_d,case+".pst"))
     par = pst.parameter_data
@@ -746,8 +744,8 @@ def plot_rosen(m_d):
 def mf6_phiobs_invest():
     model_d = "mf6_freyberg"
 
-    org_t_d = os.path.join("..","benchmarks",model_d,"template")
-    t_d = os.path.join(model_d,"template")
+    org_t_d = scratch_template(os.path.join("..","benchmarks",model_d,"template"))
+    t_d = scratch_template(os.path.join(model_d,"template"))
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     shutil.copytree(org_t_d,t_d)

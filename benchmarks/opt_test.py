@@ -7,6 +7,7 @@ import pandas as pd
 import pyemu
 
 
+from fixture_utils import scratch_template
 def _get_free_port():
     """Find an available TCP port by letting the OS assign one."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -488,7 +489,7 @@ def run_supply2_test():
 
 def est_res_test():
     worker_d = os.path.join("opt_supply2_chance")
-    t_d = os.path.join(worker_d,"template")
+    t_d = scratch_template(os.path.join(worker_d,"template"))
     m_d = os.path.join(worker_d,"master")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -701,8 +702,7 @@ def dewater_restart_test():
     
 def startworker():
     worker_d = os.path.join("opt_dewater_chance")
-    t_d = os.path.join(worker_d, "template")
-
+    t_d = scratch_template(os.path.join(worker_d, "template"))
     pyemu.os_utils.start_workers(t_d,exe_path,"test.pst",num_workers=10,worker_root=worker_d)
 
 
@@ -735,8 +735,7 @@ def stack_chance_anomaly_conservative_test():
 
     Also checks MPS<->reported-shift coherence across all iterations.
     """
-    base = os.path.join("opt_dewater_chance", "template")
-
+    base = scratch_template(os.path.join("opt_dewater_chance", "template"))
     def setup(pst):
         par = pst.parameter_data
         par.loc[par.partrans == "fixed", "partrans"] = "log"

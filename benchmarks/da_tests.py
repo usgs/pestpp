@@ -7,6 +7,7 @@ import pandas as pd
 import platform
 import pyemu
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
@@ -444,8 +445,7 @@ def da_mf6_freyberg_smoother_test():
         #prep_for_travis(model_d)
         local=False
     
-    t_d = os.path.join(model_d,"template")
-
+    t_d = scratch_template(os.path.join(model_d,"template"))
     m_d = os.path.join(model_d,"master_da_smoother")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -646,7 +646,7 @@ def da_mf6_freyberg_test_3():
 def seq_10par_xsec_state_est_test():
     #todo: add localization to this test!
     test_d = "10par_xsec"
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
     par = pst.parameter_data
     par.loc[:,"cycle"] = -1
@@ -808,7 +808,7 @@ def seq_10par_xsec_state_est_test():
 def seq_10par_xsec_fixed_test():
     
     test_d = "10par_xsec"
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
     par = pst.parameter_data
     par.loc[:,"cycle"] = -1
@@ -1047,7 +1047,7 @@ def seq_10par_diff_obspar_cycle_test():
 def seq_10par_xsec_hotstart_test():
     
     test_d = "10par_xsec"
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
     par = pst.parameter_data
     par.loc[:,"cycle"] = -1
@@ -1173,7 +1173,7 @@ def seq_10par_xsec_hotstart_test():
 def seq_10par_cycle_parse_test():
     
     test_d = "10par_xsec"
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
 
     new_ins_file = os.path.join(t_d, "firstcycle.hds.ins")
@@ -1351,7 +1351,7 @@ def compare_mf6_freyberg():
     #par.loc[~par.parnme.str.contains("head"),"partrans"] = "fixed"
       
     ies_test_d = "mf6_freyberg"
-    ies_t_d = os.path.join(ies_test_d, "template")
+    ies_t_d = scratch_template(os.path.join(ies_test_d, "template"))
     org_ies_t_d = ies_t_d
     ies_t_d = ies_t_d + "_compare"
     if os.path.exists(ies_t_d):
@@ -1643,7 +1643,7 @@ def plot_compare(solution="ies",noptmax=1):
 def da_pareto_demo():
 
     test_d = "mf6_freyberg"
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
     pst.control_data.noptmax = 0
     #pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
@@ -1750,7 +1750,7 @@ def plot_da_pareto_demo():
 def seq_10par_xsec_double_state_test():
     """a test of estimating parameters and final states - initial states fixed"""
     test_d = "10par_xsec"
-    t_d_org = os.path.join(test_d, "template")
+    t_d_org = scratch_template(os.path.join(test_d, "template"))
     t_d = os.path.join(test_d, "template_double")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
@@ -1888,7 +1888,7 @@ def seq_10par_xsec_double_state_test():
 def seq_10par_xsec_double_state_test_2():
     """a test of estimating only final states"""
     test_d = "10par_xsec"
-    t_d_org = os.path.join(test_d, "template")
+    t_d_org = scratch_template(os.path.join(test_d, "template"))
     t_d = os.path.join(test_d, "template_double")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
@@ -2022,7 +2022,7 @@ def seq_10par_xsec_double_state_test_2():
 def seq_10par_xsec_double_state_test_3():
     """a test of carrying but not using a subset of final states"""
     test_d = "10par_xsec"
-    t_d_org = os.path.join(test_d, "template")
+    t_d_org = scratch_template(os.path.join(test_d, "template"))
     t_d = os.path.join(test_d, "template_double")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
@@ -2132,7 +2132,7 @@ def seq_10par_xsec_double_state_test_3():
 
 def pump_test_2():
     test_d = "pump_test_2"
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     m_d = os.path.join(test_d,"master_da")
     pst = pyemu.Pst(os.path.join(t_d,"es_pmp.pst"))
     pst.pestpp_options["da_lambda_mults"] = 1.0
@@ -2146,7 +2146,7 @@ def pump_test_2():
 def seq_10par_diff_state_cycle_test():
 
     test_d = "10par_xsec"
-    t_d_org = os.path.join(test_d, "template")
+    t_d_org = scratch_template(os.path.join(test_d, "template"))
     t_d = os.path.join(test_d, "template_double")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
@@ -2276,7 +2276,7 @@ def seq_10par_diff_state_cycle_test():
 def seq_10par_xsec_ineq_test():
     """a test of estimating parameters and final states - initial states fixed"""
     test_d = "10par_xsec"
-    t_d_org = os.path.join(test_d, "template")
+    t_d_org = scratch_template(os.path.join(test_d, "template"))
     t_d = os.path.join(test_d, "template_double")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
@@ -2460,7 +2460,7 @@ def seq_10par_xsec_ineq_test():
 def seq_10par_xsec_double_state_test_with_fail():
     """a test of carrying but not using a subset of final states"""
     test_d = "10par_xsec"
-    t_d_org = os.path.join(test_d, "template")
+    t_d_org = scratch_template(os.path.join(test_d, "template"))
     t_d = os.path.join(test_d, "template_double")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)

@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import pyemu
 
+from fixture_utils import scratch_template
 _BENCH = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
@@ -36,7 +37,7 @@ os.environ["PATH"] += os.pathsep + os.path.join(_BENCH, "test_bin", _sub)
 
 def _case(name, noptmax=2, num_reals=6, **options):
     """A small ies case in its own directory."""
-    base = os.path.join(_BENCH, "ies_10par_xsec", "template")
+    base = scratch_template(os.path.join(_BENCH, "ies_10par_xsec", "template"))
     d = os.path.join(_BENCH, name)
     if os.path.exists(d):
         shutil.rmtree(d)
@@ -244,7 +245,7 @@ def api_phi_by_obs_group_test():
     The case is rewritten to put its two non-zero-weighted observations in different groups,
     because a single-group case would not actually exercise the grouping.
     """
-    base = os.path.join(_BENCH, "ies_10par_xsec", "template")
+    base = scratch_template(os.path.join(_BENCH, "ies_10par_xsec", "template"))
     d = os.path.join(_BENCH, "api_phigrp")
     if os.path.exists(d):
         shutil.rmtree(d)
@@ -455,7 +456,7 @@ def api_quiet_captures_output_test():
 
 def api_tools_without_phi_say_so_test():
     """mou and sqp have no phi, and asking says why rather than returning a wrong number."""
-    base = os.path.join(_BENCH, "g07", "template")
+    base = scratch_template(os.path.join(_BENCH, "g07", "template"))
     d = os.path.join(_BENCH, "api_mou")
     if os.path.exists(d):
         shutil.rmtree(d)
@@ -1006,7 +1007,7 @@ def api_option_sequence_reaches_the_algorithm_test():
 
 def _mou_case(name, noptmax=1, pop=10):
     """A small mou case in its own directory, from the g07 template."""
-    base = os.path.join(_BENCH, "g07", "template")
+    base = scratch_template(os.path.join(_BENCH, "g07", "template"))
     d = os.path.join(_BENCH, name)
     if os.path.exists(d):
         shutil.rmtree(d)
@@ -1746,7 +1747,7 @@ def _stack_case(name, risk=0.95, stack_size=10, chance_points="all", tool="mou")
     finite-difference gradient path, where chance dies with "no stack runs have been
     processed". That is a real gap, not a configuration rule.
     """
-    base = os.path.join(_BENCH, "g07", "template")
+    base = scratch_template(os.path.join(_BENCH, "g07", "template"))
     d = os.path.join(_BENCH, name)
     if os.path.exists(d):
         shutil.rmtree(d)

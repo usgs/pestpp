@@ -8,6 +8,7 @@ import platform
 import matplotlib.pyplot as plt
 import pyemu
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path, "linux")
@@ -37,7 +38,7 @@ port = 4016
 def tenpar_superpar_restart_test():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_basic_restart_test2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -113,7 +114,7 @@ def tenpar_user_lambdas_unchanged_test():
     import re
 
     model_d = "glm_10par_xsec"
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     test_d = os.path.join(model_d, "master_user_lambdas")
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
@@ -148,7 +149,7 @@ def tenpar_base_test():
 
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_basic_test2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -198,7 +199,7 @@ def tenpar_base_test():
 def freyberg_basic_restart_test():
     model_d = "glm_freyberg"
     test_d = os.path.join(model_d, "master_basic_test2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -324,7 +325,7 @@ def new_fmt_load_test():
 def tenpar_hotstart_test():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_hotstart_test")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -359,7 +360,7 @@ def tenpar_hotstart_test():
 def tenpar_normalform_test():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_normal_test")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -424,7 +425,7 @@ def tenpar_normalform_test():
 def freyberg_stress_test():
     model_d = "glm_freyberg"
     test_d = os.path.join(model_d, "master_stress")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -475,7 +476,7 @@ def freyberg_stress_test():
 def tenpar_xsec_stress_test():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -511,7 +512,7 @@ def tenpar_xsec_stress_test():
 def threept_fail_test():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_3pt_fail")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -529,7 +530,7 @@ def threept_fail_test():
 def tenpar_xsec_high_phi_test():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_high_phi")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -567,7 +568,7 @@ def tenpar_xsec_high_phi_test():
 def tenpar_xsec_stress_test2a():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -610,7 +611,7 @@ def tenpar_xsec_stress_test2a():
 def tenpar_xsec_stress_test_2():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress2")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -650,7 +651,7 @@ def tenpar_xsec_stress_test_2():
 def tenpar_xsec_stress_test_3():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress3")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -701,7 +702,7 @@ def tenpar_xsec_stress_test_3():
 def tenpar_xsec_stress_test_4():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress4")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -736,7 +737,7 @@ def tenpar_xsec_stress_test_4():
 def tenpar_xsec_stress_test_hp():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stressh")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -773,7 +774,7 @@ def tenpar_xsec_stress_test_hp():
 def tenpar_xsec_stress_test_panther():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stressp")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -816,7 +817,7 @@ def invest():
 def tenpar_xsec_stress_test_5():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress5")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -892,7 +893,7 @@ def tenpar_fosm_external_stdev_test():
 
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_ext_stdev")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):
@@ -935,7 +936,7 @@ def tenpar_fosm_external_stdev_test():
 
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_ext_stdev")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if not os.path.exists(template_d):
         raise Exception("template_d {0} not found".format(template_d))
     if os.path.exists(test_d):

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import pyemu
 
 
+from fixture_utils import scratch_template
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
@@ -50,7 +51,7 @@ num_reals = 10
 
 def setup_suite_dir(model_d):
     pyemu.Ensemble.reseed()
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "test_template")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)
@@ -146,8 +147,7 @@ def freyberg_localizer_test1():
 
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_local1")
-    template_d = os.path.join(model_d, "template")
-
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     print("loading pst")
@@ -211,8 +211,7 @@ def freyberg_localizer_test1():
 def freyberg_localizer_test2():
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_local2")
-    template_d = os.path.join(model_d, "template")
-
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     print("loading pst")
@@ -273,8 +272,7 @@ def freyberg_localizer_test3():
     """freyberg local 3"""
     model_d = "ies_freyberg"
     test_d = os.path.join(model_d, "master_local31")
-    template_d = os.path.join(model_d, "template")
-
+    template_d = scratch_template(os.path.join(model_d, "template"))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     print("loading pst")
@@ -431,7 +429,7 @@ def tenpar_restart_binary_test():
     """tenpar restart tests"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_binary_restart1")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 10
     if os.path.exists(test_d):
@@ -508,7 +506,7 @@ def tenpar_restart_test():
     """tenpar restart tests"""
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_restart1")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 30
     if os.path.exists(test_d):
@@ -556,7 +554,7 @@ def tenpar_par_restart_test():
     """tenpar par restart tests"""
     model_d = "ies_10par_xsec"
 
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
 
     num_reals = 30
@@ -636,7 +634,7 @@ def tenpar_par_restart_byvars_test():
     """tenpar par restart tests by vars"""
     model_d = "ies_10par_xsec"
 
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
 
     num_reals = 30
@@ -718,7 +716,7 @@ def tenpar_rns_test():
     import subprocess as sb
     model_d = "ies_10par_xsec"
     test_d = os.path.join(model_d, "master_rns")
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     
     num_reals = 5
@@ -782,7 +780,7 @@ def tenpar_restart_test_2():
     """tenpar par restart tests without supplying base obs en - the hard way"""
     model_d = "ies_10par_xsec"
 
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 30
     test_d = os.path.join(model_d, "master_hard_restart")
@@ -878,7 +876,7 @@ def tenpar_restart_wo_noise_w_base_test():
     """tenpar par restart tests"""
     model_d = "ies_10par_xsec"
 
-    template_d = os.path.join(model_d, "template")
+    template_d = scratch_template(os.path.join(model_d, "template"))
     pst = pyemu.Pst(os.path.join(template_d, "pest.pst"))
     num_reals = 30
     test_d = os.path.join(model_d, "master_restart_wo_noise_w_base")

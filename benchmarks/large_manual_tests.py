@@ -1,6 +1,7 @@
 import platform
 import numpy as np 
 import pyemu
+from fixture_utils import scratch_template
 import os, shutil 
 import pathlib as pl
 
@@ -14,7 +15,7 @@ def persistence_big_test():
     This test is left out of 
     """
     model_d = "ies_10par_xsec"
-    base_d = os.path.join(model_d, "template")
+    base_d = scratch_template(os.path.join(model_d, "template"))
     new_d = os.path.join(model_d, "timeout_template")
     if os.path.exists(new_d):
         shutil.rmtree(new_d)

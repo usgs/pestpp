@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import platform
 import pyemu
+from fixture_utils import scratch_template
 sys.path.append(os.path.join("..","benchmarks"))
 import opt_test_suite_helper as mou_suite_helper
 
@@ -72,7 +73,7 @@ def ppd_part1_test():
 
 def ppd_fitness(ppd_beta = 0.5, master_dir = "master",test_d="ppd_fitness_test_sklearn"):
 
-    t_d = os.path.join(test_d, "template")
+    t_d = scratch_template(os.path.join(test_d, "template"))
     m_d = None
     if master_dir is not None:
         m_d = os.path.join(test_d, master_dir)
