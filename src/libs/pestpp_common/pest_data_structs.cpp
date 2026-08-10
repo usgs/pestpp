@@ -1375,6 +1375,13 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		return true;
 	}
 
+	if (key == "PANTHER_WORKER_PARTIAL_OBS_COMMAND")
+	{
+		// org_value, not value: a shell command must keep its case
+		panther_worker_partial_obs_command = org_value;
+		return true;
+	}
+
 	if (key == "PANTHER_AGENT_NO_PING_TIMEOUT_SECS")
 	{
 		convert_ip(value, panther_agent_no_ping_timeout_secs);
@@ -2007,6 +2014,7 @@ void PestppOptions::summary_legacy(ostream& os) const
 	
 	os << "panther_echo: " << panther_echo << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
+	os << "panther_worker_partial_obs_command: " << panther_worker_partial_obs_command << endl;
 	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << "panther_debug_loop: " << panther_debug_loop << endl;
 	os << "debug_check_par_en_consistency: " << debug_check_paren_consistency << endl;
@@ -2585,6 +2593,7 @@ void PestppOptions::set_defaults_legacy()
 	set_num_tpl_ins_threads(1);	
 
 	set_panther_agent_restart_on_error(false);
+	set_panther_worker_partial_obs_command("");
 	set_panther_agent_no_ping_timeout_secs(-1);
 	set_panther_debug_loop(false);
 	set_debug_check_par_en_consistency(false);

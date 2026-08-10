@@ -655,6 +655,14 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_panther_agent_restart_on_error(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_panther_agent_restart_on_error(false); },
         [](const PestppOptions& o)->string{ return std::to_string(o.get_panther_agent_restart_on_error()?1:0); } },
+    // Runs on the AGENT, only when the master asks for partial results, and only just before
+    // the output files are read. Failures are forgiven by design - see the call site: a
+    // partial-results request is a courtesy and must never be able to damage the run it is
+    // asking about.
+    OptionSpec{ "PANTHER_WORKER_PARTIAL_OBS_COMMAND", {}, OptType::STRING, "panther", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ o.set_panther_worker_partial_obs_command(org_value); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o){ o.set_panther_worker_partial_obs_command(""); },
+        [](const PestppOptions& o)->string{ return o.get_panther_worker_partial_obs_command(); } },
     OptionSpec{ "PANTHER_AGENT_NO_PING_TIMEOUT_SECS", {}, OptType::INT, "panther", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_panther_agent_no_ping_timeout_secs(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_panther_agent_no_ping_timeout_secs(-1); },

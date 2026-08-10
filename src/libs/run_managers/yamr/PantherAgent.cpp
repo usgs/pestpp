@@ -542,6 +542,33 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				report("received partial results request from master", false);
 				try
 				{
+					// A user command run FIRST, if one was supplied: some models buffer their
+					// output, so a mid-run read of the files means nothing until the model has
+					// been told to flush or checkpoint. Its failure is FORGIVEN on purpose -
+					// answering a partial-results request is a courtesy, and must never be able
+					// to damage the run being asked about. Same reason the outer catch forgives.
+					const string& partial_cmd = pest_scenario.get_pestpp_options()
+						.get_panther_worker_partial_obs_command();
+					if (!partial_cmd.empty())
+					{
+						try
+						{
+							report("running panther_worker_partial_obs_command: " + partial_cmd, false);
+							pest_utils::run_command(partial_cmd, nullptr, false,
+								poll_interval_seconds * 1000);
+						}
+						catch (const std::exception& e)
+						{
+							report(string("panther_worker_partial_obs_command failed, "
+								"continuing with whatever the output files hold: ") + e.what(), false);
+						}
+						catch (...)
+						{
+							report("panther_worker_partial_obs_command failed with an unknown "
+								"error, continuing with whatever the output files hold", false);
+						}
+					}
+
 					Observations partial;
 					vector<string> missing, problems;
 					// only read once this run owns the files on disk - see

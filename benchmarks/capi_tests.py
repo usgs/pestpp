@@ -1154,6 +1154,93 @@ def capi_unknown_option_is_reported_test():
 # ---- panther ------------------------------------------------------------------------------
 
 
+def capi_partial_obs_command_test():
+    """++panther_worker_partial_obs_command runs on the AGENT, only when partials are asked for.
+
+    Two things worth proving separately. First that it fires AT ALL and at the right moment -
+    a command that never runs and a command that runs at the wrong time look identical from
+    the master. Second that its FAILURE is forgiven: a partial-results request is a courtesy,
+    and a user command that exits non-zero must not damage the run being asked about. The
+    second is the one that would hurt if it were wrong, because the natural implementation -
+    let it throw - kills a run that was otherwise fine.
+
+    The command writes a file, so "did it run" is a filesystem fact rather than a log grep.
+    """
+    wd = _setup("capi_partial_cmd", noptmax=1, num_reals=4)
+    # a model slow enough that the master can ask for partials while it is still going
+    with open(os.path.join(wd, "slow_model.py"), "w") as f:
+        f.write("import time\n"
+                "row = ' '.join(['1.0'] * 10)\n"
+                "time.sleep(20)\n"
+                "with open('10par_xsec.hds', 'w') as o:\n"
+                "    o.write(row + '\\n' + row + '\\n')\n")
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.model_command = ["python slow_model.py"]
+    # A SCRIPT, not an inline -c: the command string is tokenized before it is spawned, so
+    # embedded quotes are not a safe thing for a test to depend on. It deliberately EXITS
+    # NON-ZERO after leaving its mark, which proves both that the mark was made and that the
+    # failure after it is forgiven.
+    with open(os.path.join(wd, "partial_cmd.py"), "w") as f:
+        f.write("open('partial_cmd_ran.txt','a').write('x')\n"
+                "raise SystemExit(3)\n")
+    pst.pestpp_options["panther_worker_partial_obs_command"] = "python partial_cmd.py"
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    worker_root = os.path.join(_BENCH, "capi_partial_cmd_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    procs, worker_dirs = [], []
+    agent_exe = _find_agent_exe()
+    cmd_port = port + 11
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=cmd_port) as ies:
+            for i in range(2):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                worker_dirs.append(d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(cmd_port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+            ies.initialize()
+            ies.queue_runs()
+            ies.begin_batch()
+
+            # Ask REPEATEDLY, about once a second, for as long as the batch runs - one
+            # well-timed request is not enough, for the reasons capi_partial_results_test
+            # spells out. Requesting is the ONLY thing that should trigger the command.
+            asked, last_ask = 0, 0.0
+            deadline = time.time() + 300
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    break
+                if ies.get_run_time_stats()["running"] > 0 and (time.time() - last_ask) > 1.0:
+                    last_ask = time.time()
+                    asked += ies.request_partial_results()
+            ies.end_batch()
+
+        assert asked > 0, "never caught a run in progress, so partials were never requested"
+        marks = [d for d in worker_dirs
+                 if os.path.exists(os.path.join(d, "partial_cmd_ran.txt"))]
+        assert marks, (
+            "panther_worker_partial_obs_command left no mark in any worker directory - it "
+            "never ran, though partial results were requested")
+        # and the non-zero exit did not take the agent down with it
+        for d in worker_dirs:
+            log = os.path.join(d, "worker.log")
+            if os.path.exists(log):
+                txt = open(log, errors="replace").read()
+                assert "terminating" not in txt.lower() or "terminate requested" in txt.lower(), \
+                    "the agent died on a failing partial-obs command: {0}".format(d)
+    finally:
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
+
 def capi_partial_results_test():
     """Ask a worker mid-run what it has, and get a real answer back.
 
@@ -1901,6 +1988,7 @@ if __name__ == "__main__":
     capi_release_all_then_cancel_test()
     capi_release_workers_refused_serial_test()
     capi_partial_results_test()
+    capi_partial_obs_command_test()
     capi_service_runs_yourself_test()
     capi_service_runs_failure_test()
     print("all capi tests passed")

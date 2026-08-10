@@ -801,6 +801,12 @@ public:
     void set_condor_submit_file(string _condor_submit_file) { condor_submit_file = _condor_submit_file; }
     void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
     bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
+    /// A command the AGENT runs when the master asks for partial results, immediately before
+    /// the output files are read. For models that buffer their output and need a nudge - a
+    /// flush, a checkpoint dump - before a mid-run read means anything. Empty (the default)
+    /// means no command, which is the behaviour every existing control file already has.
+    void set_panther_worker_partial_obs_command(const string& _cmd) { panther_worker_partial_obs_command = _cmd; }
+    string get_panther_worker_partial_obs_command() const { return panther_worker_partial_obs_command; }
     void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
     int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
     void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
@@ -1116,6 +1122,7 @@ private:
 
 
 	bool panther_agent_restart_on_error;
+	string panther_worker_partial_obs_command;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
 	bool debug_check_paren_consistency;		
