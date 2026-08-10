@@ -1242,11 +1242,9 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
             s->pest_scenario->assign_da_cycles(fout_rec);
         s->pest_scenario->check_inputs(fout_rec);
         // The per-iteration summary files are a glm artifact; the ensemble tools do not write
-        // them and the flag only costs them file handles. glm is exempt because for it the
-        // flag is NOT cosmetic: OutputFileWriter opens upg.csv only when it is set, while
-        // SVDSolver::write_upgrade() writes to that stream UNCONDITIONALLY. Clearing it for
-        // glm means the first upgrade dies on 'Error accessing file: "pest.upg.csv"'. Leaving
-        // it alone also keeps API-driven glm producing the same files as the executable.
+        // them and the flag only costs them file handles. glm is exempt so that an API-driven
+        // run produces the same files as the executable - and so that it does not print the
+        // deprecation warning on every session for a value the caller never chose.
         if (s->tool != PESTPP_GLM)
             s->pest_scenario->get_pestpp_options_ptr()->set_iter_summary_flag(false);
 

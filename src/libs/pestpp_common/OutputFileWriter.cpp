@@ -80,10 +80,35 @@ void OutputFileWriter::prep_glm_files(bool restart_flag)
 		write_sen_header(fout_sen, case_name);
 		file_manager.open_ofile_ext("svd");
 	}
+	// upg.csv is ALWAYS prepared, whatever ++iteration_summary() says.
+	//
+	// It is the one file in this set whose writer has no matching guard. write_par_iter(),
+	// write_obj_iter() and write_sen_iter() all return early when the flag is false, so .ipar,
+	// .iobj and .isen are consistent: nothing opens them and nothing writes them. write_upgrade()
+	// does not - it goes straight to get_ofstream("upg.csv"). Gating the open therefore did not
+	// suppress the upgrade summary, it just removed the stream that SVDSolver was about to
+	// write to, and the first upgrade died on `Error accessing file: "pest.upg.csv"`.
+	//
+	// Opening it unconditionally is the smaller and safer half of the fix: the alternative,
+	// adding a guard to write_upgrade(), would silently drop upgrade records that anyone who
+	// set the flag has never actually been able to get.
+	prepare_upgrade_summary_files();
+
 	if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 	{
 		prepare_iteration_summary_files(restart_flag);
-		prepare_upgrade_summary_files();
+	}
+	else
+	{
+		stringstream ss;
+		ss << endl << "WARNING: ++iteration_summary() is false. The upgrade summary file"
+		   << endl << "         (.upg.csv) is written ANYWAY - the routine that fills it does"
+		   << endl << "         not honour this option, so suppressing the file only produced"
+		   << endl << "         a file-access error partway through the first iteration."
+		   << endl << "         This option is DEPRECATED and will be removed."
+		   << endl;
+		cout << ss.str();
+		file_manager.rec_ofstream() << ss.str();
 	}
 }
 

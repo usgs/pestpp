@@ -83,8 +83,8 @@ int GLM::initialize_prepare()
 	// exist until prepare_iteration_summary_files() opens it. main() used to do both, in that
 	// order, and separating them is what broke pestpp-glm with 'Error accessing file:
 	// "pest.ipar"' - so they travel together.
-	if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
-		output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
+	// write_par_iter() checks ++iteration_summary() itself, so no gate here
+	output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
 
 	base_jacobian_ptr.reset(new Jacobian_1to1(file_manager, output_file_writer));
 

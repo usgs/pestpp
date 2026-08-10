@@ -79,8 +79,12 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ vector<double> v; vector<string> tok; tokenize(value,tok,","); for(const auto& t:tok){ v.push_back(convert_cp<double>(t)); } o.set_lambda_scale_vec(v); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1}); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; auto v=o.get_lambda_scale_vec(); for(size_t i=0;i<v.size();++i){if(i)ss<<",";ss<<v[i];} return ss.str(); } },
+    // DEPRECATED. It gated only the OPENING of the .ipar/.iobj/.isen/.upg.csv files, while the
+    // routines that write them were never gated, so setting it false did not suppress the
+    // summaries - it made the run fail on a missing file. The files are now always prepared
+    // (OutputFileWriter::prep_glm_files) and the value is recorded but not obeyed.
     OptionSpec{ "ITERATION_SUMMARY", {}, OptType::BOOL, "general", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_iter_summary_flag(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ bool b=pest_utils::parse_string_arg_to_bool(value); if(!b) cout<<"++ITERATION_SUMMARY(false) is deprecated and no longer suppresses the summary files; they are always written"<<endl; o.set_iter_summary_flag(b); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_iter_summary_flag(true); },
         [](const PestppOptions& o)->string{ return std::to_string(o.get_iter_summary_flag()?1:0); } },
     OptionSpec{ "DER_FORGIVE", {}, OptType::BOOL, "general", false,
