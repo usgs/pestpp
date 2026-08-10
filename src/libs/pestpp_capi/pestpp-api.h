@@ -977,6 +977,18 @@ PESTPP_API pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data,
                                              int* nrow, int* ncol,
                                              char* row_names, char* col_names);
 
+/* The Jacobian batch as three stages: queue, run, harvest. glm only.
+
+   prepare() builds the finite-difference runs and QUEUES them with the run manager without
+   running them, returning how many. Run them however you like - pestpp_jacobian_run() is the
+   in-tree way, but driving the run manager yourself is the point of the split - then
+   process() harvests them into the Jacobian and writes the jco/sen output.
+
+   The tool's own iteration composes exactly these three calls, so there is one code path. */
+PESTPP_API pestpp_status pestpp_jacobian_prepare(pestpp_handle h, int calc_init_obs, int* n_runs);
+PESTPP_API pestpp_status pestpp_jacobian_run(pestpp_handle h);
+PESTPP_API pestpp_status pestpp_jacobian_process(pestpp_handle h, int* ok);
+
 /* The tool's parameter vector in CTL space, names packed PESTPP_NAME_LEN-wide and sorted, so
    names and values always correspond. NULL pointers size it, as above. */
 PESTPP_API pestpp_status pestpp_get_par_vector(pestpp_handle h, int which, double* vals,

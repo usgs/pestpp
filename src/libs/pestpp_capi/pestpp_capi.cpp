@@ -224,6 +224,14 @@ struct ToolAdapter
     /// the weights ensemble together, and only the tool can do that coherently.
     virtual EnsembleMethod* ensemble_method() { return nullptr; }
 
+    /// The Jacobian batch as separately callable stages, for the tools that build one.
+    /// Refuse by default: the ensemble methods have no Jacobian to queue runs for.
+    virtual int  jacobian_prepare(bool)
+    { unsupported("this tool does not build a Jacobian"); return 0; }
+    virtual void jacobian_run() { unsupported("this tool does not build a Jacobian"); }
+    virtual bool jacobian_process()
+    { unsupported("this tool does not build a Jacobian"); return false; }
+
     /// The Jacobian, or null for the tools that do not build one.
     ///
     /// Only glm has one. The ensemble methods carry the same information implicitly, in the
@@ -941,6 +949,11 @@ struct GlmAdapter : public ToolAdapter
     Ensemble* ensemble(int) override { return nullptr; }
     ParameterEnsemble* par_ensemble() override { return nullptr; }
     ObservationEnsemble* obs_ensemble() override { return nullptr; }
+
+    int  jacobian_prepare(bool calc_init_obs) override
+    { return tool.jacobian_prepare(calc_init_obs); }
+    void jacobian_run() override { tool.jacobian_run(); }
+    bool jacobian_process() override { return tool.jacobian_process(); }
 
     Jacobian* jacobian() override
     {
@@ -2551,6 +2564,32 @@ pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data, int max_nrow, i
                     if ((it.row() < nr) && (it.col() < nc))
                         data[it.row() + ((size_t)it.col() * max_nrow)] = it.value();
         }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_jacobian_prepare(pestpp_handle h, int calc_init_obs, int* n_runs)
+{
+    CAPI_BEGIN(h)
+        int n = s->adapter->jacobian_prepare(calc_init_obs != 0);
+        if (n_runs != nullptr) *n_runs = n;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_jacobian_run(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        s->adapter->jacobian_run();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_jacobian_process(pestpp_handle h, int* ok)
+{
+    CAPI_BEGIN(h)
+        bool b = s->adapter->jacobian_process();
+        if (ok != nullptr) *ok = b ? 1 : 0;
         return PESTPP_OK;
     CAPI_END()
 }

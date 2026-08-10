@@ -1081,7 +1081,21 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
  */
 bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
-	ostream &os = file_manager.rec_ofstream();
+	// the in-tree composition of the three stages below - see jacobian_prepare()
+	jacobian_prepare(run_manager, base_run, calc_init_obs, restart_runs);
+	jacobian_run(run_manager);
+	return jacobian_process(run_manager, termination_ctl, base_run);
+}
+
+/** Build the Jacobian runs and QUEUE them with the run manager, without running them.
+ *
+ * Returns how many runs are outstanding. Split out of iteration_jac() so a caller can own the
+ * Jacobian batch the way the API already owns the ensemble batches: queue, run it however it
+ * likes - a different run manager, a subset, its own scheduling - then harvest. The in-tree
+ * loop composes the same three calls in the same order, so there is one code path, not two.
+ */
+int SVDSolver::jacobian_prepare(RunManagerAbstract &run_manager, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
+{
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	set<string> out_ofbound_pars;
 	vector<string> numeric_parname_vec = par_transform.ctl2numeric_cp(base_run.get_ctl_pars()).get_keys();
@@ -1118,9 +1132,21 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	    cout << endl;
     }
     RestartController::write_jac_runs_built(fout_restart);
+	return run_manager.get_nruns();
+}
 
+/** Run the queued Jacobian batch. The in-tree composition; a caller owning run management can
+ *  drive the run manager itself instead and go straight to jacobian_process(). */
+void SVDSolver::jacobian_run(RunManagerAbstract &run_manager)
+{
 	performance_log->log_event("jacobian parameter sets built, commencing model runs");
 	jacobian.make_runs(run_manager);
+}
+
+/** Harvest the completed runs into the Jacobian, write the jco and sen output, and bring the
+ *  base run up to date with what the model actually returned. */
+bool SVDSolver::jacobian_process(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run)
+{
 	performance_log->log_event("jacobian runs complete, processing runs");
 	jacobian.process_runs(par_transform,
 		*par_group_info_ptr, run_manager, *prior_info_ptr, splitswh_flag,

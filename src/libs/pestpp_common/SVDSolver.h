@@ -79,6 +79,13 @@ public:
 		ModelRun &optimum_run, RestartController &restart_controller, bool calc_first_jacobian = true);
 	virtual ModelRun iteration_reuse_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool rerun_base = true, const std::string &jco_filename = "",const std::string &res_filename="");
 	virtual bool iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs = false, bool restart_runs = false);
+	// The three stages iteration_jac() is built from, in call order. Public so a caller can own
+	// the Jacobian batch - queue it, run it however it likes, harvest it - the same way the API
+	// already owns the ensemble batches. iteration_jac() is now just their composition, so
+	// there is one code path rather than an in-tree one and an API one that drift apart.
+	int  jacobian_prepare(RunManagerAbstract &run_manager, ModelRun &base_run, bool calc_init_obs = false, bool restart_runs = false);
+	void jacobian_run(RunManagerAbstract &run_manager);
+	bool jacobian_process(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run);
 	virtual ModelRun iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs = false);
 	virtual void set_svd_package(PestppOptions::SVD_PACK _svd_pack);
 	bool get_phiredswh_flag() const { return phiredswh_flag;}

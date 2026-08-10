@@ -79,6 +79,20 @@ public:
 	/// calculations. Safe to call after a failed iteration: it reports what there is.
 	void finalize();
 
+	// -- the Jacobian batch, as separately callable stages ---------------------------------
+	//
+	// prepare -> run -> process, the same shape mou and sqp expose for their populations.
+	// A caller that wants to own the jco runs queues them, drives the run manager itself, then
+	// harvests; solve_iteration() composes the same calls internally, so both paths run the
+	// same code. All three require initialize() to have built the solver.
+
+	/// Build the Jacobian runs and queue them WITHOUT running them. Returns the run count.
+	int  jacobian_prepare(bool calc_init_obs = false);
+	/// Run the queued batch. Skip it if you are driving the run manager yourself.
+	void jacobian_run();
+	/// Harvest the completed runs into the Jacobian and write the jco/sen output.
+	bool jacobian_process();
+
 	/// Report to the record file and throw. The record stream is FLUSHED, never closed:
 	/// closing it destroys the ofstream, and a later write - including one from a destructor
 	/// during unwinding - then terminates the process. That is not hypothetical; it is what

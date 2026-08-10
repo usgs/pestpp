@@ -1409,6 +1409,30 @@ class Glm(_Tool):
         """
         return 0
 
+    def jacobian_prepare(self, calc_init_obs: bool = False) -> int:
+        """Queue the Jacobian runs WITHOUT running them. Returns how many are outstanding.
+
+        The three stages - prepare, run, process - let you own the jco batch::
+
+            n = glm.jacobian_prepare()
+            glm.jacobian_run()          # or drive the run manager yourself
+            glm.jacobian_process()
+            jco = glm.jco()
+
+        ``solve()`` composes exactly these internally, so both paths run the same code.
+        """
+        return self._lib.jacobian_prepare(calc_init_obs)
+
+    def jacobian_run(self) -> None:
+        """Run the queued Jacobian batch."""
+        with self._q():
+            self._lib.jacobian_run()
+
+    def jacobian_process(self) -> bool:
+        """Harvest the completed Jacobian runs. The jco is available from :meth:`jco` after."""
+        with self._q():
+            return self._lib.jacobian_process()
+
     def par_vector(self, which: str = "current", lower: bool = False) -> pd.Series:
         """The current (or ``"optimum"``) parameter vector in CTL space, as a labelled Series."""
         which_id = {"current": 0, "optimum": 1}.get(str(which).lower())

@@ -192,6 +192,27 @@ void GLM::run_initial_parameters_only()
 	(void)fout_rec;
 }
 
+int GLM::jacobian_prepare(bool calc_init_obs)
+{
+	if (!initialized)
+		throw_glm_error("jacobian_prepare() called before initialize()");
+	return base_svd_ptr->jacobian_prepare(*run_mgr_ptr, cur_run, calc_init_obs, false);
+}
+
+void GLM::jacobian_run()
+{
+	if (!initialized)
+		throw_glm_error("jacobian_run() called before initialize()");
+	base_svd_ptr->jacobian_run(*run_mgr_ptr);
+}
+
+bool GLM::jacobian_process()
+{
+	if (!initialized)
+		throw_glm_error("jacobian_process() called before initialize()");
+	return base_svd_ptr->jacobian_process(*run_mgr_ptr, termination_ctl, cur_run);
+}
+
 void GLM::iterate_2_solution()
 {
 	if (!initialized)

@@ -398,6 +398,12 @@ class PestppLib:
         lib.pestpp_cancel_runs.restype = c_int
         lib.pestpp_release_workers.argtypes = (c_void_p, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_release_workers.restype = c_int
+        lib.pestpp_jacobian_prepare.argtypes = (c_void_p, c_int, POINTER(c_int))
+        lib.pestpp_jacobian_prepare.restype = c_int
+        lib.pestpp_jacobian_run.argtypes = (c_void_p,)
+        lib.pestpp_jacobian_run.restype = c_int
+        lib.pestpp_jacobian_process.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_jacobian_process.restype = c_int
         lib.pestpp_get_jacobian.argtypes = (
             c_void_p, POINTER(c_double), c_int, c_int, POINTER(c_int), POINTER(c_int),
             c_char_p, c_char_p)
@@ -1023,6 +1029,24 @@ class PestppLib:
         self._check(self.lib.pestpp_release_workers(self.handle, arr, count, byref(n)),
                     "pestpp_release_workers")
         return n.value
+
+    def jacobian_prepare(self, calc_init_obs: bool = False) -> int:
+        """Queue the Jacobian runs without running them. Returns how many."""
+        n = c_int()
+        self._check(self.lib.pestpp_jacobian_prepare(
+            self.handle, 1 if calc_init_obs else 0, byref(n)), "pestpp_jacobian_prepare")
+        return n.value
+
+    def jacobian_run(self) -> None:
+        """Run the queued Jacobian batch."""
+        self._check(self.lib.pestpp_jacobian_run(self.handle), "pestpp_jacobian_run")
+
+    def jacobian_process(self) -> bool:
+        """Harvest the completed runs into the Jacobian."""
+        ok = c_int()
+        self._check(self.lib.pestpp_jacobian_process(self.handle, byref(ok)),
+                    "pestpp_jacobian_process")
+        return bool(ok.value)
 
     def get_jacobian(self):
         """The Jacobian as (values, row_names, col_names). Rows are observations.

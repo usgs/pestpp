@@ -2346,6 +2346,52 @@ def api_run_manager_settings_are_live_test():
     print("api_run_manager_settings_are_live_test passed")
 
 
+def api_glm_jacobian_stages_test():
+    """The caller can own the jco batch: prepare -> run -> process, then read the Jacobian.
+
+    The claim under test is that the split is REAL - that driving the three stages by hand
+    fills the same Jacobian the tool's own iteration would - not merely that three functions
+    exist. So it checks the queued run count against the adjustable parameter set and that the
+    matrix comes back populated, and that the ensemble tools refuse the stages outright rather
+    than silently doing nothing.
+    """
+    d = _case("api_glm_jac_stages", noptmax=2, num_reals=5)
+    with Glm.from_pst("pest.pst", workdir=d) as glm:
+        glm.initialize()
+
+        n = glm.jacobian_prepare()
+        # one run per adjustable parameter, plus the base run when it is needed
+        assert n > 0, "no jacobian runs were queued"
+
+        glm.jacobian_run()
+        assert glm.jacobian_process(), "jacobian_process reported failure"
+
+        j = glm.jco()
+        assert (j.values != 0).any(), "the jacobian is empty after the caller drove the stages"
+        assert n >= j.shape[1], (
+            "queued {0} runs for {1} parameters - expected at least one per parameter"
+            .format(n, j.shape[1]))
+
+        # the stages compose into what solve() does, so the tool still iterates normally after
+        step = glm.solve()
+        assert step.iter >= 1, step
+
+    # ...and an ensemble tool refuses them, rather than quietly doing nothing
+    d2 = _case("api_ies_no_jac", noptmax=1, num_reals=5)
+    with Ies.from_pst("pest.pst", workdir=d2) as ies:
+        ies.initialize()
+        for label, call in (("jacobian_prepare", ies._lib.jacobian_prepare),
+                            ("jacobian_run", ies._lib.jacobian_run),
+                            ("jacobian_process", ies._lib.jacobian_process)):
+            try:
+                call()
+            except PestppError as e:
+                assert "jacobian" in str(e).lower(), "{0}: {1}".format(label, e)
+            else:
+                raise AssertionError("ies accepted {0}, which it has no Jacobian for".format(label))
+    print("api_glm_jacobian_stages_test passed")
+
+
 def api_glm_jco_and_par_vector_test():
     """glm's own surface: the parameter VECTOR and the Jacobian, in the shapes users work in.
 
@@ -2644,6 +2690,7 @@ if __name__ == "__main__":
     api_run_manager_settings_are_live_test()
     api_release_workers_test()
     api_glm_jco_and_par_vector_test()
+    api_glm_jacobian_stages_test()
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_robust_requires_paired_parameters_test()
