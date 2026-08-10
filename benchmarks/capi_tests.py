@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, PESTPP_OK, PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
     RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
-    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, WORKER_COMPLETED,
+    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, TOOL_GLM, WORKER_COMPLETED,
 )
 
 plat = "unknown"
@@ -1465,6 +1465,100 @@ def capi_panther_control_test():
                 pass
 
 
+def capi_glm_test():
+    """pestpp-glm drives through the C ABI, and refuses what it genuinely cannot answer.
+
+    glm is the odd tool on this interface: it is not an ensemble method. It carries ONE
+    parameter set through a Jacobian and an upgrade, so "the parameter ensemble" and "phi over
+    realizations" have no honest answer. The assertion that matters is not just that the loop
+    runs - it is that those calls REFUSE rather than hand back a one-row ensemble, which would
+    typecheck and mislead. A caller that gets a 1xN matrix back reasonably reads it as an
+    ensemble of one realization; that is not what glm computed.
+    """
+    wd = _setup("capi_glm", noptmax=2)
+    with PestppLib(_find_library(), TOOL_GLM, "pest.pst", wd) as glm:
+        glm.initialize()
+
+        n_iters = 0
+        while not glm.should_terminate() and n_iters < 3:
+            glm.solve_iteration()
+            n_iters += 1
+        assert n_iters > 0, "glm terminated before running a single iteration"
+        assert glm.get_iteration() > 0, glm.get_iteration()
+        glm.finalize()
+
+        # the refusals, each with a message that says why rather than a bare error code
+        for label, call in (("ensemble view", lambda: glm.get_ensemble_view(PAR_EN)),
+                            ("phi summary",   lambda: glm.get_phi_summary(0)),
+                            ("queue_runs",    lambda: glm.queue_runs())):
+            try:
+                call()
+            except PestppError as e:
+                assert "glm" in str(e).lower(), \
+                    "{0} refusal should explain itself, got: {1}".format(label, e)
+            else:
+                raise AssertionError("glm accepted '{0}', which it has no answer for".format(label))
+
+    # and it actually did the work
+    assert os.path.exists(os.path.join(wd, "pest.rec")), "no record file written"
+    par = [f for f in os.listdir(wd) if f.endswith(".par")]
+    assert par, "glm wrote no .par file, so it did not complete an upgrade"
+
+
+def capi_glm_matches_exe_test():
+    """The ABI-driven glm and the pestpp-glm executable reach the same answer.
+
+    The point of the refactor is that main() and a library caller run the SAME loop. If they
+    diverge, every other glm assertion here is testing a private code path rather than the
+    tool. Compares the final parameter file, which is the thing a user acts on.
+    """
+    import filecmp
+    exe_d = _setup("capi_glm_exe", noptmax=2)
+    api_d = _setup("capi_glm_api", noptmax=2)
+
+    exe = _find_tool_exe("pestpp-glm")
+    if exe is None:
+        print("skipping capi_glm_matches_exe_test: pestpp-glm not found")
+        return
+    pyemu.os_utils.run("{0} pest.pst".format(exe), cwd=exe_d)
+
+    with PestppLib(_find_library(), TOOL_GLM, "pest.pst", api_d) as glm:
+        glm.initialize()
+        while not glm.should_terminate():
+            glm.solve_iteration()
+        glm.finalize()
+
+    a = os.path.join(exe_d, "pest.par")
+    b = os.path.join(api_d, "pest.par")
+    assert os.path.exists(a) and os.path.exists(b), (a, b)
+    # .par is a fixed-format text file: skip the header line, key on the parameter name
+    def _par_values(path):
+        vals = {}
+        with open(path) as f:
+            next(f)                      # the format/precision header
+            for line in f:
+                t = line.split()
+                if len(t) >= 2:
+                    vals[t[0].lower()] = float(t[1])
+        return vals
+    av, bv = _par_values(a), _par_values(b)
+    assert set(av) == set(bv), "the two runs report different parameters"
+    d = max(abs(av[k] - bv[k]) for k in av)
+    assert d == 0.0, (
+        "the ABI-driven glm and the executable disagree by {0:.3e} in the final parameters - "
+        "main() and the library are not running the same loop".format(d))
+
+
+def _find_tool_exe(name):
+    """The built executable beside the library, or None."""
+    sfx = ".exe" if plat == "windows" else ""
+    for c in (os.path.join("..", "bin", plat if plat != "apple" else "mac", name + sfx),
+              os.path.join("..", "bin", name + sfx)):
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    return None
+
+
 def capi_panther_release_workers_test():
     """Releasing a BUSY worker reschedules its run instead of giving up on it.
 
@@ -1800,6 +1894,8 @@ if __name__ == "__main__":
     capi_da_resize_between_queue_and_harvest_test()
     capi_tool_ensemble_availability_test()
     capi_run_storage_read_test()
+    capi_glm_test()
+    capi_glm_matches_exe_test()
     capi_panther_control_test()
     capi_panther_release_workers_test()
     capi_release_all_then_cancel_test()

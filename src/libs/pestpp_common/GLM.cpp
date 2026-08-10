@@ -9,6 +9,22 @@
 
 using namespace std;
 
+/// The regularization scheme, creating the default one first if the control file had no
+/// regularization section.
+///
+/// Pest leaves regul_scheme_ptr NULL until a '* regularization' section sets it, and the
+/// termination controller below reads through that pointer - so on a control file without one
+/// this is a null dereference. pest++.cpp used to paper over it by calling set_default_dynreg()
+/// in main() before building anything, which meant the precondition was the CALLER's to know:
+/// the executable satisfied it and a library caller segfaulted. Owning it here is what makes
+/// "main and the API run the same loop" true rather than aspirational.
+static DynamicRegularization& ensure_dynreg(Pest& scenario)
+{
+	if (scenario.get_regul_scheme_ptr() == nullptr)
+		scenario.set_default_dynreg();
+	return *scenario.get_regul_scheme_ptr();
+}
+
 GLM::GLM(Pest& _pest_scenario, FileManager& _file_manager,
 	OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 	RunManagerAbstract* _run_mgr_ptr,
@@ -27,8 +43,8 @@ GLM::GLM(Pest& _pest_scenario, FileManager& _file_manager,
 		_pest_scenario.get_control_info().nphinored,
 		_pest_scenario.get_control_info().relparstp,
 		_pest_scenario.get_control_info().nrelpar,
-		_pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
-		_pest_scenario.get_regul_scheme_ptr()->get_phimaccept()),
+		ensure_dynreg(_pest_scenario).get_use_dynamic_reg(),
+		ensure_dynreg(_pest_scenario).get_phimaccept()),
 	cur_run(&obj_func, _pest_scenario.get_ctl_observations()),
 	optimum_run(&obj_func, _pest_scenario.get_ctl_observations()),
 	noptmax(_pest_scenario.get_control_info().noptmax),
@@ -56,6 +72,19 @@ void GLM::initialize()
 int GLM::initialize_prepare()
 {
 	const ParamTransformSeq& base_trans_seq = pest_scenario.get_base_par_tran_seq();
+
+	// The glm output files (.sen, .svd, the iteration summaries) and the svd output option.
+	// main() used to do this before constructing anything, which made it another precondition
+	// the executable happened to satisfy and a library caller did not - the first upgrade then
+	// died on 'Error accessing file: "pest.svd"'. Same reasoning as ensure_dynreg().
+	output_file_writer.prep_glm_files(restart_flag);
+	output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
+	// iteration 0's parameter record, which has to follow the prep above: .ipar does not
+	// exist until prepare_iteration_summary_files() opens it. main() used to do both, in that
+	// order, and separating them is what broke pestpp-glm with 'Error accessing file:
+	// "pest.ipar"' - so they travel together.
+	if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
+		output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
 
 	base_jacobian_ptr.reset(new Jacobian_1to1(file_manager, output_file_writer));
 

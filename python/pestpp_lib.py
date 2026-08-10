@@ -48,6 +48,10 @@ PESTPP_NOT_SUPPORTED = 6
 PESTPP_INVALID_STATE = 7
 
 TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP = 0, 1, 2, 3
+#: pestpp-glm. Not an ensemble method: it carries one parameter set through a Jacobian and an
+#: upgrade, so the ensemble and phi-over-realizations calls refuse rather than hand back a
+#: one-row ensemble. initialize / advance / finalize work as they do for the others.
+TOOL_GLM = 4
 PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN = 0, 1, 2, 3
 #: the chance stacks, mou and sqp only. Empty - not an error - on a fosm or risk-neutral run;
 #: get_stack_status() is how you tell those apart from "not drawn yet"

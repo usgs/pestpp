@@ -53,6 +53,7 @@
 #include "EnsembleSmoother.h"
 #include "DataAssimilator.h"
 #include "MOEA.h"
+#include "GLM.h"
 #include "SQP.h"
 #include "utilities.h"
 #include "system_variables.h"
@@ -862,6 +863,81 @@ struct SqpAdapter : public ToolAdapter
     const char* name() const override { return "sqp"; }
 };
 
+/** glm: initialize -> solve_iteration -> finalize, carrying ONE parameter set, not an ensemble.
+ *
+ * The other four tools all propagate a population. glm does not: it holds a single ModelRun,
+ * fills a Jacobian around it, and takes an upgrade step. Nearly every "which ensemble" call on
+ * this interface therefore has no honest answer, and this adapter refuses them rather than
+ * fabricating a one-row ensemble that would satisfy the type and mislead the caller - a
+ * pestpp_get_ensemble_view() returning a 1xN matrix reads as "an ensemble of one realization",
+ * which is not what glm computed.
+ *
+ * The refusals are load-bearing, not laziness. The base queue_runs/process_runs dereference
+ * par_ensemble(), so inheriting them with a null ensemble is a segfault in the host process;
+ * they are overridden to say why instead. glm's model runs are its Jacobian perturbations and
+ * upgrade trials, which the solver issues and harvests as a unit - there is no point in that
+ * sequence where handing the caller "the batch" would mean anything.
+ */
+struct GlmAdapter : public ToolAdapter
+{
+    GLM tool;
+    Pest& scen;
+
+    GlmAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
+               RunManagerAbstract* rm)
+        : tool(p, fm, ofw, pl, rm), scen(p) {}
+
+    Pest& scenario() override { return scen; }
+
+    void initialize() override { tool.initialize(); }
+    /// 1 on the noptmax==0 path, which really is a single forward run the caller can own.
+    /// 0 otherwise: every other path computes its first batch inside the first iteration.
+    int  initialize_prepare() override { return tool.initialize_prepare(); }
+    void initialize_finish() override { tool.initialize_finish(); }
+
+    map<string, int> queue_runs(PerformanceLog*, ofstream&, RunManagerAbstract*) override
+    {
+        unsupported("glm has no parameter ensemble to queue - its runs are the Jacobian "
+                    "perturbations and upgrade trials, which the solver issues and harvests "
+                    "together inside one iteration");
+        return map<string, int>();          // not reached; unsupported() throws
+    }
+    vector<int> process_runs(PerformanceLog*, ofstream&, RunManagerAbstract*,
+                             map<string, int>&) override
+    {
+        unsupported("glm has no parameter ensemble to process - see queue_runs");
+        return vector<int>();
+    }
+
+    pestpp_status advance() override
+    {
+        // solve_iteration() reports whether the loop should CONTINUE, which is not the same
+        // question as whether the step succeeded - a run that meets a termination criterion
+        // returns false having done everything right. So it is not mapped to PESTPP_RETRY the
+        // way sqp's rejected step is; should_terminate() is how a caller learns to stop.
+        tool.solve_iteration();
+        return PESTPP_OK;
+    }
+    void finalize() override { tool.finalize(); }
+    int  iteration() override { return tool.get_iteration_number(); }
+    bool should_terminate() override { return tool.get_termination_ctl().terminate(); }
+
+    Ensemble* ensemble(int) override { return nullptr; }
+    ParameterEnsemble* par_ensemble() override { return nullptr; }
+    ObservationEnsemble* obs_ensemble() override { return nullptr; }
+
+    void phi_summary(int, double&, double&, double&, double&) override
+    { unsupported("glm has one phi, not a phi over realizations - use the .rec/.iobj output"); }
+    void phi_vector(int, vector<string>&, vector<double>&) override
+    { unsupported("glm has one phi, not a phi over realizations"); }
+    void phi_residuals(int, vector<string>&, vector<string>&, vector<double>&) override
+    { unsupported("glm has one phi, not a phi over realizations"); }
+    void update_phi() override
+    { unsupported("glm has one phi, not a phi over realizations"); }
+
+    const char* name() const override { return "glm"; }
+};
+
 /// The message for the handle-less entry points, which have nowhere else to put one.
 string g_create_error;
 
@@ -1137,6 +1213,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         case PESTPP_DA:  tool_type = PestppOptions::ToolType::DA;  break;
         case PESTPP_MOU: tool_type = PestppOptions::ToolType::MOU; break;
         case PESTPP_SQP: tool_type = PestppOptions::ToolType::SQP; break;
+        case PESTPP_GLM: tool_type = PestppOptions::ToolType::GLM; break;
         default: bad_arg("unknown tool id");
         }
 
@@ -1164,7 +1241,14 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         if (s->tool == PESTPP_DA)
             s->pest_scenario->assign_da_cycles(fout_rec);
         s->pest_scenario->check_inputs(fout_rec);
-        s->pest_scenario->get_pestpp_options_ptr()->set_iter_summary_flag(false);
+        // The per-iteration summary files are a glm artifact; the ensemble tools do not write
+        // them and the flag only costs them file handles. glm is exempt because for it the
+        // flag is NOT cosmetic: OutputFileWriter opens upg.csv only when it is set, while
+        // SVDSolver::write_upgrade() writes to that stream UNCONDITIONALLY. Clearing it for
+        // glm means the first upgrade dies on 'Error accessing file: "pest.upg.csv"'. Leaving
+        // it alone also keeps API-driven glm producing the same files as the executable.
+        if (s->tool != PESTPP_GLM)
+            s->pest_scenario->get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
         s->output_file_writer.reset(new OutputFileWriter(*s->file_manager, *s->pest_scenario, false));
         s->output_file_writer->scenario_report(fout_rec, false);
@@ -1254,6 +1338,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         }
         case PESTPP_MOU: s->adapter.reset(new MouAdapter(scen, fm, ofw, pl, rm)); break;
         case PESTPP_SQP: s->adapter.reset(new SqpAdapter(scen, fm, ofw, pl, rm)); break;
+        case PESTPP_GLM: s->adapter.reset(new GlmAdapter(scen, fm, ofw, pl, rm)); break;
         default: bad_arg("unknown tool id");
         }
     }

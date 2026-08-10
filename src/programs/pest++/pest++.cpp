@@ -262,17 +262,10 @@ int main(int argc, char* argv[]) {
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
 			exit(0);
 		}
-		output_file_writer.prep_glm_files(restart_flag);
-		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
 		//if base jco arg read from control file, reset restart controller
 		if (!pest_scenario.get_pestpp_options().get_basejac_filename().empty())
 		{
 			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
-		}
-
-		if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
-		{
-			output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
 		}
 
 		if ((pest_scenario.get_pestpp_options().get_n_iter_super() != 0) ||

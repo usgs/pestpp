@@ -123,7 +123,13 @@ typedef enum {
     PESTPP_IES = 0,
     PESTPP_DA  = 1,
     PESTPP_MOU = 2,
-    PESTPP_SQP = 3
+    PESTPP_SQP = 3,
+    /* pestpp-glm. The odd one out: it is not an ensemble method and has no population, so it
+       carries ONE parameter set through a Jacobian and an upgrade rather than an ensemble
+       through a solve. The ensemble and phi-over-realizations calls therefore refuse rather
+       than inventing a single-row ensemble - see pestpp_get_ensemble_view. What it does share
+       with the others is the loop: initialize, iterate, finalize. */
+    PESTPP_GLM = 4
 } pestpp_tool;
 
 /* Which ensemble to look at. The raw parameter ensemble is in whatever transform space the
