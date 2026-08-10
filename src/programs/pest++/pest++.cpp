@@ -224,31 +224,6 @@ int main(int argc, char* argv[]) {
 		// reset this here because we want to draw from the FOSM posterior as a whole matrix
 		pest_scenario.get_pestpp_options_ptr()->set_ies_group_draws(false);
 
-		if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
-		{
-			if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
-			{
-				throw runtime_error("'GLM_NORMAL_FORM' = 'PRIOR' is incompatible with 'PESTMODE' = 'REGULARIZATION'");
-			}
-		}
-
-		if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
-		{
-			if (pest_scenario.get_prior_info().get_nnz_pi() == 0)
-			{
-				throw runtime_error("regularization mode requires at least one non-zero weighted prior info equation");
-			}
-			if ((pest_scenario.get_pestpp_options().get_glm_iter_mc()) &&
-			(pest_scenario.get_pestpp_options().get_glm_accept_mc_phi()))
-			{
-				stringstream ss;
-				ss << endl << "WARNING 'regularization' mode is not conceptually compatible with 'glm_accept_mc_phi'" << endl;
-				cout << ss.str();
-				fout_rec << ss.str();
-			}
-
-		}
-
 		//Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);

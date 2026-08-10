@@ -224,6 +224,18 @@ struct ToolAdapter
     /// the weights ensemble together, and only the tool can do that coherently.
     virtual EnsembleMethod* ensemble_method() { return nullptr; }
 
+    /// The regularization scheme, or null for the tools that have none.
+    ///
+    /// Tikhonov regularization with a dynamically adjusted weight is a glm concept; the
+    /// ensemble methods regularize implicitly through the prior ensemble and have no weight to
+    /// read or set.
+    virtual DynamicRegularization* regularization() { return nullptr; }
+
+    /// The upgraded parameters a given lambda would produce, without running anything.
+    /// Only the tools that solve with a lambda have an answer; the rest refuse.
+    virtual Parameters compute_upgrade(double, std::string&)
+    { unsupported("this tool does not compute a lambda-based upgrade"); return Parameters(); }
+
     /// The Jacobian batch as separately callable stages, for the tools that build one.
     /// Refuse by default: the ensemble methods have no Jacobian to queue runs for.
     virtual int  jacobian_prepare(bool)
@@ -950,6 +962,12 @@ struct GlmAdapter : public ToolAdapter
     ParameterEnsemble* par_ensemble() override { return nullptr; }
     ObservationEnsemble* obs_ensemble() override { return nullptr; }
 
+    DynamicRegularization* regularization() override
+    { return scen.get_regul_scheme_ptr(); }
+
+    Parameters compute_upgrade(double lambda, std::string& limit_hit) override
+    { return tool.compute_upgrade(lambda, limit_hit); }
+
     int  jacobian_prepare(bool calc_init_obs) override
     { return tool.jacobian_prepare(calc_init_obs); }
     void jacobian_run() override { tool.jacobian_run(); }
@@ -1270,6 +1288,18 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         ofstream& fout_rec = s->file_manager->rec_ofstream();
 
         s->pest_scenario.reset(new Pest());
+        // BEFORE parsing, exactly as pest++.cpp does (set_default_dynreg at :200, parse at
+        // :205). Pest leaves regul_scheme_ptr null, and EVERY assignment the '* regularization'
+        // parser makes is guarded on that pointer - so parsing with it still null discards the
+        // whole section silently: phimlim, phimaccept, fracphim, the wf* dials, iregadj, and
+        // the pestmode switch that turns dynamic regularization on at all.
+        //
+        // The executable got this right by accident of ordering; the API did not, so an
+        // API-driven glm ran a regularization control file in estimation mode and reported
+        // use_dynamic_reg=false. Creating the default here costs the other tools nothing -
+        // GLM::ensure_dynreg() would have created the same object later, and nothing else in
+        // the codebase branches on the pointer being null.
+        s->pest_scenario->set_default_dynreg();
         s->pest_scenario->process_ctl_file(s->file_manager->open_ifile_ext("pst"),
                                            s->file_manager->build_filename("pst"), fout_rec);
         // follow pestpp-ies.cpp's order exactly: closing the pst stream and running the
@@ -2563,6 +2593,96 @@ pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data, int max_nrow, i
                 for (Eigen::SparseMatrix<double>::InnerIterator it(*m, k); it; ++it)
                     if ((it.row() < nr) && (it.col() < nc))
                         data[it.row() + ((size_t)it.col() * max_nrow)] = it.value();
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// Shared by the getter and the setter so the two cannot disagree about what exists.
+DynamicRegularization* require_regularization(PestppSession* s)
+{
+    DynamicRegularization* r = s->adapter->regularization();
+    if (r == nullptr)
+        unsupported(string("tool '") + s->adapter->name() + "' has no regularization scheme: "
+                    "tikhonov regularization is a glm concept, and the ensemble methods "
+                    "regularize through the prior ensemble instead");
+    return r;
+}
+
+pestpp_status pestpp_get_regularization(pestpp_handle h, int* use_dynamic, double* weight,
+                                        double* phimlim, double* phimaccept, double* fracphim,
+                                        double* wfmin, double* wfmax, double* wffac,
+                                        double* wftol, double* wfinit, int* max_reg_iter,
+                                        int* adj_grp_weights)
+{
+    CAPI_BEGIN(h)
+        DynamicRegularization* r = require_regularization(s);
+        if (use_dynamic   != nullptr) *use_dynamic   = r->get_use_dynamic_reg() ? 1 : 0;
+        if (weight        != nullptr) *weight        = r->get_weight();
+        if (phimlim       != nullptr) *phimlim       = r->get_phimlim();
+        if (phimaccept    != nullptr) *phimaccept    = r->get_phimaccept();
+        if (fracphim      != nullptr) *fracphim      = r->get_fracphim();
+        if (wfmin         != nullptr) *wfmin         = r->get_wfmin();
+        if (wfmax         != nullptr) *wfmax         = r->get_wfmax();
+        if (wffac         != nullptr) *wffac         = r->get_wffac();
+        if (wftol         != nullptr) *wftol         = r->get_wftol();
+        if (wfinit        != nullptr) *wfinit        = r->get_wfinit();
+        if (max_reg_iter  != nullptr) *max_reg_iter  = r->get_max_reg_iter();
+        if (adj_grp_weights != nullptr) *adj_grp_weights = r->get_adj_grp_weights() ? 1 : 0;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_set_regularization(pestpp_handle h, const char* key, double value)
+{
+    CAPI_BEGIN(h)
+        if (key == nullptr) bad_arg("pestpp_set_regularization needs a key");
+        DynamicRegularization* r = require_regularization(s);
+        string k = key;
+        pest_utils::upper_ip(k);
+        // Keyed rather than a wide setter so a caller changes one dial without having to
+        // restate the other ten - and so an unknown name is an error instead of a silently
+        // ignored argument.
+        if      (k == "USE_DYNAMIC_REG") r->set_use_dynamic_reg(value != 0.0);
+        else if (k == "WEIGHT")          r->set_weight(value);
+        else if (k == "PHIMLIM")         r->set_phimlim(value);
+        else if (k == "PHIMACCEPT")      r->set_phimaccept(value);
+        else if (k == "FRACPHIM")        r->set_fracphim(value);
+        else if (k == "WFMIN")           r->set_wfmin(value);
+        else if (k == "WFMAX")           r->set_wfmax(value);
+        else if (k == "WFFAC")           r->set_wffac(value);
+        else if (k == "WFTOL")           r->set_wftol(value);
+        else if (k == "WFINIT")          r->set_wfinit(value);
+        else if (k == "MAX_REG_ITER")    r->set_max_reg_iter((int)value);
+        // IREGADJ is the control-file spelling; accept both so a user can write what they know
+        else if ((k == "ADJ_GRP_WEIGHTS") || (k == "IREGADJ")) r->set_adj_grp_weights(value != 0.0);
+        else bad_arg(string("unknown regularization key '") + key + "'; expected one of "
+                     "use_dynamic_reg, weight, phimlim, phimaccept, fracphim, wfmin, wfmax, "
+                     "wffac, wftol, wfinit, max_reg_iter, adj_grp_weights (iregadj)");
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_compute_upgrade(pestpp_handle h, double lambda, double* vals, int max_n,
+                                     int* n, char* names, char* limit_buf, int limit_buf_len)
+{
+    CAPI_BEGIN(h)
+        string limit_hit;
+        Parameters up = s->adapter->compute_upgrade(lambda, limit_hit);
+        vector<string> keys = up.get_keys();
+        sort(keys.begin(), keys.end());       // same order as pestpp_get_par_vector()
+        int nn = (int)keys.size();
+        if (n != nullptr) *n = nn;
+        if (limit_buf != nullptr)
+            copy_to_buf(limit_hit, limit_buf, limit_buf_len);
+        if ((vals == nullptr) && (names == nullptr))
+            return PESTPP_OK;
+        if (max_n < nn)
+            too_small("upgrade buffers too small; call with NULL pointers to size them first");
+        for (int i = 0; i < nn; i++)
+        {
+            if (names != nullptr) pack_one_name(keys[i], names + (i * PESTPP_NAME_LEN));
+            if (vals  != nullptr) vals[i] = up.get_rec(keys[i]);
         }
         return PESTPP_OK;
     CAPI_END()

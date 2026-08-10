@@ -69,8 +69,44 @@ void GLM::initialize()
 	initialize_finish();
 }
 
+/** The glm-specific validity checks, which used to sit loose in main().
+ *
+ * Same story as ensure_dynreg() and prep_glm_files(): the executable ran them, a library
+ * caller did not, so the API happily accepted a regularization control file the executable
+ * refuses outright - and then ran it in estimation mode. A check that only one of the two
+ * entry points performs is not a check.
+ */
+void GLM::check_scenario()
+{
+	const bool regul_mode =
+		(pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL);
+
+	if ((pest_scenario.get_pestpp_options().get_glm_normal_form() ==
+		PestppOptions::GLMNormalForm::PRIOR) && regul_mode)
+		throw_glm_error("'GLM_NORMAL_FORM' = 'PRIOR' is incompatible with "
+			"'PESTMODE' = 'REGULARIZATION'");
+
+	if (regul_mode)
+	{
+		if (pest_scenario.get_prior_info().get_nnz_pi() == 0)
+			throw_glm_error("regularization mode requires at least one non-zero weighted "
+				"prior info equation");
+		if (pest_scenario.get_pestpp_options().get_glm_iter_mc() &&
+			pest_scenario.get_pestpp_options().get_glm_accept_mc_phi())
+		{
+			stringstream ss;
+			ss << endl << "WARNING 'regularization' mode is not conceptually compatible with "
+				<< "'glm_accept_mc_phi'" << endl;
+			cout << ss.str();
+			file_manager.rec_ofstream() << ss.str();
+		}
+	}
+}
+
 int GLM::initialize_prepare()
 {
+	check_scenario();
+
 	const ParamTransformSeq& base_trans_seq = pest_scenario.get_base_par_tran_seq();
 
 	// The glm output files (.sen, .svd, the iteration summaries) and the svd output option.
@@ -213,6 +249,25 @@ bool GLM::jacobian_process()
 	return base_svd_ptr->jacobian_process(*run_mgr_ptr, termination_ctl, cur_run);
 }
 
+Parameters GLM::compute_upgrade(double lambda, string& limit_hit)
+{
+	if (!initialized)
+		throw_glm_error("compute_upgrade() called before initialize()");
+	if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+		throw_glm_error("compute_upgrade() needs a jacobian - run an iteration, or "
+			"jacobian_prepare/jacobian_run/jacobian_process, first");
+	Pest::LimitType lt = Pest::LimitType::NONE;
+	Parameters upgrade = base_svd_ptr->compute_upgrade(lambda, cur_run, lt);
+	switch (lt)
+	{
+	case Pest::LimitType::LBND: case Pest::LimitType::UBND: limit_hit = "bound"; break;
+	case Pest::LimitType::REL:  limit_hit = "relative"; break;
+	case Pest::LimitType::FACT: limit_hit = "factor"; break;
+	default: limit_hit = "none"; break;
+	}
+	return upgrade;
+}
+
 void GLM::iterate_2_solution()
 {
 	if (!initialized)
@@ -253,7 +308,7 @@ bool GLM::solve_iteration()
 				cur_run = base_svd.iteration_reuse_jac(*run_mgr_ptr, termination_ctl, cur_run,
 					true, jco_filename, res_filename);
 				if (!cur_run.obs_valid())
-					cur_run = base_svd.solve(*run_mgr_ptr, termination_ctl, noptmax, cur_run,
+					cur_run = base_svd.solve(*run_mgr_ptr, termination_ctl, 1, cur_run,
 						optimum_run, *restart_ctl, false);
 			}
 			catch (const exception& e)
@@ -296,8 +351,11 @@ bool GLM::solve_iteration()
 			cur_run = base_svd.iteration_reuse_jac(*run_mgr_ptr, termination_ctl, cur_run, true,
 				jco_filename, res_filename);
 			// run the model once with the current parameters to compute the observations
-			cur_run = base_svd.solve(*run_mgr_ptr, termination_ctl, noptmax, cur_run,
+			cur_run = base_svd.solve(*run_mgr_ptr, termination_ctl, 1, cur_run,
 				optimum_run, *restart_ctl, calc_first_jacobian);
+			// the supplied jacobian has now been used; the next iteration computes its own.
+			// Harmless when solve() ran the whole loop, load-bearing now that it runs one pass.
+			restart_ctl->get_restart_option() = RestartController::RestartOption::NONE;
 			termination_ctl.check_last_iteration();
 		}
 		catch (const exception& e)
@@ -316,7 +374,7 @@ bool GLM::solve_iteration()
 			// solve() needs a RestartController even when there is no restart; a default-
 			// constructed one is RestartOption::NONE, which is exactly "no restart"
 			RestartController none_ctl;
-			cur_run = base_svd.solve(*run_mgr_ptr, termination_ctl, noptmax, cur_run,
+			cur_run = base_svd.solve(*run_mgr_ptr, termination_ctl, 1, cur_run,
 				optimum_run, (restart_ctl != nullptr) ? *restart_ctl : none_ctl,
 				calc_first_jacobian);
 			termination_ctl.check_last_iteration();

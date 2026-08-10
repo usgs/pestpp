@@ -398,6 +398,15 @@ class PestppLib:
         lib.pestpp_cancel_runs.restype = c_int
         lib.pestpp_release_workers.argtypes = (c_void_p, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_release_workers.restype = c_int
+        lib.pestpp_get_regularization.argtypes = (
+            c_void_p, POINTER(c_int)) + (POINTER(c_double),) * 9 + (POINTER(c_int), POINTER(c_int))
+        lib.pestpp_get_regularization.restype = c_int
+        lib.pestpp_set_regularization.argtypes = (c_void_p, c_char_p, c_double)
+        lib.pestpp_set_regularization.restype = c_int
+        lib.pestpp_compute_upgrade.argtypes = (
+            c_void_p, c_double, POINTER(c_double), c_int, POINTER(c_int), c_char_p,
+            c_char_p, c_int)
+        lib.pestpp_compute_upgrade.restype = c_int
         lib.pestpp_jacobian_prepare.argtypes = (c_void_p, c_int, POINTER(c_int))
         lib.pestpp_jacobian_prepare.restype = c_int
         lib.pestpp_jacobian_run.argtypes = (c_void_p,)
@@ -1029,6 +1038,48 @@ class PestppLib:
         self._check(self.lib.pestpp_release_workers(self.handle, arr, count, byref(n)),
                     "pestpp_release_workers")
         return n.value
+
+    _REG_KEYS = ("weight", "phimlim", "phimaccept", "fracphim",
+                 "wfmin", "wfmax", "wffac", "wftol", "wfinit")
+
+    def get_regularization(self) -> dict:
+        """The tikhonov regularization state as a dict. glm only."""
+        use_dyn = c_int()
+        vals = [c_double() for _ in self._REG_KEYS]
+        max_it, adj_grp = c_int(), c_int()
+        self._check(self.lib.pestpp_get_regularization(
+            self.handle, byref(use_dyn), *[byref(v) for v in vals],
+            byref(max_it), byref(adj_grp)), "pestpp_get_regularization")
+        d = {"use_dynamic_reg": bool(use_dyn.value)}
+        d.update({k: v.value for k, v in zip(self._REG_KEYS, vals)})
+        d["max_reg_iter"] = max_it.value
+        d["adj_grp_weights"] = bool(adj_grp.value)
+        return d
+
+    def set_regularization(self, key: str, value) -> None:
+        """Set one regularization dial by name."""
+        v = 1.0 if value is True else 0.0 if value is False else float(value)
+        self._check(self.lib.pestpp_set_regularization(
+            self.handle, key.encode(), c_double(v)), "pestpp_set_regularization({0})".format(key))
+
+    def compute_upgrade(self, lambda_value: float):
+        """The upgrade a lambda would give, without running anything.
+
+        Returns (names, values, limit_hit) where limit_hit is one of 'none', 'bound',
+        'factor', 'relative'.
+        """
+        n = c_int()
+        buf = create_string_buffer(64)
+        self._check(self.lib.pestpp_compute_upgrade(
+            self.handle, c_double(lambda_value), None, 0, byref(n), None, buf, 64),
+            "pestpp_compute_upgrade")
+        cnt = n.value
+        vals = np.empty(cnt, dtype=np.float64)
+        nbuf = create_string_buffer(cnt * self.name_len)
+        self._check(self.lib.pestpp_compute_upgrade(
+            self.handle, c_double(lambda_value), vals.ctypes.data_as(POINTER(c_double)), cnt,
+            byref(n), nbuf, buf, 64), "pestpp_compute_upgrade")
+        return self._unpack_names(nbuf.raw, cnt), vals, buf.value.decode()
 
     def jacobian_prepare(self, calc_init_obs: bool = False) -> int:
         """Queue the Jacobian runs without running them. Returns how many."""

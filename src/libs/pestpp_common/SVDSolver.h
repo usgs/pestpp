@@ -98,6 +98,37 @@ public:
 	virtual ~SVDSolver(void);
 	virtual string get_solver_type() const { return svd_solver_type_name; }
 
+	/** The upgraded parameters a given lambda would produce, WITHOUT running anything.
+	 *
+	 * "Give me a lambda, get an upgrade" - the query the lambda loop makes internally, exposed
+	 * so a caller can make it directly. Uses the CURRENT Jacobian and the residuals of
+	 * `base_run`, so it requires a Jacobian to have been filled.
+	 *
+	 * Returns parameters in CTL space, bound- and change-limited exactly as the solver's own
+	 * candidates are - `limit_type` reports which limit bit, if any. This is deliberately the
+	 * limited upgrade rather than the raw one from calc_lambda_upgrade_vec_JtQJ(): the raw
+	 * vector can sit outside the bounds and is not something a caller could run.
+	 *
+	 * DOES NOT adjust the regularization weight. iteration_upgrd() calls dynamic_weight_adj()
+	 * before its candidates when ++reg_use_dynamic is on; doing that here would mean a query
+	 * silently re-weighted the problem for everything afterwards. So with dynamic
+	 * regularization the answer is "the upgrade at the CURRENT weight", which is what the
+	 * solver would produce only if it were not about to re-weight. Identical either way when
+	 * dynamic regularization is off, which is the common case.
+	 */
+	Parameters compute_upgrade(double lambda, ModelRun& base_run, Pest::LimitType& limit_type);
+
+	/// The measurement phi the previous call to dynamic_weight_adj() started from, and the
+	/// reduction ratio it actually achieved. -1 until the second call.
+	///
+	/// FRACPHIM's demand is otherwise OPEN-LOOP: it asks for the same fractional cut every
+	/// iteration no matter what the last one managed. Once phi plateaus above phimlim the
+	/// target becomes permanently unreachable and the weight is the only lever left, so it
+	/// collapses toward wfmin and the regularization objective is destroyed. Remembering what
+	/// was actually achievable is what closes that loop.
+	double prev_meas_phi = -1.0;
+	double last_phi_ratio = -1.0;
+
 	void calc_lambda_upgrade_vec_JtQJ(const Jacobian& jacobian, const QSqrtMatrix& Q_sqrt, const DynamicRegularization& regul,
 		const Eigen::VectorXd& Residuals, const vector<string>& obs_name_vec,
 		const Parameters& active_base_ctl_pars, const Parameters& freeze_active_ctl_pars,

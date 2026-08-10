@@ -801,6 +801,14 @@ public:
     void set_condor_submit_file(string _condor_submit_file) { condor_submit_file = _condor_submit_file; }
     void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
     bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
+    /// Whether the dynamic regularization target may be relaxed to what the previous iteration
+    /// actually achieved. ON by default. It can only ever relax a target, and only where
+    /// FRACPHIM is the binding term AND phi has stalled - so a run converging toward an
+    /// attainable phimlim cannot be changed by it. Set false for the pre-2026 trajectory,
+    /// in which an unreachable phimlim drove the weight to WFMIN and silently disabled
+    /// regularization.
+    void set_reg_use_achievable_target(bool _flag) { reg_use_achievable_target = _flag; }
+    bool get_reg_use_achievable_target() const { return reg_use_achievable_target; }
     /// A command the AGENT runs when the master asks for partial results, immediately before
     /// the output files are read. For models that buffer their output and need a nudge - a
     /// flush, a checkpoint dump - before a mid-run read means anything. Empty (the default)
@@ -1122,6 +1130,7 @@ private:
 
 
 	bool panther_agent_restart_on_error;
+	bool reg_use_achievable_target;
 	string panther_worker_partial_obs_command;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;

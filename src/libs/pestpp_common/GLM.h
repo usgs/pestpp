@@ -69,10 +69,15 @@ public:
 	/// solve_iteration().
 	void iterate_2_solution();
 
-	/// One iteration - the loop body of iterate_2_solution(), including the restart branching
+	/// ONE iteration - the loop body of iterate_2_solution(), including the restart branching
 	/// and the termination check. Returns whether the loop should continue, so a caller
 	/// driving its own loop runs the same steps in the same order rather than an
 	/// approximation of them.
+	///
+	/// Exactly one: SVDSolver::solve()'s third argument is max_iter and its body loops
+	/// `iter_num = 1 .. max_iter`, so this passes 1. It used to pass noptmax, which meant a
+	/// single call ran the entire solve and every per-iteration observation a caller made -
+	/// weights, phi, parameters - reported the FINAL state after the first call.
 	bool solve_iteration();
 
 	/// Termination summary, final parameter/residual reporting, and the posterior FOSM
@@ -92,6 +97,14 @@ public:
 	void jacobian_run();
 	/// Harvest the completed runs into the Jacobian and write the jco/sen output.
 	bool jacobian_process();
+
+	/// The upgraded parameters a given lambda would produce, without running anything.
+	///
+	/// Needs a Jacobian, so call it after an iteration or after jacobian_prepare/run/process.
+	/// `limit_hit` reports which limit clipped the step, if any - "none", "bound", "factor"
+	/// or "relative" - because an upgrade that was truncated is a different answer from one
+	/// that was not, and a caller comparing lambdas needs to know which it is looking at.
+	Parameters compute_upgrade(double lambda, std::string& limit_hit);
 
 	/// Report to the record file and throw. The record stream is FLUSHED, never closed:
 	/// closing it destroys the ofstream, and a later write - including one from a destructor
@@ -145,6 +158,8 @@ private:
 	int noptmax;
 	bool initialized;
 
+	/// The glm-specific validity checks main() used to run before building anything.
+	void check_scenario();
 	/// noptmax==0: one forward run with the initial parameters, reported and then done.
 	void run_initial_parameters_only();
 	/// The posterior Schur-complement block, and the wall of explanatory text that goes with it.

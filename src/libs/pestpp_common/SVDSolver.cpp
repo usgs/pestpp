@@ -1079,6 +1079,51 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
  *
  * @return Description.
  */
+/** See the declaration. The setup below is lifted from iteration_upgrd()'s prologue so the two
+ *  agree on what a candidate for a lambda means - same weight matrix, same residual sign, same
+ *  frozen set, same limits. */
+Parameters SVDSolver::compute_upgrade(double lambda, ModelRun& base_run, Pest::LimitType& limit_type)
+{
+	// non-zero-weight observations, then the prior-information equations - the order the
+	// residual vector and the weight matrix are both built against
+	vector<string> obs_names_vec;
+	for (const auto& o : base_run.get_obs_template().get_keys())
+		if (base_run.get_obj_func_ptr()->get_obs_info_ptr()->get_weight(o) > 0.0)
+			obs_names_vec.push_back(o);
+	{
+		vector<string> prior_info_names = prior_info_ptr->get_keys();
+		obs_names_vec.insert(obs_names_vec.end(), prior_info_names.begin(), prior_info_names.end());
+	}
+
+	// parameters whose jacobian column could not be computed start out frozen - there is no
+	// derivative to move them along
+	auto& failed_jac_pars_names = jacobian.get_failed_parameter_names();
+	Parameters frozen_active_ctl_pars = base_run.get_ctl_pars().get_subset(
+		failed_jac_pars_names.begin(), failed_jac_pars_names.end());
+
+	QSqrtMatrix Q_sqrt(obs_info_ptr, prior_info_ptr);
+	VectorXd residuals_vec = -1.0 * stlvec_2_eigenvec(base_run.get_residuals_vec(obs_names_vec));
+	Parameters base_run_active_ctl_par = par_transform.ctl2active_ctl_cp(base_run.get_ctl_pars());
+
+	// grow the frozen set the way the solver does before it trusts a lambda: parameters that
+	// this step would push past a bound are held rather than allowed to leave the feasible box
+	Parameters tmp_new_par;
+	test_upgrade_to_find_freeze_pars(lambda, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr,
+		residuals_vec, obs_names_vec, base_run_active_ctl_par, tmp_new_par);
+
+	Parameters upgrade_active_ctl_pars;
+	calc_upgrade_vec(lambda, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
+		obs_names_vec, base_run_active_ctl_par, upgrade_active_ctl_pars, limit_type);
+
+	// hand back CTL space: active-ctl omits the frozen and fixed parameters, so a caller
+	// diffing it against par_vector() would see holes that are not really holes
+	Parameters upgrade_ctl_pars = base_run.get_ctl_pars();
+	par_transform.active_ctl2ctl_ip(upgrade_active_ctl_pars);
+	for (const auto& p : upgrade_active_ctl_pars)
+		upgrade_ctl_pars.update_rec(p.first, p.second);
+	return upgrade_ctl_pars;
+}
+
 bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	// the in-tree composition of the three stages below - see jacobian_prepare()
@@ -2377,6 +2422,8 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 	double wfmin = regul_scheme_ptr->get_wfmin();
 	double wfmax = regul_scheme_ptr->get_wfmax();
 	double wffac = regul_scheme_ptr->get_wffac();
+	// read here, at point of use, so ++reg_use_achievable_target is live per iteration
+	const bool use_achievable_target = pest_scenario.get_pestpp_options().get_reg_use_achievable_target();
 	double mu_cur = regul_scheme_ptr->get_weight();
 	double wftol = regul_scheme_ptr->get_wftol();
 	int max_iter = regul_scheme_ptr->get_max_reg_iter();
@@ -2413,6 +2460,49 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 	PhiComponets phi_comp_cur = base_run.get_obj_func_ptr()->get_phi_comp(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr);
 	double target_phi_meas_frac = phi_comp_cur.meas * fracphim;
 	double target_phi_meas = max(phimlim, target_phi_meas_frac);
+
+	// -- the achievable floor -------------------------------------------------------------
+	//
+	// FRACPHIM and PHIMLIM cooperate while phi is descending: the throttle governs far away,
+	// phimlim takes over near the goal. Neither has a notion of "phi has STOPPED improving",
+	// and that is the gap. Once phi plateaus above phimlim the target stays at fracphim*phi -
+	// permanently out of reach - and the only lever the weight search has is the weight, so it
+	// drives it to wfmin every iteration and the regularization objective is annihilated.
+	//
+	// Measured on a case with phimlim 45x below the attainable phi: meas phi 50 -> 0.789 ->
+	// 0.0692 -> 0.045 -> 0.045 -> 0.045 while regul phi went 39.8 -> 249 -> 42.8 -> 0.293 ->
+	// 0.002 -> 1.4e-05 and the weight fell 1 -> 3.2e-07. Regularization silently switched off.
+	//
+	// So: never ask for a bigger cut than the last iteration actually delivered. This can only
+	// RELAX the target, never tighten it, so a run that was converging is unaffected - when
+	// progress beats fracphim the throttle still governs.
+	// Only when phi has genuinely STALLED - not merely when it moved slower than FRACPHIM
+	// asked. Slow-but-converging is the case where phimlim is still reachable and the throttle
+	// is doing its job; relaxing there would raise the target above an attainable phimlim and
+	// under-fit. The pathology this exists for is the plateau, where the ratio pins at 1.
+	const double stall_ratio = 0.99;
+	// ...and only where FRACPHIM is the BINDING term, i.e. phi is still far enough above
+	// phimlim that the throttle - not phimlim - is setting the target. That is exactly the
+	// region where the open-loop demand can run away. Once phimlim binds, the run has reached
+	// its goal and phi oscillating around it (ratio slightly above 1) is convergence, not a
+	// stall; relaxing there would raise the target above an attainable phimlim.
+	const bool fracphim_binds = (target_phi_meas_frac > phimlim);
+	double achievable_target = -1.0;
+	if (use_achievable_target && fracphim_binds && (prev_meas_phi > 0.0) &&
+		(last_phi_ratio >= stall_ratio))
+	{
+		achievable_target = phi_comp_cur.meas * min(1.0, max(fracphim, last_phi_ratio));
+		if (achievable_target > target_phi_meas)
+		{
+			os << "    Note: measurement phi has STALLED (" << last_phi_ratio
+			   << " of its previous value) while the target is still " << fracphim
+			   << " of current phi." << endl
+			   << "          Relaxing this iteration's target from " << target_phi_meas
+			   << " to " << achievable_target << " so the weight search is not driven toward"
+			   << endl << "          wfmin chasing an unreachable target." << endl;
+			target_phi_meas = achievable_target;
+		}
+	}
 
 	os << endl << "    ---  Solving for regularization weight factor   ---   " << endl;
 	os << "    Starting regularization weight factor      : " << mu_cur << endl;
@@ -2518,10 +2608,12 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 	if (mu_vec[0].f() > 0)
 	{
 		auto min_mu = (mu_vec[0] < mu_vec[3]) ? mu_vec[0] : mu_vec[3];
-		os << "    ---  optimal regularization weight factor found  ---   " << endl;
+		os << "    ---  target NOT attainable at any weight in [wfmin, wfmax]  ---   " << endl
+		   << "         (the target lies beyond the lowest weight the search could reach;\n"
+		   << "          using the closest weight found - see the discrepancy below)" << endl;
 		min_mu.print(os);
 		os << endl;
-		cout << "    ---  optimal regularization weight factor found  ---   " << endl;
+		cout << "    ---  target NOT attainable at any weight  ---   " << endl;
 		min_mu.print(cout);
 		cout << endl;
 		double m = (mu_vec[0] < mu_vec[3]) ? mu_vec[0].mu : mu_vec[3].mu;
@@ -2530,10 +2622,12 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 	else if (mu_vec[3].f() < 0)
 	{
 		auto min_mu = (mu_vec[0] < mu_vec[3]) ? mu_vec[0] : mu_vec[3];
-		os << "    ---  optimal regularization weight factor found  ---   " << endl;
+		os << "    ---  target NOT attainable at any weight in [wfmin, wfmax]  ---   " << endl
+		   << "         (the target lies beyond the highest weight the search could reach;\n"
+		   << "          using the closest weight found - see the discrepancy below)" << endl;
 		min_mu.print(os);
 		os << endl;
-		cout << "    ---  optimal regularization weight factor found  ---   " << endl;
+		cout << "    ---  target NOT attainable at any weight  ---   " << endl;
 		min_mu.print(cout);
 		cout << endl;
 		double m = (mu_vec[0] < mu_vec[3]) ? mu_vec[0].mu : mu_vec[3].mu;
@@ -2575,15 +2669,62 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 		}
 		auto min_mu = std::min_element(mu_vec.begin(), mu_vec.end());
 
-		os << "    ---  optimal regularization weight factor found  ---   " << endl;
+		// Only a success if the refinement actually met wftol. It used to print "found"
+		// either way, which is why an unreachable target read as normal operation for years.
+		const bool converged = (min_mu->error_frac() <= wftol);
+		const string headline = converged
+			? "    ---  optimal regularization weight factor found  ---   "
+			: "    ---  weight search did NOT converge (wftol not met)  ---   ";
+		os << headline << endl;
 		min_mu->print(os);
 		os << endl;
-		cout << "    ---  optimal regularization weight factor found  ---   " << endl;
+		cout << headline << endl;
 		min_mu->print(cout);
 		cout << endl;
 		double new_mu = std::min_element(mu_vec.begin(), mu_vec.end())->mu;
 		regul_scheme_ptr->set_weight(new_mu);
 	}
+
+	// -- standing diagnosis ----------------------------------------------------------------
+	//
+	// The failure this catches is silent by nature: phi stops improving, the target stays out
+	// of reach, and the weight walks down to its floor one iteration at a time while every
+	// message reads like normal operation. Name it plainly instead.
+	{
+		const double new_w = regul_scheme_ptr->get_weight();
+		const bool no_progress = (prev_meas_phi > 0.0) &&
+			(phi_comp_cur.meas >= prev_meas_phi * 0.999);
+		const bool at_floor = (new_w <= wfmin * 10.0);
+		const bool collapsing = (new_w < mu_cur * 0.5);
+		if (no_progress && (collapsing || at_floor))
+		{
+			stringstream ss;
+			ss << endl
+			   << "    WARNING: measurement phi did not improve this iteration (" << prev_meas_phi
+			   << " -> " << phi_comp_cur.meas << ") yet the target is " << target_phi_meas
+			   << "," << endl
+			   << "             so the weight search has nothing left to trade and is driving the"
+			   << endl
+			   << "             regularization weight down (" << mu_cur << " -> " << new_w << ").";
+			if (at_floor)
+				ss << endl << "             The weight is at or near WFMIN: regularization is now"
+				   << " effectively DISABLED.";
+			ss << endl
+			   << "             PHIMLIM (" << phimlim << ") is likely below the phi this problem"
+			   << " can attain." << endl
+			   << "             Consider raising PHIMLIM toward an achievable fit"
+			   << (use_achievable_target ? "" : ", or setting ++reg_use_achievable_target(true)")
+			   << "." << endl;
+			os << ss.str();
+			cout << ss.str();
+		}
+	}
+
+	// remember what this iteration started from, so the next one knows what was achievable
+	if (prev_meas_phi > 0.0)
+		last_phi_ratio = phi_comp_cur.meas / prev_meas_phi;
+	prev_meas_phi = phi_comp_cur.meas;
+
 	os << endl;
 }
 

@@ -2346,6 +2346,268 @@ def api_run_manager_settings_are_live_test():
     print("api_run_manager_settings_are_live_test passed")
 
 
+def _reg_case(tag, phimlim, achievable, noptmax=6, fracphim=0.1):
+    """A regularization-mode glm case with prior info on every adjustable parameter."""
+    wd = _case(tag, noptmax=noptmax, num_reals=5)
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    for p in pst.adj_par_names:
+        pst.add_pi_equation([p], pilbl="pi_" + p,
+                            rhs=float(pst.parameter_data.loc[p, "parval1"]),
+                            weight=1.0, obs_group="regul_p")
+    pst.control_data.pestmode = "regularization"
+    pst.reg_data.phimlim = phimlim
+    pst.reg_data.phimaccept = phimlim * 1.1
+    pst.reg_data.fracphim = fracphim
+    # ALWAYS explicit: the default is now ON, so relying on it here would make the off/on
+    # comparison below compare a run against itself. Pass achievable=None to exercise the
+    # shipped default rather than pinning it.
+    if achievable is not None:
+        pst.pestpp_options["reg_use_achievable_target"] = bool(achievable)
+    pst.write(os.path.join(wd, "pest.pst"), version=1)
+    return wd
+
+
+def _run_reg(wd, n):
+    """Run n iterations, returning the weight trajectory and the .rec text."""
+    from pestpp import Glm
+    with Glm.from_pst("pest.pst", workdir=wd) as glm:
+        glm.initialize()
+        ws = [glm.regularization()["weight"]]
+        for _ in range(n):
+            if glm.should_terminate:
+                break
+            glm.solve()
+            ws.append(glm.regularization()["weight"])
+    return ws, open(os.path.join(wd, "pest.rec"), errors="replace").read()
+
+
+def api_glm_dynreg_reachable_phimlim_test():
+    """The healthy regime: when PHIMLIM is attainable, the weight search does its job.
+
+    The companion to the unreachable test, and the one that says the ALGORITHM is sound rather
+    than merely guarded. With an attainable phimlim the cooperative design should work as
+    documented: FRACPHIM throttles the descent while phi is far away, phimlim takes over as
+    the binding target near the goal, the weight settles instead of collapsing, and the
+    regularization objective survives.
+
+    Asserted on the observable quantities rather than on log text where possible: the weight
+    trajectory from the API, and the phi components from the .rec. Runs with the SHIPPED
+    DEFAULTS, so it is also the check that defaulting reg_use_achievable_target on is safe.
+    """
+    import re
+    phi0 = 50.0                       # this case's initial measurement phi
+    phimlim = phi0 * 0.5              # comfortably attainable
+    # achievable=None -> the shipped default, which is now ON. The point of this test is
+    # that the DEFAULT cannot harm a run whose phimlim is attainable.
+    wd = _reg_case("api_reg_healthy", phimlim=phimlim, achievable=None, noptmax=5)
+    ws, rec = _run_reg(wd, 5)
+
+    meas = [float(x) for x in re.findall(
+        r"Starting measurement objective function\s*:\s*([-\d.eE+]+)", rec)]
+    regul = [float(x) for x in re.findall(
+        r"Starting regularization objective function\s*:\s*([-\d.eE+]+)", rec)]
+    assert len(meas) >= 3, meas
+
+    # 1. phi actually reaches the target rather than stalling far above it
+    assert min(meas) <= phimlim * 1.15, (
+        "measurement phi never got near an attainable phimlim={0}: {1}".format(phimlim, meas))
+
+    # 2. the weight SETTLES - it does not walk to the floor. This is the property that fails
+    #    in the unreachable case, where it falls ~9 orders of magnitude.
+    assert ws[-1] > 1.0e-6, (
+        "the weight collapsed toward wfmin on a run whose phimlim was attainable: {0}"
+        .format(ws))
+    tail = ws[-3:]
+    spread = max(tail) / min(tail) if min(tail) > 0 else float("inf")
+    assert spread < 10.0, (
+        "the weight never settled - last three values span {0:.3g}x: {1}".format(spread, tail))
+
+    # 3. regularization is still DOING something. In the pathological case regul phi is
+    #    annihilated (39.8 -> 1.4e-05) because the weight goes to zero; here it must not be.
+    assert regul[-1] > 1.0e-3, (
+        "the regularization objective was annihilated on a healthy run: {0}".format(regul))
+
+    # 4. and none of the pathology reporting fires
+    assert "measurement phi did not improve" not in rec, \
+        "the no-progress diagnosis fired on a healthy, converging run"
+    assert "NOT attainable" not in rec, \
+        "an attainable target was reported as unattainable"
+    print("api_glm_dynreg_reachable_phimlim_test passed")
+
+
+def api_glm_dynreg_unreachable_phimlim_test():
+    """An unreachable PHIMLIM is diagnosed, and the achievable target stops the collapse.
+
+    The failure being guarded against is silent by construction. FRACPHIM's demand is
+    open-loop - it asks for the same fractional cut every iteration regardless of what the last
+    one managed - so once measurement phi plateaus ABOVE phimlim the target is permanently out
+    of reach, the weight is the only lever left, and it walks to WFMIN while the regularization
+    objective is annihilated. glm becomes unregularized least squares without saying so.
+
+    Measured on this case with phimlim ~1000x below the attainable phi: meas phi
+    50 -> 0.789 -> 0.0692 -> 0.045 -> 0.045, regul phi 39.8 -> ... -> 1.4e-05, weight 1 -> 3e-09.
+    """
+    # -- unreachable phimlim, guard OFF: the collapse, now at least reported ----------------
+    wd = _reg_case("api_reg_unreach_off", phimlim=1.0e-3, achievable=False)
+    ws_off, rec_off = _run_reg(wd, 6)
+    assert ws_off[-1] < ws_off[0] * 1.0e-6, (
+        "expected the weight to collapse with an unreachable phimlim, got {0}".format(ws_off))
+    assert "NOT attainable" in rec_off, \
+        "an unattainable target was not reported - it still claims 'optimal ... found'"
+    assert "measurement phi did not improve" in rec_off, \
+        "the no-progress/weight-collapse diagnosis never fired"
+    assert "regularization is now effectively DISABLED" in rec_off or \
+           "PHIMLIM" in rec_off, "the diagnosis does not name PHIMLIM as the likely cause"
+
+    # -- same case, guard ON: the target relaxes to what is achievable ----------------------
+    wd2 = _reg_case("api_reg_unreach_on", phimlim=1.0e-3, achievable=True)
+    ws_on, rec_on = _run_reg(wd2, 6)
+    assert "Relaxing this iteration's target" in rec_on, \
+        "++reg_use_achievable_target was set but the target was never relaxed"
+    assert ws_on[-1] > ws_off[-1], (
+        "the achievable target did not arrest the weight collapse: off ended at {0}, on ended "
+        "at {1}".format(ws_off[-1], ws_on[-1]))
+
+    # -- THE SAFETY PROPERTY: a REACHABLE phimlim must be unaffected ------------------------
+    # the relaxation may only ever loosen a target, so a run that was converging cannot be
+    # changed by it. If this fails, the feature is not opt-in-safe and must not ship enabled.
+    wd3 = _reg_case("api_reg_reach_off", phimlim=25.0, achievable=False, noptmax=4)
+    wd4 = _reg_case("api_reg_reach_on", phimlim=25.0, achievable=True, noptmax=4)
+    r_off, _ = _run_reg(wd3, 4)
+    r_on, rec4 = _run_reg(wd4, 4)
+    assert len(r_off) == len(r_on), (r_off, r_on)
+    for a, b in zip(r_off, r_on):
+        assert abs(a - b) <= abs(a) * 1.0e-9, (
+            "the achievable target changed a run whose phimlim was already reachable: "
+            "{0} vs {1}".format(r_off, r_on))
+    assert "Relaxing this iteration's target" not in rec4, \
+        "the target was relaxed on a run that was converging normally"
+    print("api_glm_dynreg_unreachable_phimlim_test passed")
+
+
+def api_glm_regularization_test():
+    """The tikhonov regularization state is readable and settable through the API.
+
+    These dials live in the control file's `* regularization` section rather than as ++
+    options, so pestpp_set_option() does not reach them and there was previously no way to
+    change one without editing a control file and starting a new process. That made the
+    dynamic-weight algorithm effectively unstudiable: no way to sweep phimlim within a session.
+
+    The property worth pinning is that a SET is visible to a subsequent GET and survives an
+    iteration - a dial that reads back but is not consulted would look identical here if we
+    only checked the round trip, so the test also runs an iteration between the two.
+    """
+    d = _case("api_glm_reg", noptmax=2, num_reals=5)
+    with Glm.from_pst("pest.pst", workdir=d) as glm:
+        glm.initialize()
+        r = glm.regularization()
+        for k in ("use_dynamic_reg", "weight", "phimlim", "phimaccept", "fracphim",
+                  "wfmin", "wfmax", "wffac", "wftol", "wfinit", "max_reg_iter",
+                  "adj_grp_weights"):
+            assert k in r, "regularization state is missing '{0}': {1}".format(k, sorted(r))
+        assert r["weight"] > 0.0, r["weight"]
+
+        glm.set_regularization(phimlim=123.0, phimaccept=456.0, max_reg_iter=7,
+                               use_dynamic_reg=True)
+        r2 = glm.regularization()
+        assert r2["phimlim"] == 123.0, r2["phimlim"]
+        assert r2["phimaccept"] == 456.0, r2["phimaccept"]
+        assert r2["max_reg_iter"] == 7, r2["max_reg_iter"]
+        assert r2["use_dynamic_reg"] is True, r2["use_dynamic_reg"]
+
+        # ...and the values survive an iteration rather than being reset from the scenario
+        glm.solve()
+        r3 = glm.regularization()
+        assert r3["phimlim"] == 123.0, (
+            "phimlim was reset across an iteration: {0}".format(r3["phimlim"]))
+
+        try:
+            glm.set_regularization(not_a_dial=1.0)
+        except PestppError as e:
+            assert "unknown regularization key" in str(e).lower(), e
+        else:
+            raise AssertionError("an unknown regularization key was accepted")
+
+    # the ensemble tools have no such thing and say so
+    d2 = _case("api_ies_no_reg", noptmax=1, num_reals=5)
+    with Ies.from_pst("pest.pst", workdir=d2) as ies:
+        ies.initialize()
+        for label, call in (("get", ies._lib.get_regularization),
+                            ("set", lambda: ies._lib.set_regularization("weight", 1.0))):
+            try:
+                call()
+            except PestppError as e:
+                assert "regulariz" in str(e).lower(), "{0}: {1}".format(label, e)
+            else:
+                raise AssertionError("ies accepted regularization {0}".format(label))
+    print("api_glm_regularization_test passed")
+
+
+def api_glm_compute_upgrade_test():
+    """Give a lambda, get the upgrade it would produce - without spending a single model run.
+
+    The assertion that carries weight is the MONOTONICITY: lambda is Marquardt damping, so a
+    larger one must not produce a larger step. That is a property of the answer rather than of
+    the plumbing, which means it fails if the lambda is being ignored, mis-scaled, or applied
+    to the wrong matrix - all things a "did it return 11 numbers" test would happily pass.
+    """
+    d = _case("api_glm_upgrade", noptmax=2, num_reals=5)
+    with Glm.from_pst("pest.pst", workdir=d) as glm:
+        glm.initialize()
+
+        # needs a jacobian, and says so before there is one
+        try:
+            glm.compute_upgrade(1.0)
+        except PestppError as e:
+            assert "jacobian" in str(e).lower(), e
+        else:
+            raise AssertionError("compute_upgrade worked with no jacobian")
+
+        glm.jacobian_prepare()
+        glm.jacobian_run()
+        glm.jacobian_process()
+
+        base = glm.par_vector()
+        lambdas = (0.1, 1.0, 10.0, 100.0, 1000.0)
+        steps, limits = [], []
+        for lam in lambdas:
+            up, limit = glm.compute_upgrade(lam)
+            assert isinstance(up, pd.Series), type(up)
+            assert list(up.index) == list(base.index), "upgrade is not on the parameter index"
+            assert np.isfinite(up.values).all(), "upgrade holds non-finite values"
+            assert limit in ("none", "bound", "factor", "relative"), limit
+            steps.append(float((up - base).abs().max()))
+            limits.append(limit)
+
+        assert steps[0] > 0.0, "lambda=0.1 produced no step at all"
+        for i in range(len(steps) - 1):
+            assert steps[i] >= steps[i + 1] - 1.0e-10, (
+                "a LARGER lambda produced a LARGER step: lambda {0} -> {1:.6g}, lambda {2} -> "
+                "{3:.6g}. lambda is Marquardt damping; this means it is not reaching the "
+                "solve".format(lambdas[i], steps[i], lambdas[i + 1], steps[i + 1]))
+
+        # asking twice gives the same answer - it is a query, not a step
+        again, _ = glm.compute_upgrade(lambdas[0])
+        first, _ = glm.compute_upgrade(lambdas[0])
+        assert np.allclose(again.values, first.values), \
+            "compute_upgrade is not idempotent - it is mutating solver state"
+        # ...and it did not move the tool's own parameters
+        assert np.allclose(glm.par_vector().values, base.values), \
+            "compute_upgrade changed the current parameter vector; it is a query"
+
+    # ensemble tools refuse it
+    d2 = _case("api_ies_no_upgrade", noptmax=1, num_reals=5)
+    with Ies.from_pst("pest.pst", workdir=d2) as ies:
+        ies.initialize()
+        try:
+            ies._lib.compute_upgrade(1.0)
+        except PestppError as e:
+            assert "lambda" in str(e).lower() or "upgrade" in str(e).lower(), e
+        else:
+            raise AssertionError("ies accepted compute_upgrade")
+    print("api_glm_compute_upgrade_test passed")
+
+
 def api_glm_jacobian_stages_test():
     """The caller can own the jco batch: prepare -> run -> process, then read the Jacobian.
 
@@ -2691,6 +2953,10 @@ if __name__ == "__main__":
     api_release_workers_test()
     api_glm_jco_and_par_vector_test()
     api_glm_jacobian_stages_test()
+    api_glm_compute_upgrade_test()
+    api_glm_regularization_test()
+    api_glm_dynreg_unreachable_phimlim_test()
+    api_glm_dynreg_reachable_phimlim_test()
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_robust_requires_paired_parameters_test()

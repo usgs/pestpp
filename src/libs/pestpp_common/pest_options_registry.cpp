@@ -659,6 +659,14 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
     // the output files are read. Failures are forgiven by design - see the call site: a
     // partial-results request is a courtesy and must never be able to damage the run it is
     // asking about.
+    // Closes FRACPHIM's open loop - see the note in SVDSolver::dynamic_weight_adj(). ON by
+    // default: it only ever RELAXES a target, and only where FRACPHIM is the binding term and
+    // phi has genuinely stalled, so a run whose phimlim is attainable is provably unaffected
+    // (api_glm_dynreg_reachable_phimlim_test). Set it false to get the pre-2026 trajectory.
+    OptionSpec{ "REG_USE_ACHIEVABLE_TARGET", {}, OptType::BOOL, "glm", false,
+        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_reg_use_achievable_target(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o){ o.set_reg_use_achievable_target(true); },
+        [](const PestppOptions& o)->string{ return std::to_string(o.get_reg_use_achievable_target()?1:0); } },
     OptionSpec{ "PANTHER_WORKER_PARTIAL_OBS_COMMAND", {}, OptType::STRING, "panther", false,
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ o.set_panther_worker_partial_obs_command(org_value); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_panther_worker_partial_obs_command(""); },

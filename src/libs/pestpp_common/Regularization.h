@@ -48,6 +48,20 @@ public:
 	virtual double get_grp_weight_fact(const std::string &grp_name) const;
 	virtual void set_weight(double _tikhonov_weight) {tikhonov_weight = _tikhonov_weight;}
 	virtual void set_max_reg_iter(int _max_reg_iter) { max_reg_iter = _max_reg_iter; }
+	// The rest of the dials. They arrive from the control file's '* regularization' section
+	// and had no setters, which meant the only way to explore this algorithm's behaviour was to
+	// edit a control file and start a new process - no way to sweep phimlim within one session,
+	// and no way to drive it from the API at all.
+	virtual void set_phimlim(double v) { phi_m_lim = v; }
+	virtual void set_phimaccept(double v) { phi_m_accept = v; }
+	virtual void set_fracphim(double v) { frac_phi_m = v; }
+	virtual void set_wfmin(double v) { wf_min = v; }
+	virtual void set_wfmax(double v) { wf_max = v; }
+	virtual void set_wffac(double v) { wffac = v; }
+	virtual void set_wftol(double v) { wftol = v; }
+	virtual void set_wfinit(double v) { wf_init = v; }
+	/// IREGADJ in the control file, where it is an int and only the value 1 turns it on.
+	virtual void set_adj_grp_weights(bool v) { adj_grp_weights = v; }
 	virtual void set_regul_grp_weights(const std::unordered_map<std::string, double> &_regul_grp_weights) { regul_grp_weights = _regul_grp_weights; }
 	static DynamicRegularization get_unit_reg_instance();
 	static DynamicRegularization get_zero_reg_instance(); //{ return DynamicRegularization(true, false, 0,0,0,0,0,0,0,0); }

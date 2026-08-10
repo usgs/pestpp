@@ -1409,6 +1409,44 @@ class Glm(_Tool):
         """
         return 0
 
+    def regularization(self) -> dict:
+        """The tikhonov regularization state: weight, phimlim, phimaccept and the wf* dials.
+
+        These come from the control file's ``* regularization`` section, not from ++ options,
+        so ``get_option`` does not reach them.
+        """
+        return self._lib.get_regularization()
+
+    def set_regularization(self, **kwargs) -> None:
+        """Set regularization dials by keyword::
+
+            glm.set_regularization(phimlim=250.0, phimaccept=275.0)
+
+        Live: the solver reads these at point of use, so a change takes effect on the next
+        iteration - which is what makes it possible to sweep phimlim within one session
+        instead of editing a control file and starting over.
+        """
+        for k, v in kwargs.items():
+            self._lib.set_regularization(k, v)
+
+    def compute_upgrade(self, lambda_value: float, lower: bool = False):
+        """The parameters a given lambda would produce, WITHOUT running anything.
+
+        Returns ``(upgrade, limit_hit)`` - a pandas Series in CTL space, and which limit
+        clipped the step: ``'none'``, ``'bound'``, ``'factor'`` or ``'relative'``. A truncated
+        upgrade is a different answer from an untruncated one, so comparing lambdas without
+        knowing which you have is comparing two different questions::
+
+            for lam in (0.1, 1.0, 10.0, 100.0):
+                up, limit = glm.compute_upgrade(lam)
+                print(lam, limit, (up - glm.par_vector()).abs().max())
+
+        Needs a Jacobian - call it after :meth:`solve` or the ``jacobian_*`` stages.
+        """
+        names, vals, limit = self._lib.compute_upgrade(float(lambda_value))
+        idx = [n.lower() for n in names] if lower else names
+        return pd.Series(vals, index=idx, name="lambda={0}".format(lambda_value)), limit
+
     def jacobian_prepare(self, calc_init_obs: bool = False) -> int:
         """Queue the Jacobian runs WITHOUT running them. Returns how many are outstanding.
 

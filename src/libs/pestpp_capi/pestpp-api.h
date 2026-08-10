@@ -977,6 +977,47 @@ PESTPP_API pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data,
                                              int* nrow, int* ncol,
                                              char* row_names, char* col_names);
 
+/* ---- Tikhonov regularization (glm) -------------------------------------------------------
+   The dynamically adjusted regularization weight and the dials that govern it. These arrive
+   from the control file's `* regularization` section rather than as ++ options, which is why
+   pestpp_set_option() does not reach them.
+
+   The ensemble tools refuse both calls: they regularize through the prior ensemble and have no
+   weight to read or set. */
+
+/* Read the whole state. Any out-param may be NULL. `use_dynamic` is 0/1. */
+PESTPP_API pestpp_status pestpp_get_regularization(pestpp_handle h, int* use_dynamic,
+                                                   double* weight, double* phimlim,
+                                                   double* phimaccept, double* fracphim,
+                                                   double* wfmin, double* wfmax, double* wffac,
+                                                   double* wftol, double* wfinit,
+                                                   int* max_reg_iter, int* adj_grp_weights);
+
+/* Set ONE dial by name: use_dynamic_reg, weight, phimlim, phimaccept, fracphim, wfmin, wfmax,
+   wffac, wftol, wfinit, max_reg_iter, adj_grp_weights (accepted as `iregadj` too, which is
+   the control-file spelling). Keyed rather than wide so a caller changes one without
+   restating the rest, and so an unknown name is an error rather than a silently dropped
+   argument. Live - the solver reads these at point of use, so a change takes effect on the
+   next iteration. */
+PESTPP_API pestpp_status pestpp_set_regularization(pestpp_handle h, const char* key,
+                                                   double value);
+
+/* The upgraded parameters a given LAMBDA would produce, WITHOUT running anything. glm only.
+
+   The query the lambda loop makes internally, exposed so a caller can make it directly and
+   compare lambdas before spending runs on them. Needs a Jacobian, so call it after an
+   iteration or after the jacobian stages below.
+
+   Values come back in CTL space, bound- and change-limited exactly as the solver's own
+   candidates are; `limit_buf` receives "none", "bound", "factor" or "relative", because a
+   truncated upgrade is a different answer from an untruncated one. Names are sorted and packed
+   PESTPP_NAME_LEN-wide, matching pestpp_get_par_vector(). NULL pointers size it.
+
+   Does NOT adjust the regularization weight - see the note on SVDSolver::compute_upgrade. */
+PESTPP_API pestpp_status pestpp_compute_upgrade(pestpp_handle h, double lambda,
+                                                double* vals, int max_n, int* n, char* names,
+                                                char* limit_buf, int limit_buf_len);
+
 /* The Jacobian batch as three stages: queue, run, harvest. glm only.
 
    prepare() builds the finite-difference runs and QUEUES them with the run manager without
