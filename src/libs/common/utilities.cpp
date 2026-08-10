@@ -2470,7 +2470,145 @@ void CmdLine::startup_report(std::ostream &s, string start_string) {
 // end of namespace pest_utils
 }
 
+bool pest_utils::run_command(const std::string& cmd_string,
+	pest_utils::thread_flag* terminate, bool should_echo, int sleep_ms)
+{
+#ifdef OS_WIN
+	//create a job object to track child and grandchild process
+	HANDLE job = CreateJobObject(NULL, NULL);
+	if (job == NULL) throw PestError("could not create job object handle");
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = { 0 };
+	jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+	if (0 == SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli)))
+	{
+		throw PestError("could not assign job limit flag to job object");
+	}
+            if (should_echo)
+        cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
+	//start the command
+	PROCESS_INFORMATION pi;
+	try
+	{
+		std::string cmd_copy = cmd_string;
+			pi = start(cmd_copy);
+	}
+	catch (...)
+	{
+		throw std::runtime_error("start_command() failed for command: " + cmd_string);
+	}
+	if (0 == AssignProcessToJobObject(job, pi.hProcess))
+	{
+		throw PestError("could not add process to job object: " + cmd_string);
+	}
+	DWORD pid = pi.dwProcessId;
+            if (should_echo)
+	    cout << "...pid: " << pid << endl;
+	DWORD exitcode;
+	while (true)
+	{
+                //sleep
+		std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+		//check if process is still active
+		GetExitCodeProcess(pi.hProcess, &exitcode);
+		//if the process ended, break
+		if (exitcode != STILL_ACTIVE)
+		{
+			if (exitcode != 0)
+			{
+					cout << "exit_code: " << exitcode << endl;
+				throw std::runtime_error("GetExitCodeProcess() returned error status for command: " + cmd_string);
+			}
+                    if (should_echo)
+                    {
+                        cout << "...exit_code: " << exitcode << endl;
+                    }
+			break;
+		}
+		//else cout << exitcode << "...still waiting for command " << cmd_string << endl;
+		//check for termination flag
+		if (((terminate != nullptr) && terminate->get()))
+		{
+                    if (should_echo)
+			    std::cout << "received terminate signal" << std::endl;
+			//try to kill the process
+			bool success = (CloseHandle(job) != 0);
 
+			//bool success = TerminateProcess(pi.hProcess, 0);
+			if (!success)
+			{
+					throw std::runtime_error("unable to terminate process for command: " + cmd_string);
+			}
+			return false;   // cancelled
 
+			break;
+		}
 
+	}
+#endif
 
+#ifdef OS_LINUX
+            if (should_echo)
+                cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
+	//start the command
+	std::string cmd_copy = cmd_string;
+		int command_pid = start(cmd_copy);
+            if (should_echo)
+	    cout << "...pid: " << command_pid << endl;
+	while (true)
+	{
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+                //check if process is still active
+		int status = 0;
+		pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
+
+                //if the process ended, break
+		if ((exit_code == -1) || (status != 0))
+		{
+                    cout << "exit_code: " << exit_code << endl;
+                    cout << "status: " << status << endl;
+			throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
+		}
+		else if (exit_code != 0)
+		{
+                    if (should_echo)
+                    {
+                        cout << "...exit_code: " << exit_code << endl;
+                        cout << "...status: " << status << endl;
+                    }
+		    break;
+		}
+		//check for termination flag
+		if (((terminate != nullptr) && terminate->get()))
+		{
+                    if (should_echo)
+			    std::cout << "received terminate signal" << std::endl;
+			//try to kill the process
+			errno = 0;
+			int success = kill(-command_pid, SIGKILL);
+			if (success == -1)
+			{
+					throw std::runtime_error("unable to terminate process for command: " + cmd_string);
+			}
+			return false;   // cancelled
+			break;
+		}
+                //sleep
+
+	}
+#endif
+	return true;
+}
+
+bool pest_utils::run_commands(const std::vector<std::string>& comline_vec,
+	pest_utils::thread_flag* terminate, bool should_echo, int sleep_ms)
+{
+	// Stop at the first cancellation rather than starting the rest - which is what the
+	// original `if (term_break) break;` did, and matters: the commands are a pipeline, so
+	// running step 3 after step 2 was killed would feed it half-written inputs.
+	for (const std::string& cmd_string : comline_vec)
+	{
+		if (!run_command(cmd_string, terminate, should_echo, sleep_ms))
+			return false;
+	}
+	return true;
+}

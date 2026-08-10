@@ -3110,13 +3110,18 @@ int MOEA::initialize_prepare()
 	member_count = 0;
 
 	warn_min_members = 20;
-	// 5, not 4: at exactly 4 the generators cannot make progress. selection() can only supply
-	// n-1 distinct members under tournament mating - a pass needs two unselected members but
-	// adds one - so a population of 4 cannot yield the 4 distinct parents the differential
-	// evolution generator asks for, and it retries without ever accepting a candidate. That is
-	// what hung pestpp-mou on CI for 82 minutes rather than failing. Below this we already say
-	// "too few members to continue"; 4 belongs on that side of the line.
-	error_min_members = 5;
+	// 4 is fine. It was briefly raised to 5 on the theory that the generators could not make
+	// progress at exactly 4 - a population of 4 hung pestpp-mou on CI for 82 minutes. The hang
+	// was real but the diagnosis was not: it was selection() failing to terminate, because its
+	// retry `continue`s jumped over the tries++ that was supposed to bound them, and because
+	// tournament mating can only ever supply n-1 distinct members. Both are fixed in
+	// selection(), and a population of 4 now runs to completion.
+	//
+	// The measurement that suggested otherwise was taken against a stale binary - `make
+	// pestpp-mou` builds and links but does not run local_install, so bin/ still held the
+	// previous day's executable. Raising this threshold cost henry_test, which legitimately
+	// collapses to 4 members and was then refused outright.
+	error_min_members = 4;
 
 	initialize_population_schedule();
 

@@ -792,148 +792,15 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		if (should_echo)
             cout << pest_utils::get_time_string() << " calling forward run command(s)" << endl;
 
-#ifdef OS_WIN
-		//a flag to track if the run was terminated
-		bool term_break = false;
-		//create a job object to track child and grandchild process
-		HANDLE job = CreateJobObject(NULL, NULL);
-		if (job == NULL) throw PestError("could not create job object handle");
-		JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = { 0 };
-		jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-		if (0 == SetInformationJobObject(job, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli)))
-		{
-			throw PestError("could not assign job limit flag to job object");
-		}
-		for (auto &cmd_string : comline_vec)
-		{
-            if (should_echo)
-		        cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
-			//start the command
-			PROCESS_INFORMATION pi;
-			try
-			{
-				pi = start(cmd_string);
-			}
-			catch (...)
-			{
-				finished->set(true);
-				throw std::runtime_error("start_command() failed for command: " + cmd_string);
-			}
-			if (0 == AssignProcessToJobObject(job, pi.hProcess))
-			{
-				throw PestError("could not add process to job object: " + cmd_string);
-			}
-			DWORD pid = pi.dwProcessId;
-            if (should_echo)
-			    cout << "...pid: " << pid << endl;
-			DWORD exitcode;
-			while (true)
-			{
-                //sleep
-				std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
-				//check if process is still active
-				GetExitCodeProcess(pi.hProcess, &exitcode);
-				//if the process ended, break
-				if (exitcode != STILL_ACTIVE)
-				{
-					if (exitcode != 0)
-					{
-						finished->set(true);
-						cout << "exit_code: " << exitcode << endl;
-						throw std::runtime_error("GetExitCodeProcess() returned error status for command: " + cmd_string);
-					}
-                    if (should_echo)
-                    {
-                        cout << "...exit_code: " << exitcode << endl;
-                    }
-					break;
-				}
-				//else cout << exitcode << "...still waiting for command " << cmd_string << endl;
-				//check for termination flag
-				if (terminate->get())
-				{
-                    if (should_echo)
-					    std::cout << "received terminate signal" << std::endl;
-					//try to kill the process
-					bool success = (CloseHandle(job) != 0);
-
-					//bool success = TerminateProcess(pi.hProcess, 0);
-					if (!success)
-					{
-						finished->set(true);
-						throw std::runtime_error("unable to terminate process for command: " + cmd_string);
-					}
-					term_break = true;
-
-					break;
-				}
-
-			}
-			//jump out of the for loop if terminated
-			if (term_break) break;
-		}
-
-
-#endif
-
-#ifdef OS_LINUX
-		//a flag to track if the run was terminated
-		bool term_break = false;
-		for (auto &cmd_string : comline_vec)
-		{
-            if (should_echo)
-                cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
-			//start the command
-			int command_pid = start(cmd_string);
-            if (should_echo)
-			    cout << "...pid: " << command_pid << endl;
-			while (true)
-			{
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
-                //check if process is still active
-				int status = 0;
-				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
-
-                //if the process ended, break
-				if ((exit_code == -1) || (status != 0))
-				{
-                    cout << "exit_code: " << exit_code << endl;
-                    cout << "status: " << status << endl;
-					finished->set(true);
-					throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
-				}
-				else if (exit_code != 0)
-				{
-                    if (should_echo)
-                    {
-                        cout << "...exit_code: " << exit_code << endl;
-                        cout << "...status: " << status << endl;
-                    }
-				    break;
-				}
-				//check for termination flag
-				if (terminate->get())
-				{
-                    if (should_echo)
-					    std::cout << "received terminate signal" << std::endl;
-					//try to kill the process
-					errno = 0;
-					int success = kill(-command_pid, SIGKILL);
-					if (success == -1)
-					{
-						finished->set(true);
-						throw std::runtime_error("unable to terminate process for command: " + cmd_string);
-					}
-					term_break = true;
-					break;
-				}
-                //sleep
-
-			}
-			//jump out of the for loop if terminated
-			if (term_break) break;
-		}
-#endif
+		// The OS-specific spawn/poll/kill is pest_utils::run_commands() now - windows job
+		// objects, posix process groups, and the grandchild-killing each exists for. It lived
+		// here and in a drifted near-copy in RunManagerExternal; one of them is enough.
+		//
+		// It does NOT touch `finished`: that flag is this class's contract with its listener
+		// thread, not something a general command runner should know about. The catch blocks
+		// below set it instead, which also covers write_input_files()/read_output_files()
+		// throwing - paths that previously left the listener waiting forever.
+		bool term_break = !pest_utils::run_commands(comline_vec, terminate, should_echo, sleep_ms);
         if (should_echo)
 		    cout << pest_utils::get_time_string() << " forward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
@@ -948,11 +815,14 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 	catch (const std::exception& e)
 	{
 		cout << "exception raised by run thread: " << e.what() << endl;
+		// the listener thread waits on this; without it a failed run hangs rather than reports
+		finished->set(true);
 		eptr = current_exception();
 	}
 	catch (...)
 	{
 		cout << "exception raised by run thread" << endl;
+		finished->set(true);
 		eptr = current_exception();
 	}
 	return;

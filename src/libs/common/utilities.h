@@ -261,6 +261,45 @@ private:
 
 };
 
+/** Run ONE shell command to completion on whichever OS this is.
+ *
+ * The single system-call site: everything that spawns a model process goes through here, so
+ * the platform difference is written down once. It is not incidental. Windows puts the child
+ * in a JOB OBJECT with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE; posix starts it in its own process
+ * group and signals the NEGATED pid. Both exist so GRANDCHILDREN die too - a forward-run
+ * command is usually a script that launches the real model, so killing only the direct child
+ * leaves the model running, holding the working directory and writing output files that the
+ * next run will read as its own.
+ *
+ * @param terminate  polled between sleeps; null means "cannot be cancelled"
+ * @param should_echo  narrate the command, pid and exit code to stdout
+ * @param sleep_ms  poll interval while waiting
+ * @return true if the command ran to completion, false if `terminate` cancelled it
+ * @throws std::runtime_error / PestError on a failed start, a non-zero exit, or a failed kill
+ */
+bool run_command(const std::string& cmd_string,
+	thread_flag* terminate = nullptr, bool should_echo = true, int sleep_ms = 10);
+
+/** Run a sequence of shell commands to completion, honouring a cooperative cancel flag.
+ *
+ * The OS-specific half of "call the forward model", lifted out of ModelInterface::run() so the
+ * other places that spawn model processes do not each carry their own copy - RunManagerExternal
+ * already had a near-duplicate, and the two had drifted.
+ *
+ * Stops at the first cancelled command rather than starting the rest: the commands are a
+ * pipeline, so running step 3 after step 2 was killed would feed it half-written inputs.
+ *
+ * @param terminate  polled between sleeps; null means "cannot be cancelled"
+ * @param should_echo  whether to narrate commands, pids and exit codes to stdout
+ * @param sleep_ms  poll interval while waiting on a command
+ * @return true if every command ran to completion, false if `terminate` stopped it early - in
+ *         which case there are NO results to read, and the caller must not read any
+ * @throws std::runtime_error / PestError on a failed start, a non-zero exit, or a failed kill
+ */
+bool run_commands(const std::vector<std::string>& comline_vec,
+	thread_flag* terminate = nullptr, bool should_echo = true, int sleep_ms = 10);
+
+
 //class thread_exceptions
 //{
 //public:
