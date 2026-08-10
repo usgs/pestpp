@@ -90,6 +90,17 @@ public:
 	const ModelRun& get_current_run() const { return cur_run; }
 	TerminationController& get_termination_ctl() { return termination_ctl; }
 	Jacobian& get_base_jacobian() { return *base_jacobian_ptr; }
+	/// Whether the Jacobian exists yet. It is built in initialize_prepare(), so a caller that
+	/// asks before initialize() gets a clear answer instead of a dereferenced null.
+	bool has_base_jacobian() const { return base_jacobian_ptr != nullptr; }
+
+	/// The parameter vector the next iteration will work from, in CTL space, and the best one
+	/// found so far. Both live in their ModelRun, so these read through rather than copy.
+	/// Setting the current one is the point of exposing it: a caller can move the starting
+	/// position between iterations.
+	const Parameters& get_current_parameters() const { return cur_run.get_ctl_pars(); }
+	const Parameters& get_optimum_parameters() const { return optimum_run.get_ctl_pars(); }
+	void set_current_parameters(const Parameters& pars) { cur_run.set_ctl_parameters(pars); }
 	int get_iteration_number() { return termination_ctl.get_iteration_number(); }
 
 private:

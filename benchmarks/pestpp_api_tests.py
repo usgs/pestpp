@@ -25,7 +25,7 @@ _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp_lib import NOISE_EN  # noqa: E402
 from pestpp import (  # noqa: E402
-    Ies, Mou, Sqp, IterationStep, PestppError, ExpiredViewError, find_library,
+    Ies, Mou, Sqp, Glm, IterationStep, PestppError, ExpiredViewError, find_library,
     run_ies, PHI_ACTUAL,
 )
 
@@ -2346,6 +2346,76 @@ def api_run_manager_settings_are_live_test():
     print("api_run_manager_settings_are_live_test passed")
 
 
+def api_glm_jco_and_par_vector_test():
+    """glm's own surface: the parameter VECTOR and the Jacobian, in the shapes users work in.
+
+    The point of these is that glm is not an ensemble method, so the inherited ensemble and
+    phi calls have no honest answer - and this checks both halves: that the glm-specific
+    accessors work, and that the ensemble-shaped ones still refuse rather than fabricate a
+    one-row frame.
+    """
+    d = _case("api_glm_surface", noptmax=2, num_reals=5)
+    with Glm.from_pst("pest.pst", workdir=d) as glm:
+        glm.initialize()
+
+        # -- parameter vector, as a labelled Series -----------------------------------------
+        pv = glm.par_vector()
+        assert isinstance(pv, pd.Series), type(pv)
+        assert pv.size > 0 and pv.index.is_unique, pv.shape
+        first, orig = pv.index[0], float(pv.iloc[0])
+
+        # partial set, matched by name: only the named parameter moves
+        glm.set_par_vector(pd.Series({first: orig * 1.01}))
+        after = glm.par_vector()
+        assert abs(after[first] - orig * 1.01) < 1.0e-12, (after[first], orig)
+        others = [n for n in pv.index if n != first]
+        assert all(after[n] == pv[n] for n in others), "a partial set changed something it did not name"
+
+        # a dict works too, and an unknown name is an error rather than a silent skip
+        glm.set_par_vector({first: orig})
+        try:
+            glm.set_par_vector({"definitely_not_a_par": 1.0})
+        except PestppError as e:
+            assert "not a parameter" in str(e).lower(), e
+        else:
+            raise AssertionError("an unknown parameter name was accepted")
+        # a bare array has no names to match on, so it is refused rather than positional
+        try:
+            glm.set_par_vector(np.ones(pv.size))
+        except TypeError:
+            pass
+        else:
+            raise AssertionError("an unlabelled array was accepted")
+
+        glm.solve()
+
+        # -- jacobian, in all three representations -----------------------------------------
+        j = glm.jco()
+        assert isinstance(j, pd.DataFrame) and j.shape[0] > 0 and j.shape[1] > 0, j.shape
+        arr, rnames, cnames = glm.jco(as_="numpy")
+        assert arr.shape == j.shape and list(rnames) == list(j.index), (arr.shape, j.shape)
+        assert arr.flags["F_CONTIGUOUS"], "jco should come back column-major, like the library holds it"
+        jc = glm.jco(as_="pyemu")
+        assert jc.shape == j.shape, (jc.shape, j.shape)
+        assert np.allclose(j.values, arr) and np.allclose(j.values, jc.x), \
+            "the three jco representations disagree"
+        assert (j.values != 0).any(), "the jacobian is entirely zero - it was never filled"
+        # columns are the ADJUSTABLE parameters, so a jco is narrower than the par vector,
+        # which carries every ctl parameter including fixed and tied
+        assert j.shape[1] <= pv.size, (j.shape, pv.size)
+        assert list(glm.jco(lower=True).columns) == [c.lower() for c in cnames]
+
+        # -- and the ensemble-shaped calls still refuse -------------------------------------
+        assert glm.n_reals == 0, glm.n_reals
+        try:
+            glm.par_df()
+        except PestppError as e:
+            assert "glm" in str(e).lower() or "ensemble" in str(e).lower(), e
+        else:
+            raise AssertionError("glm handed back a parameter ensemble it does not have")
+    print("api_glm_jco_and_par_vector_test passed")
+
+
 def api_release_workers_test():
     """Releasing through the friendly layer also reconciles the processes IT started.
 
@@ -2573,6 +2643,7 @@ if __name__ == "__main__":
     api_missing_par_columns_get_control_values_test()
     api_run_manager_settings_are_live_test()
     api_release_workers_test()
+    api_glm_jco_and_par_vector_test()
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_robust_requires_paired_parameters_test()

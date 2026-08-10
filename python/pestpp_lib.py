@@ -398,6 +398,15 @@ class PestppLib:
         lib.pestpp_cancel_runs.restype = c_int
         lib.pestpp_release_workers.argtypes = (c_void_p, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_release_workers.restype = c_int
+        lib.pestpp_get_jacobian.argtypes = (
+            c_void_p, POINTER(c_double), c_int, c_int, POINTER(c_int), POINTER(c_int),
+            c_char_p, c_char_p)
+        lib.pestpp_get_jacobian.restype = c_int
+        lib.pestpp_get_par_vector.argtypes = (
+            c_void_p, c_int, POINTER(c_double), c_int, POINTER(c_int), c_char_p)
+        lib.pestpp_get_par_vector.restype = c_int
+        lib.pestpp_set_par_vector.argtypes = (c_void_p, POINTER(c_double), c_int, c_char_p)
+        lib.pestpp_set_par_vector.restype = c_int
         lib.pestpp_get_worker_count.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_get_worker_count.restype = c_int
         lib.pestpp_get_worker_state.argtypes = (
@@ -1014,6 +1023,49 @@ class PestppLib:
         self._check(self.lib.pestpp_release_workers(self.handle, arr, count, byref(n)),
                     "pestpp_release_workers")
         return n.value
+
+    def get_jacobian(self):
+        """The Jacobian as (values, row_names, col_names). Rows are observations.
+
+        A dense COPY in numpy F order, matching how the library writes it. glm only; the
+        ensemble tools refuse, because they never form the matrix.
+        """
+        nr, nc = c_int(), c_int()
+        self._check(self.lib.pestpp_get_jacobian(self.handle, None, 0, 0, byref(nr), byref(nc),
+                                                 None, None), "pestpp_get_jacobian")
+        n_r, n_c = nr.value, nc.value
+        data = np.empty((n_r, n_c), dtype=np.float64, order="F")
+        rbuf = create_string_buffer(n_r * self.name_len)
+        cbuf = create_string_buffer(n_c * self.name_len)
+        self._check(self.lib.pestpp_get_jacobian(
+            self.handle, data.ctypes.data_as(POINTER(c_double)), n_r, n_c,
+            byref(nr), byref(nc), rbuf, cbuf), "pestpp_get_jacobian")
+        return data, self._unpack_names(rbuf.raw, n_r), self._unpack_names(cbuf.raw, n_c)
+
+    def get_par_vector(self, which: int = 0):
+        """The tool's single parameter vector as (names, values). which: 0 current, 1 optimum."""
+        n = c_int()
+        self._check(self.lib.pestpp_get_par_vector(self.handle, which, None, 0, byref(n), None),
+                    "pestpp_get_par_vector")
+        cnt = n.value
+        vals = np.empty(cnt, dtype=np.float64)
+        nbuf = create_string_buffer(cnt * self.name_len)
+        self._check(self.lib.pestpp_get_par_vector(
+            self.handle, which, vals.ctypes.data_as(POINTER(c_double)), cnt, byref(n), nbuf),
+            "pestpp_get_par_vector")
+        return self._unpack_names(nbuf.raw, cnt), vals
+
+    def set_par_vector(self, names, values) -> None:
+        """Push values onto the current parameter vector, matched by name. Partial is fine."""
+        names = list(names)
+        vals = np.asarray(values, dtype=np.float64)
+        if len(names) != vals.size:
+            raise ValueError("names and values differ in length: {0} vs {1}"
+                             .format(len(names), vals.size))
+        buf = self._pack_names(names)
+        self._check(self.lib.pestpp_set_par_vector(
+            self.handle, vals.ctypes.data_as(POINTER(c_double)), len(names), buf),
+            "pestpp_set_par_vector")
 
     def get_worker_count(self) -> int:
         v = c_int()

@@ -56,7 +56,7 @@ from pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, _UNSET,
     PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
     STACK_PAR_EN, STACK_OBS_EN, NESTED_PAR_EN, MEMBER_STACK_EN,
-    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP,
+    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, TOOL_GLM,
     RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
     PHI_MEAS, PHI_COMPOSITE, PHI_REGUL, PHI_ACTUAL, PHI_NOISE,
     WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT,
@@ -71,7 +71,7 @@ from pestpp_progress import Progress, auto as _progress_auto  # noqa: E402
 _ToolT = TypeVar("_ToolT", bound="_Tool")
 
 __all__ = [
-    "Ies", "Da", "Mou", "Sqp", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
+    "Ies", "Da", "Mou", "Sqp", "Glm", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
     "Progress", "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
     "PHI_MEAS", "PHI_COMPOSITE", "PHI_REGUL", "PHI_ACTUAL", "PHI_NOISE",
 ]
@@ -1374,6 +1374,93 @@ class Da(_Tool):
     @staticmethod
     def _agent_exe():
         return "pestpp-da"
+
+
+class Glm(_Tool):
+    """pestpp-glm: Gauss-Levenberg-Marquardt, through the same loop the executable runs.
+
+    The odd tool in this package, and worth being explicit about why. The other four carry a
+    POPULATION - an ensemble of realizations - so ``par_df()``, the ensemble views and the
+    phi-over-realizations calls all mean something. glm carries ONE parameter vector through a
+    Jacobian and an upgrade. Those inherited calls therefore refuse rather than hand back a
+    one-row frame, which would read as "an ensemble of one realization" and is not what glm
+    computed.
+
+    What glm offers instead:
+
+    ``par_vector()`` / ``set_par_vector()``   the single parameter vector, as a pandas Series
+    ``jco()``                                 the Jacobian, as a DataFrame, ndarray or pyemu Jco
+    """
+    _tool_id = TOOL_GLM
+    #: one phi, not a phi over realizations, so the inherited phi helpers stay out of the way
+    _has_phi = False
+
+    @staticmethod
+    def _agent_exe():
+        return "pestpp-glm"
+
+    @property
+    def n_reals(self) -> int:
+        """Always 0. glm carries a parameter VECTOR, so there are no realizations to count.
+
+        0 rather than a refusal because this feeds IterationStep, which solve() returns on
+        every iteration - raising here would make the ordinary loop unusable to report the
+        absence of a thing glm never had.
+        """
+        return 0
+
+    def par_vector(self, which: str = "current", lower: bool = False) -> pd.Series:
+        """The current (or ``"optimum"``) parameter vector in CTL space, as a labelled Series."""
+        which_id = {"current": 0, "optimum": 1}.get(str(which).lower())
+        if which_id is None:
+            raise ValueError("which must be 'current' or 'optimum', not {0!r}".format(which))
+        names, vals = self._lib.get_par_vector(which_id)
+        idx = [n.lower() for n in names] if lower else names
+        return pd.Series(vals, index=idx, name=str(which).lower())
+
+    def set_par_vector(self, values) -> None:
+        """Push a parameter vector back. Accepts a Series/dict, matched BY NAME.
+
+        Partial is fine: only what you name is changed. A name glm does not hold is an error
+        rather than a silent skip, because it means you and the tool disagree about the
+        parameter set - and that is worth hearing about at the call, not three iterations later.
+        """
+        if isinstance(values, pd.Series):
+            names, vals = list(values.index), values.values
+        elif isinstance(values, dict):
+            names, vals = list(values.keys()), list(values.values())
+        else:
+            raise TypeError("set_par_vector wants a pandas Series or a dict of name -> value, "
+                            "not {0}; a bare array has no names to match on"
+                            .format(type(values).__name__))
+        self._lib.set_par_vector([str(n) for n in names], vals)
+
+    def jco(self, as_: str = "pandas", lower: bool = False):
+        """The Jacobian. ``as_`` is ``"pandas"``, ``"numpy"`` or ``"pyemu"``.
+
+        Rows are simulated observations, columns the adjustable parameters it was built over.
+        A dense COPY in every case - the matrix is sparse internally, so there is no view to
+        hand out - and it exists only once ``initialize()`` has built it.
+
+        ``"numpy"`` returns ``(values, row_names, col_names)`` rather than a bare array, because
+        an unlabelled Jacobian is the easiest thing in this package to line up wrongly.
+        """
+        data, rnames, cnames = self._lib.get_jacobian()
+        if lower:
+            rnames = [r.lower() for r in rnames]
+            cnames = [c.lower() for c in cnames]
+        kind = str(as_).lower()
+        if kind == "numpy":
+            return data, rnames, cnames
+        if kind == "pandas":
+            return pd.DataFrame(data, index=rnames, columns=cnames)
+        if kind == "pyemu":
+            import pyemu
+            # pyemu keeps names lower-cased; hand it that regardless of `lower`, which governs
+            # what YOU get back, not what pyemu needs internally
+            return pyemu.Jco(x=data, row_names=[r.lower() for r in rnames],
+                             col_names=[c.lower() for c in cnames])
+        raise ValueError("as_ must be 'pandas', 'numpy' or 'pyemu', not {0!r}".format(as_))
 
 
 class _ChanceMixin:

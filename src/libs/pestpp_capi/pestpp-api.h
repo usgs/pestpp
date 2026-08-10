@@ -958,6 +958,36 @@ PESTPP_API pestpp_status pestpp_cancel_runs(pestpp_handle h, const int* run_ids,
 PESTPP_API pestpp_status pestpp_release_workers(pestpp_handle h, const int* worker_idxs, int n,
                                                 int* n_released);
 
+/* ---- Jacobian and the single parameter vector (glm) ------------------------------------
+   The ensemble tools refuse these: they carry a population, not one parameter set, and never
+   form the Jacobian. Use pestpp_get_par_snapshot() and the ensemble views for those. */
+
+/* Which parameter vector pestpp_get_par_vector() should return. */
+typedef enum {
+    PESTPP_PAR_CURRENT = 0,   /* what the next iteration will work from */
+    PESTPP_PAR_OPTIMUM = 1    /* the best found so far */
+} pestpp_par_vector;
+
+/* The Jacobian as a DENSE COLUMN-MAJOR COPY, rows = simulated observations, columns = the
+   adjustable parameters it was built over. Call with all pointers NULL to learn the shape,
+   size the buffers, then call again. Not a view: the matrix is sparse internally, so there is
+   no contiguous buffer to hand out. Available only after initialize() has built it. */
+PESTPP_API pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data,
+                                             int max_nrow, int max_ncol,
+                                             int* nrow, int* ncol,
+                                             char* row_names, char* col_names);
+
+/* The tool's parameter vector in CTL space, names packed PESTPP_NAME_LEN-wide and sorted, so
+   names and values always correspond. NULL pointers size it, as above. */
+PESTPP_API pestpp_status pestpp_get_par_vector(pestpp_handle h, int which, double* vals,
+                                               int max_n, int* n, char* names);
+
+/* Push values back onto the CURRENT vector, matched BY NAME - so a partial vector updates only
+   what it names and leaves the rest alone. A name the tool does not hold is an error, not a
+   silent skip: it means the caller and the tool disagree about the parameter set. */
+PESTPP_API pestpp_status pestpp_set_par_vector(pestpp_handle h, const double* vals, int n,
+                                               const char* names);
+
 /* Workers. get_worker_count() first, then index 0..n-1. Any out-param may be NULL. */
 PESTPP_API pestpp_status pestpp_get_worker_count(pestpp_handle h, int* n);
 PESTPP_API pestpp_status pestpp_get_worker_state(pestpp_handle h, int idx,

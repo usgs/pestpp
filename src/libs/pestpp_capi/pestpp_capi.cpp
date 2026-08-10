@@ -224,6 +224,22 @@ struct ToolAdapter
     /// the weights ensemble together, and only the tool can do that coherently.
     virtual EnsembleMethod* ensemble_method() { return nullptr; }
 
+    /// The Jacobian, or null for the tools that do not build one.
+    ///
+    /// Only glm has one. The ensemble methods carry the same information implicitly, in the
+    /// spread of the parameter and observation ensembles, and never form the matrix - so this
+    /// is null for them rather than an empty matrix, which would read as "built, but zero".
+    virtual Jacobian* jacobian() { return nullptr; }
+
+    /// The tool's current single parameter vector, for tools that carry one rather than a
+    /// population. Null for the ensemble methods, whose answer is par_ensemble().
+    virtual const Parameters* current_parameters() { return nullptr; }
+    virtual const Parameters* optimum_parameters() { return nullptr; }
+    /// Replace the current parameter vector. Values are matched BY NAME by the caller of this,
+    /// so an implementation only has to store what it is handed.
+    virtual void set_current_parameters(const Parameters&)
+    { unsupported("this tool has no single parameter vector to set"); }
+
     /// The chance machinery, or null for the tools that have none (ies and da).
     ///
     /// Returning the Constraints object rather than each stack separately keeps the resolving
@@ -925,6 +941,17 @@ struct GlmAdapter : public ToolAdapter
     Ensemble* ensemble(int) override { return nullptr; }
     ParameterEnsemble* par_ensemble() override { return nullptr; }
     ObservationEnsemble* obs_ensemble() override { return nullptr; }
+
+    Jacobian* jacobian() override
+    {
+        if (!tool.has_base_jacobian())
+            bad_state("the Jacobian does not exist until initialize() has run");
+        return &tool.get_base_jacobian();
+    }
+    const Parameters* current_parameters() override { return &tool.get_current_parameters(); }
+    const Parameters* optimum_parameters() override { return &tool.get_optimum_parameters(); }
+    void set_current_parameters(const Parameters& pars) override
+    { tool.set_current_parameters(pars); }
 
     void phi_summary(int, double&, double&, double&, double&) override
     { unsupported("glm has one phi, not a phi over realizations - use the .rec/.iobj output"); }
@@ -1683,6 +1710,33 @@ extern "C++" {
 namespace {
 
 /** The chance machinery, or a diagnosis of why this tool has none. */
+/** The tool's parameter / observation ensemble, or a refusal naming the alternative.
+ *
+ * glm returns null from both - it carries a parameter VECTOR, not a population - and every
+ * caller below dereferences immediately. An unguarded null is therefore not an error the
+ * caller can catch, it is a segfault inside the HOST process, which for a library loaded into
+ * python means the interpreter dies with no traceback. adapter->ensemble(id) has had this
+ * guard since it was written; these two did not, because until glm every tool had ensembles.
+ */
+ParameterEnsemble* require_par_ensemble(PestppSession* s)
+{
+    ParameterEnsemble* pe = s->adapter->par_ensemble();
+    if (pe == nullptr)
+        unsupported(string("tool '") + s->adapter->name() + "' has no parameter ensemble: it "
+                    "carries a single parameter vector, so use pestpp_get_par_vector() / "
+                    "pestpp_set_par_vector()");
+    return pe;
+}
+
+ObservationEnsemble* require_obs_ensemble(PestppSession* s)
+{
+    ObservationEnsemble* oe = s->adapter->obs_ensemble();
+    if (oe == nullptr)
+        unsupported(string("tool '") + s->adapter->name() + "' has no observation ensemble: it "
+                    "carries a single model run, not a population");
+    return oe;
+}
+
 Constraints* pick_constraints(PestppSession* s)
 {
     Constraints* c = s->adapter->constraints();
@@ -1928,7 +1982,7 @@ pestpp_status pestpp_get_par_transform_status(pestpp_handle h, int* tstat)
 {
     CAPI_BEGIN(h)
         if (tstat == nullptr) bad_arg("null out-param");
-        *tstat = (int)s->adapter->par_ensemble()->get_trans_status();
+        *tstat = (int)require_par_ensemble(s)->get_trans_status();
         return PESTPP_OK;
     CAPI_END()
 }
@@ -2192,7 +2246,7 @@ pestpp_status pestpp_get_obs_groups(pestpp_handle h, char* buf, int buf_len, int
 {
     CAPI_BEGIN(h)
         // aligned with the observation ensemble's columns, so a caller can zip the two
-        vector<string> onames = s->adapter->obs_ensemble()->get_var_names();
+        vector<string> onames = require_obs_ensemble(s)->get_var_names();
         const Observations& ctl_obs = s->adapter->scenario().get_ctl_observations();
         const ObservationInfo* oi = s->adapter->scenario().get_ctl_observation_info_ptr();
         vector<string> groups;
@@ -2437,7 +2491,7 @@ vector<string> unpack_names(const char* buf, int n)
 pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights, int max_n, int* n_out)
 {
     CAPI_BEGIN(h)
-        vector<string> onames = s->adapter->obs_ensemble()->get_var_names();
+        vector<string> onames = require_obs_ensemble(s)->get_var_names();
         if (n_out != nullptr)
             *n_out = (int)onames.size();
         if (weights == nullptr)
@@ -2456,6 +2510,102 @@ pestpp_status pestpp_get_obs_weights(pestpp_handle h, double* weights, int max_n
                                     "not in the control file");
             weights[i] = oi->get_weight(onames[i]);
         }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data, int max_nrow, int max_ncol,
+                                  int* nrow, int* ncol, char* row_names, char* col_names)
+{
+    CAPI_BEGIN(h)
+        Jacobian* jco = s->adapter->jacobian();
+        if (jco == nullptr)
+            unsupported("this tool does not build a Jacobian");
+        const vector<string>& rn = jco->get_sim_obs_names();
+        const vector<string>& cn = jco->get_base_numeric_par_names();
+        int nr = (int)rn.size(), nc = (int)cn.size();
+        if (nrow != nullptr) *nrow = nr;
+        if (ncol != nullptr) *ncol = nc;
+        // size-only, the same convention get_par_snapshot() uses
+        if ((data == nullptr) && (row_names == nullptr) && (col_names == nullptr))
+            return PESTPP_OK;
+        if ((max_nrow < nr) || (max_ncol < nc))
+            too_small("jacobian buffers too small; call with all pointers NULL to size them first");
+        if (row_names != nullptr)
+            for (int i = 0; i < nr; i++)
+                pack_one_name(rn[i], row_names + (i * PESTPP_NAME_LEN));
+        if (col_names != nullptr)
+            for (int j = 0; j < nc; j++)
+                pack_one_name(cn[j], col_names + (j * PESTPP_NAME_LEN));
+        if (data != nullptr)
+        {
+            // A COPY, densified, not a view. The matrix is Eigen::SparseMatrix, so there is no
+            // contiguous buffer to hand out, and a jco is mostly structural zeros - the caller
+            // wanting the sparse structure should read the .jcb file instead.
+            Eigen::SparseMatrix<double>* m = jco->get_matrix_ptr();
+            for (int j = 0; j < nc; j++)
+                for (int i = 0; i < nr; i++)
+                    data[i + ((size_t)j * max_nrow)] = 0.0;      // column-major, caller stride
+            for (int k = 0; k < m->outerSize(); k++)
+                for (Eigen::SparseMatrix<double>::InnerIterator it(*m, k); it; ++it)
+                    if ((it.row() < nr) && (it.col() < nc))
+                        data[it.row() + ((size_t)it.col() * max_nrow)] = it.value();
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_get_par_vector(pestpp_handle h, int which, double* vals, int max_n,
+                                    int* n, char* names)
+{
+    CAPI_BEGIN(h)
+        const Parameters* p = (which == PESTPP_PAR_OPTIMUM) ? s->adapter->optimum_parameters()
+                                                            : s->adapter->current_parameters();
+        if (p == nullptr)
+            unsupported("this tool carries a parameter ENSEMBLE, not a single parameter "
+                        "vector - use pestpp_get_par_snapshot()");
+        vector<string> keys = p->get_keys();
+        sort(keys.begin(), keys.end());     // stable order, so names and values always agree
+        int nn = (int)keys.size();
+        if (n != nullptr) *n = nn;
+        if ((vals == nullptr) && (names == nullptr))
+            return PESTPP_OK;
+        if (max_n < nn)
+            too_small("par vector buffers too small; call with NULL pointers to size them first");
+        for (int i = 0; i < nn; i++)
+        {
+            if (names != nullptr) pack_one_name(keys[i], names + (i * PESTPP_NAME_LEN));
+            if (vals  != nullptr) vals[i] = p->get_rec(keys[i]);
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+pestpp_status pestpp_set_par_vector(pestpp_handle h, const double* vals, int n,
+                                    const char* names)
+{
+    CAPI_BEGIN(h)
+        if ((vals == nullptr) || (names == nullptr) || (n <= 0))
+            bad_arg("pestpp_set_par_vector needs values, names and a positive count");
+        const Parameters* cur = s->adapter->current_parameters();
+        if (cur == nullptr)
+            unsupported("this tool carries a parameter ENSEMBLE, not a single parameter "
+                        "vector - use pestpp_set_par_snapshot()");
+        // Matched BY NAME onto a copy of what the tool holds, so a partial vector updates only
+        // what it names and everything else keeps its value. An unknown name is an error
+        // rather than a silent no-op: it means the caller and the tool disagree about the
+        // parameter set, and quietly dropping it would hide that.
+        Parameters updated = *cur;
+        vector<string> in_names = unpack_names(names, n);
+        for (int i = 0; i < n; i++)
+        {
+            string nm = in_names[i];
+            pest_utils::upper_ip(nm);
+            if (updated.find(nm) == updated.end())
+                bad_arg("pestpp_set_par_vector: '" + nm + "' is not a parameter this tool holds");
+            updated.update_rec(nm, vals[i]);
+        }
+        s->adapter->set_current_parameters(updated);
         return PESTPP_OK;
     CAPI_END()
 }
@@ -2983,8 +3133,8 @@ namespace {
 /** Apply a keep-list to every coupled ensemble at once, pairing obs rows by position. */
 void keep_across_coupled(PestppSession* s, const vector<string>& par_keep)
 {
-    ParameterEnsemble* pe = s->adapter->par_ensemble();
-    ObservationEnsemble* oe = s->adapter->obs_ensemble();
+    ParameterEnsemble* pe = require_par_ensemble(s);
+    ObservationEnsemble* oe = require_obs_ensemble(s);
     vector<string> pnames = pe->get_real_names(), onames = oe->get_real_names();
 
     // par and obs realizations are paired BY POSITION throughout pest++, so a length mismatch
@@ -3049,7 +3199,7 @@ pestpp_status pestpp_drop_realizations(pestpp_handle h, const char* names, int n
         if ((names == nullptr) || (n <= 0))
             bad_arg("pestpp_drop_realizations needs at least one name");
         vector<string> drop = unpack_names(names, n);
-        vector<string> current = s->adapter->par_ensemble()->get_real_names();
+        vector<string> current = require_par_ensemble(s)->get_real_names();
         set<string> present(current.begin(), current.end());
         // name a bad request rather than silently dropping fewer than asked
         for (auto& nm : drop)
@@ -3072,7 +3222,7 @@ pestpp_status pestpp_get_par_snapshot(pestpp_handle h, double* data, int max_nro
                                       int* nrow, int* ncol, char* row_names, char* col_names)
 {
     CAPI_BEGIN(h)
-        ParameterEnsemble* pe = s->adapter->par_ensemble();
+        ParameterEnsemble* pe = require_par_ensemble(s);
         ParameterSnapshot snap = pe->get_ctl_snapshot();
         // get_ctl_snapshot() emits rows in the ensemble's ORIGINAL order, which is what the
         // tools want for stable csv output but is not what this API should hand back: after a
@@ -3121,7 +3271,7 @@ pestpp_status pestpp_set_par_snapshot(pestpp_handle h, const double* data, int n
         for (int j = 0; j < ncol; j++)
             for (int i = 0; i < nrow; i++)
                 snap.values(i, j) = data[i + (j * nrow)];
-        s->adapter->par_ensemble()->set_from_ctl_snapshot(snap);
+        require_par_ensemble(s)->set_from_ctl_snapshot(snap);
         return PESTPP_OK;
     CAPI_END()
 }
