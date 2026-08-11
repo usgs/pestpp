@@ -323,6 +323,10 @@ void sequentialLP::initialize_and_check()
 	model.passInMessageHandler(&coin_hr);
 
 	terminate = false;
+	solve_begun = false;
+	solve_finished = false;
+	// so get_slp_iter() reads 0 rather than garbage before the first iteration
+	slp_iter = 0;
 
 	iter_derinc_fac = pest_scenario.get_pestpp_options().get_opt_iter_derinc_fac();
 	if ((iter_derinc_fac > 1.0) || (iter_derinc_fac <= 0.0))
@@ -807,46 +811,80 @@ CoinPackedMatrix sequentialLP::jacobian_to_coinpackedmatrix()
 }
 
 /**
- * @brief Solve.
+ * @brief Open the per-iteration objective file and start the iteration counter.
  */
-void sequentialLP::solve()
+void sequentialLP::solve_begin()
+{
+	ofstream &f_obj = file_mgr_ptr->open_ofile_ext("slp.iobj.csv");
+	f_obj << "iteration,objective_function" << endl;
+	slp_iter = 1;
+	solve_begun = true;
+}
+
+/**
+ * @brief One SLP iteration.
+ */
+bool sequentialLP::solve_iteration()
+{
+	if (!solve_begun)
+		solve_begin();
+	// idempotent once the loop is over, so a caller that keeps calling cannot run an extra
+	// iteration past convergence or past noptmax
+	if (solve_finished)
+		return false;
+
+	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
+	ofstream &f_obj = file_mgr_ptr->get_ofstream("slp.iobj.csv");
+
+	f_rec << endl << endl << "  ---------------------------------" << endl;
+	f_rec <<         "  --- starting LP iteration " << slp_iter << "  ---  " << endl;
+	f_rec << "  ---------------------------------" << endl << endl << endl;
+	cout << endl << endl << "  ----------------------------------" << endl;
+	cout << "  --- starting LP iteration " << slp_iter << "  ---  " << endl;
+	cout << "  ---------------------------------" << endl << endl << endl;
+
+	iter_presolve();
+	iter_solve();
+	iter_postsolve();
+	if (iter_obj_values.size() > 0)
+	{
+		f_obj << slp_iter << "," << iter_obj_values.at(iter_obj_values.size()-1) << endl;
+	}
+	// converged: leave slp_iter where it is, because the .par/.rei files this iteration wrote
+	// are keyed on it and finalize()'s 'best' rei is written under the same number
+	if (terminate)
+	{
+		solve_finished = true;
+		return false;
+	}
+	slp_iter++;
+	if (slp_iter > pest_scenario.get_control_info().noptmax)
+	{
+		solve_finished = true;
+		return false;
+	}
+	int q = pest_utils::quit_file_found();
+	if ((q == 1) || (q == 2))
+	{
+		cout << "'pest.stp' found, quitting" << endl;
+		f_rec << "'pest.stp' found, quitting" << endl;
+		solve_finished = true;
+		return false;
+	}
+	return true;
+}
+
+/**
+ * @brief End-of-run reporting and the final best-decision-variable run.
+ */
+void sequentialLP::finalize()
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
-	ofstream &f_obj = file_mgr_ptr->open_ofile_ext("slp.iobj.csv");
 
-	f_obj << "iteration,objective_function" << endl;
-
-	slp_iter = 1;
-	while (true)
-	{
-		f_rec << endl << endl << "  ---------------------------------" << endl;
-		f_rec <<         "  --- starting LP iteration " << slp_iter << "  ---  " << endl;
-		f_rec << "  ---------------------------------" << endl << endl << endl;
-		cout << endl << endl << "  ----------------------------------" << endl;
-		cout << "  --- starting LP iteration " << slp_iter << "  ---  " << endl;
-		cout << "  ---------------------------------" << endl << endl << endl;
-
-		iter_presolve();
-        iter_solve();
-        iter_postsolve();
-		if (iter_obj_values.size() > 0)
-		{
-			f_obj << slp_iter << "," << iter_obj_values.at(iter_obj_values.size()-1) << endl;
-		}
-		if (terminate) break;
-		slp_iter++;
-		if (slp_iter > pest_scenario.get_control_info().noptmax)
-			break;
-        int q = pest_utils::quit_file_found();
-        if ((q == 1) || (q == 2))
-        {
-		    cout << "'pest.stp' found, quitting" << endl;
-            f_rec << "'pest.stp' found, quitting" << endl;
-            break;
-
-        }
-	}
-	f_obj.close();
+	// only if solve_begin() ever ran - finalize() on a tool that never iterated has no
+	// objective stream to close and nothing to report
+	if (solve_begun)
+		file_mgr_ptr->close_file("slp.iobj.csv");
 
 	f_rec << endl << "  ---  objective function sequence  ---   " << endl << setw(10) << "iteration" << setw(15) << "obj func" << endl;
 	int i = 0;
@@ -863,7 +901,7 @@ void sequentialLP::solve()
 	{
 		f_rec << "  ---  running model one last time with best decision variables  ---  " << endl;
 		cout << "  ---  running model one last time with best decision variables  ---  " << endl;
-	
+
 		bool success = make_upgrade_run(best_pars, current_constraints_sim);
 		if (!success)
 		{
@@ -873,9 +911,19 @@ void sequentialLP::solve()
 		of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext("res"), slp_iter, current_pars,
 			pest_scenario.get_ctl_observations(), current_constraints_sim);
 		file_mgr_ptr->close_file("res");
-		
-		
+
+
 	}
+}
+
+/**
+ * @brief Solve. The in-tree composition of the steps above.
+ */
+void sequentialLP::solve()
+{
+	while (!should_terminate())
+		solve_iteration();
+	finalize();
 }
 
 

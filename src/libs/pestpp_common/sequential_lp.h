@@ -22,7 +22,32 @@ public:
 		         Covariance &_parcov, FileManager* _file_mgr_ptr, OutputFileWriter of_wr,
 				PerformanceLog& _pfm);
 	void initialize_and_check();
+
+	// -- the SLP loop, as separately callable steps ----------------------------------------
+	//
+	// solve() is the in-tree composition of these, so there is one code path rather than an
+	// in-tree one and an API one that drift apart. A caller drives it as
+	//     while (!slp.should_terminate()) slp.solve_iteration();
+	//     slp.finalize();
+
+	/// ONE LP iteration: presolve, LP solve, postsolve, and the objective-sequence bookkeeping.
+	/// Advances slp_iter by exactly one UNLESS this iteration converged, in which case the
+	/// counter stays put - which is what the loop did before, and what the .par/.rei file
+	/// names are keyed on. Returns whether the caller should keep going.
+	bool solve_iteration();
+
+	/// Whether the loop is over: convergence, noptmax reached, or 'pest.stp' seen. False
+	/// before the first solve_iteration(), so the while-loop above enters.
+	bool should_terminate() const { return solve_finished; }
+
+	/// End-of-run reporting: the objective function sequence, the best value, and (unless
+	/// ++opt_skip_final) the final model run at the best decision variables.
+	void finalize();
+
 	void solve();
+
+	/// Which SLP iteration the tool is on. 0 before the first solve_iteration().
+	int get_slp_iter() const { return slp_iter; }
 
 	~sequentialLP();
 
@@ -35,6 +60,18 @@ private:
 	//bool use_obj_obs;
 	//string obj_obs;
 	int slp_iter;
+
+	/// Whether solve_begin() has run. The slp.iobj.csv stream and slp_iter used to be set up
+	/// at the top of solve(); a caller driving iterations itself never goes through there, so
+	/// the first solve_iteration() does it instead - lazily, to keep the file's creation time
+	/// where it was rather than moving it into the constructor.
+	bool solve_begun;
+	/// Sticky: the loop has decided to stop. Separate from `terminate`, which means only
+	/// "converged" - noptmax and 'pest.stp' also end the loop and neither sets that flag.
+	bool solve_finished;
+
+	/// Open slp.iobj.csv, write its header, and start the iteration counter.
+	void solve_begin();
 
 	double* dec_var_lb;
 	double* dec_var_ub;
