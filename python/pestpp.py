@@ -1368,12 +1368,80 @@ class Ies(_Tool):
 
 
 class Da(_Tool):
-    """Data assimilation. A SINGLE cycle - multi-cycle is not exposed yet."""
+    """Data assimilation, over one cycle or over the whole sequence.
+
+    A ``Da`` session on its own is ONE cycle - the one it was created with. What makes it
+    assimilation is the sequence: every cycle gets its own child scenario with its own
+    parameters and observations, and cycle N's posterior becomes cycle N+1's prior, with
+    realizations a cycle loses dropped from the global ensembles so the two stay aligned.
+
+    Two ways to drive the sequence. :meth:`run_all_cycles` runs it end to end, which is what
+    the executable does::
+
+        with Da.from_pst("model.pst", workdir=d) as da:
+            da.run_all_cycles()
+
+    Or step it, which is the point of exposing it at all - between :meth:`cycle_begin` and
+    :meth:`cycle_end` every other call on the session refers to the OPEN cycle: its ensembles,
+    its parameter names, its phi. So you can inspect or intervene per cycle::
+
+        da.cycles_initialize()
+        while da.cycle_begin():
+            print(da.current_cycle, da.par_df().shape)   # the CYCLE's parameters
+            da.cycle_drive()                             # or drive it yourself
+            da.cycle_end()                               # NOT optional
+
+    :meth:`cycle_end` carries the cycle forward. Skipping it does not merely lose reporting, it
+    breaks the assimilation.
+    """
     _tool_id = TOOL_DA
 
     @staticmethod
     def _agent_exe():
         return "pestpp-da"
+
+    def cycles_initialize(self) -> None:
+        """Build the global ensembles and resolve the cycle list. Idempotent."""
+        self._lib.da_cycles_initialize()
+
+    @property
+    def cycles(self) -> list:
+        """Every assimilation cycle in the control file, in run order."""
+        return self._lib.da_cycles()
+
+    @property
+    def n_cycles(self) -> int:
+        return self._lib.da_n_cycles()
+
+    @property
+    def current_cycle(self) -> int:
+        """The open cycle, or -1 when none is open."""
+        return self._lib.da_current_cycle()
+
+    def cycle_begin(self) -> bool:
+        """Open the next cycle. False when the sequence is done - not an error.
+
+        Calls :meth:`cycles_initialize` for you the first time, so the loop reads as a loop.
+        """
+        if not self._cycles_ready:
+            self.cycles_initialize()
+            self._cycles_ready = True
+        return self._lib.da_cycle_begin()
+
+    def cycle_drive(self) -> None:
+        """Run the open cycle: initialize its tool, assimilate, report phi."""
+        self._lib.da_cycle_drive()
+
+    def cycle_end(self) -> None:
+        """Harvest the open cycle's posterior into the global ensembles and close it."""
+        self._lib.da_cycle_end()
+
+    def run_all_cycles(self) -> None:
+        """Every cycle, start to finish - the same composition the executable runs."""
+        self._lib.da_run_all_cycles()
+        self._cycles_ready = True
+
+    _cycles_ready = False
 
 
 class Glm(_Tool):

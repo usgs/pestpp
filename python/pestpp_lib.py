@@ -402,6 +402,23 @@ class PestppLib:
         lib.pestpp_cancel_runs.restype = c_int
         lib.pestpp_release_workers.argtypes = (c_void_p, POINTER(c_int), c_int, POINTER(c_int))
         lib.pestpp_release_workers.restype = c_int
+        # -- pestpp-da: the assimilation cycle sequence -------------------------------
+        lib.pestpp_da_cycles_initialize.argtypes = (c_void_p,)
+        lib.pestpp_da_cycles_initialize.restype = c_int
+        lib.pestpp_da_n_cycles.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_da_n_cycles.restype = c_int
+        lib.pestpp_da_get_cycles.argtypes = (c_void_p, POINTER(c_int), c_int)
+        lib.pestpp_da_get_cycles.restype = c_int
+        lib.pestpp_da_cycle_begin.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_da_cycle_begin.restype = c_int
+        lib.pestpp_da_current_cycle.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_da_current_cycle.restype = c_int
+        lib.pestpp_da_cycle_drive.argtypes = (c_void_p,)
+        lib.pestpp_da_cycle_drive.restype = c_int
+        lib.pestpp_da_cycle_end.argtypes = (c_void_p,)
+        lib.pestpp_da_cycle_end.restype = c_int
+        lib.pestpp_da_run_all_cycles.argtypes = (c_void_p,)
+        lib.pestpp_da_run_all_cycles.restype = c_int
         lib.pestpp_get_regularization.argtypes = (
             c_void_p, POINTER(c_int)) + (POINTER(c_double),) * 9 + (POINTER(c_int), POINTER(c_int))
         lib.pestpp_get_regularization.restype = c_int
@@ -1042,6 +1059,64 @@ class PestppLib:
         self._check(self.lib.pestpp_release_workers(self.handle, arr, count, byref(n)),
                     "pestpp_release_workers")
         return n.value
+
+    # -- pestpp-da: the assimilation cycle sequence ------------------------------------
+    #
+    # A DataAssimilator handles ONE cycle. Data assimilation is the SEQUENCE: each cycle gets
+    # its own child scenario, and cycle N's posterior becomes cycle N+1's prior with failed
+    # realizations dropped from the global ensembles. Without these calls a session runs only
+    # the single cycle it was created with, so a multi-cycle control file returned a one-cycle
+    # answer rather than an error.
+
+    def da_cycles_initialize(self) -> None:
+        """Build the global ensembles and resolve the cycle list. Idempotent."""
+        self._check(self.lib.pestpp_da_cycles_initialize(self.handle),
+                    "pestpp_da_cycles_initialize")
+
+    def da_n_cycles(self) -> int:
+        """How many assimilation cycles the control file defines."""
+        n = c_int()
+        self._check(self.lib.pestpp_da_n_cycles(self.handle, byref(n)), "pestpp_da_n_cycles")
+        return n.value
+
+    def da_cycles(self) -> list:
+        """The cycle numbers, in the order they will run."""
+        n = self.da_n_cycles()
+        if n <= 0:
+            return []
+        arr = (c_int * n)()
+        self._check(self.lib.pestpp_da_get_cycles(self.handle, arr, n), "pestpp_da_get_cycles")
+        return [arr[i] for i in range(n)]
+
+    def da_cycle_begin(self) -> bool:
+        """Open the next cycle. False when the sequence is finished - which is not an error."""
+        begun = c_int()
+        self._check(self.lib.pestpp_da_cycle_begin(self.handle, byref(begun)),
+                    "pestpp_da_cycle_begin")
+        return bool(begun.value)
+
+    def da_current_cycle(self) -> int:
+        """The open cycle, or -1 when none is open."""
+        c = c_int()
+        self._check(self.lib.pestpp_da_current_cycle(self.handle, byref(c)),
+                    "pestpp_da_current_cycle")
+        return c.value
+
+    def da_cycle_drive(self) -> None:
+        """Run the open cycle: initialize its tool, assimilate, report phi."""
+        self._check(self.lib.pestpp_da_cycle_drive(self.handle), "pestpp_da_cycle_drive")
+
+    def da_cycle_end(self) -> None:
+        """Harvest the open cycle's posterior into the global ensembles and close it.
+
+        NOT optional. This is the step that carries the cycle forward, so skipping it does not
+        merely lose reporting - it breaks the assimilation.
+        """
+        self._check(self.lib.pestpp_da_cycle_end(self.handle), "pestpp_da_cycle_end")
+
+    def da_run_all_cycles(self) -> None:
+        """Every cycle, start to finish - the same composition the executable runs."""
+        self._check(self.lib.pestpp_da_run_all_cycles(self.handle), "pestpp_da_run_all_cycles")
 
     _REG_KEYS = ("weight", "phimlim", "phimaccept", "fracphim",
                  "wfmin", "wfmax", "wffac", "wftol", "wfinit")

@@ -25,7 +25,7 @@ _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp_lib import NOISE_EN  # noqa: E402
 from pestpp import (  # noqa: E402
-    Ies, Mou, Sqp, Glm, Opt, IterationStep, PestppError, ExpiredViewError, find_library,
+    Ies, Da, Mou, Sqp, Glm, Opt, IterationStep, PestppError, ExpiredViewError, find_library,
     run_ies, PHI_ACTUAL,
 )
 
@@ -2226,24 +2226,30 @@ def api_sqp_ensemble_sources_test():
 
 
 def _opt_case(name, noptmax=2):
-    """The tracked dewater case, in scratch, under a control file this test WRITES.
+    """An opt case built from the g07 template that lives in THIS repo.
 
-    dewater is the smallest opt case with a portable model command - the supply2 cases hard-code
-    ``python.exe``. The control file is written rather than picked up by name because several
-    opt_test.py tests run pestpp-opt with ``cwd`` set to this template and leave their .pst files
-    behind: a test that reads one of those passes only until someone restores the template.
-    ``dewater_pest.fosm.pst`` is tracked, and carries the ++opt_risk that makes this a
-    chance-constrained case.
+    Emphatically not from pestpp-opt_benchmarks: pestpp_api_tests.py runs in a CI job that
+    clones usgs/pestpp and nothing else, so reaching into a sibling benchmark repo passes on a
+    developer machine with every repo cloned and fails everywhere else. It did - on all three
+    platforms at once, which is the signature of a missing fixture rather than a real defect.
+
+    g07 suits opt without modification: its parameters are in a ``decvar`` group and its
+    constraints are in ``l_constraint``, whose ``l_`` prefix is how opt recognises a
+    less-than constraint. With no ++opt_objective_function it forms the generic one.
     """
-    base = scratch_template(os.path.join(os.path.dirname(_BENCH), "pestpp-opt_benchmarks",
-                                         "opt_dewater_chance", "template"))
+    base = scratch_template(os.path.join(_BENCH, "g07", "template"))
     d = os.path.join(_BENCH, name)
     if os.path.exists(d):
         shutil.rmtree(d)
     shutil.copytree(base, d)
-    pst = pyemu.Pst(os.path.join(d, "dewater_pest.fosm.pst"))
+    pst = pyemu.Pst(os.path.join(d, "g07.pst"))
     pst.control_data.noptmax = noptmax
-    pst.write(os.path.join(d, "opt_api.pst"))
+    # the tracked g07 is sqp's, so it arrives carrying sqp options and a weighted objective.
+    # opt reads a non-zero weight on a non-constraint observation as FOSM data and refuses:
+    # "objective function obs has non-zero weight and chance constraints are active"
+    pst.observation_data.loc["obj", "weight"] = 0.0
+    pst.pestpp_options = {"opt_obj_func": "obj", "opt_dec_var_groups": "decvar"}
+    pst.write(os.path.join(d, "opt_api.pst"), version=2)
     return d
 
 
@@ -2288,9 +2294,14 @@ def api_opt_drives_slp_test():
             else:
                 raise AssertionError("opt has no ensembles - {0} should refuse".format(label))
 
-        # chance IS opt's - unlike the ensemble calls, these must work
+        # chance IS opt's - unlike the ensemble calls, this must ANSWER rather than refuse.
+        # It reports chance OFF here, and that is the case's property not the tool's: every g07
+        # parameter is a decision variable, so there is nothing left to draw a stack from. What
+        # is being asserted is that opt carries the machinery at all, which is what separates it
+        # from glm - glm raises PestppError on the same call.
         st = opt.stack_status
-        assert st["use_chance"], "the dewater case is chance-constrained"
+        assert "use_chance" in st and not st["use_chance"], \
+            "opt should answer the chance query; g07 has no uncertain parameters: {0}".format(st)
         opt.finalize()
 
     pyemu.os_utils.run("pestpp-opt opt_api.pst", cwd=d_exe)
@@ -2319,6 +2330,177 @@ def api_opt_drives_slp_test():
         "the ABI and the executable must produce the same objective sequence:\n" \
         "  api: {0}\n  exe: {1}".format(a, e)
     print("api_opt_drives_slp_test passed ({0} iterations, best obj {1})".format(n, min(a[1:])))
+
+
+
+def _da_cycle_case(name, n_cycles=3, num_reals=6):
+    """A MULTI-cycle da case built from the 10par_xsec template in THIS repo.
+
+    Deliberately not from pestpp-da_benchmarks: this file runs in a CI job that clones
+    usgs/pestpp and nothing else, and a test that reaches into a sibling benchmark repo passes
+    on a machine with every repo cloned and fails everywhere else.
+
+    The cycles come from an observation cycle table, which is what turns one control file into a
+    sequence. This fixture has NO dynamic states, and that is a feature here rather than a
+    shortcut: with no states to transfer, the ONLY thing linking cycle N to cycle N+1 is the
+    global ensemble carry - so if end_cycle() is not doing its job, these tests fail rather than
+    quietly still working through the state path.
+    """
+    base = scratch_template(os.path.join(_BENCH, "ies_10par_xsec", "template"))
+    d = os.path.join(_BENCH, name)
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(base, d)
+
+    pst = pyemu.Pst(os.path.join(d, "pest.pst"))
+    # -1 means "present in every cycle" - without it a parameter belongs to no cycle and the
+    # child scenarios come out empty
+    pst.parameter_data.loc[:, "cycle"] = -1
+    pst.observation_data.loc[:, "cycle"] = -1
+    pst.model_input_data.loc[:, "cycle"] = -1
+    pst.model_output_data.loc[:, "cycle"] = -1
+
+    cycles = np.arange(0, n_cycles)
+    nz = pst.nnz_obs_names
+    odf = pd.DataFrame(index=cycles, columns=nz)
+    odf.loc[:, :] = pst.observation_data.loc[nz, "obsval"].values
+    odf.T.to_csv(os.path.join(d, "obs_cycle_tbl.csv"))
+    wdf = pd.DataFrame(index=cycles, columns=nz)
+    wdf.loc[:, :] = 1.0
+    wdf.T.to_csv(os.path.join(d, "weight_cycle_tbl.csv"))
+
+    pst.control_data.noptmax = 1
+    pst.pestpp_options = {
+        "da_observation_cycle_table": "obs_cycle_tbl.csv",
+        "da_weight_cycle_table": "weight_cycle_tbl.csv",
+        "da_use_mda": True,
+        "ies_num_reals": num_reals,
+        "lambda_scale_fac": 1.0,
+        "ies_lambda_mults": 1.0,
+    }
+    pst.write(os.path.join(d, "da_api.pst"), version=2)
+    return d
+
+
+def api_da_cycle_sequence_test():
+    """Stepping da's assimilation cycles through the ABI.
+
+    This is the call sequence that did not exist until DaCycleDriver: a session held ONE
+    DataAssimilator, so a multi-cycle control file produced a one-cycle answer - and produced it
+    silently, as a completed run, which is the failure mode worth having a test for.
+
+    What is asserted, in order of how badly it would hurt to be wrong:
+
+      - every cycle in the control file actually runs, and in order;
+      - the session's view FOLLOWS the open cycle rather than staying on the parent - a caller
+        inspecting parameters mid-sequence must be shown the cycle's, not the scenario's;
+      - the global ensemble carries: cycle N+1 starts from cycle N's posterior, so the parameter
+        ensemble MOVES between cycles. A driver that re-primed from the control file each time
+        would still run three cycles and still finish, and only this assertion would notice.
+    """
+    d = _da_cycle_case("api_da_cycles", n_cycles=3, num_reals=6)
+
+    with Da.from_pst("da_api.pst", workdir=d) as da:
+        da.cycles_initialize()
+        cycles = da.cycles
+        assert cycles == [0, 1, 2], \
+            "the obs cycle table defines cycles 0,1,2: got {0}".format(cycles)
+        assert da.n_cycles == 3
+        assert da.current_cycle == -1, "no cycle is open before the first cycle_begin()"
+
+        seen, first_pe, last_pe = [], None, None
+        while da.cycle_begin():
+            c = da.current_cycle
+            seen.append(c)
+            # the view follows the OPEN cycle
+            pe = da.par_df()
+            assert pe.shape[0] == 6, \
+                "cycle {0} should show the 6-realization ensemble, got {1}".format(c, pe.shape)
+            da.cycle_drive()
+            post = da.par_df().copy()
+            if first_pe is None:
+                first_pe = post
+            last_pe = post
+            da.cycle_end()
+            assert da.current_cycle == c, \
+                "current_cycle should still name the cycle just closed, got {0}".format(
+                    da.current_cycle)
+
+        assert seen == [0, 1, 2], "every cycle should run, in order: got {0}".format(seen)
+        assert da.current_cycle == 2, "after the sequence the last cycle stays named"
+
+        # the carry: the posterior moved across the sequence. Same realizations, same
+        # parameters, different values - which is what assimilation IS.
+        assert list(first_pe.index) == list(last_pe.index)
+        assert not np.allclose(first_pe.values.astype(float),
+                               last_pe.values.astype(float)), \
+            "the parameter ensemble is identical in cycle 0 and cycle 2 - the posterior is not " \
+            "being carried forward, so each cycle is re-priming from the control file"
+        da.finalize()
+
+    # the per-cycle global artifacts the executable writes, one per cycle
+    for c in (0, 1, 2):
+        f = os.path.join(d, "da_api.global.{0}.pe.csv".format(c))
+        assert os.path.exists(f), "cycle {0} did not write its global pe csv".format(c)
+    print("api_da_cycle_sequence_test passed (cycles {0})".format(seen))
+
+
+def api_da_run_all_cycles_matches_stepping_test():
+    """run_all_cycles() and stepping the cycles by hand reach the SAME answer.
+
+    The two paths exist so a caller can intervene per cycle without giving up the in-tree
+    behaviour. If they diverge then one of them is not the real algorithm, and the stepped one -
+    the one with no executable exercising it - is the one that would rot. Comparing them is what
+    keeps the composition honest.
+    """
+    d_all = _da_cycle_case("api_da_all", n_cycles=3, num_reals=6)
+    d_step = _da_cycle_case("api_da_step", n_cycles=3, num_reals=6)
+
+    with Da.from_pst("da_api.pst", workdir=d_all) as da:
+        da.run_all_cycles()
+        da.finalize()
+
+    with Da.from_pst("da_api.pst", workdir=d_step) as da:
+        da.cycles_initialize()
+        while da.cycle_begin():
+            da.cycle_drive()
+            da.cycle_end()
+        da.finalize()
+
+    for c in (0, 1, 2):
+        fn = "da_api.global.{0}.pe.csv".format(c)
+        a = pd.read_csv(os.path.join(d_all, fn), index_col=0)
+        b = pd.read_csv(os.path.join(d_step, fn), index_col=0)
+        assert list(a.index) == list(b.index) and list(a.columns) == list(b.columns), \
+            "cycle {0}: the two paths disagree on ensemble SHAPE".format(c)
+        d = np.abs(a.values.astype(float) - b.values.astype(float)).max()
+        assert d < 1.0e-10, \
+            "cycle {0}: run_all_cycles and stepping diverge by {1:g}".format(c, d)
+    print("api_da_run_all_cycles_matches_stepping_test passed")
+
+
+def api_da_cycles_are_da_only_test():
+    """The cycle calls refuse for every tool but da.
+
+    Cycles are a pestpp-da concept. An ies session answering "3 cycles" would be inventing a
+    structure its control file does not have, and a caller would loop over it.
+    """
+    d = _case("api_cycles_refused", noptmax=1, num_reals=4)
+    with Ies.from_pst("pest.pst", workdir=d) as ies:
+        for label, call in (("cycles_initialize", lambda: ies._lib.da_cycles_initialize()),
+                            ("n_cycles", lambda: ies._lib.da_n_cycles()),
+                            ("cycle_begin", lambda: ies._lib.da_cycle_begin()),
+                            ("run_all_cycles", lambda: ies._lib.da_run_all_cycles())):
+            try:
+                call()
+            except PestppError as e:
+                assert "ies" in str(e).lower() or "cycle" in str(e).lower(), \
+                    "{0} should say WHY it refuses: {1}".format(label, e)
+            else:
+                raise AssertionError(
+                    "{0} should refuse for ies - cycles are a da concept".format(label))
+    print("api_da_cycles_are_da_only_test passed")
+
 
 
 def api_robust_requires_paired_parameters_test():
@@ -3057,6 +3239,9 @@ if __name__ == "__main__":
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_opt_drives_slp_test()
+    api_da_cycle_sequence_test()
+    api_da_run_all_cycles_matches_stepping_test()
+    api_da_cycles_are_da_only_test()
     api_robust_requires_paired_parameters_test()
     api_stacks_are_mou_and_sqp_only_test()
     print("all helper tests passed")

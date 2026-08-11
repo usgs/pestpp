@@ -166,21 +166,24 @@ bool DaCycleDriver::begin_cycle()
 	cout << "done" << endl;
 
 	// The run manager per cycle. PANTHER is re-initialized against the cycle's par/obs so the
-	// workers agree with the master; SERIAL is rebuilt because its model-exec info comes from
-	// the CHILD scenario, which differs per cycle.
+	// workers agree with the master; SERIAL and EXTERNAL are rebuilt as a RunManagerSerial
+	// because the model-exec info comes from the CHILD scenario, which differs per cycle.
 	//
-	// EXTERNAL and OTHER deliberately keep the caller's manager. main() used to fall into the
-	// serial branch for EXTERNAL, silently replacing the external run manager with a serial one
-	// and leaking it every cycle (only SERIAL was deleted) - so "preserve behaviour" would mean
-	// preserving a bug. OTHER is the C ABI case, where the session owns the manager and the
-	// driver must not delete it.
+	// EXTERNAL getting a SERIAL manager looks like a mistake and is not. pestpp-da /e builds a
+	// RunManagerExternal for the parent scenario, then replaces it per cycle with a serial one
+	// that actually runs the model - and the cycles genuinely do not run without it. Changing
+	// this to "keep the caller's manager" on the theory that it was a copy-paste bug made
+	// basic_xplat_g07_test report total_runs 140 -> 0: no cycle ran a single model call, and
+	// the run still completed, reporting the initial values as if they were results.
+	//
+	// OTHER keeps the caller's manager: that is the C ABI case, where the session owns it.
 	owns_cycle_run_mgr = false;
 	if (rm_kind == RunManagerKind::PANTHER_MASTER)
 	{
 		performance_log->log_event("reinitializing panther master");
 		run_mgr_ptr->initialize(childPest.get_ctl_parameters(), childPest.get_ctl_observations());
 	}
-	else if (rm_kind == RunManagerKind::SERIAL)
+	else if ((rm_kind == RunManagerKind::SERIAL) || (rm_kind == RunManagerKind::EXTERNAL))
 	{
 		performance_log->log_event("starting basic model IO error checking");
 		cout << "checking model IO files...";
