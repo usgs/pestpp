@@ -35,6 +35,7 @@ add_library(pestpp_com
   MOEA.cpp
   sequential_lp.cpp
   DataAssimilator.cpp
+  DaCycleDriver.cpp
 )
 
 # SVD_PROPACK.cpp is deliberately NOT built. It needs the Fortran PROPACK routines
@@ -51,6 +52,7 @@ target_link_libraries(pestpp_com
   rm_abstract
   opt
   rm_yamr
+  rm_serial
 )
 
 # PIC is set globally now (CMAKE_POSITION_INDEPENDENT_CODE in the top-level CMakeLists)

@@ -49,6 +49,10 @@ public:
 	/// Which SLP iteration the tool is on. 0 before the first solve_iteration().
 	int get_slp_iter() const { return slp_iter; }
 
+	/// The chance machinery, so opt gets the same stack/risk surface mou and sqp expose through
+	/// the C ABI. Public because the adapter needs it; the object itself stays owned here.
+	Constraints* get_constraints_ptr() { return &constraints; }
+
 	~sequentialLP();
 
 private:
@@ -85,8 +89,13 @@ private:
 	ClpSimplex model;
 	CoinMessageHandler coin_hr;
 	FILE* coin_log_ptr;
-	Jacobian_1to1 jco;
+	/// Declared BEFORE jco and constraints, and that order is load-bearing: Jacobian_1to1 keeps
+	/// an OutputFileWriter*, Constraints keeps an OutputFileWriter&, and both are bound to THIS
+	/// member. Members initialize in declaration order, so of_wr must exist first. Binding them
+	/// to the constructor's parameter instead - which is what the code did - left two references
+	/// to a stack object destroyed the moment the constructor returned.
 	OutputFileWriter of_wr;
+	Jacobian_1to1 jco;
 
 	Constraints constraints;
 	OptObjFunc optobjfunc;

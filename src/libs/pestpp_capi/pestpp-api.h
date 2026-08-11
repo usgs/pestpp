@@ -129,7 +129,12 @@ typedef enum {
        through a solve. The ensemble and phi-over-realizations calls therefore refuse rather
        than inventing a single-row ensemble - see pestpp_get_ensemble_view. What it does share
        with the others is the loop: initialize, iterate, finalize. */
-    PESTPP_GLM = 4
+    PESTPP_GLM = 4,
+    /* pestpp-opt: sequential linear programming under chance constraints. Like glm it carries
+       one decision-variable vector rather than a population, so the ensemble and
+       phi-over-realizations calls refuse; unlike glm it has the chance machinery, so the stack
+       and risk calls work as they do for mou and sqp. */
+    PESTPP_OPT = 5
 } pestpp_tool;
 
 /* Which ensemble to look at. The raw parameter ensemble is in whatever transform space the
@@ -976,6 +981,59 @@ PESTPP_API pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data,
                                              int max_nrow, int max_ncol,
                                              int* nrow, int* ncol,
                                              char* row_names, char* col_names);
+
+/* ---- pestpp-da: the assimilation cycle SEQUENCE -------------------------------------------
+   A DataAssimilator handles ONE cycle. Data assimilation is the sequence: each cycle gets its
+   own child scenario and its own tool, and cycle N's posterior becomes cycle N+1's prior, with
+   realizations a cycle lost dropped from the global ensembles so the two stay aligned.
+
+   Without these calls a session runs the single cycle it was created with - so a multi-cycle
+   control file returned a one-cycle answer rather than an error.
+
+   Two ways to drive it. pestpp_da_run_all_cycles() runs the whole sequence, the same
+   composition the executable runs. Or step it:
+
+       pestpp_da_cycles_initialize(h);
+       int begun;
+       while (pestpp_da_cycle_begin(h, &begun) == PESTPP_OK && begun) {
+           pestpp_da_cycle_drive(h);      // or drive the cycle yourself, see below
+           pestpp_da_cycle_end(h);        // NOT optional - this is what carries the cycle forward
+       }
+
+   Between begin and end, every other call on the session refers to the OPEN cycle: its
+   ensembles, its parameter and observation names, its phi. So instead of pestpp_da_cycle_drive()
+   you can drive the cycle through the ordinary session calls and get per-iteration control
+   within each cycle. pestpp_da_cycle_end() is still required either way.
+
+   Every call refuses for tools other than da. */
+
+/* Build the global ensembles and resolve the cycle list. Idempotent: a second call does NOT
+   rebuild, because the global ensembles are the run state and rebuilding them mid-sequence
+   would discard everything assimilated so far. */
+PESTPP_API pestpp_status pestpp_da_cycles_initialize(pestpp_handle h);
+
+/* How many cycles the control file defines. */
+PESTPP_API pestpp_status pestpp_da_n_cycles(pestpp_handle h, int* n);
+
+/* The cycle numbers, in run order. `cycles` must hold at least pestpp_da_n_cycles() ints. */
+PESTPP_API pestpp_status pestpp_da_get_cycles(pestpp_handle h, int* cycles, int n);
+
+/* Open the next cycle. *begun is 1 when a cycle is now open, 0 when the sequence is finished -
+   finishing is not an error, so the status is PESTPP_OK either way and *begun is the loop
+   condition. Cycles below ++da_hotstart_cycle are skipped here, as the executable skips them. */
+PESTPP_API pestpp_status pestpp_da_cycle_begin(pestpp_handle h, int* begun);
+
+/* The open cycle, or -1 when none is open. */
+PESTPP_API pestpp_status pestpp_da_current_cycle(pestpp_handle h, int* cycle);
+
+/* Run the open cycle: initialize its tool, assimilate, report phi. */
+PESTPP_API pestpp_status pestpp_da_cycle_drive(pestpp_handle h);
+
+/* Harvest the open cycle's posterior into the global ensembles and close it. */
+PESTPP_API pestpp_status pestpp_da_cycle_end(pestpp_handle h);
+
+/* Every cycle, start to finish. */
+PESTPP_API pestpp_status pestpp_da_run_all_cycles(pestpp_handle h);
 
 /* ---- Tikhonov regularization (glm) -------------------------------------------------------
    The dynamically adjusted regularization weight and the dials that govern it. These arrive

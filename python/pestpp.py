@@ -56,7 +56,7 @@ from pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, _UNSET,
     PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
     STACK_PAR_EN, STACK_OBS_EN, NESTED_PAR_EN, MEMBER_STACK_EN,
-    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, TOOL_GLM,
+    TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, TOOL_GLM, TOOL_OPT,
     RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
     PHI_MEAS, PHI_COMPOSITE, PHI_REGUL, PHI_ACTUAL, PHI_NOISE,
     WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT,
@@ -71,7 +71,7 @@ from pestpp_progress import Progress, auto as _progress_auto  # noqa: E402
 _ToolT = TypeVar("_ToolT", bound="_Tool")
 
 __all__ = [
-    "Ies", "Da", "Mou", "Sqp", "Glm", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
+    "Ies", "Da", "Mou", "Sqp", "Glm", "Opt", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
     "Progress", "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
     "PHI_MEAS", "PHI_COMPOSITE", "PHI_REGUL", "PHI_ACTUAL", "PHI_NOISE",
 ]
@@ -1710,6 +1710,30 @@ class _ChanceMixin:
     def recalc_chance_every(self, n: int) -> None:
         """How often to re-run the stacks. Every iteration is expensive; never is stale."""
         self.set_option("opt_recalc_chance_every", int(n))
+
+
+class Opt(_ChanceMixin, _Tool):
+    """pestpp-opt: sequential linear programming under chance constraints.
+
+    Carries a single decision-variable vector, not a population, so the ensemble views and the
+    phi-over-realizations calls refuse - the same shape as :class:`Glm`. Unlike Glm it has the
+    chance machinery, so the stack and risk controls from :class:`_ChanceMixin` apply exactly as
+    they do for :class:`Mou` and :class:`Sqp`.
+
+    ``initialize()`` is a formality: sequentialLP initializes itself in its constructor, so the
+    tool is ready as soon as the session exists.
+    """
+    _tool_id = TOOL_OPT
+    _has_phi = False
+
+    @staticmethod
+    def _agent_exe():
+        return "pestpp-opt"
+
+    @property
+    def n_reals(self) -> int:
+        """Always 0 - opt carries a decision-variable VECTOR, not realizations."""
+        return 0
 
 
 class Mou(_ChanceMixin, _Tool):

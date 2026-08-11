@@ -42,8 +42,8 @@ static void drive_run_batch(RunManagerAbstract* run_mgr_ptr, double slice_sec = 
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
 	Covariance &_parcov, FileManager* _file_mgr_ptr, OutputFileWriter _of_wr, PerformanceLog& _pfm) 
 	: pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
-	parcov(_parcov), file_mgr_ptr(_file_mgr_ptr),jco(*_file_mgr_ptr,_of_wr), of_wr(_of_wr), pfm(_pfm),
-	constraints(_pest_scenario,_file_mgr_ptr,_of_wr,_pfm), optobjfunc(_pest_scenario, _file_mgr_ptr,_pfm)
+	parcov(_parcov), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), jco(*_file_mgr_ptr,of_wr), pfm(_pfm),
+	constraints(_pest_scenario,_file_mgr_ptr,of_wr,_pfm), optobjfunc(_pest_scenario, _file_mgr_ptr,_pfm)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 
@@ -306,6 +306,11 @@ void sequentialLP::initialize_and_check()
 			"pestpp-sqp option. Use ++opt_risk for chance-constrained optimization under "
 			"uncertainty.");
 	//TODO: handle restart condition
+
+	// opt writes its own per-iteration summaries, so the generic ones are off. Set here rather
+	// than by the caller: it used to live in pestpp-opt.cpp's main(), which meant the C ABI ran
+	// with it ON and took a code path the executable never does.
+	pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
 	if (pest_scenario.get_control_info().pestmode != ControlInfo::PestMode::ESTIMATION)
 	{

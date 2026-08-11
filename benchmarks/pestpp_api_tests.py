@@ -25,7 +25,7 @@ _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
 from pestpp_lib import NOISE_EN  # noqa: E402
 from pestpp import (  # noqa: E402
-    Ies, Mou, Sqp, Glm, IterationStep, PestppError, ExpiredViewError, find_library,
+    Ies, Mou, Sqp, Glm, Opt, IterationStep, PestppError, ExpiredViewError, find_library,
     run_ies, PHI_ACTUAL,
 )
 
@@ -2224,6 +2224,103 @@ def api_sqp_ensemble_sources_test():
     print("api_sqp_ensemble_sources_test passed")
 
 
+
+def _opt_case(name, noptmax=2):
+    """The tracked dewater case, in scratch, under a control file this test WRITES.
+
+    dewater is the smallest opt case with a portable model command - the supply2 cases hard-code
+    ``python.exe``. The control file is written rather than picked up by name because several
+    opt_test.py tests run pestpp-opt with ``cwd`` set to this template and leave their .pst files
+    behind: a test that reads one of those passes only until someone restores the template.
+    ``dewater_pest.fosm.pst`` is tracked, and carries the ++opt_risk that makes this a
+    chance-constrained case.
+    """
+    base = scratch_template(os.path.join(os.path.dirname(_BENCH), "pestpp-opt_benchmarks",
+                                         "opt_dewater_chance", "template"))
+    d = os.path.join(_BENCH, name)
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(base, d)
+    pst = pyemu.Pst(os.path.join(d, "dewater_pest.fosm.pst"))
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(d, "opt_api.pst"))
+    return d
+
+
+def api_opt_drives_slp_test():
+    """pestpp-opt through the C ABI reaches the SAME optimum as the executable.
+
+    opt is the one tool that carries a decision-variable VECTOR rather than a population, so
+    this also pins what it must REFUSE. Those refusals are the contract: an ensemble call that
+    silently returned an empty frame would read as "no realizations yet" rather than "wrong
+    tool", and a caller would wait for realizations that are never coming.
+
+    The comparison against the executable is the point of the test. Driving to completion only
+    shows the ABI does not crash; matching the .rec objective sequence shows it does the same
+    ARITHMETIC. That distinction is not academic here - the first version of this adapter ran
+    to completion while reading an OutputFileWriter through a dangling reference, and the
+    executable survived the same bug only because main() happened to skip the code path.
+    """
+    noptmax = 2
+    d_api = _opt_case("api_opt_slp", noptmax)
+    d_exe = _opt_case("api_opt_slp_exe", noptmax)
+
+    with Opt.from_pst("opt_api.pst", workdir=d_api) as opt:
+        opt.initialize()
+        assert opt.iteration == 0, "before the first solve, opt is on iteration 0"
+        n = 0
+        while not opt.should_terminate and n < 10:
+            opt.solve()
+            n += 1
+        assert opt.should_terminate, "opt stopped on its own terms, not on the loop guard"
+        assert n == noptmax, \
+            "noptmax is {0}, so that many SLP iterations: got {1}".format(noptmax, n)
+
+        # a decision-variable vector is not an ensemble, and opt says so rather than pretending
+        assert opt.n_reals == 0, "opt carries no realizations"
+        for label, call in (("par_df", opt.par_df), ("obs_df", opt.obs_df),
+                            ("phi", lambda: opt.phi)):
+            try:
+                call()
+            except PestppError as e:
+                assert "opt" in str(e).lower(), \
+                    "{0} should name the tool it is refusing for: {1}".format(label, e)
+            else:
+                raise AssertionError("opt has no ensembles - {0} should refuse".format(label))
+
+        # chance IS opt's - unlike the ensemble calls, these must work
+        st = opt.stack_status
+        assert st["use_chance"], "the dewater case is chance-constrained"
+        opt.finalize()
+
+    pyemu.os_utils.run("pestpp-opt opt_api.pst", cwd=d_exe)
+
+    def objs(d):
+        with open(os.path.join(d, "opt_api.rec")) as f:
+            lines = f.readlines()
+        i = [k for k, l in enumerate(lines) if "objective function sequence" in l]
+        assert i, "no objective sequence in {0}".format(d)
+        out = []
+        # the "iteration / obj func" column header sits between the banner and the numbers,
+        # so scan for the numeric block rather than assuming a fixed offset
+        for l in lines[i[0] + 1:]:
+            p = l.split()
+            try:
+                val = float(p[1])
+            except (IndexError, ValueError):
+                if out:
+                    break
+                continue
+            out.append(val)
+        return out
+
+    a, e = objs(d_api), objs(d_exe)
+    assert a and a == e, \
+        "the ABI and the executable must produce the same objective sequence:\n" \
+        "  api: {0}\n  exe: {1}".format(a, e)
+    print("api_opt_drives_slp_test passed ({0} iterations, best obj {1})".format(n, min(a[1:])))
+
+
 def api_robust_requires_paired_parameters_test():
     """A supplied dv ensemble must carry the uncertain parameters when robust is on.
 
@@ -2959,6 +3056,7 @@ if __name__ == "__main__":
     api_glm_dynreg_reachable_phimlim_test()
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
+    api_opt_drives_slp_test()
     api_robust_requires_paired_parameters_test()
     api_stacks_are_mou_and_sqp_only_test()
     print("all helper tests passed")

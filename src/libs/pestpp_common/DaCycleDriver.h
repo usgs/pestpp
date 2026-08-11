@@ -2,6 +2,7 @@
 #define DA_CYCLE_DRIVER_H_
 
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -9,6 +10,7 @@
 
 #include "DataAssimilator.h"
 #include "Ensemble.h"
+#include "EnsembleMethodUtils.h"
 #include "FileManager.h"
 #include "Localizer.h"
 #include "OutputFileWriter.h"
@@ -41,6 +43,10 @@ public:
 		PerformanceLog* _performance_log, RunManagerAbstract* _run_mgr_ptr,
 		RunManagerKind _rm_kind = RunManagerKind::OTHER, bool _restart_flag = false);
 
+	/// Where a per-cycle RunManagerSerial should run the model. Defaults to ".", which is what
+	/// every in-tree caller uses; set it before initialize() if the caller ran from elsewhere.
+	void set_pathname(const std::string& _pathname);
+
 	/// Build the global ensembles, resolve the cycle list and the per-cycle noptmax schedule,
 	/// and initialize the localizer. After this get_cycles() is meaningful.
 	void initialize();
@@ -61,6 +67,11 @@ public:
 	/// This is what an API caller drives - initialize(), solve, and so on - so the per-cycle
 	/// surface is the ordinary DataAssimilator one and needs nothing new.
 	DataAssimilator* get_da() { return da.get(); }
+
+	/// The cycle's OWN scenario, valid between begin_cycle() and end_cycle(). A cycle has its
+	/// own parameter and observation sets - that is what a cycle IS - so a caller asking "what
+	/// parameters am I looking at" must be answered from here, not from the parent.
+	Pest* get_child_scenario() { return child_scenario.get(); }
 
 	/// Run the cycle that begin_cycle() set up: initialize the tool, assimilate, report phi.
 	/// Split from begin_cycle() so a caller can instead take get_da() and drive the cycle
@@ -110,6 +121,38 @@ private:
 
 	std::unique_ptr<Localizer> global_loc;
 	bool initialized;
+
+	/// The cycle tables, read once by initialize(). A cycle absent from a table simply has no
+	/// entry - the tables are sparse, and obs_in_tbl is what lets a cycle zero the weight of an
+	/// observation the table lists for OTHER cycles but not this one.
+	std::vector<int> cycles_in_tables;
+	std::map<int, std::map<std::string, double>> par_cycle_info;
+	std::map<int, std::map<std::string, double>> obs_cycle_info;
+	std::map<int, std::map<std::string, double>> weight_cycle_info;
+	std::set<std::string> obs_in_tbl;
+
+	/// The parent scenario's writer. A MEMBER, not a local in initialize(): ParChangeSummarizer
+	/// keeps an OutputFileWriter* and would otherwise point at a destroyed stack object - the
+	/// same defect that made sequentialLP crash the first time it was driven through the ABI.
+	std::unique_ptr<OutputFileWriter> parent_ofw;
+	/// Built once curr_pe exists, because it holds a pointer to it.
+	std::unique_ptr<ParChangeSummarizer> pcs;
+
+	std::string pathname;   ///< passed to a per-cycle RunManagerSerial
+	int verbose_level;
+
+	/// Set by end_cycle() when da_stop_cycle or pest.stp says to stop. begin_cycle() reports
+	/// false on the next call, so the stop looks like the sequence ending rather than a break
+	/// out of somebody's loop - which is what makes the API and the executable agree.
+	bool stop_requested;
+
+	/// True when begin_cycle() created the run manager for this cycle and end_cycle() must
+	/// destroy it. Only the SERIAL path does; every other kind reuses the caller's.
+	bool owns_cycle_run_mgr;
+	/// Whether the cycle's simulated outputs can be reused. Computed in begin_cycle() because it
+	/// compares against the PREVIOUS cycle, consumed by drive_cycle().
+	bool use_existing;
+	int cycle_nnz_obs;
 
 	/// Live only between begin_cycle() and end_cycle(): the cycle's view of the global
 	/// ensembles. end_cycle() reads them back out, which is why they outlive begin_cycle()'s

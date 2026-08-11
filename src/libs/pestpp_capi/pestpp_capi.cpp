@@ -52,8 +52,10 @@
 #include "EnsembleView.h"
 #include "EnsembleSmoother.h"
 #include "DataAssimilator.h"
+#include "DaCycleDriver.h"
 #include "MOEA.h"
 #include "GLM.h"
+#include "sequential_lp.h"
 #include "SQP.h"
 #include "utilities.h"
 #include "system_variables.h"
@@ -678,42 +680,87 @@ struct DaAdapter : public ToolAdapter
     // the per-cycle CHILD scenario, not the session's parent - see ToolAdapter::scenario()
     Pest& scen;
     int cycle;
+    /// The cycle SEQUENCE, created only when a caller asks for it. Absent by default, so the
+    /// single-cycle surface below is exactly what it always was.
+    unique_ptr<DaCycleDriver> driver;
+
     DaAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
               RunManagerAbstract* rm, int _cycle)
         : tool(p, fm, ofw, pl, rm), scen(p), cycle(_cycle) {}
 
-    EnsembleMethod* ensemble_method() override { return &tool; }
-    Pest& scenario() override { return scen; }
+    /// The DataAssimilator a call should act on. With a cycle open that is the CYCLE's tool -
+    /// its own child scenario, its own ensembles - and otherwise the adapter's own. Every
+    /// accessor below goes through here so none of them can be looking at a different cycle
+    /// than the others.
+    DataAssimilator& active()
+    {
+        if (driver)
+        {
+            DataAssimilator* d = driver->get_da();
+            if (d != nullptr) return *d;
+        }
+        return tool;
+    }
+
+    EnsembleMethod* ensemble_method() override { return &active(); }
+    Pest& scenario() override
+    {
+        if (driver)
+        {
+            Pest* c = driver->get_child_scenario();
+            if (c != nullptr) return *c;
+        }
+        return scen;
+    }
 
     void initialize() override { tool.initialize(cycle, true, false); }
     int  initialize_prepare() override { return tool.initialize_prepare(cycle, true, false); }
     void initialize_finish() override { tool.initialize_finish(cycle); }
-    pestpp_status advance() override { tool.da_update(cycle); return PESTPP_OK; }
-    int  da_cycle() const override { return cycle; }
-    void finalize() override { tool.finalize(); }
-    int  iteration() override { return tool.get_iter(); }
-    bool should_terminate() override { return tool.should_terminate(); }
+    pestpp_status advance() override { active().da_update(current_cycle()); return PESTPP_OK; }
+    int  da_cycle() const override { return current_cycle(); }
+    /// The cycle a call refers to: the open one when stepping a sequence, else the fixed one
+    /// the session was created with.
+    int current_cycle() const
+    {
+        if (driver)
+        {
+            int c = driver->get_current_cycle();
+            if (c >= 0) return c;
+        }
+        return cycle;
+    }
+    void finalize() override
+    {
+        if (driver) driver->finalize();
+        else tool.finalize();
+    }
+    int  iteration() override { return active().get_iter(); }
+    bool should_terminate() override { return active().should_terminate(); }
     Ensemble* ensemble(int id) override
     {
+        DataAssimilator& t = active();
         switch (id)
         {
-        case PESTPP_PAR_EN:     return tool.get_pe_ptr();
-        case PESTPP_OBS_EN:     return tool.get_oe_ptr();
-        case PESTPP_NOISE_EN:   return tool.get_noise_oe_ptr();
-        case PESTPP_WEIGHTS_EN: return tool.get_weights_ptr();
+        case PESTPP_PAR_EN:     return t.get_pe_ptr();
+        case PESTPP_OBS_EN:     return t.get_oe_ptr();
+        case PESTPP_NOISE_EN:   return t.get_noise_oe_ptr();
+        case PESTPP_WEIGHTS_EN: return t.get_weights_ptr();
         default: return nullptr;
         }
     }
-    ParameterEnsemble* par_ensemble() override { return tool.get_pe_ptr(); }
-    ObservationEnsemble* obs_ensemble() override { return tool.get_oe_ptr(); }
+    ParameterEnsemble* par_ensemble() override { return active().get_pe_ptr(); }
+    ObservationEnsemble* obs_ensemble() override { return active().get_oe_ptr(); }
     void phi_summary(int t, double& mean, double& sd, double& mn, double& mx) override
-    { ensemble_phi_summary(tool, t, mean, sd, mn, mx); }
+    { ensemble_phi_summary(active(), t, mean, sd, mn, mx); }
     void phi_vector(int t, vector<string>& names, vector<double>& vals) override
-    { ensemble_phi_vector(tool, t, names, vals); }
+    { ensemble_phi_vector(active(), t, names, vals); }
     void phi_residuals(int t, vector<string>& rn, vector<string>& cn, vector<double>& d) override
-    { ensemble_phi_residuals(tool, t, rn, cn, d); }
+    { ensemble_phi_residuals(active(), t, rn, cn, d); }
     void update_phi() override
-    { tool.get_phi_handler().update(*tool.get_oe_ptr(), *tool.get_pe_ptr(), *tool.get_weights_ptr()); }
+    {
+        DataAssimilator& t = active();
+        t.get_phi_handler().update(*t.get_oe_ptr(), *t.get_pe_ptr(), *t.get_weights_ptr());
+    }
     const char* name() const override { return "da"; }
 };
 
@@ -897,6 +944,86 @@ struct SqpAdapter : public ToolAdapter
     { unsupported("sqp has an objective function, not a phi over realizations"); }
     void update_phi() override { unsupported("sqp has an objective function, not a phi over realizations"); }
     const char* name() const override { return "sqp"; }
+};
+
+/** opt: sequential linear programming, one LP iteration at a time.
+ *
+ * Sits between glm and sqp on this interface. Like glm it carries a single decision-variable
+ * vector rather than a population, so the ensemble and phi-over-realizations calls refuse.
+ * Unlike glm it has the chance machinery, so constraints() is real and the stack and risk calls
+ * work exactly as they do for mou and sqp - which is the point of routing them through
+ * Constraints rather than per-tool.
+ */
+struct OptAdapter : public ToolAdapter
+{
+    /// Declared BEFORE tool: sequentialLP takes the covariance by reference and holds it, so it
+    /// must outlive the tool and be constructed first. Member order is the only thing enforcing
+    /// that, hence the note.
+    Covariance parcov;
+    sequentialLP tool;
+    Pest& scen;
+
+    static Covariance build_parcov(Pest& p, FileManager& fm)
+    {
+        Covariance c;
+        c.try_from(p, fm);
+        return c;
+    }
+
+    OptAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
+               RunManagerAbstract* rm)
+        : parcov(build_parcov(p, fm)), tool(p, rm, parcov, &fm, ofw, *pl), scen(p) {}
+
+    Pest& scenario() override { return scen; }
+
+    /// A no-op, and deliberately so: sequentialLP calls initialize_and_check() from its own
+    /// constructor, so by the time a caller has a handle the tool is already initialized.
+    /// Pretending there is a separate init phase would be a lie the first caller would trip on.
+    void initialize() override {}
+    int  initialize_prepare() override { return 0; }
+    void initialize_finish() override {}
+
+    map<string, int> queue_runs(PerformanceLog*, ofstream&, RunManagerAbstract*) override
+    {
+        unsupported("opt has no parameter ensemble to queue - its runs are the response-matrix "
+                    "and candidate evaluations, which the SLP iteration issues itself");
+        return map<string, int>();
+    }
+    vector<int> process_runs(PerformanceLog*, ofstream&, RunManagerAbstract*,
+                             map<string, int>&) override
+    {
+        unsupported("opt has no parameter ensemble to process - see queue_runs");
+        return vector<int>();
+    }
+
+    pestpp_status advance() override
+    {
+        // solve_iteration() reports whether to keep going, which is not the same as whether the
+        // step succeeded - so, as with glm, it is not mapped to PESTPP_RETRY. should_terminate()
+        // is how a caller learns to stop.
+        tool.solve_iteration();
+        return PESTPP_OK;
+    }
+    void finalize() override { tool.finalize(); }
+    int  iteration() override { return tool.get_slp_iter(); }
+    bool should_terminate() override { return tool.should_terminate(); }
+
+    Ensemble* ensemble(int) override { return nullptr; }
+    ParameterEnsemble* par_ensemble() override { return nullptr; }
+    ObservationEnsemble* obs_ensemble() override { return nullptr; }
+
+    Constraints* constraints() override { return tool.get_constraints_ptr(); }
+
+    void phi_summary(int, double&, double&, double&, double&) override
+    { unsupported("opt has an objective function, not a phi over realizations"); }
+    void phi_vector(int, vector<string>&, vector<double>&) override
+    { unsupported("opt has an objective function, not a phi over realizations"); }
+    void phi_residuals(int, vector<string>&, vector<string>&, vector<double>&) override
+    { unsupported("opt has an objective function, not a phi over realizations"); }
+    void update_phi() override
+    { unsupported("opt has an objective function, not a phi over realizations"); }
+
+    const char* name() const override { return "opt"; }
 };
 
 /** glm: initialize -> solve_iteration -> finalize, carrying ONE parameter set, not an ensemble.
@@ -1272,6 +1399,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         case PESTPP_MOU: tool_type = PestppOptions::ToolType::MOU; break;
         case PESTPP_SQP: tool_type = PestppOptions::ToolType::SQP; break;
         case PESTPP_GLM: tool_type = PestppOptions::ToolType::GLM; break;
+        case PESTPP_OPT: tool_type = PestppOptions::ToolType::OPT; break;
         default: bad_arg("unknown tool id");
         }
 
@@ -1407,6 +1535,7 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
         case PESTPP_MOU: s->adapter.reset(new MouAdapter(scen, fm, ofw, pl, rm)); break;
         case PESTPP_SQP: s->adapter.reset(new SqpAdapter(scen, fm, ofw, pl, rm)); break;
         case PESTPP_GLM: s->adapter.reset(new GlmAdapter(scen, fm, ofw, pl, rm)); break;
+        case PESTPP_OPT: s->adapter.reset(new OptAdapter(scen, fm, ofw, pl, rm)); break;
         default: bad_arg("unknown tool id");
         }
     }
@@ -2594,6 +2723,132 @@ pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data, int max_nrow, i
                     if ((it.row() < nr) && (it.col() < nc))
                         data[it.row() + ((size_t)it.col() * max_nrow)] = it.value();
         }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/* -- pestpp-da: the cycle SEQUENCE ----------------------------------------------------------
+ *
+ * A DataAssimilator is one cycle. Data assimilation is the sequence: each cycle gets its own
+ * child scenario and its own tool, and cycle N's posterior becomes cycle N+1's prior with
+ * failed realizations dropped from the global ensembles along the way. Until DaCycleDriver that
+ * lived in pestpp-da.cpp's main(), so a caller holding a session could only ever run the first
+ * cycle - and a multi-cycle control file quietly produced a one-cycle answer rather than an
+ * error, which is the worst way for it to fail.
+ *
+ * Two ways to drive it. pestpp_da_run_all_cycles() runs the whole sequence, which is what the
+ * executable does. Or step it: begin -> (drive, or take the cycle's tool and drive it yourself
+ * through the ordinary ensemble calls) -> end. Between begin and end every other call on the
+ * session refers to the OPEN cycle - its ensembles, its parameter names, its phi.
+ */
+
+/// The driver, created on first use. Refuses for every tool but da.
+DaCycleDriver* require_da_driver(PestppSession* s, bool create)
+{
+    DaAdapter* a = dynamic_cast<DaAdapter*>(s->adapter.get());
+    if (a == nullptr)
+        unsupported(string("tool '") + s->adapter->name() + "' has no assimilation cycles: "
+                    "cycles are a pestpp-da concept");
+    if ((!a->driver) && create)
+    {
+        a->driver.reset(new DaCycleDriver(*s->pest_scenario, *s->file_manager,
+            s->performance_log.get(), s->run_manager.get(),
+            DaCycleDriver::RunManagerKind::OTHER, false));
+        a->driver->initialize();
+    }
+    if (!a->driver)
+        bad_state("no cycle sequence: call pestpp_da_cycles_initialize() first");
+    return a->driver.get();
+}
+
+/// Build the global ensembles and resolve the cycle list. Idempotent - calling it twice does
+/// not rebuild, because the global ensembles ARE the run state and rebuilding them mid-sequence
+/// would silently discard everything assimilated so far.
+pestpp_status pestpp_da_cycles_initialize(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        require_da_driver(s, true);
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// How many cycles the control file defines.
+pestpp_status pestpp_da_n_cycles(pestpp_handle h, int* n)
+{
+    CAPI_BEGIN(h)
+        if (n == nullptr)
+            bad_arg("n is null");
+        *n = (int)require_da_driver(s, false)->get_cycles().size();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// The cycle numbers, in the order they will run. Pass a buffer of pestpp_da_n_cycles() ints.
+pestpp_status pestpp_da_get_cycles(pestpp_handle h, int* cycles, int n)
+{
+    CAPI_BEGIN(h)
+        if (cycles == nullptr)
+            bad_arg("cycles buffer is null");
+        const vector<int>& c = require_da_driver(s, false)->get_cycles();
+        if (n < (int)c.size())
+            bad_arg("cycles buffer too small");
+        for (size_t i = 0; i < c.size(); ++i)
+            cycles[i] = c[i];
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// Open the next cycle. *begun is 1 when a cycle is now open and 0 when the sequence is done -
+/// which is not an error, so the status stays PESTPP_OK either way and the loop condition is
+/// *begun. Cycles below ++da_hotstart_cycle are skipped here, exactly as the executable skips
+/// them.
+pestpp_status pestpp_da_cycle_begin(pestpp_handle h, int* begun)
+{
+    CAPI_BEGIN(h)
+        if (begun == nullptr)
+            bad_arg("begun is null");
+        *begun = require_da_driver(s, false)->begin_cycle() ? 1 : 0;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// The open cycle, or -1 when none is open.
+pestpp_status pestpp_da_current_cycle(pestpp_handle h, int* cycle)
+{
+    CAPI_BEGIN(h)
+        if (cycle == nullptr)
+            bad_arg("cycle is null");
+        *cycle = require_da_driver(s, false)->get_current_cycle();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// Run the open cycle: initialize its tool, assimilate, report phi. Skip this and drive the
+/// cycle through the ordinary session calls instead if you want control within the cycle.
+pestpp_status pestpp_da_cycle_drive(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        require_da_driver(s, false)->drive_cycle();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// Harvest the open cycle's posterior into the global ensembles and close it. Required: this is
+/// the step that carries the cycle forward, so skipping it does not merely lose reporting, it
+/// breaks the assimilation.
+pestpp_status pestpp_da_cycle_end(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        require_da_driver(s, false)->end_cycle();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// Every cycle, start to finish - the same composition the executable runs.
+pestpp_status pestpp_da_run_all_cycles(pestpp_handle h)
+{
+    CAPI_BEGIN(h)
+        require_da_driver(s, true)->run_all_cycles();
         return PESTPP_OK;
     CAPI_END()
 }

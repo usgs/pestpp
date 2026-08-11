@@ -52,6 +52,10 @@ TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP = 0, 1, 2, 3
 #: upgrade, so the ensemble and phi-over-realizations calls refuse rather than hand back a
 #: one-row ensemble. initialize / advance / finalize work as they do for the others.
 TOOL_GLM = 4
+#: pestpp-opt. Sequential linear programming: one decision-variable vector rather than a
+#: population, so the ensemble and phi calls refuse - but it HAS the chance machinery, so the
+#: stack and risk calls work as they do for mou and sqp.
+TOOL_OPT = 5
 PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN = 0, 1, 2, 3
 #: the chance stacks, mou and sqp only. Empty - not an error - on a fosm or risk-neutral run;
 #: get_stack_status() is how you tell those apart from "not drawn yet"
