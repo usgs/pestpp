@@ -1982,6 +1982,14 @@ void RunManagerPanther::process_message(int i_sock)
 				ss << " run_id:" << run_id << " partial results from:" << host_name << "$"
 				   << agent_info_iter->get_work_dir() << " " << n_real << " of " << pi.n_total
 				   << " observations";
+				// What the model itself last reported, when the agent was given a
+				// ++panther_worker_status_file to tail. The counts above say how much of the
+				// output file the agent could read; this says what the model is DOING, which
+				// is the question anyone watching a slow run is actually asking. Empty for an
+				// agent without the option set, and for any older agent.
+				string status_txt = net_pack.get_info_txt();
+				if (!status_txt.empty())
+					ss << " " << status_txt;
 				report(ss.str(), false);
 
 				// hand it to the tool's predicate. Only the names actually READ are offered

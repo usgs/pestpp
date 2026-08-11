@@ -28,6 +28,7 @@
 #include "MOEA.h"
 #include "SQP.h"
 #include "model_interface.h"
+#include "utilities.h"
 #include "RunStorage.h"
 
 using namespace std;
@@ -682,6 +683,84 @@ static void test_run_map_survives_resize()
  * with the stack frame. Catching the exception higher up would have caught an exception and
  * no data. The parse now writes into a caller-owned Observations, so what was read survives.
  */
+/* pest_utils::read_file_tail: what a PANTHER agent appends to a partial-results reply.
+ *
+ * Worth a test rather than trusting four lines of seek-and-read, because every branch here is
+ * one this feature actually hits and every one of them fails QUIETLY. A mid-line seek yields
+ * half a line, which reads as corruption rather than truncation. An unstripped newline is
+ * DROPPED by NetPackage::reset() - not replaced - so two lines arrive welded into one word.
+ * And truncating the wrong end throws away the newest text, which is the only part anyone
+ * asked for.
+ */
+static void test_read_file_tail()
+{
+    cout << "[status file tail: the newest text, on one printable line]" << endl;
+    const string fname = "selftest_status_tail.txt";
+
+    // missing file is not an error - the model may not have written anything yet
+    remove(fname.c_str());
+    CHK(pest_utils::read_file_tail(fname, 100).empty(),
+        "a missing status file should give an empty tail, not throw");
+
+    {
+        ofstream f(fname);
+        f << "solving timestep 1" << endl;
+        f << "solving timestep 2" << endl;
+    }
+    CHK(pest_utils::read_file_tail(fname, 0).empty(),
+        "a zero budget should give nothing rather than a stray character");
+
+    // whole file fits: both lines survive, joined by the separator, no trailing blank
+    string all = pest_utils::read_file_tail(fname, 200);
+    CHK(all == "solving timestep 1 | solving timestep 2",
+        "a short file should come back whole and flattened, got: '" + all + "'");
+
+    // the newest text is what must survive a tight budget
+    string tight = pest_utils::read_file_tail(fname, 18);
+    CHK((int)tight.size() <= 18, "the tail must respect the budget");
+    CHK(tight == "solving timestep 2",
+        "truncation must drop the OLDEST text, got: '" + tight + "'");
+
+    // a long file: the read window lands mid-line and that partial line must not be reported
+    {
+        ofstream f(fname);
+        for (int i = 0; i < 500; ++i)
+            f << "iteration " << i << " residual 0.0001 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << endl;
+    }
+    string big = pest_utils::read_file_tail(fname, 120);
+    CHK((int)big.size() <= 120, "a big file must still respect the budget");
+    CHK(big.find("iteration 499") != string::npos,
+        "the tail of a big file must contain the LAST line, got: '" + big + "'");
+    CHK(big.find("iteration 0 ") == string::npos,
+        "the tail of a big file must not reach back to the first line");
+    // and the cut lands on a line boundary: an arbitrary cut leaves the orphan tail of a line
+    // at the front, which reads as garbage rather than as a truncation. This was real - the
+    // first end-to-end run reported "...observations 4 of 20 | solving timestep 5 of 20 | ..."
+    CHK(big.compare(0, 10, "iteration ") == 0,
+        "a truncated tail must start at a line boundary, got: '" + big + "'");
+
+    // non-printables become spaces rather than vanishing, and runs collapse
+    {
+        ofstream f(fname, std::ios::binary);
+        f << "progress\t\t50%\x01\x02 done\r\n";
+    }
+    string ctrl = pest_utils::read_file_tail(fname, 100);
+    for (size_t i = 0; i < ctrl.size(); ++i)
+        CHK(((unsigned char)ctrl[i] >= 32) && ((unsigned char)ctrl[i] <= 126),
+            "every byte of the tail must survive NetPackage's printable-ASCII filter");
+    CHK(ctrl == "progress 50% done",
+        "control characters should collapse to single spaces, got: '" + ctrl + "'");
+
+    // an empty file is not a status
+    {
+        ofstream f(fname);
+    }
+    CHK(pest_utils::read_file_tail(fname, 100).empty(),
+        "an empty status file should give an empty tail");
+
+    remove(fname.c_str());
+}
+
 static void test_instruction_file_tolerant_read()
 {
     cout << "[instruction files: a failed parse still yields what it read]" << endl;
@@ -1463,6 +1542,7 @@ int main()
     test_ensemble_zero_copy_view();
     test_run_map_survives_resize();
     test_subset_names_survive_membership_change();
+    test_read_file_tail();
     test_instruction_file_tolerant_read();
     test_instruction_file_partial_reads_are_never_wrong();
     test_model_interface_partial_across_files();

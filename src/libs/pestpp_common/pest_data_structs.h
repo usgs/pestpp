@@ -815,6 +815,23 @@ public:
     /// means no command, which is the behaviour every existing control file already has.
     void set_panther_worker_partial_obs_command(const string& _cmd) { panther_worker_partial_obs_command = _cmd; }
     string get_panther_worker_partial_obs_command() const { return panther_worker_partial_obs_command; }
+    /// A file the AGENT tails when the master asks for partial results, appending the last line
+    /// to the reply's info text so the master can report what the model is actually doing.
+    ///
+    /// A FILE rather than the model's stdout, deliberately. The agent's message loop and the
+    /// model run are on different threads, so capturing stdout means a shared buffer and a lock;
+    /// a file needs neither - the OS is the handoff, the run thread never touches it, and the
+    /// message thread only reads. It is also more useful: point it at the log the model already
+    /// writes (a MODFLOW .lst, a solver log) and the reported line is the one that means
+    /// something, instead of whatever happened to go to the console.
+    ///
+    /// AGENT-ONLY. The master never reads it, so setting it on a master is inert rather than an
+    /// error - the same control file is normally handed to both.
+    ///
+    /// Empty (the default) means no status reporting, which is what every existing control file
+    /// already does.
+    void set_panther_worker_status_file(const string& _fname) { panther_worker_status_file = _fname; }
+    string get_panther_worker_status_file() const { return panther_worker_status_file; }
     void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
     int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
     void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
@@ -1132,6 +1149,7 @@ private:
 	bool panther_agent_restart_on_error;
 	bool reg_use_achievable_target;
 	string panther_worker_partial_obs_command;
+	string panther_worker_status_file;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
 	bool debug_check_paren_consistency;		

@@ -1241,6 +1241,102 @@ def capi_partial_obs_command_test():
                 pass
 
 
+def capi_partial_status_file_test():
+    """++panther_worker_status_file rides back to the MASTER on a partial-results reply.
+
+    The point of the option is that someone watching a slow run can see what the model is
+    doing. So the assertion is on the master's log, not on the agent's: an agent that reads the
+    file perfectly and a master that discards what it sends look identical from the worker
+    directory, and that is exactly what was happening before - the master rebuilt its report
+    line from the deserialized payload and never looked at info_txt at all.
+
+    The model writes a progress file while it sleeps, so the tail is different each time it is
+    read - which also proves the agent is reading it LIVE rather than once at startup.
+    """
+    wd = _setup("capi_status_file", noptmax=1, num_reals=4)
+    with open(os.path.join(wd, "slow_model.py"), "w") as f:
+        f.write("import time\n"
+                "row = ' '.join(['1.0'] * 10)\n"
+                "for i in range(20):\n"
+                "    with open('model_progress.txt', 'a') as p:\n"
+                "        p.write('solving timestep {0} of 20\\n'.format(i))\n"
+                "    time.sleep(1)\n"
+                "with open('10par_xsec.hds', 'w') as o:\n"
+                "    o.write(row + '\\n' + row + '\\n')\n")
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.model_command = ["python slow_model.py"]
+    pst.pestpp_options["panther_worker_status_file"] = "model_progress.txt"
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    worker_root = os.path.join(_BENCH, "capi_status_file_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    procs, worker_dirs = [], []
+    agent_exe = _find_agent_exe()
+    cmd_port = port + 13
+    # the .rmr, not the .rec: RunManagerPanther::report() is the run-manager log
+    rec = os.path.join(wd, "pest.rmr")
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=cmd_port) as ies:
+            for i in range(2):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                worker_dirs.append(d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(cmd_port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+            ies.initialize()
+            ies.queue_runs()
+            ies.begin_batch()
+            asked, last_ask = 0, 0.0
+            deadline = time.time() + 300
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    break
+                if ies.get_run_time_stats()["running"] > 0 and (time.time() - last_ask) > 1.0:
+                    last_ask = time.time()
+                    asked += ies.request_partial_results()
+            ies.end_batch()
+
+        assert asked > 0, "never caught a run in progress, so partials were never requested"
+        txt = open(rec, errors="replace").read()
+        lines = [l for l in txt.splitlines() if "partial results from" in l]
+        assert lines, "no partial results reached the master at all"
+        with_status = [l for l in lines if "solving timestep" in l]
+        assert with_status, (
+            "the master logged {0} partial replies but none carried the status file text - "
+            "info_txt is being dropped somewhere between the agent and the record file. "
+            "sample: {1}".format(len(lines), lines[0] if lines else ""))
+        # the tail must be the NEWEST text, not the file's whole history: asking for the full
+        # DESC_LEN budget came back as 35 timesteps at once, which buries the current one
+        # bounded, and bounded by the AGENT rather than by NetPackage truncating it: the whole
+        # log came back at first, which buries the current timestep and is written once per
+        # request per agent
+        for l in with_status:
+            tail = l.split("observations", 1)[1].strip()
+            assert len(tail) <= 140, (
+                "the status tail should be recent progress, not the whole log "
+                "({0} chars): {1}".format(len(tail), tail))
+            # and it must not start mid-line - an arbitrary cut leaves an orphan fragment
+            assert tail.startswith("solving timestep"), (
+                "the status tail should start at a line boundary, got: '{0}'".format(tail))
+        # it tracks the run: later replies report later timesteps than the first
+        def last_step(l):
+            return int(l.rsplit("solving timestep", 1)[1].split("of")[0].strip())
+        assert len(set(last_step(l) for l in with_status)) > 1, \
+            "every reply reported the same timestep - the file is being read once, not live"
+        print("capi_partial_status_file_test passed ({0} replies, {1} with status)".format(
+            len(lines), len(with_status)))
+    finally:
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
+
 def capi_partial_results_test():
     """Ask a worker mid-run what it has, and get a real answer back.
 
@@ -1989,6 +2085,7 @@ if __name__ == "__main__":
     capi_release_workers_refused_serial_test()
     capi_partial_results_test()
     capi_partial_obs_command_test()
+    capi_partial_status_file_test()
     capi_service_runs_yourself_test()
     capi_service_runs_failure_test()
     print("all capi tests passed")

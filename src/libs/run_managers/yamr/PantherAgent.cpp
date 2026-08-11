@@ -595,8 +595,46 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 					// is indistinguishable from a broken exchange, which cost real debugging
 					if ((missing.size() == master_obs_name_vec.size()) && (problems.size() > 0))
 						pss << " (" << problems[0] << ")";
+
+					// Whatever the model last reported, if the user named a file to read it
+					// from. This is what rides in info_txt, and ONLY this: the master rebuilds
+					// the observation counts from the payload it just deserialized, so sending
+					// our own copy of them would print the same numbers twice - and if the two
+					// ever disagreed, the payload is the one that is true.
+					//
+					// Budgeted against DESC_LEN rather than sent at whatever length it happens
+					// to be. reset() truncates silently at 1000 bytes and drops every byte
+					// outside printable ASCII, so an unbudgeted append does not overflow - it
+					// gets quietly shortened, which is worse than being asked to fit.
+					string status_txt;
+					const string& status_file = pest_scenario.get_pestpp_options()
+						.get_panther_worker_status_file();
+					if (!status_file.empty())
+					{
+						try
+						{
+							// Deliberately far below DESC_LEN. The question being answered is
+							// "what is the model doing NOW", and asking for the full 1000 bytes
+							// answers "what has it done so far" instead - one request against a
+							// progress log came back as 35 timesteps of history, which buries
+							// the current one. It is also written to the master's rmr file once
+							// per request PER AGENT, and partials can be requested every second,
+							// so the width of this line is a real cost at fleet scale. A couple
+							// of lines is what "last reported" means.
+							const int STATUS_CHARS = 120;
+							status_txt = pest_utils::read_file_tail(status_file, STATUS_CHARS);
+							if (!status_txt.empty())
+								pss << " | status: " << status_txt;
+						}
+						catch (...)
+						{
+							// same contract as the rest of this block: reporting status must
+							// never cost the caller its partial results
+						}
+					}
+
 					net_pack.reset(NetPackage::PackType::PARTIAL_OBS, p_group, p_run,
-						pss.str());
+						status_txt);
 					err = send_message(net_pack, sdata.data(), sdata.size());
 					if (err.first != 1)
 						report("error sending partial results to master: " + err.second, false);

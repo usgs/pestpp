@@ -299,6 +299,28 @@ bool run_command(const std::string& cmd_string,
 bool run_commands(const std::vector<std::string>& comline_vec,
 	thread_flag* terminate = nullptr, bool should_echo = true, int sleep_ms = 10);
 
+/** The tail of a file, flattened to one printable line of at most `max_chars`.
+ *
+ * For reporting what a long-running model is doing without capturing its stdout. A FILE rather
+ * than a pipe because the reader and the writer are different threads - the agent's message
+ * loop answers a request while the run thread is going - and a file needs no shared buffer and
+ * no lock to be safe between them.
+ *
+ * Three details that are the reason this is a function rather than four lines at the call site:
+ *
+ *  - a seek into the middle of a file lands mid-line, and half a line reads as corruption, so
+ *    the leading partial line is discarded;
+ *  - newlines become " | " and non-printables become spaces, because NetPackage::reset() DROPS
+ *    bytes outside 32-126 instead of replacing them - untreated, two lines arrive welded into
+ *    one word;
+ *  - over-length text is cut from the FRONT, keeping the newest, which is the whole point.
+ *
+ * @return the tail, or an empty string if the file is missing, empty, unreadable, or holds a
+ *         single line longer than the read window - never throws, because every caller is
+ *         reporting a courtesy and must not fail because of it
+ */
+std::string read_file_tail(const std::string& filename, int max_chars);
+
 
 //class thread_exceptions
 //{

@@ -1388,6 +1388,13 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		return true;
 	}
 
+	if (key == "PANTHER_WORKER_STATUS_FILE")
+	{
+		// org_value, not value: a path must keep its case
+		panther_worker_status_file = org_value;
+		return true;
+	}
+
 	if (key == "PANTHER_AGENT_NO_PING_TIMEOUT_SECS")
 	{
 		convert_ip(value, panther_agent_no_ping_timeout_secs);
@@ -2021,6 +2028,7 @@ void PestppOptions::summary_legacy(ostream& os) const
 	os << "panther_echo: " << panther_echo << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
 	os << "panther_worker_partial_obs_command: " << panther_worker_partial_obs_command << endl;
+	os << "panther_worker_status_file: " << panther_worker_status_file << endl;
 	os << "reg_use_achievable_target: " << reg_use_achievable_target << endl;
 	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << "panther_debug_loop: " << panther_debug_loop << endl;
@@ -2601,6 +2609,7 @@ void PestppOptions::set_defaults_legacy()
 
 	set_panther_agent_restart_on_error(false);
 	set_panther_worker_partial_obs_command("");
+	set_panther_worker_status_file("");
 	set_reg_use_achievable_target(true);
 	set_panther_agent_no_ping_timeout_secs(-1);
 	set_panther_debug_loop(false);

@@ -671,6 +671,12 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ o.set_panther_worker_partial_obs_command(org_value); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_panther_worker_partial_obs_command(""); },
         [](const PestppOptions& o)->string{ return o.get_panther_worker_partial_obs_command(); } },
+    // Agent-only, and NOT init_only: the agent reads it at the moment a partial request is
+    // answered, so a live set takes effect on the next request rather than needing a restart.
+    OptionSpec{ "PANTHER_WORKER_STATUS_FILE", {}, OptType::STRING, "panther", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ o.set_panther_worker_status_file(org_value); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o){ o.set_panther_worker_status_file(""); },
+        [](const PestppOptions& o)->string{ return o.get_panther_worker_status_file(); } },
     OptionSpec{ "PANTHER_AGENT_NO_PING_TIMEOUT_SECS", {}, OptType::INT, "panther", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_panther_agent_no_ping_timeout_secs(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_panther_agent_no_ping_timeout_secs(-1); },
