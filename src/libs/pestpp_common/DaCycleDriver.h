@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include "DataAssimilator.h"
 #include "Ensemble.h"
@@ -61,6 +62,11 @@ public:
 	/// surface is the ordinary DataAssimilator one and needs nothing new.
 	DataAssimilator* get_da() { return da.get(); }
 
+	/// Run the cycle that begin_cycle() set up: initialize the tool, assimilate, report phi.
+	/// Split from begin_cycle() so a caller can instead take get_da() and drive the cycle
+	/// itself - which is the whole point of exposing the sequence rather than just running it.
+	void drive_cycle();
+
 	/// Harvest this cycle's posterior back into the global ensembles: drop realizations the
 	/// cycle lost, realign, and write the cycle's columns back. This is the step that makes it
 	/// assimilation rather than a loop, and the reason a caller cannot just run cycles itself.
@@ -104,6 +110,16 @@ private:
 
 	std::unique_ptr<Localizer> global_loc;
 	bool initialized;
+
+	/// Live only between begin_cycle() and end_cycle(): the cycle's view of the global
+	/// ensembles. end_cycle() reads them back out, which is why they outlive begin_cycle()'s
+	/// scope rather than being locals as they were in main().
+	ParameterEnsemble cycle_curr_pe;
+	ObservationEnsemble cycle_curr_oe;
+	/// Carried across cycles so a cycle can see what the previous one ended at.
+	Parameters prev_cycle_ctl_pars;
+	Observations prev_cycle_obs;
+	std::ofstream f_phi;   ///< the global phi log, opened once by initialize()
 
 	void drop_missing_realizations(ParameterEnsemble& cycle_pe);
 	void drop_missing_realizations(ObservationEnsemble& cycle_oe);
