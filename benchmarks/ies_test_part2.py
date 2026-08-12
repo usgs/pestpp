@@ -777,25 +777,25 @@ def tenpar_rns_test():
 
 
 def assert_restart_phi_matches(phi_df1, phi_df2, tol=0.01, max_lost_frac=0.2):
-    """Run 2's FIRST phi must reproduce run 1's LAST phi, per realization, matched by NAME.
+    """run 2's first phi has to match run 1's last phi, realization by realization, by name.
 
-    That is the restart property: run 2 starts from run 1's final ensembles, so realization by
-    realization the phi has to come back the same.
+    that is what restarting means - run 2 starts from run 1's final ensembles, so realization by
+    realization the phi should come back the same.
 
-    Matched by name rather than by position, and the difference matters. Positionally this is
-    only correct while both runs hold the same realizations; when run 2 loses some - agents
-    dropping mid-batch, which happens on a loaded CI box - the rows have different widths and
-    numpy raises "operands could not be broadcast together with shapes (34,) (28,)". That says
-    nothing about restart fidelity and sends you looking in the wrong place. It cost a CI
-    investigation once already.
+    matched by name instead of by position, and that matters. by position it is only right while
+    both runs have the same realizations. when run 2 loses a few - agents dropping mid-batch,
+    which happens on a busy ci box - the rows are different widths and numpy says "operands
+    could not be broadcast together with shapes (34,) (28,)". that tells you nothing about
+    whether the restart worked and sends you off looking in the wrong place. it already cost one
+    ci go-around.
 
-    A lost realization is tolerated in small numbers, because it is an infrastructure symptom
-    rather than a restart defect - but never silently, because a test that quietly shrinks its
-    own sample is how a real regression gets to look like a pass. Losing more than
-    ``max_lost_frac`` fails: at that point it is the restart dropping them, not the machine.
+    losing a realization or two is ok, since that is a machine problem and not a restart
+    problem - but never quietly, because a test that shrinks its own sample without saying so is
+    how a real regression ends up looking like a pass. losing more than ``max_lost_frac`` fails,
+    because at that point it is the restart dropping them and not the machine.
 
-    A module-level function rather than eight lines inside the test so its unhappy paths can be
-    exercised without needing a CI box to drop an agent - see restart_phi_helper_test().
+    this is a function up here instead of eight lines inside the test so the failure paths can
+    be exercised without needing a ci box to drop an agent - see restart_phi_helper_test().
     """
     stat_cols = {"total_runs", "mean", "standard_deviation", "min", "max"}
 
@@ -827,9 +827,9 @@ def assert_restart_phi_matches(phi_df1, phi_df2, tol=0.01, max_lost_frac=0.2):
             row1[common].values[int(np.argmax(diff))],
             row2[common].values[int(np.argmax(diff))])
 
-    # Ensemble-wide statistics are only comparable when both runs hold the SAME realizations -
-    # a lost realization moves the mean legitimately. Checked when it applies, so the ordinary
-    # case keeps the coverage the old positional comparison gave.
+    # the ensemble-wide stats only compare when both runs have the same realizations - losing
+    # one moves the mean for a perfectly good reason. so check them when they apply, which keeps
+    # the normal case covered the same as the old positional comparison did.
     if not lost:
         for c in ("mean", "standard_deviation", "min", "max"):
             if c in phi_df1.columns and c in phi_df2.columns:
@@ -838,11 +838,11 @@ def assert_restart_phi_matches(phi_df1, phi_df2, tol=0.01, max_lost_frac=0.2):
 
 
 def restart_phi_helper_test():
-    """The unhappy paths of assert_restart_phi_matches, which a healthy run never reaches.
+    """the failure paths in assert_restart_phi_matches, which a normal run never gets to.
 
-    Written because the branch that matters most here - "run 2 lost realizations" - only fires
-    when the machine misbehaves, and a guard that has never executed is a guard nobody has
-    checked.
+    wrote this because the branch that matters most - "run 2 lost realizations" - only fires
+    when the machine acts up, and a check that has never actually run is a check nobody has
+    looked at.
     """
     def frame(reals, vals, mean=None):
         d = {"total_runs": [10], "mean": [mean if mean is not None else float(np.mean(vals))],
@@ -853,10 +853,10 @@ def restart_phi_helper_test():
     names = ["r{0}".format(i) for i in range(10)]
     vals = [float(i) for i in range(10)]
 
-    # identical -> passes, and the summary-stat branch runs
+    # identical -> passes, and the summary stat branch runs
     assert_restart_phi_matches(frame(names, vals), frame(names, vals))
 
-    # six of ten lost is over the 20% budget -> must fail, and name the loss
+    # six of ten lost is over the 20% allowance -> should fail, and say which ones
     try:
         assert_restart_phi_matches(frame(names, vals), frame(names[:4], vals[:4]))
     except AssertionError as e:
@@ -864,10 +864,10 @@ def restart_phi_helper_test():
     else:
         raise AssertionError("losing 6 of 10 realizations should fail")
 
-    # one of ten lost is tolerated, and the surviving nine are still compared exactly
+    # one of ten lost is fine, and the nine that are left still get compared exactly
     assert_restart_phi_matches(frame(names, vals), frame(names[:9], vals[:9]))
 
-    # ...but a tolerated loss must not become an excuse: the common ones still have to match
+    # ...but losing one isnt an excuse - the ones they share still have to match
     bad = list(vals[:9]); bad[3] += 5.0
     try:
         assert_restart_phi_matches(frame(names, vals), frame(names[:9], bad))
@@ -876,7 +876,7 @@ def restart_phi_helper_test():
     else:
         raise AssertionError("a wrong phi among the surviving realizations should fail")
 
-    # realizations that do not line up at all -> the restart carried nothing
+    # realizations that dont line up at all -> the restart carried nothing over
     try:
         assert_restart_phi_matches(frame(names, vals),
                                    frame(["x{0}".format(i) for i in range(10)], vals))
@@ -885,7 +885,7 @@ def restart_phi_helper_test():
     else:
         raise AssertionError("a disjoint realization set should fail")
 
-    # a lost realization moves the mean legitimately, so the stat check must NOT fire then
+    # losing a realization moves the mean for a good reason, so the stat check shouldnt fire
     assert_restart_phi_matches(frame(names, vals),
                                frame(names[:9], vals[:9], mean=999.0))
     print("restart_phi_helper_test passed")
@@ -1340,8 +1340,8 @@ def tenpar_restart_test_2():
     assert os.path.exists(os.path.join(test_d, "pest_restart.phi.group.csv"))
     phi_df2 = pd.read_csv(os.path.join(test_d,"pest_restart.phi.composite.csv"),index_col=0)
 
-    # The property under test: run 2 restarts from run 1's iteration-1 ensembles, so run 2's
-    # iteration-0 phi must reproduce run 1's iteration-1 phi - PER REALIZATION, matched by name.
+    # what we are testing: run 2 restarts from run 1's iteration-1 ensembles, so run 2's
+    # iteration-0 phi should match run 1's iteration-1 phi, realization by realization, by name.
     #
     # Positionally (the old `iloc[-1,1:]` vs `iloc[0,1:]`) this is only correct while both runs
     # hold the same realizations. When run 2 loses some - agents dropping mid-batch, which does
@@ -1362,10 +1362,9 @@ def tenpar_restart_test_2():
         "run 2 shares no realizations with run 1 - the restart did not carry the ensemble at " \
         "all.  run 1: {0}  run 2: {1}".format(r1[:5], r2[:5])
     if lost:
-        # Runs that failed while evaluating run 2's initial ensemble. Tolerated in small
-        # numbers because it is an infrastructure symptom rather than a restart defect, but
-        # never silently: a test that quietly shrinks its own sample is how a real regression
-        # gets to look like a pass.
+        # runs that failed while evaluating run 2's initial ensemble. a few is ok since that is
+        # a machine problem not a restart problem, but never quietly - a test that shrinks its
+        # own sample without saying so is how a real regression ends up looking like a pass.
         print("WARNING: {0} of {1} realizations missing from the restart run "
               "(runs failed during its initial ensemble): {2}".format(
                   len(lost), len(r1), lost))
@@ -1385,9 +1384,9 @@ def tenpar_restart_test_2():
             row1[common].values[int(np.argmax(diff))],
             row2[common].values[int(np.argmax(diff))])
 
-    # The ensemble-wide statistics are only comparable when the two runs hold the SAME
-    # realizations - a lost realization moves the mean legitimately. Checked when it applies, so
-    # the ordinary case keeps the coverage the positional comparison used to give.
+    # the ensemble-wide stats only compare when both runs have the same realizations - losing
+    # one moves the mean for a perfectly good reason. so check them when they apply, which keeps
+    # the normal case covered the same as the old positional comparison did.
     if not lost:
         for c in ("mean", "standard_deviation", "min", "max"):
             if c in phi_df1.columns and c in phi_df2.columns:

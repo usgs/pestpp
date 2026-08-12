@@ -42,16 +42,16 @@ using namespace std;
 const double RunStorage::no_data = -9999.0;
 
 /**
- * @brief Everything known about a failed stream operation, as one message.
+ * @brief everything we know about a stream operation that failed, in one message.
  *
- * See the header for why this exists. Short version: these failures surface in CI and do not
- * reproduce, so the message thrown at the moment of failure is the only evidence anyone will
- * ever get. "stream not good" was not enough to tell a short file from a bad offset from a
- * disk error, and three separate investigations died on that ambiguity.
+ * see the header for why. short version - these show up in ci and dont reproduce, so the
+ * message we throw right when it happens is the only evidence anybody is ever going to get.
+ * "stream not good" wasnt enough to tell a short file from a bad offset from a disk error, and
+ * three separate go-arounds on this died right there.
  *
- * Reads the file size through a SEPARATE ifstream rather than through buf_stream. buf_stream is
- * already in a failed state by the time we are called - seeking it to measure the file would
- * either fail too or, worse, clear the very state we are trying to report.
+ * gets the file size through its own ifstream instead of buf_stream. by the time we get called
+ * buf_stream is already in a bad state, so seeking it to measure the file would either fail too
+ * or, worse, clear the very state we are trying to report.
  */
 string RunStorage::stream_diagnostic(const string &where, int run_id,
 	std::streamoff expected_pos) const
@@ -63,8 +63,8 @@ string RunStorage::stream_diagnostic(const string &where, int run_id,
 		ss << "RunStorage::" << where << "() stream not good";
 		ss << " [file='" << filename << "'";
 
-		// stream state: which bit is set says a lot on its own. eof alone means we asked for
-		// bytes past the end - a short file. bad means the OS refused.
+		// which bit is set tells you a lot by itself. just eof means we asked for bytes past the
+		// end, so the file is short. bad means the os said no.
 		ss << " state=";
 		if (buf_stream.good()) ss << "good";
 		else
@@ -80,12 +80,13 @@ string RunStorage::stream_diagnostic(const string &where, int run_id,
 		if (expected_pos >= 0)
 			ss << " target_pos=" << (long long)expected_pos;
 
-		// the record geometry, so a wrong offset is recognisable as arithmetic rather than IO
+		// the record sizes, so you can tell a bad offset from an actual io problem
 		ss << " beg_run0=" << (long long)beg_run0
 		   << " run_byte_size=" << (long long)run_byte_size;
 
-		// The counter as recorded in the header, read WITHOUT going through get_nruns(): that
-		// function throws on a bad stream, and a diagnostic that throws is no diagnostic.
+		// the counter out of the header, read without going through get_nruns() - that one
+		// throws on a bad stream, and something that throws while explaining an error is no
+		// help at all.
 		long long nruns = -1, fsize = -1;
 		{
 			ifstream probe(filename, ios_base::in | ios_base::binary);
@@ -104,9 +105,9 @@ string RunStorage::stream_diagnostic(const string &where, int run_id,
 		ss << " file_size=" << (fsize < 0 ? string("?") : to_string(fsize));
 		ss << " header_nruns=" << (nruns < 0 ? string("?") : to_string(nruns));
 
-		// The decisive comparison, stated rather than left for the reader to do: if the file is
-		// smaller than the offset we asked for, the file is short and the question is who
-		// failed to write it - not why the read failed.
+		// do the comparison here instead of making whoever reads this do it. if the file is
+		// smaller than the offset we asked for then the file is short, and the question is who
+		// didnt write it - not why the read failed.
 		if ((fsize >= 0) && (expected_pos >= 0))
 		{
 			ss << " short_by=";
@@ -121,17 +122,17 @@ string RunStorage::stream_diagnostic(const string &where, int run_id,
 				ss << " MISMATCH(counter says " << nruns << ", file holds " << records << ")";
 		}
 
-		// errno ONLY when badbit is set, i.e. the OS actually refused the operation. A short
-		// read sets eof/fail without touching errno, so reporting it there prints whatever
-		// unrelated call last failed - "errno=2(No such file or directory)" against a file that
-		// is plainly open and readable, which is worse than saying nothing.
+		// only report errno when badbit is set, meaning the os actually refused. a short read
+		// sets eof/fail without touching errno, so printing it there just shows whatever
+		// unrelated call failed last - "errno=2(No such file or directory)" against a file that
+		// is obviously open and readable, which is worse than saying nothing.
 		if (buf_stream.bad() && (saved_errno != 0))
 			ss << " errno=" << saved_errno << "(" << strerror(saved_errno) << ")";
 		ss << "]";
 	}
 	catch (...)
 	{
-		// a diagnostic that throws while diagnosing loses the original failure entirely
+		// if this throws while explaining an error you lose the original error completely
 		return "RunStorage::" + where + "() stream not good [diagnostic unavailable]";
 	}
 	return ss.str();
@@ -144,10 +145,10 @@ string RunStorage::stream_diagnostic(const string &where, int run_id,
  *
  * @return Description.
  */
-// beg_run0 and the byte sizes are zeroed here rather than left to reset()/init_restart().
-// They feed get_stream_pos() arithmetic, so before initialization they made an offset out
-// of uninitialized memory - which the new failure diagnostic promptly reported as
-// "beg_run0=49807605984", a number that could only ever confuse whoever read it.
+// zero beg_run0 and the byte sizes here instead of leaving it to reset()/init_restart(). they
+// feed the get_stream_pos() math, so before they were set up we were making an offset out of
+// uninitialized memory. the new error message caught this right away and printed
+// "beg_run0=49807605984", which would only ever confuse whoever read it.
 RunStorage::RunStorage(const string &_filename) :filename(_filename), beg_run0(0),
 	run_byte_size(0), run_par_byte_size(0), run_data_byte_size(0)
 {

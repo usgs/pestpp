@@ -815,21 +815,21 @@ public:
     /// means no command, which is the behaviour every existing control file already has.
     void set_panther_worker_partial_obs_command(const string& _cmd) { panther_worker_partial_obs_command = _cmd; }
     string get_panther_worker_partial_obs_command() const { return panther_worker_partial_obs_command; }
-    /// A file the AGENT tails when the master asks for partial results, appending the last line
-    /// to the reply's info text so the master can report what the model is actually doing.
+    /// a file the agent reads the tail of when the master asks for partial results, and sticks
+    /// the last line onto the reply so the master can report what the model is actually doing.
     ///
-    /// A FILE rather than the model's stdout, deliberately. The agent's message loop and the
-    /// model run are on different threads, so capturing stdout means a shared buffer and a lock;
-    /// a file needs neither - the OS is the handoff, the run thread never touches it, and the
-    /// message thread only reads. It is also more useful: point it at the log the model already
-    /// writes (a MODFLOW .lst, a solver log) and the reported line is the one that means
-    /// something, instead of whatever happened to go to the console.
+    /// a file instead of the model's stdout, on purpose. the agent's message loop and the model
+    /// run are on different threads, so capturing stdout would mean a shared buffer and a lock -
+    /// with a file you dont need either, since the run thread never touches it and the message
+    /// thread only reads. it also works out better: point it at whatever log the model already
+    /// writes (a modflow .lst, a solver log) and you get the line that actually means something
+    /// instead of whatever happened to go to the console.
     ///
-    /// AGENT-ONLY. The master never reads it, so setting it on a master is inert rather than an
-    /// error - the same control file is normally handed to both.
+    /// agent only. the master never reads it, so setting it on a master does nothing rather
+    /// than being an error - usually the same control file gets handed to both.
     ///
-    /// Empty (the default) means no status reporting, which is what every existing control file
-    /// already does.
+    /// empty (the default) means no status reporting, which is what every control file out
+    /// there does today.
     void set_panther_worker_status_file(const string& _fname) { panther_worker_status_file = _fname; }
     string get_panther_worker_status_file() const { return panther_worker_status_file; }
     void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }

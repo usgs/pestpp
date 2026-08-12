@@ -307,9 +307,9 @@ void sequentialLP::initialize_and_check()
 			"uncertainty.");
 	//TODO: handle restart condition
 
-	// opt writes its own per-iteration summaries, so the generic ones are off. Set here rather
-	// than by the caller: it used to live in pestpp-opt.cpp's main(), which meant the C ABI ran
-	// with it ON and took a code path the executable never does.
+	// opt writes its own per-iteration summaries so the generic ones get turned off. set here
+	// instead of making the caller do it - it used to be in main() in pestpp-opt.cpp, which
+	// meant the c api ran with it on and went down a code path the exe never does.
 	pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
 	if (pest_scenario.get_control_info().pestmode != ControlInfo::PestMode::ESTIMATION)

@@ -42,19 +42,19 @@ void DaCycleDriver::initialize()
 {
 	ofstream& frec = file_manager.rec_ofstream();
 
-	// The cycle list comes from the assimilation/dci tables in the control file. It is resolved
-	// here rather than by the caller because the noptmax schedule below is keyed on it, and the
-	// two disagreeing is not a failure anyone would notice.
+	// the cycle list comes from the assimilation/dci tables in the control file. we work it out
+	// here instead of making the caller do it, because the noptmax schedule below is keyed on it
+	// and if the two disagree nobody would ever notice.
 	verbose_level = parent_scenario.get_pestpp_options().get_ies_verbose_level();
 
-	// The cycle tables must be read BEFORE the cycle list: get_assim_dci_cycles() takes the
-	// cycles the tables mention, so a table naming a cycle the control file does not is how a
-	// cycle enters the sequence at all.
+	// read the cycle tables before the cycle list - get_assim_dci_cycles() uses the cycles the
+	// tables mention, so a table naming a cycle that isnt in the control file is how a cycle
+	// gets into the sequence in the first place.
 	par_cycle_info = process_da_par_cycle_table(parent_scenario, cycles_in_tables, frec);
 	obs_cycle_info = process_da_obs_cycle_table(parent_scenario, cycles_in_tables, frec, obs_in_tbl);
-	// a SEPARATE set, deliberately: obs_in_tbl drives which observations a cycle zero-weights,
-	// and letting the weight table add names to it would silently zero observations the obs
-	// table never mentioned
+	// use a separate set here on purpose. obs_in_tbl decides which obs a cycle zero-weights, so
+	// if the weight table could add names to it we would end up zeroing obs that the obs table
+	// never mentioned
 	set<string> weights_in_tbl;
 	weight_cycle_info = process_da_weight_cycle_table(parent_scenario, cycles_in_tables, frec,
 		weights_in_tbl);
@@ -64,9 +64,9 @@ void DaCycleDriver::initialize()
 	if (assimilation_cycles.size() == 0)
 		throw runtime_error("no assimilation cycles found");
 
-	// A bootstrap DataAssimilator on the PARENT scenario, used only to build the global
-	// ensembles and resolve the schedule. Each cycle gets its own instance in begin_cycle();
-	// this one never assimilates.
+	// a throwaway DataAssimilator on the parent pest object, just to build the global ensembles
+	// and work out the schedule. each cycle makes its own in begin_cycle() - this one never
+	// assimilates anything.
 	parent_ofw.reset(new OutputFileWriter(file_manager, parent_scenario, restart_flag));
 	DataAssimilator bootstrap(parent_scenario, file_manager, *parent_ofw, performance_log,
 		run_mgr_ptr);
@@ -74,7 +74,7 @@ void DaCycleDriver::initialize()
 	bootstrap.sanity_checks();
 
 	generate_global_ensembles(bootstrap, frec, curr_pe, curr_oe, curr_noise);
-	// the base realization is a cycle-level concept; the global ensembles carry realizations
+	// the base realization is a per-cycle thing - the global ensembles just carry realizations
 	parent_scenario.get_pestpp_options_ptr()->set_ies_include_base(false);
 	noptmax_schedule = bootstrap.initialize_noptmax_schedule(assimilation_cycles);
 
@@ -115,8 +115,8 @@ void DaCycleDriver::finalize()
 {
 	if (f_phi.is_open())
 		f_phi.flush();
-	// flushed, never closed: closing destroys the stream, and a later write - including one
-	// from a destructor during unwinding - then terminates the process
+	// flush but dont close. closing kills the stream, and then any later write - including one
+	// from a destructor while an exception is unwinding - takes the whole process down
 }
 
 bool DaCycleDriver::begin_cycle()
@@ -129,8 +129,9 @@ bool DaCycleDriver::begin_cycle()
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
 
-	// ++da_hotstart_cycle is honoured HERE rather than by the caller, so a caller stepping
-	// cycles by hand cannot accidentally assimilate one the executable would have skipped
+	// handle ++da_hotstart_cycle in here instead of making the caller do it, so somebody
+	// stepping through cycles by hand cant accidentally assimilate one the exe would have
+	// skipped
 	while ((cycle_index < (int)assimilation_cycles.size()) &&
 		(assimilation_cycles[cycle_index] < start_cycle))
 	{
@@ -165,18 +166,19 @@ bool DaCycleDriver::begin_cycle()
 	childPest.check_inputs(frec, false, true, icycle);
 	cout << "done" << endl;
 
-	// The run manager per cycle. PANTHER is re-initialized against the cycle's par/obs so the
-	// workers agree with the master; SERIAL and EXTERNAL are rebuilt as a RunManagerSerial
-	// because the model-exec info comes from the CHILD scenario, which differs per cycle.
+	// the run manager for this cycle. panther gets re-initialized against the cycle's par/obs so
+	// the workers and master agree. serial and external get rebuilt as a RunManagerSerial
+	// because the model exec info comes from the child pest object, which is different each
+	// cycle.
 	//
-	// EXTERNAL getting a SERIAL manager looks like a mistake and is not. pestpp-da /e builds a
-	// RunManagerExternal for the parent scenario, then replaces it per cycle with a serial one
-	// that actually runs the model - and the cycles genuinely do not run without it. Changing
-	// this to "keep the caller's manager" on the theory that it was a copy-paste bug made
-	// basic_xplat_g07_test report total_runs 140 -> 0: no cycle ran a single model call, and
-	// the run still completed, reporting the initial values as if they were results.
+	// external getting a serial manager looks like a mistake but it isnt. pestpp-da /e builds a
+	// RunManagerExternal for the parent, then swaps in a serial one each cycle that actually
+	// runs the model - without it the cycles dont run at all. i tried "just keep the caller's
+	// manager" thinking it was a copy-paste bug and basic_xplat_g07_test went from total_runs
+	// 140 to 0. no cycle ran a single model call and the run still finished, reporting the
+	// initial values like they were results.
 	//
-	// OTHER keeps the caller's manager: that is the C ABI case, where the session owns it.
+	// other keeps the caller's manager - that is the c api case, where the session owns it.
 	owns_cycle_run_mgr = false;
 	if (rm_kind == RunManagerKind::PANTHER_MASTER)
 	{
@@ -526,9 +528,9 @@ void DaCycleDriver::end_cycle()
 	else
 		da->transfer_par_dynamic_state_final_to_initial_ip(curr_pe);
 
-	// Tear the cycle down BEFORE deciding whether to stop, so that a stop leaves the driver in
-	// the same state as a normal cycle end - get_da() null, run manager released. main() could
-	// break out of its loop and let scope do this; a driver cannot.
+	// clean the cycle up before deciding whether to stop, so stopping leaves things in the same
+	// state as a normal cycle ending - get_da() null, run manager freed. main() could just break
+	// out of its loop and let scope handle it, but we cant do that here.
 	bool stop_now = false;
 	if (icycle >= parent_scenario.get_pestpp_options().get_da_stop_cycle())
 	{
@@ -572,9 +574,9 @@ void DaCycleDriver::end_cycle()
 	cycle_index++;
 }
 
-/// Realizations a cycle lost must leave the GLOBAL ensemble too, or the next cycle builds its
-/// view from rows the previous cycle no longer has - a misalignment that shows up as garbage
-/// values rather than as an error.
+/// any realizations a cycle lost have to come out of the global ensemble too, otherwise the
+/// next cycle builds its view from rows the last cycle doesnt have anymore. that shows up as
+/// garbage values instead of an error, which is worse.
 void DaCycleDriver::drop_missing_realizations(ParameterEnsemble& cycle_pe)
 {
 	if (curr_pe.shape().first <= cycle_pe.shape().first)

@@ -299,25 +299,25 @@ bool run_command(const std::string& cmd_string,
 bool run_commands(const std::vector<std::string>& comline_vec,
 	thread_flag* terminate = nullptr, bool should_echo = true, int sleep_ms = 10);
 
-/** The tail of a file, flattened to one printable line of at most `max_chars`.
+/** the tail end of a file, mashed into one printable line of at most `max_chars`.
  *
- * For reporting what a long-running model is doing without capturing its stdout. A FILE rather
- * than a pipe because the reader and the writer are different threads - the agent's message
- * loop answers a request while the run thread is going - and a file needs no shared buffer and
- * no lock to be safe between them.
+ * this is for reporting what a long running model is up to without having to capture its
+ * stdout. a file instead of a pipe because the reader and the writer are on different threads -
+ * the agent's message loop answers a request while the run thread is going - and with a file
+ * you dont need a shared buffer or a lock to make that safe.
  *
- * Three details that are the reason this is a function rather than four lines at the call site:
+ * three things in here are why this is a function instead of four lines at the call site:
  *
- *  - a seek into the middle of a file lands mid-line, and half a line reads as corruption, so
- *    the leading partial line is discarded;
- *  - newlines become " | " and non-printables become spaces, because NetPackage::reset() DROPS
- *    bytes outside 32-126 instead of replacing them - untreated, two lines arrive welded into
- *    one word;
- *  - over-length text is cut from the FRONT, keeping the newest, which is the whole point.
+ *  - seeking into the middle of a file lands you mid-line, and half a line looks like garbage,
+ *    so we throw away the partial line at the front
+ *  - newlines turn into " | " and non-printables turn into spaces, because NetPackage::reset()
+ *    drops anything outside 32-126 rather than replacing it. if you dont do this, two lines
+ *    show up welded together into one word
+ *  - if it is too long we cut from the front and keep the newest part, which is the whole point
  *
- * @return the tail, or an empty string if the file is missing, empty, unreadable, or holds a
- *         single line longer than the read window - never throws, because every caller is
- *         reporting a courtesy and must not fail because of it
+ * @return the tail, or an empty string if the file is missing, empty, cant be read, or is one
+ *         line longer than the read window. never throws - everybody calling this is just
+ *         reporting something extra and shouldnt fail because of it
  */
 std::string read_file_tail(const std::string& filename, int max_chars);
 
@@ -454,34 +454,34 @@ string get_time_string();
 string get_time_string_short();
 bool cmp_pair(pair<string,double>& first, pair<string,double>& second);
 
-/** The token in 'pest.stp', or 0 when there is nothing to do.
+/** what is in 'pest.stp', or 0 if there is nothing to do.
  *
- * The values that mean something, and to whom:
+ * the values that mean something, and who cares about them:
  *
- *   1, 2  stop - honoured by every tool
- *   3     pause - NOT implemented; reported and treated as 0
- *   4     stop, run manager has returned control (the caller removes the file)
- *   5     PANTHER MASTER ONLY: request partial results from every running agent
- *   6 N   PANTHER MASTER ONLY: kill and abandon run id N
+ *   1, 2  stop - every tool does this
+ *   3     pause - not implemented, gets reported and treated as 0
+ *   4     stop, run manager has handed control back (caller removes the file)
+ *   5     panther master only: ask every running agent for partial results
+ *   6 N   panther master only: kill run id N and give up on it
  *
- * 5 and 6 are commands to a RUNNING master rather than stop requests, so every other tool
- * ignores them - the existing call sites test for 1, 2 and 4 explicitly, so an unknown token
- * falls through untouched. The master consumes the file once it acts, which is what keeps a
- * one-shot command from firing on every poll of the scheduling loop.
+ * 5 and 6 are commands to a master that is already running, not requests to stop, so every
+ * other tool just ignores them - all the existing call sites check for 1, 2 and 4 by name, so
+ * anything else falls right through. the master deletes the file once it acts on it, which is
+ * what keeps a one-off command from firing over and over on every pass of the scheduling loop.
  *
- * Note the startup guards in each tool's main() are deliberately stricter: they refuse to
- * start when the file holds ANY non-zero token, because a file left over from a previous run
- * is not a command to this one.
+ * note the check in each tool's main() at startup is stricter on purpose - it wont start if the
+ * file has anything non-zero in it, since a file left over from a previous run isnt a command
+ * to this one.
  */
 int quit_file_found();
 
-/** The same, plus whatever else was on the line.
+/** same thing, plus whatever else was on the line.
  *
- * `args` receives the remaining whitespace-separated tokens, unparsed. Only token 6 uses one
- * today (the run id to abandon), but the file was always tokenized - the extra values were
- * simply thrown away - so nothing about the format changes by reading them.
+ * `args` gets the rest of the whitespace-separated tokens, unparsed. right now only 6 uses one
+ * (the run id to give up on), but the line was always getting tokenized anyway - we just threw
+ * the extra values away - so reading them doesnt change the file format at all.
  *
- * @param args cleared, then filled with tokens 1..n of the first line
+ * @param args cleared, then filled with tokens 1..n from the first line
  */
 int quit_file_found(std::vector<std::string>& args);
 

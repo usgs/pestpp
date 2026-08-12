@@ -491,16 +491,16 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
 		
-		// The global ensembles, the noptmax schedule, the phi log, the localizer and the parameter
-		// change summarizer are all built by DaCycleDriver::initialize() now - they are per-RUN
-		// state that every caller needs, not per-invocation setup, and duplicating them here is
-		// how the two entry points would drift.
+		// DaCycleDriver::initialize() builds the global ensembles, the noptmax schedule, the phi
+		// file, the localizer and the par change summarizer now. all of that is per-run state
+		// that every caller needs, not setup for this one program, and having a copy here is
+		// exactly how the two entry points would end up drifting apart.
 
-		// The cycle SEQUENCE lives in DaCycleDriver, not here. It used to be this loop, which is
-		// why the C ABI could only ever run cycle one: a caller with a handle to a
-		// DataAssimilator has one cycle, and everything that made it assimilation - the child
-		// scenario per cycle, the posterior becoming the next prior, the dropped realizations -
-		// was in main() where no other caller could reach it.
+		// the cycle sequence lives in DaCycleDriver now, not here. it used to be this loop, which
+		// is why the c api could only ever run cycle one - somebody with a handle to a
+		// DataAssimilator has one cycle, and everything that made it assimilation (the child
+		// pest object per cycle, the posterior becoming the next prior, the dropped
+		// realizations) was stuck in main() where nobody else could get at it.
 		DaCycleDriver::RunManagerKind rm_kind = DaCycleDriver::RunManagerKind::OTHER;
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
 			rm_kind = DaCycleDriver::RunManagerKind::PANTHER_MASTER;

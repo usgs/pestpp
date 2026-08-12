@@ -320,16 +320,16 @@ public:
 	int request_partial_results(const std::vector<int>& run_ids) override;
 	bool get_partial_info(int run_id, int& n_reported, int& n_total) const override;
 private:
-	/** Act on the pest.stp tokens that are commands to a RUNNING master rather than stop
-	 * requests: 5 (request partial results from every running agent) and 6 N (kill and abandon
-	 * run N). Every other token, including the stop values, is left alone for the callers that
-	 * already handle them.
+	/** handle the pest.stp values that are commands to a master that is already running, rather
+	 * than requests to stop: 5 (ask every running agent for partial results) and 6 N (kill run N
+	 * and give up on it). everything else, including the stop values, gets left alone for the
+	 * callers that already deal with them.
 	 *
-	 * CONSUMES the file when it acts. These are one-shot commands and the scheduling loop polls
-	 * every pass, so leaving the file in place would re-request partials several times a second
-	 * for the rest of the batch, or re-kill an already-abandoned run forever.
+	 * deletes the file once it acts. these are one-off commands and the scheduling loop checks
+	 * every pass, so if we left the file there it would re-request partials several times a
+	 * second for the rest of the batch, or keep re-killing a run we already gave up on.
 	 *
-	 * Never throws: a malformed command must not take down a run that is otherwise fine.
+	 * never throws - a bad command shouldnt take down a run that is otherwise fine.
 	 */
 	void process_quit_file_commands();
 

@@ -2226,16 +2226,16 @@ def api_sqp_ensemble_sources_test():
 
 
 def _opt_case(name, noptmax=2):
-    """An opt case built from the g07 template that lives in THIS repo.
+    """an opt case built from the g07 template that lives in this repo.
 
-    Emphatically not from pestpp-opt_benchmarks: pestpp_api_tests.py runs in a CI job that
-    clones usgs/pestpp and nothing else, so reaching into a sibling benchmark repo passes on a
-    developer machine with every repo cloned and fails everywhere else. It did - on all three
-    platforms at once, which is the signature of a missing fixture rather than a real defect.
+    not from pestpp-opt_benchmarks, on purpose. this file runs in a ci job that clones
+    usgs/pestpp and nothing else, so reaching into one of the other benchmark repos works fine
+    on a machine that has them all cloned and fails everywhere else. it did - on all three
+    platforms at once, which is what a missing fixture looks like as opposed to a real bug.
 
-    g07 suits opt without modification: its parameters are in a ``decvar`` group and its
-    constraints are in ``l_constraint``, whose ``l_`` prefix is how opt recognises a
-    less-than constraint. With no ++opt_objective_function it forms the generic one.
+    g07 works for opt as-is: its parameters are in a ``decvar`` group and its constraints are in
+    ``l_constraint``, and the ``l_`` prefix is how opt knows it is a less-than constraint. with
+    no ++opt_objective_function it makes up a generic one.
     """
     base = scratch_template(os.path.join(_BENCH, "g07", "template"))
     d = os.path.join(_BENCH, name)
@@ -2244,9 +2244,9 @@ def _opt_case(name, noptmax=2):
     shutil.copytree(base, d)
     pst = pyemu.Pst(os.path.join(d, "g07.pst"))
     pst.control_data.noptmax = noptmax
-    # the tracked g07 is sqp's, so it arrives carrying sqp options and a weighted objective.
-    # opt reads a non-zero weight on a non-constraint observation as FOSM data and refuses:
-    # "objective function obs has non-zero weight and chance constraints are active"
+    # the g07 in the repo is sqp's, so it comes with sqp options and a weighted objective. opt
+    # sees a non-zero weight on an obs that isnt a constraint and treats it as fosm data, then
+    # refuses: "objective function obs has non-zero weight and chance constraints are active"
     pst.observation_data.loc["obj", "weight"] = 0.0
     pst.pestpp_options = {"opt_obj_func": "obj", "opt_dec_var_groups": "decvar"}
     pst.write(os.path.join(d, "opt_api.pst"), version=2)
@@ -2254,18 +2254,18 @@ def _opt_case(name, noptmax=2):
 
 
 def api_opt_drives_slp_test():
-    """pestpp-opt through the C ABI reaches the SAME optimum as the executable.
+    """pestpp-opt through the c api gets the same optimum as the exe.
 
-    opt is the one tool that carries a decision-variable VECTOR rather than a population, so
-    this also pins what it must REFUSE. Those refusals are the contract: an ensemble call that
-    silently returned an empty frame would read as "no realizations yet" rather than "wrong
-    tool", and a caller would wait for realizations that are never coming.
+    opt is the one tool that carries a decision variable vector instead of a population, so this
+    also pins down what it has to refuse. those refusals matter - an ensemble call that quietly
+    handed back an empty dataframe would look like "no realizations yet" instead of "you called
+    the wrong tool", and somebody would sit there waiting for realizations that are never coming.
 
-    The comparison against the executable is the point of the test. Driving to completion only
-    shows the ABI does not crash; matching the .rec objective sequence shows it does the same
-    ARITHMETIC. That distinction is not academic here - the first version of this adapter ran
-    to completion while reading an OutputFileWriter through a dangling reference, and the
-    executable survived the same bug only because main() happened to skip the code path.
+    comparing against the exe is the whole point of this test. running to the end just shows the
+    api doesnt crash - matching the objective sequence in the .rec shows it does the same math.
+    that is not a theoretical difference here: the first version of this adapter ran all the way
+    through while reading an OutputFileWriter through a dangling reference, and the exe only got
+    away with the same bug because main() happened to skip that code path.
     """
     noptmax = 2
     d_api = _opt_case("api_opt_slp", noptmax)
@@ -2282,7 +2282,7 @@ def api_opt_drives_slp_test():
         assert n == noptmax, \
             "noptmax is {0}, so that many SLP iterations: got {1}".format(noptmax, n)
 
-        # a decision-variable vector is not an ensemble, and opt says so rather than pretending
+        # a decision variable vector isnt an ensemble, and opt says so instead of pretending
         assert opt.n_reals == 0, "opt carries no realizations"
         for label, call in (("par_df", opt.par_df), ("obs_df", opt.obs_df),
                             ("phi", lambda: opt.phi)):
@@ -2294,11 +2294,47 @@ def api_opt_drives_slp_test():
             else:
                 raise AssertionError("opt has no ensembles - {0} should refuse".format(label))
 
-        # chance IS opt's - unlike the ensemble calls, this must ANSWER rather than refuse.
-        # It reports chance OFF here, and that is the case's property not the tool's: every g07
-        # parameter is a decision variable, so there is nothing left to draw a stack from. What
-        # is being asserted is that opt carries the machinery at all, which is what separates it
-        # from glm - glm raises PestppError on the same call.
+        # -- opt's own calls: the objective values and the decision variables. before these
+        # existed you could drive opt to an optimum and then have no way to read either the
+        # optimum or how it got there - the class was just _tool_id and nothing else.
+        objs = opt.objective_sequence
+        # element 0 is the starting objective, then one per iteration - so iterations + 1
+        assert len(objs) == noptmax + 1, \
+            "the sequence leads with the initial objective: got {0} for {1} iterations".format(
+                objs, noptmax)
+        assert objs[0] == opt.initial_objective, \
+            "element 0 must BE the initial objective, not merely resemble it: {0} vs {1}".format(
+                objs[0], opt.initial_objective)
+        assert opt.best_objective == min(objs), \
+            "best is the minimum of the sequence for a minimisation: {0} vs {1}".format(
+                opt.best_objective, objs)
+        assert opt.best_objective <= objs[0], "the run should not end worse than it started"
+        odf = opt.objective_df()
+        assert list(odf.index) == list(range(len(objs))) and "objective" in odf.columns
+
+        dv = opt.dec_var_names
+        assert len(dv) > 0, "g07's parameters are all decision variables"
+        cur = opt.dec_var_vector()
+        best = opt.best_dec_var_vector()
+        assert set(dv).issubset(set(n.lower() for n in cur.index)) or \
+               set(n.lower() for n in dv).issubset(set(n.lower() for n in cur.index)), \
+            "every decision variable should appear in the decision-variable vector"
+        assert len(cur) == len(best), "current and best vectors describe the same variables"
+        # 'best' is a different question from 'current' - a later iteration can be worse and
+        # still be the one the tool ends up on
+        assert isinstance(cur, pd.Series) and isinstance(best, pd.Series)
+        try:
+            opt.dec_var_vector(which="nonsense")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("an unknown 'which' should be refused, not guessed at")
+
+        # chance is opt's - unlike the ensemble calls this has to answer instead of erroring.
+        # it says chance is off here, and that is about this case not about the tool: every g07
+        # parameter is a decision variable, so there is nothing left to draw a stack from. what
+        # we are checking is that opt has the machinery at all, which is what separates it from
+        # glm - glm raises PestppError on the same call.
         st = opt.stack_status
         assert "use_chance" in st and not st["use_chance"], \
             "opt should answer the chance query; g07 has no uncertain parameters: {0}".format(st)
@@ -2334,17 +2370,17 @@ def api_opt_drives_slp_test():
 
 
 def _da_cycle_case(name, n_cycles=3, num_reals=6):
-    """A MULTI-cycle da case built from the 10par_xsec template in THIS repo.
+    """a multi-cycle da case built from the 10par_xsec template in this repo.
 
-    Deliberately not from pestpp-da_benchmarks: this file runs in a CI job that clones
-    usgs/pestpp and nothing else, and a test that reaches into a sibling benchmark repo passes
-    on a machine with every repo cloned and fails everywhere else.
+    not from pestpp-da_benchmarks, on purpose - this file runs in a ci job that clones
+    usgs/pestpp and nothing else, so a test that reaches into one of the other benchmark repos
+    works on a machine that has them all and fails everywhere else.
 
-    The cycles come from an observation cycle table, which is what turns one control file into a
-    sequence. This fixture has NO dynamic states, and that is a feature here rather than a
-    shortcut: with no states to transfer, the ONLY thing linking cycle N to cycle N+1 is the
-    global ensemble carry - so if end_cycle() is not doing its job, these tests fail rather than
-    quietly still working through the state path.
+    the cycles come from an obs cycle table, which is what turns one control file into a
+    sequence. this case has no dynamic states, and that is actually what we want here rather
+    than a shortcut - with no states to hand off, the only thing connecting cycle N to cycle N+1
+    is the global ensemble carry. so if end_cycle() isnt doing its job these tests fail, instead
+    of quietly still working because the state path covered for it.
     """
     base = scratch_template(os.path.join(_BENCH, "ies_10par_xsec", "template"))
     d = os.path.join(_BENCH, name)
@@ -2353,8 +2389,8 @@ def _da_cycle_case(name, n_cycles=3, num_reals=6):
     shutil.copytree(base, d)
 
     pst = pyemu.Pst(os.path.join(d, "pest.pst"))
-    # -1 means "present in every cycle" - without it a parameter belongs to no cycle and the
-    # child scenarios come out empty
+    # -1 means "in every cycle" - without it a parameter belongs to no cycle at all and the
+    # child pest objects come out empty
     pst.parameter_data.loc[:, "cycle"] = -1
     pst.observation_data.loc[:, "cycle"] = -1
     pst.model_input_data.loc[:, "cycle"] = -1
@@ -2382,21 +2418,53 @@ def _da_cycle_case(name, n_cycles=3, num_reals=6):
     return d
 
 
+
+def api_opt_objective_is_opt_only_test():
+    """the objective value calls give an error for every tool but opt.
+
+    one objective changing per iteration is an opt thing. ies and da report phi over
+    realizations, mou reports a pareto front. an ies session answering "here are 3 objective
+    values" would be making up something its run doesnt have - and unlike an obviously wrong
+    number, a plausible one just gets plotted.
+    """
+    d = _case("api_obj_refused", noptmax=1, num_reals=4)
+    with Ies.from_pst("pest.pst", workdir=d) as ies:
+        ies.initialize()
+        for label, call in (("n_objectives", lambda: ies._lib.opt_n_objectives()),
+                            ("objectives", lambda: ies._lib.opt_objectives()),
+                            ("objective_bounds", lambda: ies._lib.opt_objective_bounds()),
+                            ("dec_var_names", lambda: ies._lib.opt_dec_var_names())):
+            try:
+                call()
+            except PestppError as e:
+                msg = str(e).lower()
+                assert ("ies" in msg) and ("objective" in msg or "decision" in msg), \
+                    "{0} should name the tool AND what it lacks: {1}".format(label, e)
+            else:
+                raise AssertionError(
+                    "{0} should refuse for ies - a scalar objective sequence is an opt "
+                    "concept".format(label))
+        ies.finalize()
+    print("api_opt_objective_is_opt_only_test passed")
+
+
 def api_da_cycle_sequence_test():
-    """Stepping da's assimilation cycles through the ABI.
+    """stepping through da's assimilation cycles with the api.
 
-    This is the call sequence that did not exist until DaCycleDriver: a session held ONE
-    DataAssimilator, so a multi-cycle control file produced a one-cycle answer - and produced it
-    silently, as a completed run, which is the failure mode worth having a test for.
+    these calls didnt exist until DaCycleDriver - a session held one DataAssimilator, so a
+    control file with several cycles gave you a one cycle answer. and it did it quietly, as a
+    run that finished normally, which is the kind of failure worth having a test for.
 
-    What is asserted, in order of how badly it would hurt to be wrong:
+    what it checks, roughly in order of how bad it would be to get wrong:
 
-      - every cycle in the control file actually runs, and in order;
-      - the session's view FOLLOWS the open cycle rather than staying on the parent - a caller
-        inspecting parameters mid-sequence must be shown the cycle's, not the scenario's;
-      - the global ensemble carries: cycle N+1 starts from cycle N's posterior, so the parameter
-        ensemble MOVES between cycles. A driver that re-primed from the control file each time
-        would still run three cycles and still finish, and only this assertion would notice.
+      - every cycle in the control file actually runs, in order
+      - what the session shows you follows the cycle that is open instead of staying on the
+        parent - if you look at parameters partway through you should see the cycle's, not the
+        parent pest object's
+      - the global ensemble carries forward: cycle N+1 starts from cycle N's posterior, so the
+        parameter ensemble moves between cycles. a driver that just re-primed from the control
+        file every time would still run three cycles and still finish, and this is the only
+        check that would catch it.
     """
     d = _da_cycle_case("api_da_cycles", n_cycles=3, num_reals=6)
 
@@ -2412,7 +2480,7 @@ def api_da_cycle_sequence_test():
         while da.cycle_begin():
             c = da.current_cycle
             seen.append(c)
-            # the view follows the OPEN cycle
+            # what you see follows the cycle that is open
             pe = da.par_df()
             assert pe.shape[0] == 6, \
                 "cycle {0} should show the 6-realization ensemble, got {1}".format(c, pe.shape)
@@ -2429,8 +2497,8 @@ def api_da_cycle_sequence_test():
         assert seen == [0, 1, 2], "every cycle should run, in order: got {0}".format(seen)
         assert da.current_cycle == 2, "after the sequence the last cycle stays named"
 
-        # the carry: the posterior moved across the sequence. Same realizations, same
-        # parameters, different values - which is what assimilation IS.
+        # the carry - the posterior moved across the sequence. same realizations, same
+        # parameters, different values, which is what assimilation is.
         assert list(first_pe.index) == list(last_pe.index)
         assert not np.allclose(first_pe.values.astype(float),
                                last_pe.values.astype(float)), \
@@ -2438,7 +2506,7 @@ def api_da_cycle_sequence_test():
             "being carried forward, so each cycle is re-priming from the control file"
         da.finalize()
 
-    # the per-cycle global artifacts the executable writes, one per cycle
+    # the per-cycle global files the exe writes, one per cycle
     for c in (0, 1, 2):
         f = os.path.join(d, "da_api.global.{0}.pe.csv".format(c))
         assert os.path.exists(f), "cycle {0} did not write its global pe csv".format(c)
@@ -2446,12 +2514,12 @@ def api_da_cycle_sequence_test():
 
 
 def api_da_run_all_cycles_matches_stepping_test():
-    """run_all_cycles() and stepping the cycles by hand reach the SAME answer.
+    """run_all_cycles() and stepping through the cycles by hand give the same answer.
 
-    The two paths exist so a caller can intervene per cycle without giving up the in-tree
-    behaviour. If they diverge then one of them is not the real algorithm, and the stepped one -
-    the one with no executable exercising it - is the one that would rot. Comparing them is what
-    keeps the composition honest.
+    both paths exist so you can step in on a per-cycle basis without giving up what the exe
+    does. if they drift apart then one of them isnt the real algorithm anymore, and it would be
+    the stepped one - nothing else exercises it. comparing them is what keeps that from
+    happening.
     """
     d_all = _da_cycle_case("api_da_all", n_cycles=3, num_reals=6)
     d_step = _da_cycle_case("api_da_step", n_cycles=3, num_reals=6)
@@ -2480,10 +2548,10 @@ def api_da_run_all_cycles_matches_stepping_test():
 
 
 def api_da_cycles_are_da_only_test():
-    """The cycle calls refuse for every tool but da.
+    """the cycle calls give an error for every tool but da.
 
-    Cycles are a pestpp-da concept. An ies session answering "3 cycles" would be inventing a
-    structure its control file does not have, and a caller would loop over it.
+    cycles are a pestpp-da thing. an ies session answering "3 cycles" would be making up
+    something its control file doesnt have, and somebody would go loop over it.
     """
     d = _case("api_cycles_refused", noptmax=1, num_reals=4)
     with Ies.from_pst("pest.pst", workdir=d) as ies:
@@ -3239,6 +3307,7 @@ if __name__ == "__main__":
     api_overdue_policy_is_panther_only_test()
     api_sqp_ensemble_sources_test()
     api_opt_drives_slp_test()
+    api_opt_objective_is_opt_only_test()
     api_da_cycle_sequence_test()
     api_da_run_all_cycles_matches_stepping_test()
     api_da_cycles_are_da_only_test()

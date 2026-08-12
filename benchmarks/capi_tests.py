@@ -1242,14 +1242,14 @@ def capi_partial_obs_command_test():
 
 
 def capi_stp_file_commands_test():
-    """'5' and '6 <run_id>' in pest.stp are commands to a RUNNING panther master.
+    """'5' and '6 <run_id>' in pest.stp are commands to a panther master that is running.
 
-    Both are one-shot instructions to a live batch rather than stop requests, and that
-    distinction is the whole risk: every tool decides whether to abort by testing the token
-    against 1, 2 and 4, so a token that accidentally read as a stop would turn "show me partial
-    results" into "kill the batch". The selftest pins the parsing; this pins the BEHAVIOUR -
-    that the batch survives, that the command has its effect, and that the file is consumed so
-    the command does not fire again on every poll of the scheduling loop.
+    both are one-off instructions to a live batch, not requests to stop, and that difference is
+    where the risk is: every tool decides whether to quit by checking the value against 1, 2 and
+    4, so a value that accidentally read as a stop would turn "show me partial results" into
+    "kill the batch". the selftest covers the parsing - this covers what actually happens: the
+    batch survives, the command does what it should, and the file gets deleted so it doesnt fire
+    again on every pass of the scheduling loop.
     """
     wd = _setup("capi_stp_cmds", noptmax=1, num_reals=6)
     with open(os.path.join(wd, "slow_model.py"), "w") as f:
@@ -1297,8 +1297,8 @@ def capi_stp_file_commands_test():
                         f.write("5\n")
                     wrote_5 = True
                 elif not os.path.exists(stp) and not wrote_6:
-                    # only after the master consumed the '5' - proving consumption before
-                    # issuing the next command keeps the two from being confused
+                    # wait until the master has deleted the '5' before sending the next one, so
+                    # we dont end up confusing the two
                     killed_run = running[0]["run_id"]
                     with open(stp, "w") as f:
                         f.write("6 {0}\n".format(killed_run))
@@ -1317,7 +1317,7 @@ def capi_stp_file_commands_test():
             "the master did not report acting on the partial-results request"
         assert "'pest.stp' with '6 {0}'".format(killed_run) in txt, \
             "the master did not report acting on the kill-and-abandon command"
-        # and the batch was NOT aborted by either command
+        # and neither command killed the batch
         assert "analysis complete" not in txt.lower() or True
         print("capi_stp_file_commands_test passed (killed run {0})".format(killed_run))
     finally:
@@ -1331,16 +1331,16 @@ def capi_stp_file_commands_test():
 
 
 def capi_partial_status_file_test():
-    """++panther_worker_status_file rides back to the MASTER on a partial-results reply.
+    """++panther_worker_status_file makes it back to the master on a partial results reply.
 
-    The point of the option is that someone watching a slow run can see what the model is
-    doing. So the assertion is on the master's log, not on the agent's: an agent that reads the
-    file perfectly and a master that discards what it sends look identical from the worker
-    directory, and that is exactly what was happening before - the master rebuilt its report
-    line from the deserialized payload and never looked at info_txt at all.
+    the whole point of the option is that somebody watching a slow run can see what the model is
+    doing, so this checks the master's log and not the agent's. an agent that reads the file
+    perfectly and a master that throws away what it sends look exactly the same from the worker
+    directory, and that is what was happening before - the master rebuilt its report line from
+    the unpacked data and never looked at info_txt at all.
 
-    The model writes a progress file while it sleeps, so the tail is different each time it is
-    read - which also proves the agent is reading it LIVE rather than once at startup.
+    the model writes to a progress file while it sleeps, so the tail is different every time it
+    gets read. that also shows the agent is reading it as it goes instead of once at startup.
     """
     wd = _setup("capi_status_file", noptmax=1, num_reals=4)
     with open(os.path.join(wd, "slow_model.py"), "w") as f:

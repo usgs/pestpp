@@ -74,59 +74,18 @@ __all__ = [
     "Ies", "Da", "Mou", "Sqp", "Glm", "Opt", "IterationStep", "Candidate", "PestppError", "ExpiredViewError",
     "Progress", "run_ies", "run_da", "run_mou", "run_sqp", "find_library",
     "PHI_MEAS", "PHI_COMPOSITE", "PHI_REGUL", "PHI_ACTUAL", "PHI_NOISE",
+    "find_library", "api_info",
 ]
 
 
-# ---- locating the shared library ----------------------------------------------------------
-
-def find_library(lib_path: str | None = None) -> str:
-    """Locate the built C ABI shared library.
-
-    Searched rather than hardcoded because the path depends on the build generator. Set
-    ``PESTPP_LIB`` to skip the search entirely.
-    """
-    if lib_path is not None:
-        if not os.path.exists(lib_path):
-            raise FileNotFoundError(lib_path)
-        return lib_path
-    env = os.environ.get("PESTPP_LIB")
-    if env:
-        if not os.path.exists(env):
-            raise FileNotFoundError("PESTPP_LIB points at {0}, which does not exist".format(env))
-        return env
-
-    plat = platform.platform().lower()
-    # pestpp-api.<so|dll|dylib> - no "lib" prefix, matching the pestpp-* executables
-    name = ("pestpp-api.dll" if ("windows" in plat or os.name == "nt")
-            else "pestpp-api.dylib" if "darwin" in plat or "macos" in plat
-            else "pestpp-api.so")
-    here = os.path.dirname(os.path.abspath(__file__))
-    roots = [os.path.join(os.path.dirname(here), "build"), os.path.join(here, "..", "..", "build")]
-
-    # An installed copy next to the executables COMPETES on mtime; it does not win outright.
-    # Short-circuiting to it meant a stale install silently shadowed a fresh build - the
-    # symptom is an AttributeError from ctypes about a symbol that plainly exists in the
-    # source, which sends you looking in exactly the wrong place.
-    found = []
-    for cand in (os.path.join(os.path.dirname(here), "bin", name),):
-        if os.path.exists(cand):
-            found.append(os.path.abspath(cand))
-    for root in roots:
-        if not os.path.isdir(root):
-            continue
-        for dirpath, dirnames, filenames in os.walk(root):
-            # Never a packaging staging area. CPack leaves a full copy of the install tree
-            # under _CPack_Packages, so a stale one from an earlier build sits there looking
-            # exactly like the real thing - and being picked would mean silently testing a
-            # library that is not the one just compiled.
-            dirnames[:] = [d for d in dirnames if d != "_CPack_Packages"]
-            if name in filenames:
-                found.append(os.path.abspath(os.path.join(dirpath, name)))
-    if found:
-        # newest wins, so a fresh build beats anything left over
-        return max(found, key=os.path.getmtime)
-    raise FileNotFoundError(
-        "could not find {0} under {1}. Build pest++ first, or set PESTPP_LIB.".format(name, roots))
+# ---- finding the shared library -----------------------------------------------------------
+#
+# find_library() lives over in pestpp_lib (the thin binding) instead of here, so that finding
+# the library - and the api_info() report built on it - work without pyemu. somebody filing a
+# bug report shouldnt need the heavier dependency just to tell us which library they were
+# running. re-exported here since `from pestpp import find_library` is how people already
+# import it.
+from pestpp_lib import find_library, api_info  # noqa: E402,F401
 
 
 # ---- name case ----------------------------------------------------------------------------
@@ -1368,22 +1327,24 @@ class Ies(_Tool):
 
 
 class Da(_Tool):
-    """Data assimilation, over one cycle or over the whole sequence.
+    """data assimilation - one cycle, or the whole sequence.
 
-    A ``Da`` session on its own is ONE cycle - the one it was created with. What makes it
-    assimilation is the sequence: every cycle gets its own child scenario with its own
-    parameters and observations, and cycle N's posterior becomes cycle N+1's prior, with
-    realizations a cycle loses dropped from the global ensembles so the two stay aligned.
+    a ``Da`` session by itself is one cycle, the one it was made with. what makes it
+    assimilation is the sequence: every cycle gets its own child pest object with its own
+    parameters and observations, and the posterior from cycle N becomes the prior for cycle
+    N+1. any realizations a cycle loses get dropped from the global ensembles so the two stay
+    lined up.
 
-    Two ways to drive the sequence. :meth:`run_all_cycles` runs it end to end, which is what
-    the executable does::
+    two ways to run the sequence. :meth:`run_all_cycles` does the whole thing, same as the
+    exe::
 
         with Da.from_pst("model.pst", workdir=d) as da:
             da.run_all_cycles()
 
-    Or step it, which is the point of exposing it at all - between :meth:`cycle_begin` and
-    :meth:`cycle_end` every other call on the session refers to the OPEN cycle: its ensembles,
-    its parameter names, its phi. So you can inspect or intervene per cycle::
+    or step through it, which is really the point of exposing it - in between
+    :meth:`cycle_begin` and :meth:`cycle_end`, every other call on the session is about the
+    cycle that is open: its ensembles, its parameter names, its phi. so you can look at things
+    or step in on a per-cycle basis::
 
         da.cycles_initialize()
         while da.cycle_begin():
@@ -1391,8 +1352,8 @@ class Da(_Tool):
             da.cycle_drive()                             # or drive it yourself
             da.cycle_end()                               # NOT optional
 
-    :meth:`cycle_end` carries the cycle forward. Skipping it does not merely lose reporting, it
-    breaks the assimilation.
+    :meth:`cycle_end` is what carries the cycle forward. skipping it doesnt just lose you some
+    reporting, it breaks the assimilation.
     """
     _tool_id = TOOL_DA
 
@@ -1401,12 +1362,12 @@ class Da(_Tool):
         return "pestpp-da"
 
     def cycles_initialize(self) -> None:
-        """Build the global ensembles and resolve the cycle list. Idempotent."""
+        """build the global ensembles and work out the cycle list. safe to call twice."""
         self._lib.da_cycles_initialize()
 
     @property
     def cycles(self) -> list:
-        """Every assimilation cycle in the control file, in run order."""
+        """every assimilation cycle in the control file, in the order they run."""
         return self._lib.da_cycles()
 
     @property
@@ -1415,13 +1376,13 @@ class Da(_Tool):
 
     @property
     def current_cycle(self) -> int:
-        """The open cycle, or -1 when none is open."""
+        """the cycle that is open, or -1 if none is."""
         return self._lib.da_current_cycle()
 
     def cycle_begin(self) -> bool:
-        """Open the next cycle. False when the sequence is done - not an error.
+        """start the next cycle. false when there are none left, which isnt an error.
 
-        Calls :meth:`cycles_initialize` for you the first time, so the loop reads as a loop.
+        calls :meth:`cycles_initialize` for you the first time so the loop just reads as a loop.
         """
         if not self._cycles_ready:
             self.cycles_initialize()
@@ -1429,15 +1390,15 @@ class Da(_Tool):
         return self._lib.da_cycle_begin()
 
     def cycle_drive(self) -> None:
-        """Run the open cycle: initialize its tool, assimilate, report phi."""
+        """run the open cycle - initialize the tool, assimilate, report phi."""
         self._lib.da_cycle_drive()
 
     def cycle_end(self) -> None:
-        """Harvest the open cycle's posterior into the global ensembles and close it."""
+        """pull the open cycle's posterior into the global ensembles and close the cycle."""
         self._lib.da_cycle_end()
 
     def run_all_cycles(self) -> None:
-        """Every cycle, start to finish - the same composition the executable runs."""
+        """every cycle, start to finish - the same thing the exe runs."""
         self._lib.da_run_all_cycles()
         self._cycles_ready = True
 
@@ -1781,15 +1742,15 @@ class _ChanceMixin:
 
 
 class Opt(_ChanceMixin, _Tool):
-    """pestpp-opt: sequential linear programming under chance constraints.
+    """pestpp-opt - sequential linear programming with chance constraints.
 
-    Carries a single decision-variable vector, not a population, so the ensemble views and the
-    phi-over-realizations calls refuse - the same shape as :class:`Glm`. Unlike Glm it has the
-    chance machinery, so the stack and risk controls from :class:`_ChanceMixin` apply exactly as
+    carries one decision variable vector instead of a population, so the ensemble calls and the
+    phi-over-realizations calls give you an error, same as :class:`Glm`. unlike glm it does have
+    the chance stuff, so the stack and risk controls from :class:`_ChanceMixin` work just like
     they do for :class:`Mou` and :class:`Sqp`.
 
-    ``initialize()`` is a formality: sequentialLP initializes itself in its constructor, so the
-    tool is ready as soon as the session exists.
+    ``initialize()`` doesnt really do anything - sequentialLP initializes itself in its
+    constructor, so the tool is ready as soon as you have a session.
     """
     _tool_id = TOOL_OPT
     _has_phi = False
@@ -1800,8 +1761,84 @@ class Opt(_ChanceMixin, _Tool):
 
     @property
     def n_reals(self) -> int:
-        """Always 0 - opt carries a decision-variable VECTOR, not realizations."""
+        """always 0 - opt carries a decision variable vector, not realizations."""
         return 0
+
+    # -- the objective values ------------------------------------------------------------
+    #
+    # this is how you watch opt converge - same idea as phi in the ensemble tools. it gets its
+    # own calls instead of going through phi because it is one value changing per iteration, not
+    # a spread over realizations. that is also why _has_phi is False.
+
+    @property
+    def objective_sequence(self) -> list:
+        """the objective values, oldest first.
+
+        element 0 is the objective at the starting decision variables - the same number as
+        :attr:`initial_objective` - and everything after that is one slp iteration. so the
+        length is ``iterations + 1``, not ``iterations``. having the starting point in there is
+        what lets you compare it against :attr:`best_objective`.
+        """
+        return self._lib.opt_objectives()
+
+    @property
+    def best_objective(self) -> float:
+        """the best objective anywhere in :attr:`objective_sequence`.
+
+        not necessarily the last one - an slp iteration can come out worse than the one before
+        it and still be where the tool ends up sitting. that is exactly why
+        :meth:`best_dec_var_vector` and :meth:`dec_var_vector` are different questions.
+        """
+        return self._lib.opt_objective_bounds()[0]
+
+    @property
+    def initial_objective(self) -> float:
+        """the objective at the starting decision variables."""
+        return self._lib.opt_objective_bounds()[1]
+
+    # -- the decision variables ---------------------------------------------------------
+
+    @property
+    def dec_var_names(self) -> list:
+        """which parameters are decision variables.
+
+        not the same as the adjustable parameters - with chance constraints the adjustable set
+        also has the uncertain parameters that feed the stack or the fosm calculation, and those
+        arent being optimized.
+        """
+        return self._lib.opt_dec_var_names()
+
+    def dec_var_vector(self, which: str = "current", lower: bool = False) -> pd.Series:
+        """the decision variables as a labeled series.
+
+        opt's parameter vector is its decision variables, so this goes through the same call glm
+        uses for its parameters. only the name is different, because nobody running opt calls
+        the thing they are optimizing a "parameter vector".
+
+        ``which='best'`` gives you the vector at :attr:`best_objective`, which usually isnt the
+        current one.
+
+        written out here instead of just inheriting glm's ``par_vector``. the call underneath is
+        the same, but the word isnt - and piling generic names onto every tool is exactly what
+        we were trying to get away from.
+        """
+        which_id = {"current": 0, "best": 1, "optimum": 1}.get(str(which).lower())
+        if which_id is None:
+            raise ValueError(
+                "which must be 'current' or 'best', not {0!r}".format(which))
+        names, vals = self._lib.get_par_vector(which_id)
+        idx = [n.lower() for n in names] if lower else names
+        return pd.Series(vals, index=idx, name=str(which).lower())
+
+    def best_dec_var_vector(self, lower: bool = False) -> pd.Series:
+        """the decision variables at the best objective - for most people this is the answer."""
+        return self.dec_var_vector(which="best", lower=lower)
+
+    def objective_df(self) -> pd.DataFrame:
+        """the objective values as a dataframe indexed by iteration, for plotting."""
+        vals = self.objective_sequence
+        return pd.DataFrame({"objective": vals},
+                            index=pd.Index(range(len(vals)), name="iteration"))
 
 
 class Mou(_ChanceMixin, _Tool):

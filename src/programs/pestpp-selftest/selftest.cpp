@@ -1233,25 +1233,25 @@ static void test_instruction_file_partial_remaining_branches()
  * So the test is not really about the observations - it is about everything that must NOT
  * have changed.
  */
-/* The message a RunStorage failure throws must identify WHAT went wrong.
+/* when a RunStorage operation fails, the message has to say what actually went wrong.
  *
- * Written after the third CI investigation in a row stalled on the same string. A macOS run
+ * wrote this after the third ci go-around in a row got stuck on the same string. a macos run
  * failed with exactly "RunStorage::get_run_status_native() stream not good" after 200 model
- * runs had completed successfully - and that message cannot distinguish a truncated file from a
- * bad offset from a disk error, so there was nothing to act on and nothing reproduced locally.
+ * runs had finished fine - and that message cant tell a truncated file from a bad offset from
+ * a disk error, so there was nothing to act on and nothing reproduced locally.
  *
- * These failures are rare and machine-dependent, so the thrown message is the ONLY evidence
- * anyone will ever have. This test induces the failure that CI keeps hitting - a storage file
- * shorter than its own run counter claims - and asserts the message carries the facts needed to
- * recognise it: the file, the record, where we looked, how big the file actually is, and the
- * counter-versus-records mismatch that names the culprit.
+ * these are rare and depend on the machine, so the message we throw is the only evidence
+ * anybody is ever going to have. this test makes the failure ci keeps hitting - a storage file
+ * shorter than its own run counter says - and checks the message has what you need to
+ * recognize it: the file, the record, where we looked, how big the file really is, and the
+ * counter vs records mismatch that points at the culprit.
  */
-/* The pest.stp vocabulary, including the two master-only commands.
+/* what the values in pest.stp mean, including the two master-only commands.
  *
- * The file is a user-facing contract - people write it by hand mid-run - so what each token
- * means, and what a malformed one does, is worth pinning. In particular: 5 and 6 must NOT read
- * as stop requests, because every tool tests 1/2/4 explicitly and an accidental widening there
- * would abort runs on a request to inspect them.
+ * people write this file by hand while a run is going, so what each value means - and what a
+ * bad one does - is worth pinning down. mainly: 5 and 6 must not read as requests to stop,
+ * because every tool checks for 1/2/4 by name and widening that by accident would kill runs
+ * when somebody only asked to look at them.
  */
 static void test_quit_file_tokens()
 {
@@ -1275,7 +1275,7 @@ static void test_quit_file_tokens()
     write_stp("4\n");
     CHK(pest_utils::quit_file_found() == 4, "'4' still reads through the no-arg overload");
 
-    // 3 is reported and neutralised rather than honoured
+    // 3 gets reported and ignored rather than acted on
     write_stp("3\n");
     CHK(pest_utils::quit_file_found(args) == 0, "'3' (pause) is not supported and reads as 0");
 
@@ -1294,9 +1294,9 @@ static void test_quit_file_tokens()
         CHK(rid == 17, "the argument is the run id");
     }
 
-    // The property that keeps 5 and 6 from aborting runs: they are not stop values. Stated as a
-    // test because every tool encodes it as `q==1||q==2||q==4`, and widening that by accident
-    // would turn "show me partial results" into "kill the batch".
+    // this is what keeps 5 and 6 from killing runs - they arent stop values. worth a test
+    // because every tool writes it as `q==1||q==2||q==4`, and widening that by accident would
+    // turn "show me partial results" into "kill the batch".
     for (const string &t : {string("5"), string("6 17")})
     {
         write_stp(t + "\n");
@@ -1305,20 +1305,20 @@ static void test_quit_file_tokens()
             "'" + t + "' must not read as a stop token");
     }
 
-    // extra whitespace and extra arguments survive
+    // extra whitespace and extra arguments come through fine
     write_stp("  6   42   ignored_extra  \n");
     CHK(pest_utils::quit_file_found(args) == 6, "leading whitespace should not hide the token");
     CHK(args.size() == 2, "every remaining token is handed back, not just the first");
 
-    // a second line is not read - the format is one line, and saying so keeps a future reader
-    // from assuming otherwise
+    // the second line doesnt get read - it is a one line format, and saying so keeps somebody
+    // later from assuming otherwise
     write_stp("5\n6 17\n");
     CHK(pest_utils::quit_file_found(args) == 5, "only the first line is read");
     CHK(args.empty(), "arguments come from the first line only");
 
-    // garbage is 0, i.e. indistinguishable from no file. Pinned because it is a real sharp
-    // edge: a typo'd stop request is silently ignored, and anyone changing this should have to
-    // change a test that says so.
+    // garbage reads as 0, which is the same as no file at all. pinned because it is a real
+    // sharp edge - a typo'd stop request just gets ignored, and anybody changing that should
+    // have to change a test that says so.
     write_stp("stop\n");
     CHK(pest_utils::quit_file_found(args) == 0,
         "a non-numeric token reads as 0 - SILENTLY, which is a known sharp edge");
@@ -1344,12 +1344,12 @@ static void test_run_storage_error_diagnostics()
     for (int i = 0; i < 4; ++i)
         rs.add_run(pars, "run", 0.0);
     CHK(rs.get_nruns() == 4, "four runs were added");
-    // NOT free_memory(): that closes the stream and REMOVES the file. Reading the bytes back
-    // through a separate stream leaves the storage on disk to be truncated.
+    // dont call free_memory() here - it closes the stream and deletes the file. reading the
+    // bytes back through a separate stream leaves the file on disk so we can truncate it.
 
-    // Truncate to the header plus one record: the counter still says 4, the file holds 1. This
-    // is the shape of the CI failure - check_rec_id() passes because the COUNTER is fine, and
-    // then the read runs off the end of a file nobody noticed was short.
+    // cut it down to the header plus a record or so. the counter still says 4 but the file
+    // only has 1 or 2. this is the shape of the ci failure - check_rec_id() passes because the
+    // counter is fine, then the read runs off the end of a file nobody noticed was short.
     {
         ifstream in(stor, ios_base::binary);
         CHK(in.good(), "the storage file should be readable");
@@ -1357,15 +1357,15 @@ static void test_run_storage_error_diagnostics()
         in.close();
         CHK(all.size() > 0, "the storage file should be non-empty");
         ofstream out(stor, ios_base::binary | ios_base::trunc);
-        // two thirds is arbitrary but lands mid-record-set, which is the realistic case
+        // two thirds is arbitrary but lands in the middle of the records, which is realistic
         out.write(all.data(), (streamsize)(all.size() * 2 / 3));
     }
 
     string msg;
     try
     {
-        // init_restart() may itself detect the truncation - it walks the records looking for
-        // where to resume - so it is inside the try. Either entry point must diagnose.
+        // init_restart() might catch the truncation itself, since it walks the records looking
+        // for where to pick up - so it goes inside the try. either way we need a good message.
         RunStorage rs2(stor);
         rs2.init_restart(stor);
         for (int i = 0; i < 4; ++i)
@@ -1384,7 +1384,7 @@ static void test_run_storage_error_diagnostics()
     if (!msg.empty())
     {
         cout << "  diagnostic: " << msg << endl;
-        // each of these is a question that had to be answered by guesswork before
+        // every one of these was something you had to guess at before
         CHK(msg.find(stor) != string::npos,
             "the message must name the FILE: " + msg);
         CHK(msg.find("run_id=") != string::npos,
@@ -1395,13 +1395,13 @@ static void test_run_storage_error_diagnostics()
             "the message must give the ACTUAL file size, or a short file is invisible: " + msg);
         CHK(msg.find("state=") != string::npos,
             "the message must give the stream state bits - eof alone means a short file: " + msg);
-        // the decisive one: counter says 4, file holds fewer
+        // the important one - counter says 4, file has fewer than that
         CHK(msg.find("MISMATCH") != string::npos,
             "a file shorter than its own run counter must be called out explicitly: " + msg);
     }
 
-    // and the helper must survive being asked about a file that is not there at all - a
-    // diagnostic that throws while diagnosing destroys the error it was explaining
+    // and it has to survive being asked about a file that isnt there at all - if it throws
+    // while explaining an error you lose the error it was explaining
     remove(stor.c_str());
     string msg2;
     try

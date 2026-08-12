@@ -12,6 +12,9 @@ The ergonomic layer belongs on top of this, not inside it.
 from __future__ import annotations
 
 import os
+import platform
+import sys
+import time
 import weakref
 from ctypes import (
     CDLL,
@@ -134,6 +137,123 @@ class PestppError(Exception):
 
     Its own type rather than RuntimeError, so callers can catch precisely.
     """
+
+
+def find_library(lib_path: str | None = None) -> str:
+    """Locate the built C ABI shared library.
+
+    Searched rather than hardcoded because the path depends on the build generator. Set
+    ``PESTPP_LIB`` to skip the search entirely.
+    """
+    if lib_path is not None:
+        if not os.path.exists(lib_path):
+            raise FileNotFoundError(lib_path)
+        return lib_path
+    env = os.environ.get("PESTPP_LIB")
+    if env:
+        if not os.path.exists(env):
+            raise FileNotFoundError("PESTPP_LIB points at {0}, which does not exist".format(env))
+        return env
+
+    plat = platform.platform().lower()
+    # pestpp-api.<so|dll|dylib> - no "lib" prefix, matching the pestpp-* executables
+    name = ("pestpp-api.dll" if ("windows" in plat or os.name == "nt")
+            else "pestpp-api.dylib" if "darwin" in plat or "macos" in plat
+            else "pestpp-api.so")
+    here = os.path.dirname(os.path.abspath(__file__))
+    roots = [os.path.join(os.path.dirname(here), "build"), os.path.join(here, "..", "..", "build")]
+
+    # An installed copy next to the executables COMPETES on mtime; it does not win outright.
+    # Short-circuiting to it meant a stale install silently shadowed a fresh build - the
+    # symptom is an AttributeError from ctypes about a symbol that plainly exists in the
+    # source, which sends you looking in exactly the wrong place.
+    found = []
+    for cand in (os.path.join(os.path.dirname(here), "bin", name),):
+        if os.path.exists(cand):
+            found.append(os.path.abspath(cand))
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            # Never a packaging staging area. CPack leaves a full copy of the install tree
+            # under _CPack_Packages, so a stale one from an earlier build sits there looking
+            # exactly like the real thing - and being picked would mean silently testing a
+            # library that is not the one just compiled.
+            dirnames[:] = [d for d in dirnames if d != "_CPack_Packages"]
+            if name in filenames:
+                found.append(os.path.abspath(os.path.join(dirpath, name)))
+    if found:
+        # newest wins, so a fresh build beats anything left over
+        return max(found, key=os.path.getmtime)
+    raise FileNotFoundError(
+        "could not find {0} under {1}. Build pest++ first, or set PESTPP_LIB.".format(name, roots))
+
+def api_info(lib_path: str | None = None) -> dict:
+    """what is actually loaded - the library path, the api version and the pest++ version.
+
+    meant to be the first thing in a bug report, and the library path is the reason why.
+    find_library() picks between several candidates by modification time, so two people with the
+    same checkout can end up running different libraries - a stale install next to the exes, or
+    a build tree from another branch - and nothing about how it behaves tells you which. "it
+    broke" is impossible to do anything with. "it broke, here is the path and the api version"
+    usually isnt.
+
+    works without a session on purpose - making one needs a control file, and if the library
+    wont even load you cant get that far. nothing in here makes a tool, it just loads the
+    library, asks a couple of questions and returns.
+
+    also doesnt need pyemu, which is why it is in this file instead of pestpp.py.
+
+    >>> import pestpp_lib; print(pestpp_lib.api_info())
+    """
+    from ctypes import CDLL, byref, c_int, create_string_buffer
+
+    info = {
+        "library_path": None,
+        "api_version": None,
+        "pestpp_version": None,
+        "header_api_version": None,
+        "error": None,
+    }
+    try:
+        path = find_library(lib_path)
+        info["library_path"] = path
+        try:
+            info["library_mtime"] = time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(path)))
+            info["library_size"] = os.path.getsize(path)
+        except OSError:
+            pass
+
+        lib = CDLL(path)
+        major, minor, patch = c_int(), c_int(), c_int()
+        lib.pestpp_get_api_version(byref(major), byref(minor), byref(patch))
+        info["api_version"] = "{0}.{1}.{2}".format(major.value, minor.value, patch.value)
+
+        needed = c_int(0)
+        lib.pestpp_get_version(None, c_int(0), byref(needed))
+        if needed.value > 0:
+            buf = create_string_buffer(needed.value)
+            if lib.pestpp_get_version(buf, c_int(needed.value), byref(needed)) == PESTPP_OK:
+                info["pestpp_version"] = buf.value.decode(errors="replace")
+    except Exception as e:
+        # if this raises it is useless exactly when you need it - a library that wont load is
+        # the whole case it exists for
+        info["error"] = "{0}: {1}".format(type(e).__name__, e)
+    return info
+
+
+def format_api_info(lib_path: str | None = None) -> str:
+    """api_info() as a block you can paste into an issue."""
+    info = api_info(lib_path)
+    lines = ["pestpp API environment:"]
+    for k in ("library_path", "library_mtime", "library_size", "api_version",
+              "pestpp_version", "error"):
+        if info.get(k) is not None:
+            lines.append("  {0:<16} {1}".format(k, info[k]))
+    lines.append("  {0:<16} {1}".format("python", sys.version.split()[0]))
+    lines.append("  {0:<16} {1}".format("platform", platform.platform()))
+    return "\n".join(lines)
 
 
 def format_option_value(value) -> str:
@@ -419,6 +539,15 @@ class PestppLib:
         lib.pestpp_da_cycle_end.restype = c_int
         lib.pestpp_da_run_all_cycles.argtypes = (c_void_p,)
         lib.pestpp_da_run_all_cycles.restype = c_int
+        # -- pestpp-opt: objective trajectory and decision variables -------------------
+        lib.pestpp_opt_n_objectives.argtypes = (c_void_p, POINTER(c_int))
+        lib.pestpp_opt_n_objectives.restype = c_int
+        lib.pestpp_opt_get_objectives.argtypes = (c_void_p, POINTER(c_double), c_int)
+        lib.pestpp_opt_get_objectives.restype = c_int
+        lib.pestpp_opt_objective_bounds.argtypes = (c_void_p, POINTER(c_double), POINTER(c_double))
+        lib.pestpp_opt_objective_bounds.restype = c_int
+        lib.pestpp_opt_dec_var_names.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_opt_dec_var_names.restype = c_int
         lib.pestpp_get_regularization.argtypes = (
             c_void_p, POINTER(c_int)) + (POINTER(c_double),) * 9 + (POINTER(c_int), POINTER(c_int))
         lib.pestpp_get_regularization.restype = c_int
@@ -1060,27 +1189,27 @@ class PestppLib:
                     "pestpp_release_workers")
         return n.value
 
-    # -- pestpp-da: the assimilation cycle sequence ------------------------------------
+    # -- pestpp-da: running the assimilation cycles ---------------------------------------
     #
-    # A DataAssimilator handles ONE cycle. Data assimilation is the SEQUENCE: each cycle gets
-    # its own child scenario, and cycle N's posterior becomes cycle N+1's prior with failed
-    # realizations dropped from the global ensembles. Without these calls a session runs only
-    # the single cycle it was created with, so a multi-cycle control file returned a one-cycle
-    # answer rather than an error.
+    # a DataAssimilator only handles one cycle. what makes it data assimilation is the sequence:
+    # each cycle gets its own child pest object, and the posterior from cycle N becomes the
+    # prior for cycle N+1, with any failed realizations dropped from the global ensembles.
+    # without these calls a session only runs the one cycle it was made with, so a control file
+    # with several cycles would quietly give you a one cycle answer.
 
     def da_cycles_initialize(self) -> None:
-        """Build the global ensembles and resolve the cycle list. Idempotent."""
+        """build the global ensembles and work out the cycle list. safe to call twice."""
         self._check(self.lib.pestpp_da_cycles_initialize(self.handle),
                     "pestpp_da_cycles_initialize")
 
     def da_n_cycles(self) -> int:
-        """How many assimilation cycles the control file defines."""
+        """how many assimilation cycles are in the control file."""
         n = c_int()
         self._check(self.lib.pestpp_da_n_cycles(self.handle, byref(n)), "pestpp_da_n_cycles")
         return n.value
 
     def da_cycles(self) -> list:
-        """The cycle numbers, in the order they will run."""
+        """the cycle numbers, in the order they run."""
         n = self.da_n_cycles()
         if n <= 0:
             return []
@@ -1089,34 +1218,80 @@ class PestppLib:
         return [arr[i] for i in range(n)]
 
     def da_cycle_begin(self) -> bool:
-        """Open the next cycle. False when the sequence is finished - which is not an error."""
+        """start the next cycle. false when you are done, which isnt an error."""
         begun = c_int()
         self._check(self.lib.pestpp_da_cycle_begin(self.handle, byref(begun)),
                     "pestpp_da_cycle_begin")
         return bool(begun.value)
 
     def da_current_cycle(self) -> int:
-        """The open cycle, or -1 when none is open."""
+        """the cycle that is open, or -1 if none is."""
         c = c_int()
         self._check(self.lib.pestpp_da_current_cycle(self.handle, byref(c)),
                     "pestpp_da_current_cycle")
         return c.value
 
     def da_cycle_drive(self) -> None:
-        """Run the open cycle: initialize its tool, assimilate, report phi."""
+        """run the open cycle - initialize the tool, assimilate, report phi."""
         self._check(self.lib.pestpp_da_cycle_drive(self.handle), "pestpp_da_cycle_drive")
 
     def da_cycle_end(self) -> None:
-        """Harvest the open cycle's posterior into the global ensembles and close it.
+        """pull the open cycle's posterior into the global ensembles and close the cycle.
 
-        NOT optional. This is the step that carries the cycle forward, so skipping it does not
-        merely lose reporting - it breaks the assimilation.
+        not optional. this is the step that carries the cycle forward, so skipping it doesnt
+        just lose you some reporting - it breaks the assimilation.
         """
         self._check(self.lib.pestpp_da_cycle_end(self.handle), "pestpp_da_cycle_end")
 
     def da_run_all_cycles(self) -> None:
-        """Every cycle, start to finish - the same composition the executable runs."""
+        """every cycle, start to finish - the same thing the exe runs."""
         self._check(self.lib.pestpp_da_run_all_cycles(self.handle), "pestpp_da_run_all_cycles")
+
+    # -- pestpp-opt: objective values and decision variables -----------------------------
+    #
+    # opt has one objective value that changes from iteration to iteration. no other tool works
+    # that way - the ensemble methods report phi over realizations and mou reports a pareto
+    # front. the decision variable values come back through get_par_vector(); these tell you how
+    # the objective moved and which parameters are the decision variables.
+
+    def opt_n_objectives(self) -> int:
+        """how many objective values there are."""
+        n = c_int()
+        self._check(self.lib.pestpp_opt_n_objectives(self.handle, byref(n)),
+                    "pestpp_opt_n_objectives")
+        return n.value
+
+    def opt_objectives(self) -> list:
+        """the objective value at each iteration, oldest first."""
+        n = self.opt_n_objectives()
+        if n <= 0:
+            return []
+        arr = (c_double * n)()
+        self._check(self.lib.pestpp_opt_get_objectives(self.handle, arr, n),
+                    "pestpp_opt_get_objectives")
+        return [arr[i] for i in range(n)]
+
+    def opt_objective_bounds(self) -> tuple[float, float]:
+        """(best, starting) objective function values."""
+        best, initial = c_double(), c_double()
+        self._check(self.lib.pestpp_opt_objective_bounds(self.handle, byref(best), byref(initial)),
+                    "pestpp_opt_objective_bounds")
+        return best.value, initial.value
+
+    def opt_dec_var_names(self) -> list:
+        """which parameters are decision variables - not the same set as the adjustable ones
+        once you turn on chance constraints."""
+        count = c_int()
+        # ask for the count first, then size the buffer - same two-call thing as _get_names()
+        self._check(self.lib.pestpp_opt_dec_var_names(self.handle, None, 0, byref(count)),
+                    "pestpp_opt_dec_var_names")
+        if count.value == 0:
+            return []
+        buf = create_string_buffer(count.value * self.name_len)
+        self._check(self.lib.pestpp_opt_dec_var_names(
+            self.handle, buf, count.value * self.name_len, byref(count)),
+            "pestpp_opt_dec_var_names")
+        return self._unpack_names(buf.raw, count.value)
 
     _REG_KEYS = ("weight", "phimlim", "phimaccept", "fracphim",
                  "wfmin", "wfmax", "wffac", "wftol", "wfinit")
@@ -1411,3 +1586,9 @@ class PestppLib:
         self._check(self.lib.pestpp_set_par_snapshot(
             self.handle, flat, nr, nc, self._pack_names(row_names), self._pack_names(col_names)),
             "pestpp_set_par_snapshot")
+
+
+if __name__ == "__main__":
+    # `python pestpp_lib.py` prints the environment block. easiest way to answer "which library
+    # were you running", which is the first question on every bug report.
+    print(format_api_info())

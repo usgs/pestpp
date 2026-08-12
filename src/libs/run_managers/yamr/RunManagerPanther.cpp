@@ -795,11 +795,11 @@ void RunManagerPanther::begin_batch()
  * This is the body of the old run_until() loop, unchanged. Nothing here resets batch
  * state, so it is safe to call repeatedly - which is what makes run_slice() work.
  */
-/* pest.stp tokens that command a running master. See the header for the contract.
+/* pest.stp values that tell a running master to do something. see the header for what they are.
  *
- * Kept separate from the 1/2/4 stop handling on purpose: those mean "give up", and every tool
- * honours them. These two mean "do something to the batch you are running", so they are the
- * master's alone and no other caller should have to know they exist.
+ * kept separate from the 1/2/4 stop handling on purpose - those mean "quit" and every tool acts
+ * on them. these two mean "do something to the batch you are running right now", so they belong
+ * to the master and nobody else should have to know they exist.
  */
 void RunManagerPanther::process_quit_file_commands()
 {
@@ -821,9 +821,9 @@ void RunManagerPanther::process_quit_file_commands()
 	{
 		if (q == 5)
 		{
-			// empty vector: every ACTIVE run. Agents too old to understand the request are
-			// skipped by request_partial_results() rather than sent to - see its comment;
-			// asking one would kill the run we are asking about.
+			// empty vector means every active run. request_partial_results() skips agents that
+			// are too old to understand the message instead of sending to them - see the
+			// comment there. asking one would kill the run we are asking about.
 			int n = request_partial_results(vector<int>());
 			ss.str("");
 			ss << "'pest.stp' with '5' found: requested partial results from " << n
@@ -834,8 +834,8 @@ void RunManagerPanther::process_quit_file_commands()
 		}
 		else
 		{
-			// 6 N - the run id is required, and a 6 without one is a user error worth saying
-			// out loud rather than guessing at
+			// 6 N - you have to give a run id. a 6 with nothing after it is a mistake worth
+			// saying out loud instead of guessing
 			if (args.size() == 0)
 			{
 				report("'pest.stp' with '6' found but no run id followed it - expected "
@@ -884,8 +884,9 @@ void RunManagerPanther::process_quit_file_commands()
 		report("unknown error processing 'pest.stp' command (run continues)", true);
 	}
 
-	// One-shot: consume the file whether or not the command did anything. The loop below polls
-	// every pass, so a file left in place would re-fire the command several times a second.
+	// one-off, so delete the file whether or not the command actually did anything. the loop
+	// below checks every pass, so leaving it there would re-fire the command several times a
+	// second.
 	if (!pest_utils::try_remove_quit_file())
 		report("error removing 'pest.stp' after acting on it - the command may repeat", true);
 }
@@ -905,9 +906,9 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UN
             kill_all_active_runs();
 
         }
-        // 5 and 6 are commands to this master rather than stop requests - handled here because
-        // this is the loop that is alive while runs are in flight, which is the only time they
-        // mean anything
+        // 5 and 6 are commands to this master, not requests to stop. handled here because this
+        // is the loop that is running while runs are out, which is the only time they mean
+        // anything
         else if ((q == 5) || (q == 6))
         {
             process_quit_file_commands();
@@ -2084,11 +2085,11 @@ void RunManagerPanther::process_message(int i_sock)
 				ss << " run_id:" << run_id << " partial results from:" << host_name << "$"
 				   << agent_info_iter->get_work_dir() << " " << n_real << " of " << pi.n_total
 				   << " observations";
-				// What the model itself last reported, when the agent was given a
-				// ++panther_worker_status_file to tail. The counts above say how much of the
-				// output file the agent could read; this says what the model is DOING, which
-				// is the question anyone watching a slow run is actually asking. Empty for an
-				// agent without the option set, and for any older agent.
+				// whatever the model last said, if the agent was given a
+				// ++panther_worker_status_file to read. the counts above tell you how much of
+				// the output file the agent could read - this tells you what the model is
+				// doing, which is what anybody watching a slow run actually wants to know.
+				// empty if the agent doesnt have the option set, or is an older agent.
 				string status_txt = net_pack.get_info_txt();
 				if (!status_txt.empty())
 					ss << " " << status_txt;

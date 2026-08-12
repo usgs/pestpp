@@ -257,6 +257,15 @@ struct ToolAdapter
     /// population. Null for the ensemble methods, whose answer is par_ensemble().
     virtual const Parameters* current_parameters() { return nullptr; }
     virtual const Parameters* optimum_parameters() { return nullptr; }
+
+    /// the objective function values, for tools that have one objective that changes from
+    /// iteration to iteration. null for everything but opt - the ensemble tools report phi over
+    /// realizations and mou reports a pareto front, and neither of those is a list of numbers.
+    virtual const vector<double>* objective_sequence() { return nullptr; }
+    virtual bool objective_bounds(double&, double&) { return false; }
+    /// which parameters are decision variables - not the same set as the adjustable parameters
+    /// once chance constraints are turned on.
+    virtual const vector<string>* dec_var_names() { return nullptr; }
     /// Replace the current parameter vector. Values are matched BY NAME by the caller of this,
     /// so an implementation only has to store what it is handed.
     virtual void set_current_parameters(const Parameters&)
@@ -680,18 +689,17 @@ struct DaAdapter : public ToolAdapter
     // the per-cycle CHILD scenario, not the session's parent - see ToolAdapter::scenario()
     Pest& scen;
     int cycle;
-    /// The cycle SEQUENCE, created only when a caller asks for it. Absent by default, so the
-    /// single-cycle surface below is exactly what it always was.
+    /// the cycle sequence, only made when somebody asks for it. not there by default, so the
+    /// single cycle calls below work exactly like they always did.
     unique_ptr<DaCycleDriver> driver;
 
     DaAdapter(Pest& p, FileManager& fm, OutputFileWriter& ofw, PerformanceLog* pl,
               RunManagerAbstract* rm, int _cycle)
         : tool(p, fm, ofw, pl, rm), scen(p), cycle(_cycle) {}
 
-    /// The DataAssimilator a call should act on. With a cycle open that is the CYCLE's tool -
-    /// its own child scenario, its own ensembles - and otherwise the adapter's own. Every
-    /// accessor below goes through here so none of them can be looking at a different cycle
-    /// than the others.
+    /// which DataAssimilator a call should use. if a cycle is open that is the cycle's tool -
+    /// its own child pest object and its own ensembles - otherwise it is the adapter's own.
+    /// everything below goes through here so they cant end up looking at different cycles.
     DataAssimilator& active()
     {
         if (driver)
@@ -718,8 +726,8 @@ struct DaAdapter : public ToolAdapter
     void initialize_finish() override { tool.initialize_finish(cycle); }
     pestpp_status advance() override { active().da_update(current_cycle()); return PESTPP_OK; }
     int  da_cycle() const override { return current_cycle(); }
-    /// The cycle a call refers to: the open one when stepping a sequence, else the fixed one
-    /// the session was created with.
+    /// which cycle a call is about - the open one if you are stepping through, otherwise the
+    /// one the session was made with.
     int current_cycle() const
     {
         if (driver)
@@ -874,6 +882,7 @@ struct MouAdapter : public ToolAdapter
     ParameterEnsemble* par_ensemble() override { return tool.get_dp_ptr(); }
     ObservationEnsemble* obs_ensemble() override { return tool.get_op_ptr(); }
     Constraints* constraints() override { return tool.get_constraints_ptr(); }
+
     void phi_summary(int, double&, double&, double&, double&) override
     { unsupported("mou optimizes objectives rather than minimizing a phi"); }
     void phi_vector(int, vector<string>&, vector<double>&) override
@@ -956,9 +965,9 @@ struct SqpAdapter : public ToolAdapter
  */
 struct OptAdapter : public ToolAdapter
 {
-    /// Declared BEFORE tool: sequentialLP takes the covariance by reference and holds it, so it
-    /// must outlive the tool and be constructed first. Member order is the only thing enforcing
-    /// that, hence the note.
+    /// declared before tool. sequentialLP takes the covariance by reference and hangs onto it,
+    /// so it has to be built first and outlive the tool. member order is the only thing making
+    /// that happen, hence this note.
     Covariance parcov;
     sequentialLP tool;
     Pest& scen;
@@ -976,9 +985,9 @@ struct OptAdapter : public ToolAdapter
 
     Pest& scenario() override { return scen; }
 
-    /// A no-op, and deliberately so: sequentialLP calls initialize_and_check() from its own
-    /// constructor, so by the time a caller has a handle the tool is already initialized.
-    /// Pretending there is a separate init phase would be a lie the first caller would trip on.
+    /// does nothing, on purpose. sequentialLP calls initialize_and_check() from its own
+    /// constructor, so by the time you have a handle the tool is already set up. pretending
+    /// there is a separate init step would just trip up whoever called it first.
     void initialize() override {}
     int  initialize_prepare() override { return 0; }
     void initialize_finish() override {}
@@ -1013,6 +1022,21 @@ struct OptAdapter : public ToolAdapter
     ObservationEnsemble* obs_ensemble() override { return nullptr; }
 
     Constraints* constraints() override { return tool.get_constraints_ptr(); }
+
+    /// the decision variables are opt's parameter vector, so these are the same virtuals glm
+    /// uses and pestpp_get_par_vector() gets at them the same way. not filling these in was why
+    /// you could drive opt all the way to an optimum and then not be able to read it.
+    const Parameters* current_parameters() override { return &tool.get_current_pars(); }
+    const Parameters* optimum_parameters() override { return &tool.get_best_pars(); }
+
+    const vector<double>* objective_sequence() override { return &tool.get_obj_values(); }
+    bool objective_bounds(double& best, double& initial) override
+    {
+        best = tool.get_obj_best();
+        initial = tool.get_obj_init();
+        return true;
+    }
+    const vector<string>* dec_var_names() override { return &tool.get_dv_names(); }
 
     void phi_summary(int, double&, double&, double&, double&) override
     { unsupported("opt has an objective function, not a phi over realizations"); }
@@ -2727,22 +2751,22 @@ pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data, int max_nrow, i
     CAPI_END()
 }
 
-/* -- pestpp-da: the cycle SEQUENCE ----------------------------------------------------------
+/* -- pestpp-da: running the cycles ----------------------------------------------------------
  *
- * A DataAssimilator is one cycle. Data assimilation is the sequence: each cycle gets its own
- * child scenario and its own tool, and cycle N's posterior becomes cycle N+1's prior with
- * failed realizations dropped from the global ensembles along the way. Until DaCycleDriver that
- * lived in pestpp-da.cpp's main(), so a caller holding a session could only ever run the first
- * cycle - and a multi-cycle control file quietly produced a one-cycle answer rather than an
- * error, which is the worst way for it to fail.
+ * a DataAssimilator is one cycle. what makes it data assimilation is the sequence - each cycle
+ * gets its own child pest object and its own tool, and the posterior from cycle N becomes the
+ * prior for cycle N+1, with failed realizations dropped from the global ensembles along the
+ * way. before DaCycleDriver all of that lived in main() in pestpp-da.cpp, so somebody holding a
+ * session could only ever run the first cycle. a control file with several cycles would quietly
+ * give you a one cycle answer instead of an error, which is about the worst way it could fail.
  *
- * Two ways to drive it. pestpp_da_run_all_cycles() runs the whole sequence, which is what the
- * executable does. Or step it: begin -> (drive, or take the cycle's tool and drive it yourself
- * through the ordinary ensemble calls) -> end. Between begin and end every other call on the
- * session refers to the OPEN cycle - its ensembles, its parameter names, its phi.
+ * two ways to run it. pestpp_da_run_all_cycles() does the whole thing, same as the exe. or step
+ * through it: begin -> (drive, or grab the cycle's tool and drive it yourself with the normal
+ * ensemble calls) -> end. in between begin and end, every other call on the session is about
+ * the cycle that is open - its ensembles, its parameter names, its phi.
  */
 
-/// The driver, created on first use. Refuses for every tool but da.
+/// the driver, made the first time you use it. gives an error for any tool but da.
 DaCycleDriver* require_da_driver(PestppSession* s, bool create)
 {
     DaAdapter* a = dynamic_cast<DaAdapter*>(s->adapter.get());
@@ -2761,9 +2785,9 @@ DaCycleDriver* require_da_driver(PestppSession* s, bool create)
     return a->driver.get();
 }
 
-/// Build the global ensembles and resolve the cycle list. Idempotent - calling it twice does
-/// not rebuild, because the global ensembles ARE the run state and rebuilding them mid-sequence
-/// would silently discard everything assimilated so far.
+/// build the global ensembles and work out the cycle list. calling it twice doesnt rebuild
+/// anything - the global ensembles are the state of the run, so rebuilding them partway through
+/// would quietly throw away everything assimilated so far.
 pestpp_status pestpp_da_cycles_initialize(pestpp_handle h)
 {
     CAPI_BEGIN(h)
@@ -2772,7 +2796,7 @@ pestpp_status pestpp_da_cycles_initialize(pestpp_handle h)
     CAPI_END()
 }
 
-/// How many cycles the control file defines.
+/// how many cycles are in the control file.
 pestpp_status pestpp_da_n_cycles(pestpp_handle h, int* n)
 {
     CAPI_BEGIN(h)
@@ -2783,7 +2807,7 @@ pestpp_status pestpp_da_n_cycles(pestpp_handle h, int* n)
     CAPI_END()
 }
 
-/// The cycle numbers, in the order they will run. Pass a buffer of pestpp_da_n_cycles() ints.
+/// the cycle numbers, in the order they run. pass a buffer of pestpp_da_n_cycles() ints.
 pestpp_status pestpp_da_get_cycles(pestpp_handle h, int* cycles, int n)
 {
     CAPI_BEGIN(h)
@@ -2798,10 +2822,9 @@ pestpp_status pestpp_da_get_cycles(pestpp_handle h, int* cycles, int n)
     CAPI_END()
 }
 
-/// Open the next cycle. *begun is 1 when a cycle is now open and 0 when the sequence is done -
-/// which is not an error, so the status stays PESTPP_OK either way and the loop condition is
-/// *begun. Cycles below ++da_hotstart_cycle are skipped here, exactly as the executable skips
-/// them.
+/// start the next cycle. *begun is 1 if a cycle is now open and 0 if you are done, which isnt
+/// an error - the status stays PESTPP_OK either way and you loop on *begun. cycles before
+/// ++da_hotstart_cycle get skipped here, same as the exe skips them.
 pestpp_status pestpp_da_cycle_begin(pestpp_handle h, int* begun)
 {
     CAPI_BEGIN(h)
@@ -2812,7 +2835,7 @@ pestpp_status pestpp_da_cycle_begin(pestpp_handle h, int* begun)
     CAPI_END()
 }
 
-/// The open cycle, or -1 when none is open.
+/// the cycle that is open, or -1 if none is.
 pestpp_status pestpp_da_current_cycle(pestpp_handle h, int* cycle)
 {
     CAPI_BEGIN(h)
@@ -2823,8 +2846,8 @@ pestpp_status pestpp_da_current_cycle(pestpp_handle h, int* cycle)
     CAPI_END()
 }
 
-/// Run the open cycle: initialize its tool, assimilate, report phi. Skip this and drive the
-/// cycle through the ordinary session calls instead if you want control within the cycle.
+/// run the open cycle - initialize the tool, assimilate, report phi. skip this and drive the
+/// cycle with the normal session calls instead if you want control inside the cycle.
 pestpp_status pestpp_da_cycle_drive(pestpp_handle h)
 {
     CAPI_BEGIN(h)
@@ -2833,9 +2856,9 @@ pestpp_status pestpp_da_cycle_drive(pestpp_handle h)
     CAPI_END()
 }
 
-/// Harvest the open cycle's posterior into the global ensembles and close it. Required: this is
-/// the step that carries the cycle forward, so skipping it does not merely lose reporting, it
-/// breaks the assimilation.
+/// pull the open cycle's posterior into the global ensembles and close the cycle. you have to
+/// call this - it is the step that carries the cycle forward, so skipping it doesnt just lose
+/// you some reporting, it breaks the assimilation.
 pestpp_status pestpp_da_cycle_end(pestpp_handle h)
 {
     CAPI_BEGIN(h)
@@ -2844,7 +2867,7 @@ pestpp_status pestpp_da_cycle_end(pestpp_handle h)
     CAPI_END()
 }
 
-/// Every cycle, start to finish - the same composition the executable runs.
+/// every cycle, start to finish - the same thing the exe runs.
 pestpp_status pestpp_da_run_all_cycles(pestpp_handle h)
 {
     CAPI_BEGIN(h)
@@ -2853,7 +2876,80 @@ pestpp_status pestpp_da_run_all_cycles(pestpp_handle h)
     CAPI_END()
 }
 
-/// Shared by the getter and the setter so the two cannot disagree about what exists.
+/* -- pestpp-opt: objective values and decision variables ------------------------------------
+ *
+ * opt has one objective function value that changes from iteration to iteration, which no other
+ * tool does - the ensemble methods report phi over realizations and mou reports a pareto front.
+ * so this is how you watch opt converge, and it needs its own calls instead of being squeezed
+ * into the phi calls. that is also why glm and opt both report _has_phi false.
+ *
+ * the decision variables come back through pestpp_get_par_vector(), same call glm uses - they
+ * are opt's parameter vector, so a separate call would just be another name for the same thing.
+ * pestpp_opt_dec_var_names() tells you which of those parameters are decision variables, since
+ * with chance constraints the adjustable set is bigger than the decision variable set.
+ */
+
+/// how many objective values there are - also how big to make the array.
+pestpp_status pestpp_opt_n_objectives(pestpp_handle h, int* n)
+{
+    CAPI_BEGIN(h)
+        if (n == nullptr)
+            bad_arg("n is null");
+        const vector<double>* v = s->adapter->objective_sequence();
+        if (v == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no objective sequence: "
+                        "a single objective that moves per iteration is a pestpp-opt concept - "
+                        "the ensemble tools report phi over realizations and mou reports a "
+                        "pareto front");
+        *n = (int)v->size();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// the objective function value at each iteration, oldest first.
+pestpp_status pestpp_opt_get_objectives(pestpp_handle h, double* vals, int max_n)
+{
+    CAPI_BEGIN(h)
+        if (vals == nullptr)
+            bad_arg("vals is null");
+        const vector<double>* v = s->adapter->objective_sequence();
+        if (v == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no objective sequence");
+        if (max_n < (int)v->size())
+            bad_arg("objective buffer too small");
+        for (size_t i = 0; i < v->size(); ++i)
+            vals[i] = (*v)[i];
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// the best objective seen and the one it started from. either one can be NULL.
+pestpp_status pestpp_opt_objective_bounds(pestpp_handle h, double* best, double* initial)
+{
+    CAPI_BEGIN(h)
+        double b = 0.0, i0 = 0.0;
+        if (!s->adapter->objective_bounds(b, i0))
+            unsupported(string("tool '") + s->adapter->name() + "' has no objective function "
+                        "value");
+        if (best != nullptr) *best = b;
+        if (initial != nullptr) *initial = i0;
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// the decision variable names, packed the same way as every other name list.
+pestpp_status pestpp_opt_dec_var_names(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        const vector<string>* v = s->adapter->dec_var_names();
+        if (v == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no decision variables: "
+                        "they are a pestpp-opt concept");
+        return pack_names(*v, buf, buf_len, count);
+    CAPI_END()
+}
+
+/// shared by the getter and the setter so the two cant disagree about what is there.
 DynamicRegularization* require_regularization(PestppSession* s)
 {
     DynamicRegularization* r = s->adapter->regularization();

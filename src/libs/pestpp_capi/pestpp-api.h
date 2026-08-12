@@ -1,47 +1,51 @@
 /*
- * PEST++ C ABI - walking skeleton.
+ * pest++ c api
  *
- * A flat, C-callable surface over the PEST++ tools, intended to be driven from Python via
- * ctypes (see python/pestpp_lib.py) or from any language that can call C. Design rationale
- * and the full intended surface are in docs/api_part1/c_abi_design.md; this header is the
- * first vertical slice of that design - enough to create a handle, drive iterations, and
- * read an ensemble without copying.
+ * a flat set of c functions for driving the pest++ tools, meant to be called from python with
+ * ctypes (see python/pestpp_lib.py and python/README.md) or from anything else that can call c.
+ * why it is put together this way is in docs/api_part1/c_abi_design.md.
  *
- * Conventions, all deliberate:
- *   - Every function returns pestpp_status. Nothing throws across the boundary; exceptions
- *     are caught at every entry point and turned into a status plus a per-handle message.
- *   - Strings out are written into caller-allocated buffers, with a `needed` out-param so a
- *     caller can size then fill. The library never allocates something the caller must free.
- *   - Everything is __cdecl, on every platform. There is no __stdcall entry point, so python
- *     callers want ctypes.CDLL on windows as well as posix, not WinDLL.
+ * stability: this is 0.x, so expect breaking changes. it is out for feedback and that feedback
+ * is going to change it. until 1.0, check the PESTPP_API_VERSION_* values below - what you
+ * built against - against what pestpp_get_api_version() reports - what you actually loaded -
+ * and dont assume they match. the python files move with the library, so use them from the
+ * same commit. if you need something that wont move on you, run the exes.
  *
- * WHAT THIS LIBRARY DOES TO YOUR PROCESS
+ * how it works, on purpose:
+ *   - every function returns pestpp_status. nothing throws across the boundary - exceptions
+ *     get caught at every entry point and turned into a status plus a message you can ask for.
+ *   - strings come back in buffers you allocate, with a `needed` out-param so you can size it
+ *     first and then fill it. the library never hands you something you have to free.
+ *   - everything is __cdecl on every platform. there is no __stdcall entry point, so on
+ *     windows you want ctypes.CDLL, same as posix, not WinDLL.
  *
- * It is loaded into your address space and it is not inert. Before coupling it to anything
- * else, know all five:
+ * what this library does to your process
  *
- *   1. IT CHANGES THE PROCESS WORKING DIRECTORY. Every entry point chdir's into the session's
- *      working_dir on the way in and restores it on the way out. This is process-global for
- *      the duration of the call - if another thread performs relative-path io while a pestpp
- *      call is in flight, that io lands in the wrong directory. See "threading" below.
- *   2. It can redirect file descriptor 1, if you ask it to (pestpp_redirect_output).
- *   3. It writes .rec / .log / .rns / .rmr files next to the control file.
- *   4. It binds a TCP port, for a PANTHER session.
- *   5. It spawns child processes, whenever the run manager runs the forward model.
+ * it gets loaded into your process and it does things. before you hook it up to anything else,
+ * know all five:
  *
- * THREADING
+ *   1. it changes the working directory. every function chdir's into the session's working_dir
+ *      on the way in and puts it back on the way out. that is process wide while the call is
+ *      running, so if another thread does relative-path io at the same time, that io ends up in
+ *      the wrong place. see threading below.
+ *   2. it can redirect file descriptor 1 if you ask it to (pestpp_redirect_output).
+ *   3. it writes .rec / .log / .rns / .rmr files next to the control file.
+ *   4. it binds a tcp port for a panther session.
+ *   5. it starts child processes any time the run manager runs the forward model.
  *
- * Two handles in one process are supported, but SERIALIZE THE CALLS - the chdir above is
- * process-global, so two handles with different working directories cannot be driven
- * concurrently. Distinct handles otherwise share no mutable state; the fatal-error flag
- * (pestpp_get_fatal_error) and the fd-1 redirect are the two exceptions and both are
- * documented where they are declared. One handle is not safe to use from two threads at once.
+ * threading
  *
- * ERROR HANDLING
+ * you can have two handles in one process, but dont call them at the same time - the chdir
+ * above is process wide, so two handles with different working directories cant run at once.
+ * other than that, separate handles dont share anything that changes. the two exceptions are
+ * the fatal-error flag (pestpp_get_fatal_error) and the fd-1 redirect, and both say so where
+ * they are declared. one handle is not safe to use from two threads at once.
  *
- * Every call reports through pestpp_status, and the bands are what a wrapper should switch on:
- * negative is a non-fault algorithmic outcome, zero is success, positive is failure. Codes may
- * be added inside those bands, so test the SIGN rather than enumerating values.
+ * error handling
+ *
+ * every call reports through pestpp_status. switch on the sign, not the number: negative
+ * means the algorithm did something normal that isnt success, zero means success, positive
+ * means it failed. new codes get added inside those bands, so check the sign.
  */
 #ifndef PESTPP_API_H_
 #define PESTPP_API_H_
@@ -50,10 +54,10 @@
 extern "C" {
 #endif
 
-/* Exported when building the library, imported when including the installed header.
- * PESTPP_API_BUILD is defined only on the pestpp_capi target. Getting this wrong is not
- * cosmetic on windows: a consumer that compiles with dllexport re-exports these symbols from
- * its own binary, and for the data symbol PESTPP_NAME_LEN below it is a hard link error. */
+/* exported when building the library, imported when including the installed header.
+ * PESTPP_API_BUILD is only defined on the pestpp_capi target. this matters on windows - if you
+ * get it wrong and compile with dllexport, your binary re-exports these symbols, and for the
+ * data symbol PESTPP_NAME_LEN below that is a link error. */
 #if defined(_WIN32)
 #  if defined(PESTPP_API_BUILD)
 #    define PESTPP_API __declspec(dllexport)
@@ -64,11 +68,14 @@ extern "C" {
 #  define PESTPP_API __attribute__((visibility("default")))
 #endif
 
-/* The header's own version, so a caller can compile-time compare against what it loads at
- * runtime with pestpp_get_api_version(). Bumped by hand: MINOR for additions that leave the
- * existing surface alone, MAJOR for anything that does not. */
+/* the version of this header, so you can compare what you built against with what
+ * pestpp_get_api_version() says you loaded. bumped by hand: minor for stuff that gets added
+ * without changing what is already there, major for anything else.
+ *
+ * while major is still 0, a breaking change might show up as a minor bump too - that is what
+ * 0.x means. pin to a commit if that matters to you. */
 #define PESTPP_API_VERSION_MAJOR 0
-#define PESTPP_API_VERSION_MINOR 3
+#define PESTPP_API_VERSION_MINOR 4
 #define PESTPP_API_VERSION_PATCH 0
 
 /* Opaque session handle. Owns the scenario, file manager, run manager and tool object. */
@@ -982,16 +989,17 @@ PESTPP_API pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data,
                                              int* nrow, int* ncol,
                                              char* row_names, char* col_names);
 
-/* ---- pestpp-da: the assimilation cycle SEQUENCE -------------------------------------------
-   A DataAssimilator handles ONE cycle. Data assimilation is the sequence: each cycle gets its
-   own child scenario and its own tool, and cycle N's posterior becomes cycle N+1's prior, with
-   realizations a cycle lost dropped from the global ensembles so the two stay aligned.
+/* ---- pestpp-da: running the assimilation cycles -------------------------------------------
+   a DataAssimilator only handles one cycle. what makes it data assimilation is the sequence:
+   every cycle gets its own child pest object and its own tool, and the posterior from cycle N
+   becomes the prior for cycle N+1. any realizations a cycle loses get dropped from the global
+   ensembles too, so the two stay lined up.
 
-   Without these calls a session runs the single cycle it was created with - so a multi-cycle
-   control file returned a one-cycle answer rather than an error.
+   without these calls a session only runs the one cycle it was made with, so a control file
+   with several cycles would quietly give you a one cycle answer.
 
-   Two ways to drive it. pestpp_da_run_all_cycles() runs the whole sequence, the same
-   composition the executable runs. Or step it:
+   two ways to run it. pestpp_da_run_all_cycles() does the whole thing, same as the exe. or you
+   can step through it:
 
        pestpp_da_cycles_initialize(h);
        int begun;
@@ -1000,40 +1008,67 @@ PESTPP_API pestpp_status pestpp_get_jacobian(pestpp_handle h, double* data,
            pestpp_da_cycle_end(h);        // NOT optional - this is what carries the cycle forward
        }
 
-   Between begin and end, every other call on the session refers to the OPEN cycle: its
-   ensembles, its parameter and observation names, its phi. So instead of pestpp_da_cycle_drive()
-   you can drive the cycle through the ordinary session calls and get per-iteration control
-   within each cycle. pestpp_da_cycle_end() is still required either way.
+   in between begin and end, every other call on the session is about the cycle that is open -
+   its ensembles, its parameter and observation names, its phi. so instead of calling
+   pestpp_da_cycle_drive() you can drive the cycle yourself with the normal calls and get
+   iteration by iteration control inside each cycle. either way you still have to call
+   pestpp_da_cycle_end().
 
-   Every call refuses for tools other than da. */
+   all of these give an error for any tool other than da. */
 
-/* Build the global ensembles and resolve the cycle list. Idempotent: a second call does NOT
-   rebuild, because the global ensembles are the run state and rebuilding them mid-sequence
-   would discard everything assimilated so far. */
+/* build the global ensembles and work out the cycle list. calling it twice doesnt rebuild
+   anything - the global ensembles are the state of the run, so rebuilding them partway through
+   would throw away everything assimilated so far. */
 PESTPP_API pestpp_status pestpp_da_cycles_initialize(pestpp_handle h);
 
-/* How many cycles the control file defines. */
+/* how many cycles are in the control file. */
 PESTPP_API pestpp_status pestpp_da_n_cycles(pestpp_handle h, int* n);
 
-/* The cycle numbers, in run order. `cycles` must hold at least pestpp_da_n_cycles() ints. */
+/* the cycle numbers in the order they run. `cycles` needs room for pestpp_da_n_cycles() ints. */
 PESTPP_API pestpp_status pestpp_da_get_cycles(pestpp_handle h, int* cycles, int n);
 
-/* Open the next cycle. *begun is 1 when a cycle is now open, 0 when the sequence is finished -
-   finishing is not an error, so the status is PESTPP_OK either way and *begun is the loop
-   condition. Cycles below ++da_hotstart_cycle are skipped here, as the executable skips them. */
+/* start the next cycle. *begun is 1 if a cycle is now open and 0 if you are done - being done
+   isnt an error, so the status is PESTPP_OK either way and you loop on *begun. cycles before
+   ++da_hotstart_cycle get skipped here, same as the exe skips them. */
 PESTPP_API pestpp_status pestpp_da_cycle_begin(pestpp_handle h, int* begun);
 
-/* The open cycle, or -1 when none is open. */
+/* the cycle that is open, or -1 if none is. */
 PESTPP_API pestpp_status pestpp_da_current_cycle(pestpp_handle h, int* cycle);
 
-/* Run the open cycle: initialize its tool, assimilate, report phi. */
+/* run the open cycle - initialize the tool, assimilate, report phi. */
 PESTPP_API pestpp_status pestpp_da_cycle_drive(pestpp_handle h);
 
-/* Harvest the open cycle's posterior into the global ensembles and close it. */
+/* pull the open cycle's posterior back into the global ensembles and close the cycle. */
 PESTPP_API pestpp_status pestpp_da_cycle_end(pestpp_handle h);
 
-/* Every cycle, start to finish. */
+/* run every cycle, start to finish. */
 PESTPP_API pestpp_status pestpp_da_run_all_cycles(pestpp_handle h);
+
+/* ---- pestpp-opt: objective values and decision variables ----------------------------------
+   opt has one objective function value that changes from iteration to iteration. no other tool
+   works that way - the ensemble methods report phi over realizations and mou reports a pareto
+   front - so opt gets its own calls instead of trying to squeeze this into the phi calls.
+
+   the decision variable VALUES come back through pestpp_get_par_vector(), since they are opt's
+   parameter vector and a second call would just be another name for the same thing. what does
+   need its own call is WHICH parameters are decision variables, because when you turn on
+   chance constraints the adjustable set is bigger than the decision variable set.
+
+   all of these give an error for any tool other than opt. */
+
+/* how many objective values there are - also how big to make the array below. */
+PESTPP_API pestpp_status pestpp_opt_n_objectives(pestpp_handle h, int* n);
+
+/* the objective value at each iteration, oldest first. */
+PESTPP_API pestpp_status pestpp_opt_get_objectives(pestpp_handle h, double* vals, int max_n);
+
+/* the best objective value seen, and the one it started from. either can be NULL. */
+PESTPP_API pestpp_status pestpp_opt_objective_bounds(pestpp_handle h, double* best,
+                                                     double* initial);
+
+/* the decision variable names. call with buf=NULL first to get the count. */
+PESTPP_API pestpp_status pestpp_opt_dec_var_names(pestpp_handle h, char* buf, int buf_len,
+                                                  int* count);
 
 /* ---- Tikhonov regularization (glm) -------------------------------------------------------
    The dynamically adjusted regularization weight and the dials that govern it. These arrive

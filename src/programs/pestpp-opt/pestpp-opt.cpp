@@ -179,9 +179,9 @@ int main(int argc, char* argv[])
 			exit(0);
 		}
 
-		// iter_summary_flag is now cleared by sequentialLP::initialize_and_check(), so both this
-		// executable and the C ABI get it. Left here only because it must be false before the
-		// scenario report below, which runs first.
+		// sequentialLP::initialize_and_check() clears iter_summary_flag now, so the exe and the
+		// c api both get it. still here because it has to be false before the scenario report
+		// below, which runs first.
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
 		//if base jco arg read from control file, reset restart controller

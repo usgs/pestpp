@@ -2252,10 +2252,9 @@ int quit_file_found(std::vector<std::string>& args)
                 cout << "pest.stp file with '3' found, pausing not supported...continuing" << endl;
                 return 0;
             }
-            // tokens 1..n: only token 6 uses one today (the run id to abandon). They were
-            // always parsed and discarded; handing them back costs nothing and means the
-            // format does not have to change again for the next command that needs an
-            // argument.
+            // tokens 1..n - right now only 6 uses one (the run id to give up on). they were
+            // always getting parsed and thrown away, so handing them back is free and means we
+            // dont have to change the file format again next time something needs an argument.
             for (size_t j = 1; j < tokens.size(); ++j)
                 args.push_back(tokens[j]);
 
@@ -2631,8 +2630,9 @@ string pest_utils::read_file_tail(const string& filename, int max_chars)
 	if ((filename.empty()) || (max_chars <= 0))
 		return string();
 
-	// Read more raw bytes than we intend to return: the first line is usually partial and gets
-	// discarded, and collapsing newlines to a separator can grow the text rather than shrink it.
+	// read more raw bytes than we plan to return - the first line is usually a partial one and
+	// gets thrown out, and turning newlines into a separator can make the text longer, not
+	// shorter.
 	const std::streamoff raw_want = (std::streamoff)max_chars * 2 + 256;
 
 	ifstream in(filename, std::ios::binary | std::ios::ate);
@@ -2650,20 +2650,20 @@ string pest_utils::read_file_tail(const string& filename, int max_chars)
 	if (raw.empty())
 		return string();
 
-	// A seek into the middle of the file almost always lands mid-line, and half a line reads as
-	// corruption rather than as a truncation. Drop through the first newline.
+	// seeking into the middle of the file almost always lands mid-line, and half a line looks
+	// like corruption instead of just being cut off. so skip past the first newline.
 	if (start > 0)
 	{
 		size_t nl = raw.find('\n');
 		if (nl == string::npos)
-			return string();     // one enormous line, no safe cut point
+			return string();     // one giant line, nowhere safe to cut
 		raw = raw.substr(nl + 1);
 	}
 
-	// Flatten to ONE printable line. NetPackage::reset() silently DROPS every byte outside
-	// 32-126 rather than replacing it, so a newline there would weld two lines into one word
-	// and a UTF-8 progress bar would arrive as shredded fragments. Normalizing here means what
-	// the master reports is what the file said.
+	// mash it into one printable line. NetPackage::reset() quietly drops every byte outside
+	// 32-126 instead of replacing it, so a newline in there would weld two lines into one word
+	// and a utf-8 progress bar would show up as a bunch of fragments. doing it here means what
+	// the master reports is what the file actually said.
 	string out;
 	out.reserve(raw.size());
 	bool pending_break = false;
@@ -2680,7 +2680,7 @@ string pest_utils::read_file_tail(const string& filename, int max_chars)
 		if (!printable)
 			c = ' ';
 		if ((c == ' ') && (!pending_break) && ((out.empty()) || (out[out.size() - 1] == ' ')))
-			continue;   // collapse runs of whitespace
+			continue;   // squash runs of whitespace
 		if (pending_break)
 		{
 			if (c == ' ')
@@ -2693,15 +2693,13 @@ string pest_utils::read_file_tail(const string& filename, int max_chars)
 	while ((!out.empty()) && (out[out.size() - 1] == ' '))
 		out.erase(out.size() - 1);
 
-	// Truncate from the FRONT: the newest text is the point of the whole exercise, so when it
-	// does not all fit the oldest is what goes. Then drop forward to the next line boundary -
-	// cutting at an arbitrary character leaves the orphan tail of a line at the front, which
-	// reads as garbage rather than as a truncation ("...observations 4 of 20 | solving...").
+	// cut from the front - the newest text is the whole point, so if it doesnt all fit the old
+	// stuff is what goes.
 	if (out.size() > (size_t)max_chars)
 	{
-		// the LONGEST suffix that both fits and begins at a line boundary - found by walking
-		// boundaries rather than by cutting first and repairing after, which mangles a cut that
-		// happened to land cleanly
+		// find the longest chunk off the end that both fits and starts at a line boundary. walk
+		// the boundaries instead of cutting first and fixing it up after - that approach wrecks
+		// a cut that happened to land in the right spot anyway
 		size_t best = string::npos;
 		size_t pos = out.find(" | ");
 		while (pos != string::npos)
@@ -2716,8 +2714,8 @@ string pest_utils::read_file_tail(const string& filename, int max_chars)
 		if (best != string::npos)
 			out = out.substr(best);
 		else
-			// the final line alone is over budget - a long single-line progress bar. Keep its
-			// newest characters rather than reporting nothing.
+			// the last line by itself is too long - probably a one-line progress bar. keep the
+			// newest characters instead of reporting nothing.
 			out = out.substr(out.size() - (size_t)max_chars);
 	}
 	return out;

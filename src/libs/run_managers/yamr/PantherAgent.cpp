@@ -596,16 +596,16 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 					if ((missing.size() == master_obs_name_vec.size()) && (problems.size() > 0))
 						pss << " (" << problems[0] << ")";
 
-					// Whatever the model last reported, if the user named a file to read it
-					// from. This is what rides in info_txt, and ONLY this: the master rebuilds
-					// the observation counts from the payload it just deserialized, so sending
-					// our own copy of them would print the same numbers twice - and if the two
-					// ever disagreed, the payload is the one that is true.
+					// whatever the model last said, if the user named a file to read it from.
+					// this is all that goes in info_txt - the master rebuilds the observation
+					// counts from the data it just unpacked, so sending our own copy would just
+					// print the same numbers twice. and if the two ever disagreed, the data is
+					// the one that is right.
 					//
-					// Budgeted against DESC_LEN rather than sent at whatever length it happens
-					// to be. reset() truncates silently at 1000 bytes and drops every byte
-					// outside printable ASCII, so an unbudgeted append does not overflow - it
-					// gets quietly shortened, which is worse than being asked to fit.
+					// keep it inside DESC_LEN instead of sending whatever length it happens to
+					// be. reset() quietly cuts it off at 1000 bytes and drops anything that
+					// isnt printable ascii, so going over doesnt overflow - it just gets
+					// silently shortened, which is worse.
 					string status_txt;
 					const string& status_file = pest_scenario.get_pestpp_options()
 						.get_panther_worker_status_file();
@@ -613,14 +613,14 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 					{
 						try
 						{
-							// Deliberately far below DESC_LEN. The question being answered is
-							// "what is the model doing NOW", and asking for the full 1000 bytes
-							// answers "what has it done so far" instead - one request against a
-							// progress log came back as 35 timesteps of history, which buries
-							// the current one. It is also written to the master's rmr file once
-							// per request PER AGENT, and partials can be requested every second,
-							// so the width of this line is a real cost at fleet scale. A couple
-							// of lines is what "last reported" means.
+							// way below DESC_LEN on purpose. the question is "what is the model
+							// doing right now", and asking for the full 1000 bytes answers
+							// "what has it done so far" instead - one try against a progress log
+							// came back with 35 timesteps of history, which buries the current
+							// one. it also goes into the master's rmr file once per request per
+							// agent, and partials can get asked for every second, so how wide
+							// this line is actually costs something with a lot of agents. a
+							// couple of lines is what "last reported" means.
 							const int STATUS_CHARS = 120;
 							status_txt = pest_utils::read_file_tail(status_file, STATUS_CHARS);
 							if (!status_txt.empty())
@@ -628,7 +628,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 						}
 						catch (...)
 						{
-							// same contract as the rest of this block: reporting status must
+							// same deal as the rest of this block - reporting status should
 							// never cost the caller its partial results
 						}
 					}
