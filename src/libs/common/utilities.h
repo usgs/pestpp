@@ -454,7 +454,37 @@ string get_time_string();
 string get_time_string_short();
 bool cmp_pair(pair<string,double>& first, pair<string,double>& second);
 
+/** The token in 'pest.stp', or 0 when there is nothing to do.
+ *
+ * The values that mean something, and to whom:
+ *
+ *   1, 2  stop - honoured by every tool
+ *   3     pause - NOT implemented; reported and treated as 0
+ *   4     stop, run manager has returned control (the caller removes the file)
+ *   5     PANTHER MASTER ONLY: request partial results from every running agent
+ *   6 N   PANTHER MASTER ONLY: kill and abandon run id N
+ *
+ * 5 and 6 are commands to a RUNNING master rather than stop requests, so every other tool
+ * ignores them - the existing call sites test for 1, 2 and 4 explicitly, so an unknown token
+ * falls through untouched. The master consumes the file once it acts, which is what keeps a
+ * one-shot command from firing on every poll of the scheduling loop.
+ *
+ * Note the startup guards in each tool's main() are deliberately stricter: they refuse to
+ * start when the file holds ANY non-zero token, because a file left over from a previous run
+ * is not a command to this one.
+ */
 int quit_file_found();
+
+/** The same, plus whatever else was on the line.
+ *
+ * `args` receives the remaining whitespace-separated tokens, unparsed. Only token 6 uses one
+ * today (the run id to abandon), but the file was always tokenized - the extra values were
+ * simply thrown away - so nothing about the format changes by reading them.
+ *
+ * @param args cleared, then filled with tokens 1..n of the first line
+ */
+int quit_file_found(std::vector<std::string>& args);
+
 bool try_remove_quit_file();
 
 

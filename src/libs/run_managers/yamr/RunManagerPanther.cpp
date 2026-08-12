@@ -795,6 +795,101 @@ void RunManagerPanther::begin_batch()
  * This is the body of the old run_until() loop, unchanged. Nothing here resets batch
  * state, so it is safe to call repeatedly - which is what makes run_slice() work.
  */
+/* pest.stp tokens that command a running master. See the header for the contract.
+ *
+ * Kept separate from the 1/2/4 stop handling on purpose: those mean "give up", and every tool
+ * honours them. These two mean "do something to the batch you are running", so they are the
+ * master's alone and no other caller should have to know they exist.
+ */
+void RunManagerPanther::process_quit_file_commands()
+{
+	vector<string> args;
+	int q = 0;
+	try
+	{
+		q = pest_utils::quit_file_found(args);
+	}
+	catch (...)
+	{
+		return;
+	}
+	if ((q != 5) && (q != 6))
+		return;
+
+	stringstream ss;
+	try
+	{
+		if (q == 5)
+		{
+			// empty vector: every ACTIVE run. Agents too old to understand the request are
+			// skipped by request_partial_results() rather than sent to - see its comment;
+			// asking one would kill the run we are asking about.
+			int n = request_partial_results(vector<int>());
+			ss.str("");
+			ss << "'pest.stp' with '5' found: requested partial results from " << n
+			   << " running agent(s)";
+			if (n == 0)
+				ss << " (nothing was running, or no connected agent supports partial results)";
+			report(ss.str(), true);
+		}
+		else
+		{
+			// 6 N - the run id is required, and a 6 without one is a user error worth saying
+			// out loud rather than guessing at
+			if (args.size() == 0)
+			{
+				report("'pest.stp' with '6' found but no run id followed it - expected "
+					"'6 <run_id>' to kill and abandon a run; ignoring", true);
+			}
+			else
+			{
+				int run_id = -1;
+				bool ok = true;
+				try
+				{
+					pest_utils::convert_ip(args[0], run_id);
+				}
+				catch (...)
+				{
+					ok = false;
+				}
+				if ((!ok) || (run_id < 0))
+				{
+					ss.str("");
+					ss << "'pest.stp' with '6' found but '" << args[0]
+					   << "' is not a valid run id; ignoring";
+					report(ss.str(), true);
+				}
+				else
+				{
+					int n = cancel_run(run_id);
+					ss.str("");
+					ss << "'pest.stp' with '6 " << run_id << "' found: ";
+					if (n > 0)
+						ss << "killed and abandoned run " << run_id;
+					else
+						ss << "run " << run_id << " was not executing, so nothing was killed - "
+						   << "it is still marked abandoned and will not be requeued";
+					report(ss.str(), true);
+				}
+			}
+		}
+	}
+	catch (const exception& e)
+	{
+		report(string("error processing 'pest.stp' command (run continues): ") + e.what(), true);
+	}
+	catch (...)
+	{
+		report("unknown error processing 'pest.stp' command (run continues)", true);
+	}
+
+	// One-shot: consume the file whether or not the command did anything. The loop below polls
+	// every pass, so a file left in place would re-fire the command several times a second.
+	if (!pest_utils::try_remove_quit_file())
+		report("error removing 'pest.stp' after acting on it - the command may repeat", true);
+}
+
 RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UNTIL_COND condition, int max_no_ops, double max_time_sec)
 {
 	RUN_UNTIL_COND terminate_reason = RUN_UNTIL_COND::NORMAL;
@@ -809,6 +904,13 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UN
             cout << "'pest.stp' found" << endl;
             kill_all_active_runs();
 
+        }
+        // 5 and 6 are commands to this master rather than stop requests - handled here because
+        // this is the loop that is alive while runs are in flight, which is the only time they
+        // mean anything
+        else if ((q == 5) || (q == 6))
+        {
+            process_quit_file_commands();
         }
 		echo();
 		// one place for both entry points: run_slice() and the composed run() both come

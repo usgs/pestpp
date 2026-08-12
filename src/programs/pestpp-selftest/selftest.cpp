@@ -1246,6 +1246,89 @@ static void test_instruction_file_partial_remaining_branches()
  * recognise it: the file, the record, where we looked, how big the file actually is, and the
  * counter-versus-records mismatch that names the culprit.
  */
+/* The pest.stp vocabulary, including the two master-only commands.
+ *
+ * The file is a user-facing contract - people write it by hand mid-run - so what each token
+ * means, and what a malformed one does, is worth pinning. In particular: 5 and 6 must NOT read
+ * as stop requests, because every tool tests 1/2/4 explicitly and an accidental widening there
+ * would abort runs on a request to inspect them.
+ */
+static void test_quit_file_tokens()
+{
+    cout << "[pest.stp: tokens, arguments, and what a bad one does]" << endl;
+    const string qf = QUIT_FILENAME;
+
+    auto write_stp = [&](const string &txt) {
+        ofstream f(qf);
+        f << txt;
+    };
+
+    remove(qf.c_str());
+    vector<string> args;
+    CHK(pest_utils::quit_file_found(args) == 0, "no file means nothing to do");
+    CHK(args.empty(), "no file means no arguments");
+
+    write_stp("1\n");
+    CHK(pest_utils::quit_file_found(args) == 1, "'1' is a stop");
+    CHK(args.empty(), "a bare token leaves no arguments");
+
+    write_stp("4\n");
+    CHK(pest_utils::quit_file_found() == 4, "'4' still reads through the no-arg overload");
+
+    // 3 is reported and neutralised rather than honoured
+    write_stp("3\n");
+    CHK(pest_utils::quit_file_found(args) == 0, "'3' (pause) is not supported and reads as 0");
+
+    // the master-only commands
+    write_stp("5\n");
+    CHK(pest_utils::quit_file_found(args) == 5, "'5' is the partial-results request");
+    CHK(args.empty(), "'5' takes no argument");
+
+    write_stp("6 17\n");
+    CHK(pest_utils::quit_file_found(args) == 6, "'6' is the kill-and-abandon command");
+    CHK(args.size() == 1, "'6 17' must hand back its argument");
+    if (args.size() == 1)
+    {
+        int rid = -1;
+        pest_utils::convert_ip(args[0], rid);
+        CHK(rid == 17, "the argument is the run id");
+    }
+
+    // The property that keeps 5 and 6 from aborting runs: they are not stop values. Stated as a
+    // test because every tool encodes it as `q==1||q==2||q==4`, and widening that by accident
+    // would turn "show me partial results" into "kill the batch".
+    for (const string &t : {string("5"), string("6 17")})
+    {
+        write_stp(t + "\n");
+        int q = pest_utils::quit_file_found(args);
+        CHK((q != 1) && (q != 2) && (q != 4),
+            "'" + t + "' must not read as a stop token");
+    }
+
+    // extra whitespace and extra arguments survive
+    write_stp("  6   42   ignored_extra  \n");
+    CHK(pest_utils::quit_file_found(args) == 6, "leading whitespace should not hide the token");
+    CHK(args.size() == 2, "every remaining token is handed back, not just the first");
+
+    // a second line is not read - the format is one line, and saying so keeps a future reader
+    // from assuming otherwise
+    write_stp("5\n6 17\n");
+    CHK(pest_utils::quit_file_found(args) == 5, "only the first line is read");
+    CHK(args.empty(), "arguments come from the first line only");
+
+    // garbage is 0, i.e. indistinguishable from no file. Pinned because it is a real sharp
+    // edge: a typo'd stop request is silently ignored, and anyone changing this should have to
+    // change a test that says so.
+    write_stp("stop\n");
+    CHK(pest_utils::quit_file_found(args) == 0,
+        "a non-numeric token reads as 0 - SILENTLY, which is a known sharp edge");
+    write_stp("\n");
+    CHK(pest_utils::quit_file_found(args) == 0, "an empty first line reads as 0");
+
+    remove(qf.c_str());
+    CHK(pest_utils::quit_file_found(args) == 0, "cleanup leaves nothing behind");
+}
+
 static void test_run_storage_error_diagnostics()
 {
     cout << "[run storage: a failure says WHAT failed, not just that something did]" << endl;
@@ -1651,6 +1734,7 @@ int main()
     test_model_interface_partial_across_files();
     test_instruction_file_partial_real_case();
     test_instruction_file_partial_remaining_branches();
+    test_quit_file_tokens();
     test_run_storage_error_diagnostics();
     test_run_storage_partial_update();
     test_external_values_are_results();

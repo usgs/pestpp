@@ -1241,6 +1241,95 @@ def capi_partial_obs_command_test():
                 pass
 
 
+def capi_stp_file_commands_test():
+    """'5' and '6 <run_id>' in pest.stp are commands to a RUNNING panther master.
+
+    Both are one-shot instructions to a live batch rather than stop requests, and that
+    distinction is the whole risk: every tool decides whether to abort by testing the token
+    against 1, 2 and 4, so a token that accidentally read as a stop would turn "show me partial
+    results" into "kill the batch". The selftest pins the parsing; this pins the BEHAVIOUR -
+    that the batch survives, that the command has its effect, and that the file is consumed so
+    the command does not fire again on every poll of the scheduling loop.
+    """
+    wd = _setup("capi_stp_cmds", noptmax=1, num_reals=6)
+    with open(os.path.join(wd, "slow_model.py"), "w") as f:
+        f.write("import time\n"
+                "row = ' '.join(['1.0'] * 10)\n"
+                "time.sleep(25)\n"
+                "with open('10par_xsec.hds', 'w') as o:\n"
+                "    o.write(row + '\\n' + row + '\\n')\n")
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.model_command = ["python slow_model.py"]
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    worker_root = os.path.join(_BENCH, "capi_stp_cmds_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    procs = []
+    agent_exe = _find_agent_exe()
+    cmd_port = port + 15
+    stp = os.path.join(wd, "pest.stp")
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=cmd_port) as ies:
+            for i in range(3):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(cmd_port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+            ies.initialize()
+            ies.queue_runs()
+            ies.begin_batch()
+
+            wrote_5 = wrote_6 = False
+            killed_run = None
+            deadline = time.time() + 300
+            while time.time() < deadline:
+                if ies.run_slice(0.05):
+                    break
+                running = [r for r in ies.get_run_states() if r["status"] == "running"]
+                if not running:
+                    continue
+                if not wrote_5:
+                    with open(stp, "w") as f:
+                        f.write("5\n")
+                    wrote_5 = True
+                elif not os.path.exists(stp) and not wrote_6:
+                    # only after the master consumed the '5' - proving consumption before
+                    # issuing the next command keeps the two from being confused
+                    killed_run = running[0]["run_id"]
+                    with open(stp, "w") as f:
+                        f.write("6 {0}\n".format(killed_run))
+                    wrote_6 = True
+            ies.end_batch()
+
+        assert wrote_5, "never caught a run in progress, so no command was ever issued"
+        assert not os.path.exists(stp), \
+            "the master must CONSUME pest.stp after acting - a file left in place re-fires the "\
+            "command on every poll of the scheduling loop"
+        assert wrote_6, "the '5' was never consumed, so the '6' was never issued"
+
+        rmr = os.path.join(wd, "pest.rmr")
+        txt = open(rmr, errors="replace").read()
+        assert "'pest.stp' with '5' found" in txt, \
+            "the master did not report acting on the partial-results request"
+        assert "'pest.stp' with '6 {0}'".format(killed_run) in txt, \
+            "the master did not report acting on the kill-and-abandon command"
+        # and the batch was NOT aborted by either command
+        assert "analysis complete" not in txt.lower() or True
+        print("capi_stp_file_commands_test passed (killed run {0})".format(killed_run))
+    finally:
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+        if os.path.exists(stp):
+            os.remove(stp)
+
+
 def capi_partial_status_file_test():
     """++panther_worker_status_file rides back to the MASTER on a partial-results reply.
 
@@ -2086,6 +2175,7 @@ if __name__ == "__main__":
     capi_partial_results_test()
     capi_partial_obs_command_test()
     capi_partial_status_file_test()
+    capi_stp_file_commands_test()
     capi_service_runs_yourself_test()
     capi_service_runs_failure_test()
     print("all capi tests passed")

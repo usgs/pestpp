@@ -2228,8 +2228,9 @@ string get_time_string_short()
 	return t_str;
 }
 
-int quit_file_found()
+int quit_file_found(std::vector<std::string>& args)
 {
+    args.clear();
     ifstream i(QUIT_FILENAME);
     int itoken = 0;
     if (i.good()) {
@@ -2251,6 +2252,12 @@ int quit_file_found()
                 cout << "pest.stp file with '3' found, pausing not supported...continuing" << endl;
                 return 0;
             }
+            // tokens 1..n: only token 6 uses one today (the run id to abandon). They were
+            // always parsed and discarded; handing them back costs nothing and means the
+            // format does not have to change again for the next command that needs an
+            // argument.
+            for (size_t j = 1; j < tokens.size(); ++j)
+                args.push_back(tokens[j]);
 
             i.close();
             return itoken;
@@ -2258,6 +2265,12 @@ int quit_file_found()
     }
     i.close();
     return itoken;
+}
+
+int quit_file_found()
+{
+    vector<string> args;
+    return quit_file_found(args);
 }
 
 bool try_remove_quit_file()
