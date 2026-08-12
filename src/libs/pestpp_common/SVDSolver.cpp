@@ -2636,7 +2636,17 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 
 	else
 	{
-		for (; i < max_iter; ++i)
+		// its own counter, not the shared `i`. the two bracketing loops above run off the same
+		// counter, so whatever they used came straight out of the refinement budget - and on a
+		// hard problem bracketing eats nearly all of it. measured on ies_10par_xsec: the weight
+		// ratio was exactly 1.3^-19 on back to back iterations, meaning 19 of the 20 went to
+		// bracketing downward and refinement got at most one pass.
+		//
+		// this only runs when bracketing already succeeded (both failure branches above return
+		// with a fallback weight), so giving it a full budget doesnt let a failed search go on
+		// longer. and it breaks on wftol below, so it stops when it has converged instead of
+		// always burning max_iter.
+		for (int j = 0; j < max_iter; ++j)
 		{
 			if (abs(mu_vec[0].f()) > abs(mu_vec[3].f()) && mu_vec[0].f() < 0)
 			{

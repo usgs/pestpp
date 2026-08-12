@@ -539,7 +539,17 @@ class PestppLib:
         lib.pestpp_da_cycle_end.restype = c_int
         lib.pestpp_da_run_all_cycles.argtypes = (c_void_p,)
         lib.pestpp_da_run_all_cycles.restype = c_int
-        # -- pestpp-opt: objective trajectory and decision variables -------------------
+        # -- constraints (mou / sqp / opt) --------------------------------------------
+        lib.pestpp_get_constraint_names.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_constraint_names.restype = c_int
+        lib.pestpp_get_constraint_senses.argtypes = (c_void_p, c_char_p, c_int, POINTER(c_int))
+        lib.pestpp_get_constraint_senses.restype = c_int
+        lib.pestpp_get_sum_of_violations.argtypes = (c_void_p, POINTER(c_double))
+        lib.pestpp_get_sum_of_violations.restype = c_int
+        lib.pestpp_get_obs_vector.argtypes = (c_void_p, POINTER(c_double), c_int, c_char_p,
+                                              c_int, POINTER(c_int))
+        lib.pestpp_get_obs_vector.restype = c_int
+        # -- pestpp-opt: objective values and decision variables -----------------------
         lib.pestpp_opt_n_objectives.argtypes = (c_void_p, POINTER(c_int))
         lib.pestpp_opt_n_objectives.restype = c_int
         lib.pestpp_opt_get_objectives.argtypes = (c_void_p, POINTER(c_double), c_int)
@@ -1246,6 +1256,53 @@ class PestppLib:
     def da_run_all_cycles(self) -> None:
         """every cycle, start to finish - the same thing the exe runs."""
         self._check(self.lib.pestpp_da_run_all_cycles(self.handle), "pestpp_da_run_all_cycles")
+
+    # -- constraints (mou / sqp / opt) ----------------------------------------------------
+
+    def _packed_names(self, fn, what: str) -> list:
+        count = c_int()
+        self._check(fn(self.handle, None, 0, byref(count)), what)
+        if count.value == 0:
+            return []
+        buf = create_string_buffer(count.value * self.name_len)
+        self._check(fn(self.handle, buf, count.value * self.name_len, byref(count)), what)
+        return self._unpack_names(buf.raw, count.value)
+
+    def get_constraint_names(self) -> list:
+        """the constraint names, obs constraints first then prior information ones."""
+        return self._packed_names(self.lib.pestpp_get_constraint_names,
+                                  "pestpp_get_constraint_names")
+
+    def get_constraint_senses(self) -> list:
+        """less_than / greater_than / equal_to, same order as get_constraint_names()."""
+        return self._packed_names(self.lib.pestpp_get_constraint_senses,
+                                  "pestpp_get_constraint_senses")
+
+    def get_sum_of_violations(self) -> float:
+        """how far the current point violates its constraints, added up. 0 means feasible."""
+        total = c_double()
+        self._check(self.lib.pestpp_get_sum_of_violations(self.handle, byref(total)),
+                    "pestpp_get_sum_of_violations")
+        return total.value
+
+    def get_obs_vector(self) -> tuple:
+        """(names, values) of the simulated observations at the current point.
+
+        only for the tools that carry one set of them instead of an ensemble - glm and opt.
+        for opt these are the constraint values.
+        """
+        count = c_int()
+        self._check(self.lib.pestpp_get_obs_vector(self.handle, None, 0, None, 0, byref(count)),
+                    "pestpp_get_obs_vector")
+        n = count.value
+        if n == 0:
+            return [], np.zeros(0)
+        vals = (c_double * n)()
+        names = create_string_buffer(n * self.name_len)
+        self._check(self.lib.pestpp_get_obs_vector(self.handle, vals, n, names,
+                                                   n * self.name_len, byref(count)),
+                    "pestpp_get_obs_vector")
+        return self._unpack_names(names.raw, n), np.array([vals[i] for i in range(n)])
 
     # -- pestpp-opt: objective values and decision variables -----------------------------
     #

@@ -110,3 +110,18 @@ install(TARGETS pestpp_capi
 # The header goes with it: a shared library with a C ABI is not much use to anyone writing
 # against it from C or C++ without the declarations.
 install(FILES pestpp-api.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# the python layer ships too, into python/ next to bin/ and include/. without this the release
+# tarball had the library and the header but nothing to call them with, so anybody wanting the
+# friendly layer had to go clone the repo and get the commit right.
+#
+# the files stay flat and importable rather than being made into a package - there is no pip
+# install yet on purpose (see python/README.md), so the way you use these is to put the
+# directory on sys.path. find_library() looks in ../bin relative to itself, which is exactly
+# where the library lands in this layout, so it works out of the tarball with nothing set.
+install(FILES
+  ${CMAKE_SOURCE_DIR}/python/pestpp.py
+  ${CMAKE_SOURCE_DIR}/python/pestpp_lib.py
+  ${CMAKE_SOURCE_DIR}/python/pestpp_progress.py
+  ${CMAKE_SOURCE_DIR}/python/README.md
+  DESTINATION python)

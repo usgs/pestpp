@@ -2419,6 +2419,79 @@ def _da_cycle_case(name, n_cycles=3, num_reals=6):
 
 
 
+
+def api_opt_constraints_test():
+    """opt can report which constraints it has, what they mean, and whether it is meeting them.
+
+    the optimum on its own is only half an answer - a decision variable vector that violates
+    three constraints is not a solution, and until these calls existed there was no way to tell
+    from the api. the sense is part of it: a constraint sitting at 5.0 is fine or broken
+    depending entirely on whether it is a less_than or a greater_than, so a value without its
+    sense tells you nothing.
+    """
+    d = _opt_case("api_opt_cons", 2)
+    with Opt.from_pst("opt_api.pst", workdir=d) as opt:
+        opt.initialize()
+        opt.solve()
+
+        names = opt.constraint_names
+        # 8 obs constraints from the control file, then the prior information ones. opt makes a
+        # _LB_/_UB_ pair per decision variable to hold the bounds, so the list is longer than
+        # what you wrote in the pst - worth knowing before you go looking for a bug.
+        obs_cons = [c for c in names if not c.startswith(("_LB_", "_UB_"))]
+        bound_cons = [c for c in names if c.startswith(("_LB_", "_UB_"))]
+        assert len(obs_cons) == 8, "g07 has 8 obs constraints: got {0}".format(obs_cons)
+        assert len(bound_cons) == 20, \
+            "10 decision variables should give 10 lower and 10 upper bound constraints: " \
+            "got {0}".format(len(bound_cons))
+        assert names[:8] == obs_cons, "obs constraints come first, then the prior info ones"
+
+        cdf = opt.constraint_df()
+        assert list(cdf.index) == list(names), "the frame is indexed by constraint name"
+        assert set(cdf["sense"]) <= {"less_than", "greater_than", "equal_to", "undefined"}, \
+            "every constraint needs a sense: {0}".format(set(cdf["sense"]))
+        # only the OBS constraints have a simulated value - the bound ones are prior
+        # information, so there is no model output behind them. NaN there is the right answer,
+        # not a gap: pretending a bound constraint had a simulated value would be made up.
+        assert cdf.loc[obs_cons, "simulated"].notnull().all(), \
+            "every obs constraint should have a simulated value after an iteration"
+        assert cdf.loc[bound_cons, "simulated"].isnull().all(), \
+            "prior information constraints have no simulated observation behind them"
+
+        # the values come from the same place the simulated observations do
+        sim = opt.constraint_values()
+        for c in obs_cons:
+            assert sim[c] == cdf.loc[c, "simulated"], \
+                "constraint_values() and constraint_df() must agree on {0}".format(c)
+
+        # feasibility is a number and a yes/no that agree with each other
+        viol = opt.sum_of_violations
+        assert viol >= 0.0, "a violation total is never negative: {0}".format(viol)
+        assert opt.is_feasible == (viol <= 0.0), \
+            "is_feasible must follow sum_of_violations: {0} vs {1}".format(opt.is_feasible, viol)
+        opt.finalize()
+
+    # ies has no constraints and says so rather than returning an empty list - an empty list
+    # reads as "no constraints defined" when the truth is "wrong tool"
+    d2 = _case("api_cons_refused", noptmax=1, num_reals=4)
+    with Ies.from_pst("pest.pst", workdir=d2) as ies:
+        ies.initialize()
+        for label, call in (("names", lambda: ies._lib.get_constraint_names()),
+                            ("senses", lambda: ies._lib.get_constraint_senses()),
+                            ("violations", lambda: ies._lib.get_sum_of_violations()),
+                            ("obs_vector", lambda: ies._lib.get_obs_vector())):
+            try:
+                call()
+            except PestppError as e:
+                assert "ies" in str(e).lower(), \
+                    "{0} should name the tool it is refusing for: {1}".format(label, e)
+            else:
+                raise AssertionError("{0} should refuse for ies".format(label))
+        ies.finalize()
+    print("api_opt_constraints_test passed ({0} obs + {1} bound constraints, "
+          "sum_of_violations {2:g})".format(len(obs_cons), len(bound_cons), viol))
+
+
 def api_opt_objective_is_opt_only_test():
     """the objective value calls give an error for every tool but opt.
 
@@ -3308,6 +3381,7 @@ if __name__ == "__main__":
     api_sqp_ensemble_sources_test()
     api_opt_drives_slp_test()
     api_opt_objective_is_opt_only_test()
+    api_opt_constraints_test()
     api_da_cycle_sequence_test()
     api_da_run_all_cycles_matches_stepping_test()
     api_da_cycles_are_da_only_test()

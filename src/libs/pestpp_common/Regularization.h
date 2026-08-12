@@ -28,7 +28,7 @@ class DynamicRegularization
 {
 public:
 	/*DynamicRegularization(bool _use_dynamic_reg = false, bool _grp_weight_adj = false, double _phi_m_lim = 0,
-		double _phi_m_accept = 0, double _frac_phi_m = 1, double _wf_min = 1e-10, double _wf_max = 1e10,
+		double _phi_m_accept = 0, double _frac_phi_m = 0.2, double _wf_min = 1e-10, double _wf_max = 1e10,
 		double _wffac = 0, double _wftol = 1000, double _wf_init = 1.0, int _max_reg_iter=20);*/
 	DynamicRegularization() { ; }
 	DynamicRegularization(const DynamicRegularization &rhs);

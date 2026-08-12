@@ -258,6 +258,10 @@ struct ToolAdapter
     virtual const Parameters* current_parameters() { return nullptr; }
     virtual const Parameters* optimum_parameters() { return nullptr; }
 
+    /// the simulated observations that go with current_parameters(). null for the ensemble
+    /// tools, which have an ensemble of them rather than one set.
+    virtual const Observations* current_observations() { return nullptr; }
+
     /// the objective function values, for tools that have one objective that changes from
     /// iteration to iteration. null for everything but opt - the ensemble tools report phi over
     /// realizations and mou reports a pareto front, and neither of those is a list of numbers.
@@ -1029,6 +1033,9 @@ struct OptAdapter : public ToolAdapter
     const Parameters* current_parameters() override { return &tool.get_current_pars(); }
     const Parameters* optimum_parameters() override { return &tool.get_best_pars(); }
 
+    const Observations* current_observations() override
+    { return &tool.get_current_constraints_sim(); }
+
     const vector<double>* objective_sequence() override { return &tool.get_obj_values(); }
     bool objective_bounds(double& best, double& initial) override
     {
@@ -1131,6 +1138,8 @@ struct GlmAdapter : public ToolAdapter
         return &tool.get_base_jacobian();
     }
     const Parameters* current_parameters() override { return &tool.get_current_parameters(); }
+    const Observations* current_observations() override
+    { return &tool.get_current_run().get_obs(); }
     const Parameters* optimum_parameters() override { return &tool.get_optimum_parameters(); }
     void set_current_parameters(const Parameters& pars) override
     { tool.set_current_parameters(pars); }
@@ -2872,6 +2881,106 @@ pestpp_status pestpp_da_run_all_cycles(pestpp_handle h)
 {
     CAPI_BEGIN(h)
         require_da_driver(s, true)->run_all_cycles();
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/* -- constraints -----------------------------------------------------------------------------
+ *
+ * mou, sqp and opt all carry a Constraints object, so these are shared rather than opt-only.
+ * "what is the optimum" and "which constraints are binding there" are two halves of the same
+ * answer, and until now you could only get the first half.
+ *
+ * the simulated constraint VALUES come back through pestpp_get_obs_vector() below, since they
+ * are just the current simulated observations.
+ */
+
+/// the constraint names, obs constraints first then prior information ones. buf=NULL for count.
+pestpp_status pestpp_get_constraint_names(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        Constraints* c = s->adapter->constraints();
+        if (c == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no constraints: "
+                        "constraints are a mou / sqp / opt concept");
+        vector<string> names = c->get_obs_constraint_names();
+        vector<string> pi = c->get_pi_constraint_names();
+        names.insert(names.end(), pi.begin(), pi.end());
+        return pack_names(names, buf, buf_len, count);
+    CAPI_END()
+}
+
+/// the sense of each constraint (less_than / greater_than / equal_to), in the same order as
+/// pestpp_get_constraint_names(). buf=NULL for count.
+pestpp_status pestpp_get_constraint_senses(pestpp_handle h, char* buf, int buf_len, int* count)
+{
+    CAPI_BEGIN(h)
+        Constraints* c = s->adapter->constraints();
+        if (c == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no constraints");
+        map<string, string> sense = c->get_constraint_sense();
+        vector<string> names = c->get_obs_constraint_names();
+        vector<string> pi = c->get_pi_constraint_names();
+        names.insert(names.end(), pi.begin(), pi.end());
+        vector<string> out;
+        for (auto& n : names)
+        {
+            map<string, string>::iterator it = sense.find(n);
+            out.push_back(it == sense.end() ? string("undefined") : it->second);
+        }
+        return pack_names(out, buf, buf_len, count);
+    CAPI_END()
+}
+
+/// how far the current point violates its constraints, summed. 0 means feasible.
+pestpp_status pestpp_get_sum_of_violations(pestpp_handle h, double* total)
+{
+    CAPI_BEGIN(h)
+        if (total == nullptr)
+            bad_arg("total is null");
+        Constraints* c = s->adapter->constraints();
+        if (c == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no constraints");
+        const Parameters* p = s->adapter->current_parameters();
+        const Observations* o = s->adapter->current_observations();
+        if ((p == nullptr) || (o == nullptr))
+            unsupported(string("tool '") + s->adapter->name() + "' has no single current point "
+                        "to test - it carries an ensemble, so ask per realization instead");
+        Parameters pars(*p);
+        Observations obs(*o);
+        *total = c->get_sum_of_violations(pars, obs);
+        return PESTPP_OK;
+    CAPI_END()
+}
+
+/// the simulated observations at the current point, for tools that have one set rather than an
+/// ensemble of them. for opt these are the constraint values.
+pestpp_status pestpp_get_obs_vector(pestpp_handle h, double* vals, int max_n,
+                                    char* names, int names_len, int* count)
+{
+    CAPI_BEGIN(h)
+        const Observations* o = s->adapter->current_observations();
+        if (o == nullptr)
+            unsupported(string("tool '") + s->adapter->name() + "' has no single observation "
+                        "vector - it carries an ensemble, so use pestpp_get_ensemble_view()");
+        vector<string> keys = o->get_keys();
+        sort(keys.begin(), keys.end());       // same order as pestpp_get_par_vector()
+        if (count != nullptr)
+            *count = (int)keys.size();
+        if (vals != nullptr)
+        {
+            if (max_n < (int)keys.size())
+                too_small("observation buffer too small; call with vals=NULL to size it first");
+            for (size_t i = 0; i < keys.size(); ++i)
+                vals[i] = o->get_rec(keys[i]);
+        }
+        if (names != nullptr)
+        {
+            int n = (int)keys.size();
+            pestpp_status st = pack_names(keys, names, names_len, &n);
+            if (st != PESTPP_OK)
+                return st;
+        }
         return PESTPP_OK;
     CAPI_END()
 }

@@ -75,7 +75,7 @@ extern "C" {
  * while major is still 0, a breaking change might show up as a minor bump too - that is what
  * 0.x means. pin to a commit if that matters to you. */
 #define PESTPP_API_VERSION_MAJOR 0
-#define PESTPP_API_VERSION_MINOR 4
+#define PESTPP_API_VERSION_MINOR 5
 #define PESTPP_API_VERSION_PATCH 0
 
 /* Opaque session handle. Owns the scenario, file manager, run manager and tool object. */
@@ -1043,6 +1043,32 @@ PESTPP_API pestpp_status pestpp_da_cycle_end(pestpp_handle h);
 
 /* run every cycle, start to finish. */
 PESTPP_API pestpp_status pestpp_da_run_all_cycles(pestpp_handle h);
+
+/* ---- constraints --------------------------------------------------------------------------
+   mou, sqp and opt all carry constraints, so these are shared instead of being opt-only.
+   "what is the optimum" and "which constraints are binding there" are two halves of the same
+   answer, and until now you could only get the first half.
+
+   the simulated constraint VALUES come back through pestpp_get_obs_vector() - they are just the
+   simulated observations at the current point. */
+
+/* the constraint names, obs constraints first then prior information ones.
+   call with buf=NULL to get the count. */
+PESTPP_API pestpp_status pestpp_get_constraint_names(pestpp_handle h, char* buf, int buf_len,
+                                                     int* count);
+
+/* the sense of each one (less_than / greater_than / equal_to), same order as the names. */
+PESTPP_API pestpp_status pestpp_get_constraint_senses(pestpp_handle h, char* buf, int buf_len,
+                                                      int* count);
+
+/* how far the current point violates its constraints, added up. 0 means feasible. */
+PESTPP_API pestpp_status pestpp_get_sum_of_violations(pestpp_handle h, double* total);
+
+/* the simulated observations at the current point, for tools that carry one set rather than an
+   ensemble of them (glm and opt). for opt these are the constraint values. `vals` and `names`
+   may each be NULL - pass both NULL with a non-NULL count to size the buffers first. */
+PESTPP_API pestpp_status pestpp_get_obs_vector(pestpp_handle h, double* vals, int max_n,
+                                               char* names, int names_len, int* count);
 
 /* ---- pestpp-opt: objective values and decision variables ----------------------------------
    opt has one objective function value that changes from iteration to iteration. no other tool

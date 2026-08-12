@@ -130,7 +130,7 @@ DynamicRegularization DynamicRegularization::get_zero_reg_instance()
 PestppOptions::ARG_STATUS DynamicRegularization::assign_value_by_key(const std::string key, const std::string org_value)
 {
 	/*DynamicRegularization(bool _use_dynamic_reg = false, bool _grp_weight_adj = false, double _phi_m_lim = 0,
-		double _phi_m_accept = 0, double _frac_phi_m = 1, double _wf_min = 1e-10, double _wf_max = 1e10,
+		double _phi_m_accept = 0, double _frac_phi_m = 0.2, double _wf_min = 1e-10, double _wf_max = 1e10,
 		double _wffac = 0, double _wftol = 1000, double _wf_init = 1.0, int _max_reg_iter = 20);*/
 	std::string value = pest_utils::upper_cp(org_value);
 	if (passed_args.find(key) != passed_args.end())
@@ -178,13 +178,22 @@ PestppOptions::ARG_STATUS DynamicRegularization::assign_value_by_key(const std::
 void DynamicRegularization::set_defaults()
 {
 	/*DynamicRegularization(bool _use_dynamic_reg = false, bool _grp_weight_adj = false, double _phi_m_lim = 0,
-		double _phi_m_accept = 0, double _frac_phi_m = 1, double _wf_min = 1e-10, double _wf_max = 1e10,
+		double _phi_m_accept = 0, double _frac_phi_m = 0.2, double _wf_min = 1e-10, double _wf_max = 1e10,
 		double _wffac = 0, double _wftol = 1000, double _wf_init = 1.0, int _max_reg_iter = 20);*/
 	use_dynamic_reg = false;
 	adj_grp_weights = false;
 	phi_m_lim = 1.0e-10;
 	phi_m_accept = 1.1e-10;
-	frac_phi_m = 1;
+	// 0.2 - the middle of the 0.1 to 0.3 range pest recommends. addreg1 writes 0.1, and pest
+	// documents fracphim as being less than one, so the old default of 1 was outside the range
+	// pest considers valid. 1 means "dont let phi go up", which is the conservative end - it
+	// isnt wrong, it just never asks for a cut, so phimlim ends up doing all the work.
+	//
+	// dont set this to 0 thinking it hands control to phimlim - it does, and it is worse.
+	// measured on ies_10par_xsec: with 0 the target is out of reach from iteration 1, the
+	// search burns its whole budget going down and pins at wfmin by iteration 5 without a
+	// single converged iteration. see docs/glm_dynreg/findings.md.
+	frac_phi_m = 0.2;
 	wf_min = 1e-10;
 	wf_max = 1e+10;
 	wffac = 1.3;

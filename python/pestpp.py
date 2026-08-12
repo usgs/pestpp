@@ -1509,6 +1509,16 @@ class Glm(_Tool):
         idx = [n.lower() for n in names] if lower else names
         return pd.Series(vals, index=idx, name=str(which).lower())
 
+    def obs_vector(self, lower: bool = False) -> pd.Series:
+        """the simulated observations of the current run, as a labeled series.
+
+        the other half of par_vector() - glm carries one model run, so it has one set of
+        simulated observations rather than an ensemble of them.
+        """
+        names, vals = self._lib.get_obs_vector()
+        idx = [n.lower() for n in names] if lower else names
+        return pd.Series(vals, index=idx, name="simulated")
+
     def set_par_vector(self, values) -> None:
         """Push a parameter vector back. Accepts a Series/dict, matched BY NAME.
 
@@ -1839,6 +1849,52 @@ class Opt(_ChanceMixin, _Tool):
         vals = self.objective_sequence
         return pd.DataFrame({"objective": vals},
                             index=pd.Index(range(len(vals)), name="iteration"))
+
+    # -- the constraints ----------------------------------------------------------------
+    #
+    # "what is the optimum" and "which constraints are binding there" are two halves of the
+    # same answer. until these existed you only got the first half.
+
+    def constraint_values(self, lower: bool = False) -> pd.Series:
+        """the simulated constraint values at the current decision variables."""
+        names, vals = self._lib.get_obs_vector()
+        idx = [n.lower() for n in names] if lower else names
+        return pd.Series(vals, index=idx, name="simulated")
+
+    @property
+    def constraint_names(self) -> list:
+        """the constraint names - obs constraints first, then prior information ones."""
+        return self._lib.get_constraint_names()
+
+    @property
+    def sum_of_violations(self) -> float:
+        """how far the current point misses its constraints, added up. 0 means feasible."""
+        return self._lib.get_sum_of_violations()
+
+    @property
+    def is_feasible(self) -> bool:
+        """whether the current decision variables satisfy every constraint."""
+        return self.sum_of_violations <= 0.0
+
+    def constraint_df(self, lower: bool = False) -> pd.DataFrame:
+        """name, sense and simulated value for every constraint, in one frame.
+
+        the sense matters as much as the value - a constraint sitting at 5.0 is fine or broken
+        depending entirely on whether it is a less_than or a greater_than, so the numbers on
+        their own dont tell you anything.
+
+        two things worth knowing about the index. opt adds a `_LB_`/`_UB_` pair per decision
+        variable to hold the bounds, so this is longer than the constraint list you wrote in the
+        pst. and those bound rows have no `simulated` value - they are prior information, so
+        there is no model output behind them and the value comes back NaN.
+        """
+        names = self._lib.get_constraint_names()
+        senses = self._lib.get_constraint_senses()
+        sim = self.constraint_values(lower=lower)
+        idx = [n.lower() for n in names] if lower else names
+        vals = [sim.get(n, np.nan) for n in idx]
+        return pd.DataFrame({"sense": senses, "simulated": vals},
+                            index=pd.Index(idx, name="constraint"))
 
 
 class Mou(_ChanceMixin, _Tool):
