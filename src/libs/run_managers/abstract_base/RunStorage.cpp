@@ -42,13 +42,114 @@ using namespace std;
 const double RunStorage::no_data = -9999.0;
 
 /**
+ * @brief Everything known about a failed stream operation, as one message.
+ *
+ * See the header for why this exists. Short version: these failures surface in CI and do not
+ * reproduce, so the message thrown at the moment of failure is the only evidence anyone will
+ * ever get. "stream not good" was not enough to tell a short file from a bad offset from a
+ * disk error, and three separate investigations died on that ambiguity.
+ *
+ * Reads the file size through a SEPARATE ifstream rather than through buf_stream. buf_stream is
+ * already in a failed state by the time we are called - seeking it to measure the file would
+ * either fail too or, worse, clear the very state we are trying to report.
+ */
+string RunStorage::stream_diagnostic(const string &where, int run_id,
+	std::streamoff expected_pos) const
+{
+	stringstream ss;
+	try
+	{
+		const int saved_errno = errno;
+		ss << "RunStorage::" << where << "() stream not good";
+		ss << " [file='" << filename << "'";
+
+		// stream state: which bit is set says a lot on its own. eof alone means we asked for
+		// bytes past the end - a short file. bad means the OS refused.
+		ss << " state=";
+		if (buf_stream.good()) ss << "good";
+		else
+		{
+			if (buf_stream.eof())  ss << "eof|";
+			if (buf_stream.fail()) ss << "fail|";
+			if (buf_stream.bad())  ss << "bad|";
+		}
+		ss << " open=" << (buf_stream.is_open() ? "yes" : "no");
+
+		if (run_id >= 0)
+			ss << " run_id=" << run_id;
+		if (expected_pos >= 0)
+			ss << " target_pos=" << (long long)expected_pos;
+
+		// the record geometry, so a wrong offset is recognisable as arithmetic rather than IO
+		ss << " beg_run0=" << (long long)beg_run0
+		   << " run_byte_size=" << (long long)run_byte_size;
+
+		// The counter as recorded in the header, read WITHOUT going through get_nruns(): that
+		// function throws on a bad stream, and a diagnostic that throws is no diagnostic.
+		long long nruns = -1, fsize = -1;
+		{
+			ifstream probe(filename, ios_base::in | ios_base::binary);
+			if (probe.good())
+			{
+				probe.seekg(0, ios_base::end);
+				fsize = (long long)probe.tellg();
+				probe.clear();
+				probe.seekg(sizeof(std::int64_t) * 0, ios_base::beg);
+				std::int64_t tmp = -1;
+				probe.read(reinterpret_cast<char*>(&tmp), sizeof(tmp));
+				if (probe)
+					nruns = (long long)tmp;
+			}
+		}
+		ss << " file_size=" << (fsize < 0 ? string("?") : to_string(fsize));
+		ss << " header_nruns=" << (nruns < 0 ? string("?") : to_string(nruns));
+
+		// The decisive comparison, stated rather than left for the reader to do: if the file is
+		// smaller than the offset we asked for, the file is short and the question is who
+		// failed to write it - not why the read failed.
+		if ((fsize >= 0) && (expected_pos >= 0))
+		{
+			ss << " short_by=";
+			if (expected_pos < fsize) ss << "0(offset is within the file)";
+			else ss << (long long)(expected_pos - fsize + 1);
+		}
+		if ((fsize >= 0) && (run_byte_size > 0) && (beg_run0 > 0))
+		{
+			long long records = (long long)((fsize - beg_run0) / run_byte_size);
+			ss << " records_in_file=" << records;
+			if ((nruns >= 0) && (records != nruns))
+				ss << " MISMATCH(counter says " << nruns << ", file holds " << records << ")";
+		}
+
+		// errno ONLY when badbit is set, i.e. the OS actually refused the operation. A short
+		// read sets eof/fail without touching errno, so reporting it there prints whatever
+		// unrelated call last failed - "errno=2(No such file or directory)" against a file that
+		// is plainly open and readable, which is worse than saying nothing.
+		if (buf_stream.bad() && (saved_errno != 0))
+			ss << " errno=" << saved_errno << "(" << strerror(saved_errno) << ")";
+		ss << "]";
+	}
+	catch (...)
+	{
+		// a diagnostic that throws while diagnosing loses the original failure entirely
+		return "RunStorage::" + where + "() stream not good [diagnostic unavailable]";
+	}
+	return ss.str();
+}
+
+/**
  * @brief Run storage.
  *
  * @param _filename Description.
  *
  * @return Description.
  */
-RunStorage::RunStorage(const string &_filename) :filename(_filename), run_byte_size(0)
+// beg_run0 and the byte sizes are zeroed here rather than left to reset()/init_restart().
+// They feed get_stream_pos() arithmetic, so before initialization they made an offset out
+// of uninitialized memory - which the new failure diagnostic promptly reported as
+// "beg_run0=49807605984", a number that could only ever confuse whoever read it.
+RunStorage::RunStorage(const string &_filename) :filename(_filename), beg_run0(0),
+	run_byte_size(0), run_par_byte_size(0), run_data_byte_size(0)
 {
 }
 
@@ -88,7 +189,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	buf_stream.open(filename.c_str(), ios_base::out |  ios_base::binary);
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::reset() stream not good");
+        throw runtime_error(stream_diagnostic("reset"));
     }
 	buf_stream.close();
 
@@ -103,7 +204,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	//assert(buf_stream.good() == true);
 	if (!buf_stream)
 	{
-		throw runtime_error("RunStorage::reset() stream not good");
+		throw runtime_error(stream_diagnostic("reset"));
 	}
 	// calculate the number of bytes required to store parameter names
 	vector<int8_t> serial_pnames(Serialization::serialize(par_names));
@@ -136,7 +237,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	buf_stream.flush();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::reset() stream not good");
+        throw runtime_error(stream_diagnostic("reset", end_of_runs, get_stream_pos(end_of_runs)));
     }
 }
 
@@ -160,7 +261,7 @@ void RunStorage::init_restart(const std::string &_filename)
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::in | ios_base::binary | ios_base::ate);
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::init_restart() stream not good");
+        throw runtime_error(stream_diagnostic("init_restart"));
     }
 	// read header
 	buf_stream.seekg(0, ios_base::beg);
@@ -229,7 +330,7 @@ void RunStorage::init_restart(const std::string &_filename)
 	}
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::init_restart() stream not good");
+        throw runtime_error(stream_diagnostic("init_restart", end_of_runs, get_stream_pos(end_of_runs)));
     }
 }
 
@@ -253,7 +354,7 @@ int RunStorage::get_nruns()
 	int n_runs = n_runs_64;
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_nruns() stream not good");
+        throw runtime_error(stream_diagnostic("get_nruns", -1, 0));
     }
     if (n_runs < 0)
     {
@@ -302,7 +403,7 @@ int RunStorage::increment_nruns()
 	buf_stream.flush();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::increment_nruns() stream not good");
+        throw runtime_error(stream_diagnostic("increment_nruns", -1, 0));
     }
 	return n_runs;
 }
@@ -363,7 +464,7 @@ streamoff RunStorage::get_stream_pos(int run_id)
 	buf_stream.flush();
      if (!buf_stream)
      {
-         throw runtime_error("RunStorage::add_run() stream not good");
+         throw runtime_error(stream_diagnostic("add_run", end_of_runs, get_stream_pos(end_of_runs)));
      }
 	return run_id;
  }
@@ -400,7 +501,7 @@ streamoff RunStorage::get_stream_pos(int run_id)
 	buf_stream.flush();
      if (!buf_stream)
      {
-         throw runtime_error("RunStorage::add_run() stream not good");
+         throw runtime_error(stream_diagnostic("add_run", end_of_runs, get_stream_pos(end_of_runs)));
      }
 	return run_id;
  }
@@ -440,13 +541,13 @@ void RunStorage::copy(const RunStorage &rhs_rs)
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::binary | std::ofstream::trunc);
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::copy() stream not good");
+        throw runtime_error(stream_diagnostic("copy"));
     }
 	buf_stream.close();
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::in | ios_base::binary);
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::copy() stream not good");
+        throw runtime_error(stream_diagnostic("copy"));
     }
 
 	// copy rhs runstorage information
@@ -462,7 +563,7 @@ void RunStorage::copy(const RunStorage &rhs_rs)
 	obs_names = rhs_rs.obs_names;
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::copy() stream not good");
+        throw runtime_error(stream_diagnostic("copy"));
     }
 }
 
@@ -510,7 +611,7 @@ void RunStorage::update_run(int run_id, const Parameters &pars, const Observatio
 	buf_stream.flush();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::update_run() stream not good");
+        throw runtime_error(stream_diagnostic("update_run", run_id, get_stream_pos(run_id)));
     }
 }
 
@@ -538,7 +639,7 @@ void RunStorage::update_run_partial(int run_id, const Observations &obs)
 	buf_stream.flush();
 	if (!buf_stream)
 	{
-		throw runtime_error("RunStorage::update_run_partial() stream not good");
+		throw runtime_error(stream_diagnostic("update_run_partial", run_id, get_stream_pos(run_id)));
 	}
 }
 
@@ -583,7 +684,7 @@ void RunStorage::update_run(int run_id, const Observations &obs)
 	buf_stream.flush();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::update_run() stream not good");
+        throw runtime_error(stream_diagnostic("update_run", run_id, get_stream_pos(run_id)));
     }
 }
 
@@ -627,7 +728,7 @@ void RunStorage::update_run(int run_id, const vector<char> serial_data)
 	buf_stream.flush();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::update_run() stream not good");
+        throw runtime_error(stream_diagnostic("update_run", run_id, get_stream_pos(run_id)));
     }
 }
 
@@ -652,7 +753,7 @@ void RunStorage::update_run_failed(int run_id)
 	}
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::update_run_failed() stream not good");
+        throw runtime_error(stream_diagnostic("update_run_failed", run_id, get_stream_pos(run_id)));
     }
 }
 
@@ -678,7 +779,7 @@ void RunStorage::set_run_nfailed(int run_id, int nfail)
 	buf_stream.flush();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::set_run_nfailed() stream not good");
+        throw runtime_error(stream_diagnostic("set_run_nfailed", run_id, get_stream_pos(run_id)));
     }
 }
 
@@ -699,7 +800,7 @@ std::int8_t RunStorage::get_run_status_native(int run_id)
 	buf_stream.read(reinterpret_cast<char*>(&r_status), sizeof(r_status));
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_run_status_native() stream not good");
+        throw runtime_error(stream_diagnostic("get_run_status_native", run_id, get_stream_pos(run_id)));
     }
 	return r_status;
 }
@@ -747,7 +848,7 @@ void RunStorage::get_info(int run_id, int &run_status, string &info_txt, double 
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_run_info() stream not good");
+        throw runtime_error(stream_diagnostic("get_run_info", run_id, get_stream_pos(run_id)));
     }
 }
 
@@ -782,7 +883,7 @@ int RunStorage::get_run(int run_id, Parameters &pars, Observations &obs, string 
 	}
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_run() stream not good");
+        throw runtime_error(stream_diagnostic("get_run", run_id, get_stream_pos(run_id)));
     }
 	return status;
 }
@@ -821,7 +922,7 @@ int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, siz
 {
     if (!buf_stream.good())
     {
-        throw runtime_error("RunStorage::get_run() stream not good");
+        throw runtime_error(stream_diagnostic("get_run", run_id, get_stream_pos(run_id)));
     }
 	std::int8_t r_status;
 	vector<char> info_txt_buf;
@@ -855,7 +956,7 @@ int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, siz
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_run() stream not good");
+        throw runtime_error(stream_diagnostic("get_run", run_id, get_stream_pos(run_id)));
     }
 	return status;
 }
@@ -896,7 +997,7 @@ int RunStorage::get_run(int run_id, vector<double> &pars_vec, vector<double> &ob
 	info_txt = info_txt_buf.data();
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_run() stream not good");
+        throw runtime_error(stream_diagnostic("get_run", run_id, get_stream_pos(run_id)));
     }
 	return status;
 }
@@ -956,7 +1057,7 @@ vector<char> RunStorage::get_serial_pars(int run_id)
 	buf_stream.read(serial_data.data(), serial_data.size());
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_serial_pars() stream not good");
+        throw runtime_error(stream_diagnostic("get_serial_pars", run_id, get_stream_pos(run_id)));
     }
 	return serial_data;
 }
@@ -992,7 +1093,7 @@ int  RunStorage::get_parameters(int run_id, Parameters &pars)
 	int status = r_status;
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_parameters() stream not good");
+        throw runtime_error(stream_diagnostic("get_parameters", run_id, get_stream_pos(run_id)));
     }
 	return status;
 }
@@ -1031,7 +1132,7 @@ int  RunStorage::get_observations(int run_id, Observations &obs)
 	obs.update(obs_names, obs_data);
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_observations() stream not good");
+        throw runtime_error(stream_diagnostic("get_observations", run_id, get_stream_pos(run_id)));
     }
 	return status;
 }
@@ -1068,7 +1169,7 @@ int  RunStorage::get_observations_vec(int run_id, vector<double> &obs_data)
 	int status = r_status;
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::get_observations_vec() stream not good");
+        throw runtime_error(stream_diagnostic("get_observations_vec", run_id, get_stream_pos(run_id)));
     }
 	return status;
 }
@@ -1085,7 +1186,7 @@ void RunStorage::free_memory()
 	}
     if (!buf_stream)
     {
-        throw runtime_error("RunStorage::free_memory() stream not good");
+        throw runtime_error(stream_diagnostic("free_memory"));
     }
 }
 

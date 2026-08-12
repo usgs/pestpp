@@ -1233,6 +1233,109 @@ static void test_instruction_file_partial_remaining_branches()
  * So the test is not really about the observations - it is about everything that must NOT
  * have changed.
  */
+/* The message a RunStorage failure throws must identify WHAT went wrong.
+ *
+ * Written after the third CI investigation in a row stalled on the same string. A macOS run
+ * failed with exactly "RunStorage::get_run_status_native() stream not good" after 200 model
+ * runs had completed successfully - and that message cannot distinguish a truncated file from a
+ * bad offset from a disk error, so there was nothing to act on and nothing reproduced locally.
+ *
+ * These failures are rare and machine-dependent, so the thrown message is the ONLY evidence
+ * anyone will ever have. This test induces the failure that CI keeps hitting - a storage file
+ * shorter than its own run counter claims - and asserts the message carries the facts needed to
+ * recognise it: the file, the record, where we looked, how big the file actually is, and the
+ * counter-versus-records mismatch that names the culprit.
+ */
+static void test_run_storage_error_diagnostics()
+{
+    cout << "[run storage: a failure says WHAT failed, not just that something did]" << endl;
+    const string stor = "selftest_diag.rns";
+    remove(stor.c_str());
+    vector<string> pnames{"P1", "P2"}, onames{"O1", "O2", "O3"};
+
+    RunStorage rs(stor);
+    rs.reset(pnames, onames, stor);
+    Parameters pars;
+    pars.insert("P1", 1.0);
+    pars.insert("P2", 2.0);
+    for (int i = 0; i < 4; ++i)
+        rs.add_run(pars, "run", 0.0);
+    CHK(rs.get_nruns() == 4, "four runs were added");
+    // NOT free_memory(): that closes the stream and REMOVES the file. Reading the bytes back
+    // through a separate stream leaves the storage on disk to be truncated.
+
+    // Truncate to the header plus one record: the counter still says 4, the file holds 1. This
+    // is the shape of the CI failure - check_rec_id() passes because the COUNTER is fine, and
+    // then the read runs off the end of a file nobody noticed was short.
+    {
+        ifstream in(stor, ios_base::binary);
+        CHK(in.good(), "the storage file should be readable");
+        vector<char> all((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+        in.close();
+        CHK(all.size() > 0, "the storage file should be non-empty");
+        ofstream out(stor, ios_base::binary | ios_base::trunc);
+        // two thirds is arbitrary but lands mid-record-set, which is the realistic case
+        out.write(all.data(), (streamsize)(all.size() * 2 / 3));
+    }
+
+    string msg;
+    try
+    {
+        // init_restart() may itself detect the truncation - it walks the records looking for
+        // where to resume - so it is inside the try. Either entry point must diagnose.
+        RunStorage rs2(stor);
+        rs2.init_restart(stor);
+        for (int i = 0; i < 4; ++i)
+        {
+            Parameters p;
+            Observations o;
+            rs2.get_run(i, p, o);
+        }
+    }
+    catch (const exception &e)
+    {
+        msg = e.what();
+    }
+
+    CHK(!msg.empty(), "reading past the end of a truncated storage file should throw");
+    if (!msg.empty())
+    {
+        cout << "  diagnostic: " << msg << endl;
+        // each of these is a question that had to be answered by guesswork before
+        CHK(msg.find(stor) != string::npos,
+            "the message must name the FILE: " + msg);
+        CHK(msg.find("run_id=") != string::npos,
+            "the message must name the RECORD it was reading: " + msg);
+        CHK(msg.find("target_pos=") != string::npos,
+            "the message must say WHERE in the file it looked: " + msg);
+        CHK(msg.find("file_size=") != string::npos,
+            "the message must give the ACTUAL file size, or a short file is invisible: " + msg);
+        CHK(msg.find("state=") != string::npos,
+            "the message must give the stream state bits - eof alone means a short file: " + msg);
+        // the decisive one: counter says 4, file holds fewer
+        CHK(msg.find("MISMATCH") != string::npos,
+            "a file shorter than its own run counter must be called out explicitly: " + msg);
+    }
+
+    // and the helper must survive being asked about a file that is not there at all - a
+    // diagnostic that throws while diagnosing destroys the error it was explaining
+    remove(stor.c_str());
+    string msg2;
+    try
+    {
+        RunStorage rs3(stor);
+        Parameters p;
+        Observations o;
+        rs3.get_run(0, p, o);
+    }
+    catch (const exception &e)
+    {
+        msg2 = e.what();
+    }
+    CHK(!msg2.empty(), "reading from a missing storage file should throw, not crash");
+    remove(stor.c_str());
+}
+
 static void test_run_storage_partial_update()
 {
     cout << "[run storage: a partial write leaves the run status untouched]" << endl;
@@ -1548,6 +1651,7 @@ int main()
     test_model_interface_partial_across_files();
     test_instruction_file_partial_real_case();
     test_instruction_file_partial_remaining_branches();
+    test_run_storage_error_diagnostics();
     test_run_storage_partial_update();
     test_external_values_are_results();
     test_partial_read_refuses_stale_outputs();

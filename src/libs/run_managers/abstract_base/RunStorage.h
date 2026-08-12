@@ -142,6 +142,27 @@ private:
 	void check_rec_id(int run_id);
 	std::int8_t get_run_status_native(int run_id);
 	std::streamoff get_stream_pos(int run_id);
+
+	/** @brief Everything known about a failed stream operation, as one message.
+	 *
+	 * Every accessor used to fail with the same bare "<function>() stream not good", which
+	 * says only that something went wrong - not whether the file was short, the position was
+	 * past the end, the counter disagreed with the records, or the OS reported an error. These
+	 * failures show up in CI and do not reproduce, so the ONE chance to learn anything is the
+	 * message thrown at the moment it happens. This builds that message: the stream state bits,
+	 * where we were trying to read or write, how big the file actually is, the record geometry,
+	 * the run counter, and errno.
+	 *
+	 * Never throws and never reports failure of its own - a diagnostic that can fail while
+	 * diagnosing turns a bad error into no error at all. Anything it cannot determine is
+	 * reported as "?" instead.
+	 *
+	 * @param where     the calling function, e.g. "get_run_status_native"
+	 * @param run_id    the record being accessed, or -1 when the operation is not per-run
+	 * @param expected_pos  the byte offset the operation used, or -1 if not applicable
+	 */
+	std::string stream_diagnostic(const std::string &where, int run_id = -1,
+		std::streamoff expected_pos = -1) const;
 };
 
 #endif //RUN_STORAGE_H_
