@@ -3984,8 +3984,18 @@ ParameterSnapshot ParameterEnsemble::get_ctl_snapshot()
 
 	// the emitted order follows org_real_names, restricted to realizations still present
 	vector<string> ordered;
+	set<string> emitted;
 	for (auto rname : rnames)
 		if (real_map.find(rname) != end)
+		{
+			ordered.push_back(rname);
+			emitted.insert(rname);
+		}
+	// ...plus any live realization org_real_names has never heard of - mou renames every
+	// member each generation, so the survivors that were parents arent in there and were
+	// getting dropped, which left par_df() with fewer rows than obs_df()
+	for (auto rname : real_names)
+		if (emitted.find(rname) == emitted.end())
 			ordered.push_back(rname);
 
 	snap.values.resize(ordered.size(), snap.col_names.size());
