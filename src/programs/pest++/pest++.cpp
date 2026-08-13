@@ -243,13 +243,8 @@ int main(int argc, char* argv[]) {
 			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
 		}
 
-		if ((pest_scenario.get_pestpp_options().get_n_iter_super() != 0) ||
-			(pest_scenario.get_pestpp_options().get_n_iter_base() < 1000000) ||
-			(pest_scenario.get_pestpp_options().get_max_n_super() < 1000000)){
-			cout << "automatic SVD-Assist within pestpp-glm has been deprecated." << endl;
-			fout_rec << "automatic SVD-Assist within pestpp-glm has been deprecated." << endl;
-			throw runtime_error("SVD-Assist detected");
-		}
+		//the svd-assist options that used to be caught here are now refused by name when the
+		//control file is parsed - see get_retired_message() - so there is nothing left to check
 
 		RunManagerAbstract *run_manager_ptr;
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)

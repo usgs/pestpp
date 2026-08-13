@@ -358,38 +358,6 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 	if (err)
 		throw runtime_error("error in inputs...");
 
-	int n_base = get_pestpp_options().get_n_iter_base();
-	if (n_base == -1 || n_base > 0)
-	{
-	}
-	else
-	{
-		stringstream ss;
-		ss << "pest++ option 'n_iter_base' must either be -1 or greater than 0, not " << n_base;
-		f_rec << "pest++ option 'n_iter_base' must either be -1 or greater than 0, not " << n_base;
-		if (!forgive)
-			throw PestError(ss.str());
-	}
-
-	int n_super = get_pestpp_options().get_n_iter_super();
-	if (n_super < 0)
-	{
-		stringstream ss;
-		ss << "pest++ option 'n_iter_super' must be >= 0, not " << n_super;
-		f_rec << "pest++ option 'n_iter_super' must be >= 0, not " << n_super;
-		if (!forgive)
-			throw PestError(ss.str());
-	}
-
-	if ((n_base == -1) && (n_super == 0))
-	{
-		stringstream ss;
-		ss << "pest++ option 'n_iter_base' == -1 so 'n_iter_super' must be > 0, not " << n_super;
-		f_rec << "pest++ option 'n_iter_base' == -1 so 'n_iter_super' must be > 0, not " << n_super;
-		if (!forgive)
-			throw PestError(ss.str());
-	}
-
 	//check that prediction names are list in obs
 	if ((pestpp_options->get_uncert_flag()) && (pestpp_options->get_prediction_names().size() > 0))
 	{

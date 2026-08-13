@@ -391,21 +391,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 	arg_map[key] = value;
 		
 
-	if (key=="MAX_N_SUPER"){
-		convert_ip(value, max_n_super);
-
-	}
-	else if ((key=="SUPER_EIGTHRESH") || (key=="SUPER_EIGTHRES"))
+	//retired with svd-assist - see get_retired_message() in pest_options_registry.cpp, which
+	//carries the same refusal for the registry path.  Both paths must agree: self_verify()
+	//compares them option by option.
+	if ((key=="MAX_N_SUPER") || (key=="SUPER_EIGTHRESH") || (key=="SUPER_EIGTHRES") ||
+		(key=="N_ITER_BASE") || (key=="N_ITER_SUPER"))
 	{
-		passed_args.insert("SUPER_EIGTHRESH");
-		passed_args.insert("SUPER_EIGTHRES");
-		convert_ip(value, super_eigthres);
-	}
-	else if (key=="N_ITER_BASE"){
-		convert_ip(value, n_iter_base);
-	}
-	else if (key=="N_ITER_SUPER"){
-		convert_ip(value, n_iter_super);
+		throw runtime_error(PestppOptions::get_retired_message(key));
 	}
 	else if (key=="SVD_PACK"){
 
@@ -425,13 +417,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 		}
 	}
 		
-	else if (key == "SUPER_RELPARMAX"){
-		convert_ip(value, super_relparmax);
+	else if ((key == "SUPER_RELPARMAX") || (key == "MAX_SUPER_FRZ_ITER")){
+		throw runtime_error(PestppOptions::get_retired_message(key));
 	}
-	else if (key == "MAX_SUPER_FRZ_ITER"){
-		convert_ip(value, max_super_frz_iter);
-	}
-		
+
 	else if (key == "MAX_RUN_FAIL"){
 		convert_ip(value, max_run_fail);
 	}
@@ -527,8 +516,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 		glm_accept_mc_phi = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "GLM_REBASE_SUPER")
-	{	
-		glm_rebase_super = pest_utils::parse_string_arg_to_bool(value);
+	{
+		throw runtime_error(PestppOptions::get_retired_message(key));
 	}
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);
@@ -2047,12 +2036,6 @@ void PestppOptions::summary_legacy(ostream& os) const
     os << endl;
 
 	os << "...pestpp-glm specific options:" << endl;
-	os << "max_n_super: " << max_n_super << endl;
-	os << "super_eigthresh: " << super_eigthres << endl;
-	os << "n_iter_base: " << n_iter_base << endl;
-	os << "n_iter_super: " << n_iter_super << endl;;
-	os << "super_relparmax: " << super_relparmax << endl;
-	os << "max_super_frz_iter: " << max_super_frz_iter << endl;	
 	os << "max_reg_iter: " << max_reg_iter << endl;
 	os << "lambdas: ";
 	for (auto l : base_lambda_vec)
@@ -2084,31 +2067,10 @@ void PestppOptions::summary_legacy(ostream& os) const
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
-	os << "glm_rebase_super: " << glm_rebase_super << endl;
 	os << "glm_iter_mc: " << glm_iter_mc << endl;
 	os << "glm_high_2nd_iter_phi: " << glm_debug_high_2nd_iter_phi << endl;
 
-//	if (global_opt == OPT_DE)
-//	{
-//		os << "global_opt: de" << endl;
-//		os << "de_f: " << de_f << endl;
-//		os << "de_cr: " << de_cr << endl;
-//		os << "de_pop_size: " << de_npopulation << endl;
-//		os << "de_max_gen: " << de_max_gen << endl;
-//		os << "de_dither_f: " << de_dither_f << endl;
-//	}
-//
-//	if (global_opt == OPT_MOEA)
-//	{
-//		os << "global_opt: MOEA" << endl;
-//		os << "de_f: " << de_f << endl;
-//		os << "de_cr: " << de_cr << endl;
-//		os << "de_pop_size: " << de_npopulation << endl;
-//		os << "de_max_gen: " << de_max_gen << endl;
-//		os << "de_dither_f: " << de_dither_f << endl;
-//	}
-
-	os << endl << "...pestpp-swp options:" << endl;
+os << endl << "...pestpp-swp options:" << endl;
 	os << "sweep_parameter_csv_file: " << sweep_parameter_csv_file << endl;
 	os << "sweep_output_csv_file: " << sweep_output_csv_file << endl;
 	os << "sweep_chunk: " << sweep_chunk << endl;
@@ -2351,7 +2313,7 @@ void PestppOptions::set_defaults_legacy()
 {
 
 	set_svd_pack(PestppOptions::SVD_PACK::REDSVD);
-	set_super_relparmax(0.1);
+
 	
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
@@ -2360,17 +2322,6 @@ void PestppOptions::set_defaults_legacy()
 	set_random_seed(358183147);
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
-	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
-	set_de_cr(0.6);
-	set_de_f(0.7);
-	set_de_dither_f(true);
-	set_de_npopulation(40);
-	set_de_max_gen(100);
-	set_n_iter_super(0);
-	set_n_iter_base(1000000);
-	set_super_eigthres(1.0e-6);
-	set_max_n_super(1000000);
-	set_max_super_frz_iter(20);
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
 	set_glm_num_reals(0);
@@ -2379,7 +2330,6 @@ void PestppOptions::set_defaults_legacy()
 	set_glm_debug_lamb_fail(false);
 	set_glm_debug_real_fail(false);
 	set_glm_accept_mc_phi(false);
-	set_glm_rebase_super(false);
 	set_glm_iter_mc(false);
     set_glm_debug_high_2nd_iter_phi(false);
 	set_glm_hp_lambdas(false);

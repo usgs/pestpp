@@ -215,7 +215,6 @@ class PestppOptions {
 public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
-	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
 	enum class ToolType { GLM, IES, DA, MOU, SQP, OPT, SWEEP, GSA };
 	enum GLMNormalForm { IDENT,DIAG, PRIOR, HP };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
@@ -276,16 +275,10 @@ public:
 	bool assign_ies_value_by_key(const string& key, const string& value, const string& org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value, const string& org_value);
 
-	int get_max_n_super() const { return max_n_super; }
-	double get_super_eigthres() const { return super_eigthres; }
-	int get_n_iter_base() const { return n_iter_base; }
-	int get_n_iter_super() const { return n_iter_super; }
 	SVD_PACK get_svd_pack() const { return svd_pack; }
-	double get_super_relparmax() const { return super_relparmax; }
 	int get_max_run_fail() const { return max_run_fail; }
 
 
-	int get_max_super_frz_iter()const { return max_super_frz_iter; }
 	int get_max_reg_iter()const { return max_reg_iter; }
 	const vector<double>& get_base_lambda_vec() const { return base_lambda_vec; }
 	void set_base_lambda_vec(vector<double> _vals) { base_lambda_vec = _vals; }
@@ -294,26 +287,8 @@ public:
 	bool get_iter_summary_flag() const { return iter_summary_flag; }
 	bool get_der_forgive() const { return der_forgive; }
 	void set_der_forgive(bool _flag) { der_forgive = _flag; }
-	GLOBAL_OPT get_global_opt() const { return global_opt; }
-	double get_de_f() const { return de_f; }
-	void set_de_f(double _val) { de_f = _val; }
-	double get_de_cr() const { return de_cr; }
-	void set_de_cr(double _val) { de_cr = _val; }
-	int get_de_npopulation() const { return de_npopulation; }
-	void set_de_npopulation(int _val) { de_npopulation = _val; }
-	int get_de_max_gen() const { return de_max_gen; }
-	void set_de_max_gen(int _val ) { de_max_gen = _val; }
-	bool get_de_dither_f() const { return de_dither_f; }
-	void set_de_dither_f(bool _val) {de_dither_f = _val; }
-	void set_global_opt(const GLOBAL_OPT _global_opt) { global_opt = _global_opt; }
-	void set_max_n_super(int _max_n_super) { max_n_super = _max_n_super; }
-	void set_super_eigthres(double _super_eigthres) { super_eigthres = _super_eigthres; }
-	void set_n_iter_base(int _n_iter_base) { n_iter_base = _n_iter_base; }
-	void set_n_iter_super(int _n_iter_super) { n_iter_super = _n_iter_super; }
 	void set_svd_pack(const SVD_PACK _svd_pack) { svd_pack = _svd_pack; }
-	void set_super_relparmax(double _super_relparmax) { super_relparmax = _super_relparmax; };
 	void set_max_run_fail(int _max_run_fail) { max_run_fail = _max_run_fail; }
-	void set_max_super_frz_iter(int n) { max_super_frz_iter = n; }
 	void set_max_reg_iter(int n) { max_reg_iter = n; }
 	void set_iter_summary_flag(const bool _iter_summary_flag) { iter_summary_flag = _iter_summary_flag; }
 	void set_uncert_flag(bool _flag) { uncert = _flag; }
@@ -338,8 +313,6 @@ public:
 	void set_glm_debug_real_fail(bool _flag) { glm_debug_real_fail = _flag; }
 	bool get_glm_accept_mc_phi() const { return glm_accept_mc_phi; }
 	void set_glm_accept_mc_phi(bool _flag) { glm_accept_mc_phi = _flag; }
-	bool get_glm_rebase_super() const { return glm_rebase_super; }
-	void set_glm_rebase_super(bool _flag) { glm_rebase_super = _flag; }
     bool get_glm_iter_mc() const { return glm_iter_mc; }
     void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
     bool get_glm_debug_high_2nd_iter_phi() const {return glm_debug_high_2nd_iter_phi;}
@@ -876,14 +849,8 @@ private:
 	bool options_initialized = false;
 	std::vector<std::string> init_only_change_warnings;
 	bool forgive_unknown_args;
-	int n_iter_base;
-	int n_iter_super;
-	int max_n_super;
-	double super_eigthres;
 	SVD_PACK svd_pack;
-	double super_relparmax;
 	int max_run_fail;
-	int max_super_frz_iter;
 	int max_reg_iter;
 	int glm_num_reals;
 	GLMNormalForm glm_normal_form;
@@ -891,7 +858,6 @@ private:
 	bool glm_debug_lamb_fail;
 	bool glm_debug_real_fail;
 	bool glm_accept_mc_phi;
-	bool glm_rebase_super;
 	bool glm_iter_mc;
 	bool glm_debug_high_2nd_iter_phi;
 	bool glm_hp_lambdas;
@@ -936,13 +902,6 @@ private:
 	bool sweep_base_run;
 	bool sweep_include_regul_phi;
 
-	GLOBAL_OPT global_opt;
-	string moea_name;
-	double de_f;
-	double de_cr;
-	int de_npopulation;
-	int de_max_gen;
-	bool de_dither_f;
 
 	string opt_obj_func;
     string org_opt_obj_func;

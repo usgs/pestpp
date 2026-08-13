@@ -35,34 +35,10 @@ struct OptionSpec {
 const std::vector<OptionSpec>& PestppOptions::get_option_registry()
 {
     static const std::vector<OptionSpec> R = {
-    OptionSpec{ "MAX_N_SUPER", {}, OptType::INT, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_max_n_super(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_max_n_super(1000000); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_max_n_super()); } },
-    OptionSpec{ "SUPER_EIGTHRESH", {"SUPER_EIGTHRES"}, OptType::DOUBLE, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_super_eigthres(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_super_eigthres(1.0e-6); },
-        [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_super_eigthres(); return ss.str(); } },
-    OptionSpec{ "N_ITER_BASE", {}, OptType::INT, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_n_iter_base(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_n_iter_base(1000000); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_n_iter_base()); } },
-    OptionSpec{ "N_ITER_SUPER", {}, OptType::INT, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_n_iter_super(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_n_iter_super(0); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_n_iter_super()); } },
     OptionSpec{ "SVD_PACK", {}, OptType::CUSTOM, "general", false,
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ if(value=="PROPACK"){cout<<"++SVD_PACK(PROPACK) is deprecated, resorting to REDSVD"<<endl;o.set_svd_pack(PestppOptions::REDSVD);}else if(value=="REDSVD")o.set_svd_pack(PestppOptions::REDSVD);else if(value=="EIGEN"||value=="JACOBI")o.set_svd_pack(PestppOptions::EIGEN);else return PestppOptions::ARG_STATUS::ARG_INVALID; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_svd_pack(PestppOptions::SVD_PACK::REDSVD); },
         [](const PestppOptions& o)->string{ switch(o.get_svd_pack()){case PestppOptions::PROPACK:return "propack";case PestppOptions::REDSVD:return "redsvd";default:return "eigen";} } },
-    OptionSpec{ "SUPER_RELPARMAX", {}, OptType::DOUBLE, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_super_relparmax(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_super_relparmax(0.1); },
-        [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_super_relparmax(); return ss.str(); } },
-    OptionSpec{ "MAX_SUPER_FRZ_ITER", {}, OptType::INT, "general", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_max_super_frz_iter(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_max_super_frz_iter(20); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_max_super_frz_iter()); } },
     OptionSpec{ "MAX_RUN_FAIL", {}, OptType::INT, "general", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_max_run_fail(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_max_run_fail(3); },
@@ -123,10 +99,6 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_glm_accept_mc_phi(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_glm_accept_mc_phi(false); },
         [](const PestppOptions& o)->string{ return std::to_string(o.get_glm_accept_mc_phi()?1:0); } },
-    OptionSpec{ "GLM_REBASE_SUPER", {}, OptType::BOOL, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_glm_rebase_super(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_glm_rebase_super(false); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_glm_rebase_super()?1:0); } },
     OptionSpec{ "OVERDUE_RESCHED_FAC", {}, OptType::DOUBLE, "general", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_overdue_reched_fac(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_overdue_reched_fac(1.15); },
@@ -223,34 +195,6 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++MAT_INV is deprecated (JtQJ is the only form now supported) and no longer supported...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions&){},
         [](const PestppOptions& o)->string{ return "(deprecated)"; } },
-    OptionSpec{ "GLOBAL_OPT", {}, OptType::CUSTOM, "general", false,
-        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ if(value=="DE")o.set_global_opt(PestppOptions::OPT_DE);else if(value=="MOEA")o.set_global_opt(PestppOptions::OPT_MOEA);else throw runtime_error(value+"is not a supported global optimization option"); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_global_opt(PestppOptions::GLOBAL_OPT::NONE); },
-        [](const PestppOptions& o)->string{ switch(o.get_global_opt()){case PestppOptions::OPT_DE:return "de";case PestppOptions::OPT_MOEA:return "moea";default:return "none";} } },
-    OptionSpec{ "MOEA_NAME", {}, OptType::CUSTOM, "general", false,
-        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ convert_ip(value,o.moea_name); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.moea_name=string(); },
-        [](const PestppOptions& o)->string{ return o.moea_name; } },
-    OptionSpec{ "DE_F", {}, OptType::DOUBLE, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_de_f(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_de_f(0.7); },
-        [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_de_f(); return ss.str(); } },
-    OptionSpec{ "DE_CR", {}, OptType::DOUBLE, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_de_cr(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_de_cr(0.6); },
-        [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_de_cr(); return ss.str(); } },
-    OptionSpec{ "DE_POP_SIZE", {}, OptType::INT, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_de_npopulation(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_de_npopulation(40); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_de_npopulation()); } },
-    OptionSpec{ "DE_MAX_GEN", {}, OptType::INT, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ int x; convert_ip(value,x); o.set_de_max_gen(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_de_max_gen(100); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_de_max_gen()); } },
-    OptionSpec{ "DE_DITHER_F", {}, OptType::BOOL, "glm", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ o.set_de_dither_f(pest_utils::parse_string_arg_to_bool(value)); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_de_dither_f(true); },
-        [](const PestppOptions& o)->string{ return std::to_string(o.get_de_dither_f()?1:0); } },
     OptionSpec{ "OPT_OBJ_FUNC", {"OPT_OBJECTIVE_FUNCTION"}, OptType::CUSTOM, "opt", false,
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ convert_ip(value,o.opt_obj_func); o.org_opt_obj_func=org_value; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_opt_obj_func(string()); o.set_org_opt_obj_func(string()); },
@@ -1171,6 +1115,15 @@ string PestppOptions::get_retired_message(const string& name)
         return "++de_pop_size has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou: ++mou_population_size.";
     if (key == "DE_MAX_GEN")
         return "++de_max_gen has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou and set noptmax to the number of generations.";
+    //svd-assist went the same way.  pestpp-glm stopped forming super parameters a long time
+    //ago - it threw "SVD-Assist detected" at startup if any of these were set - so the options
+    //were doing nothing except making the manual promise a feature that isnt there.
+    if ((key == "N_ITER_SUPER") || (key == "N_ITER_BASE") || (key == "MAX_N_SUPER") ||
+        (key == "SUPER_EIGTHRESH") || (key == "SUPER_EIGTHRES") || (key == "SUPER_RELPARMAX") ||
+        (key == "MAX_SUPER_FRZ_ITER") || (key == "GLM_REBASE_SUPER"))
+        return "++" + lower_cp(key) + " has been retired along with svd-assist in pestpp-glm. "
+               "Super parameters are no longer formed. For dimension reduction, use "
+               "pestpp-ies, or reduce the parameterization itself.";
     if (key == "SQP_RISK")
         return "++sqp_risk has been retired. It was both a risk value AND the switch that "
                "selected ensemble-based shifting, so it silently overrode opt_risk. Use "
@@ -1331,10 +1284,10 @@ bool PestppOptions::self_verify(ostream& os)
         {OptType::STRING,"TestFile.csv"}, {OptType::VEC_DOUBLE,"1.0,2.0"},
         {OptType::VEC_INT,"1,2"}, {OptType::VEC_STRING,"a,b"} };
     map<string,string> custom_probe = {
-        {"SVD_PACK","REDSVD"},{"GLM_NORMAL_FORM","PRIOR"},{"GLOBAL_OPT","DE"},
+        {"SVD_PACK","REDSVD"},{"GLM_NORMAL_FORM","PRIOR"},
         {"OPT_DIRECTION","MAX"},{"OPT_OBJ_FUNC","obj"},{"OPT_CHANCE_POINTS","ALL"},
         {"IES_RUN_REALNAME","base"},{"MOU_ENV_SELECTOR","nsga"},{"MOU_MATING_SELECTOR","tournament"},
-        {"MOU_PSO_DV_BOUND_HANDLING","reflect"},{"MOU_RESAMPLE_COMMAND","cmd"},{"MOEA_NAME","de"},
+        {"MOU_PSO_DV_BOUND_HANDLING","reflect"},{"MOU_RESAMPLE_COMMAND","cmd"},
         {"UPGRADE_AUGMENT","1"},{"UPGRADE_BOUNDS","1"},{"AUTO_NORM","1"},{"MAT_INV","1"} };
     for (const auto& s : get_option_registry())
     {
