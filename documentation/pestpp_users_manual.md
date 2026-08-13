@@ -173,9 +173,32 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [5.3.3 Running PESTPP-XXX as Manager and Agent](#s9-3-3)
         - [5.3.4 Run Management Record File](#s9-3-4)
         - [5.3.5 Run Management Control Variables](#s9-3-5)
+            - [5.3.5.1 Model Run Preemption](#s9-3-5-1)
+            - [5.3.5.2 overdue_resched_fac()](#s9-3-5-2)
+            - [5.3.5.3 overdue_giveup_fac()](#s9-3-5-3)
+            - [5.3.5.4 overdue_giveup_minutes()](#s9-3-5-4)
+            - [5.3.5.5 max_run_fail()](#s9-3-5-5)
+            - [5.3.5.6 panther_agent_restart_on_error()](#s9-3-5-6)
+            - [5.3.5.7 panther_agent_no_ping_timeout_secs()](#s9-3-5-7)
+            - [5.3.5.8 panther_agent_freeze_on_fail()](#s9-3-5-8)
+            - [5.3.5.9 panther_echo()](#s9-3-5-9)
+            - [5.3.5.10 num_tpl_ins_threads](#s9-3-5-10)
+            - [5.3.5.11 pest.stp](#s9-3-5-11)
+            - [5.3.5.12 panther_transfer_on_finish/panther_transfer_on_fail](#s9-3-5-12)
+            - [5.3.5.13 panther_poll_interval](#s9-3-5-13)
+            - [5.3.5.14 panther_persistent_workers](#s9-3-5-14)
+            - [5.3.5.15 panther_master_timeout_milliseconds](#s9-3-5-15)
+            - [5.3.5.16 panther_master_echo_interval_milliseconds](#s9-3-5-16)
+            - [5.3.5.17 panther_ping_interval_secs()](#s9-3-5-17)
+            - [5.3.5.18 condor_submit_file()](#s9-3-5-18)
+            - [5.3.5.19 save_all_runs()](#s9-3-5-19)
+            - [5.3.5.20 preemption_poll_interval_minutes()](#s9-3-5-20)
+            - [5.3.5.21 panther_worker_partial_obs_command()](#s9-3-5-21)
+            - [5.3.5.22 panther_worker_status_file()](#s9-3-5-22)
     - [5.4 Run Book-Keeping Files](#s9-4)
         - [5.4.1 Failed Run Storage File](#s9-4-1)
         - [5.4.2 All Runs Storage File](#s9-4-2)
+    - [5.5 PEST++ API](#s9-4-3)
 - [6. PESTPP-GLM](#s10)
     - [6.1 Introduction](#s10-1)
     - [6.2 Highly Parameterized Inversion](#s10-1b)
@@ -321,6 +344,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [14.3.2 Control Variables in the PEST Control File](#s17-3-2)
         - [14.3.3 PEST++ Control Variables](#s17-3-3)
 - [15. References](#s18)
+
 
 
 
@@ -1251,6 +1275,9 @@ If, in the course of the inversion process, PESTPP-GLM assigns to a parameter a 
 
 Problems associated with imposing change limits on relative- or factor-limited parameters when their values become very low can sometimes be prevented by providing them with suitable OFFSET values in the “parameter data” section of the PEST control file. Naturally, their upper and lower bounds must also be appropriately offset.
 
+A given *random_seed* now reproduces PEST++ results across Windows, Linux and macOS. The Mersenne twister engine that PEST++ seeds is specified bit-for-bit by the C++ standard, but the standard library facilities built on top of it are not: the shuffling algorithm in particular consumes the engine differently on each of the three standard C++ libraries, so identical engine state produced entirely different permutations. PESTPP-MOU now shuffles through its own integer arithmetic, which removes that source of divergence.
+
+
 ## <a id='s7-3' />3.3 Calculation of Derivatives
 
 ### <a id='s7-3-1' />3.3.1 General
@@ -1351,7 +1378,7 @@ Uses to which a JCO file may be put include the following.
 
 Most programs of the PEST and PEST++ suites minimize a least-squares objective function. This is calculated as the sum of squared weighted differences between measurements (or prior information equations) and corresponding model outputs. The difference between a measurement and a model output to which it corresponds is referred to as a residual. Let the *i*<sup>th</sup> residual be designated as *r<sub>i</sub>*. Let the weight associated with the *i*<sup>th</sup> observation (which may be a prior information equation) be designated as *w<sub>i</sub>*. Then the objective function Φ is calculated as
 
-![](./media/image3.wmf) (3.3)
+Φ = Σ<sub>*i*</sub>(*w<sub>i</sub>r<sub>i</sub>*)<sup>2</sup> (3.3)
 
 Obviously, if an observation is ascribed a weight of zero, then the residual associated with that observation makes no contribution to the total objective function. An observation can therefore be removed from an inversion process by assigning it a weight of zero. This provides a far easier mechanism for removal of an observation from the calibration dataset than that of re-building the PEST control file (and the pertinent instruction file) with this observation absent.
 
@@ -2181,6 +2208,8 @@ Each of the programs comprising the PEST++ suite requires its own control variab
 
 Any line in a PEST control file that begins with the character string “++” is ignored by PEST-suite programs, and by PESTCHEK. However, programs of the PEST++ suite read these lines, expecting to find one or more keywords.
 
+Some keywords that were once recognised are now deprecated. A deprecated keyword is accepted and then ignored, and the fact that it was ignored is reported on the screen and in the run record file, so that an existing PEST control file can still be read without editing. The keywords in this position are *auto_norm*, *mat_inv*, *upgrade_augment*, *upgrade_bounds*, and the SVD-assist keywords *n_iter_base*, *n_iter_super*, *max_n_super*, *super_eigthresh*, *super_relparmax*, *max_super_frz_iter* and *glm_rebase_super*. A smaller number of keywords have been retired outright, because ignoring them would quietly do something other than what was asked; these are refused by name, with a message saying what replaced them.
+
 Figure 4.12 shows a PEST control file that includes the values of some PEST++ control variables (and a comment line). Wherever a PEST++ keyword is supplied, one or more values for the control variable that is associated with that keyword must follow it in brackets. Where more than one value is associated with a keyword, these values must be comma-delimited within the brackets. More than one keyword can be supplied on a “++” line. If so, they must be separated by one or more whitespace characters.
 
 <div style="text-align: left"><table>
@@ -2499,57 +2528,117 @@ As has already been discussed, on commencement of execution PESTPP-XXX reads a P
 
 As was discussed in section 4.17, the value of a PEST++ control variable must be supplied as an argument to a keyword. It must be surrounded by brackets immediately following the keyword that announces its presence.
 
-**overdue_resched_fac()**
+#### <a id='s9-3-5-1' />5.3.5.1 Model Run Preemption
+
+In the case of slow running models (potentially in cloud environments where money is being spent), users may not want to wait for runs to finish if it is obvious the run is not going to useful or successful.  The problem is detecting useful/succesful before the run finishes, which leads to the concept of "preemption", where a run is terminated early when an indication of it not being useful is available.  The parallel run manager in PEST++ supports this concept in the following ways:
+
+ - "partial obsevations" processing:  The workers attached to the manager can try to process the output files using the instruction files while the model is still executing.  This attempt will obviously not be able to read all control file observations successfully, but it may be able to read some.  The successfully read observations are transferred back to the manager and stored in the binary runstorage file (unsuccessfully processed outputs are assigned an obvious null value)
+ - "drop_violations": PESTPP-IES, PESTPP-DA, PESTPP-MOU, and PESTPP-sqp support a special observation data column named "drop_violations", that when used in conjunction with the inequality observation group naming scheme, is used to identify a model run result that is unacceptable.  If a partial observation request returns a value for an observation that has been nominated as a "drop_violation" type, the manager will programmatically preempt that model run.  An example might be monitoring the MODFLOW-6 water budget and dropping any model run that has a budget error greater than 5%.  Since MODFLOW-6 writes the CSV budget file after each output time, if a run is struggling, it can be detected early in the model run and preempted, rather than waiting until the run is complete.
+ - panther_worker_partial_obs_command: A seperate, possibly fault tolerant system command to try to process available model outputs into the form that an instruction file will read.  this command is issued locally on the worker just before the attempt to read partial observations is made.  If the command is unsuccessful, it does not affect the current run or the worker.
+- preemption_poll_interval_minutes: How frequently the master should request partial observations for the workers with a current active run.
+- pest.stp extensions for supporting interactive preemption
+- PEST++ API for supporting interactive preemption
+
+#### <a id='s9-3-5-2' />5.3.5.2 overdue_resched_fac()
+
 Suppose that the value of *overdue_resched_fac()* is supplied as *r*, where *r* is a real number. If the run manager is still awaiting completion of a simulation that has already been running for more than *r* times the average model run time (calculated on the basis of previous successful runs), then it will ask another agent to start the same run if one is available. The maximum number of concurrent runs that employ the same set of parameters is set by the *max_run_fail()* control variable (this variable is further discussed below). The re-running of a simulation using another agent is done as a precautionary measure. It guards against the possibility that the computer on which the delayed model run is executing has become busy with other tasks. A competition is started between agents. The first of the concurrent model runs to finish successfully is accepted; meanwhile, the remaining concurrent model run (or runs) is terminated by PESTPP-XXX. Note, however, that if *max_run_fail()* is set to 1, concurrent model run scheduling is not undertaken.
 
 The value supplied for the *overdue_resched_fac()* variable must be a real number that is 1.0 or greater. Its default value is 1.15; this is the value which the run manager uses if you do not supply a value for this control variable yourself. A value greater than 1.15 may be desirable in circumstances where the time required for completion of a simulation is sensitive to parameter values.
 
-**overdue_giveup_fac()**
+#### <a id='s9-3-5-3' />5.3.5.3 overdue_giveup_fac()
+
 The value of *overdue_giveup_fac()* is also a real number. Suppose that it is *r*. If an overdue simulation has already taken *r* times the average model run time but is still not complete, then the run manager declares the run to have failed. It instructs the agent that is supervising the run to kill it. The agent is then free to supervise another model run based on another set of parameters. Handling of run failure by programs of the PEST++ suite is discussed in more detail below. The default value for *overdue_giveup_fac()* is 100.0 for all programs in the suite except for PESTPP-IES, which uses a default value of 2.0.
 
-**overdue_giveup_minutes()**
+#### <a id='s9-3-5-4' />5.3.5.4 overdue_giveup_minutes()
+
 This control variable can be used to place a “hard” upper bound on the acceptable model run time. The value supplied for *overdue_giveup_minutes()*must be a real number. Suppose that it is *r*. Then a model run is deemed to have failed if it has been executing for more than *r* minutes. This model run time criterion works as an “or” condition with *overdue_giveup_fac()*; if the duration of a given model run exceeds *overdue_giveup_minutes()* or *overdue_giveup_fac()* times the average model run time, it is marked as a failure. The default value for *overdue_giveup_fac()* is 1.0E+30, this effectively disabling it.
 
-**max_run_fail()**
+#### <a id='s9-3-5-5' />5.3.5.5 max_run_fail()
+
 A model run is declared to have failed if PESTPP-WRK cannot read one or more of the model’s output files. Excessive execution time can also be deemed as model run failure, as discussed above. Run failure is normally an outcome of model hostility to the set of parameters with which it was provided. However, sometimes it can be caused by external problems that are not the model’s fault, for example operating system quirks or network failure. Hence, the parallel run manager can be instructed to attempt a failed model run again using another agent. However, only a certain number of model run failures can be tolerated. This “certain number” (an integer) must be supplied as the value of the *max_run_fail()* control variable. A value of 1 is used to request no repetition of model runs. The default value of 3 is used for all programs except PESTPP-IES, which uses a default value of 1.
 
 As discussed above, *max_run_fail()* is also used to control the number of concurrent runs that are allowed when the *overdue_resched_fac()* criterion is exceeded.
 
-**panther_agent_restart_on_error()**
+#### <a id='s9-3-5-6' />5.3.5.6 panther_agent_restart_on_error()
+
 In certain Wide Area Network (WAN) environments, manager-agent communications can become “broken”, or “half-open”, where one side does not know that the other has closed the connection. This can happen with TCP/IP connections when there are long periods of no communication, such as during extended periods when the PEST++ manager is busy calculating parameter upgrades or undertaking localization calculations in PESTPP-IES. To help alleviate this, a discrete run manager ping thread is invoked which pings agents at least once every two minutes when the run manager is idle (i.e., when the manager is not communicating with agents as they undertake model runs but is busy doing other intensive calculations). In addition, agents can optionally be restarted in the case that communication errors still occur, instead of terminating or remaining in a half-open state. By default, this option is activated (i.e., it is set to *true)* but can be inactivated using the ++*panther_agent_restart_on_error(false)* control variable.
 
-**panther_agent_no_ping_timeout_secs()**
+#### <a id='s9-3-5-7' />5.3.5.7 panther_agent_no_ping_timeout_secs()
+
 Related to the above agent restart option, agent can be instructed to terminate (if *panther_agent_restart_on_error()* is set to *false*) or restart (if *panther_agent_restart_on_error()* is set to *true*), if no ping message has been received from the run manager in more than a specified time interval. This interval is configurable in seconds via the *panther_agent_no_ping_timeout_secs()* control variable, with a default value of 300 (i.e., 5 minutes).
 
-**panther_agent_freeze_on_fail()**
+#### <a id='s9-3-5-8' />5.3.5.8 panther_agent_freeze_on_fail()
+
 In some settings, when starting to use PEST++, it can be difficult to debug why runs may be failing in a parallel run environment. This is especially true when agents are on separate physical hosts, which can make monitoring agent progress difficult and when a run fails, the panther run manager will immediate try to schedule another run on that same agent, which will cause the template files to be rewritten (nearly immediately) and any temporary files to be erased, making it nearly impossible to investigate the cause of the run failure. If users want to “slow down the process” so they debug run failures, adding *panther_agent_freeze_on_fail* as *true* to a (agent) control file will cause a agent to “freeze” on the occurrence of a run failure. This freeze can only be undone by forcing the agent to exit and restarting it, but, nevertheless, freezing a agent when a run failure occurs can be very useful to diagnosing issues related to parallelization of the PEST++ process because it allows direct inspection of all (temporary) files related to the failed run.
 
-**panther_echo()**
+#### <a id='s9-3-5-9' />5.3.5.9 panther_echo()
+
 If users are piping the master instance stdout and stderr to a file (through a redirect), then the panther master run summary, which echoes to the file with a line return to overwrite the output (in place using a carriage return), can fill up these file because the carriage return character is ignored or converted to a line return. In this case, suppling *panther_echo(false)* will turn off this stdout updating during the run sequence. Users can still inspect the run management process through the run management record.
 
-**num_tpl_ins_threads**
+#### <a id='s9-3-5-10' />5.3.5.10 num_tpl_ins_threads
+
 When using the PEST++ tools for very high-dimensional problems, the time required to process template and/or instruction files can be considerable. To speed things up, the parallel agents can multithread these input and output processing operations. By default, only one thread is used and the number of threads to use is controlled by the *num_tpl_ins_threads* arg. Note that the number of threads used to process template and/or instruction files is set to the minimum of the number files and the value of *num_tpl_ins_threads*. Also note that using multithreading to process template and/or instruction files can consume significantly more memory and clock cycles.
 
-**pest.stp**
+#### <a id='s9-3-5-11' />5.3.5.11 pest.stp
+
 Sometimes, users may want to stop a pest++ tool at a certain stage of the algorithm. Of course, you can use the ctrl+c, but this option will quit (nearly) immediately without recording any results regarding the current stage of the algorithm. For example, during an ensemble evaluation for pestpp-ies or pestpp-da, users may not want to wait for one or more (really) slow model runs to finish, but still want the results of the completed runs to be written to files. In this case, users can place a file named “pest.stp” (case sensitive – use lower case!) in the directory where PESTPP-XXX master is running and the first line of “pest.stp” should have a “1” or a “2” as the first whitespace-delimited token on the first line. If this file is found and meets the first-token requirement, then the PESTPP-XXX master instance will exit gracefully. If the file’s presence is detected during run management, all remaining runs (queued or being run) are marked as fails (supported by both parallel and serial run manager). Then the algorithm records any relevant results are recorded and the pestpp-xxx exits gracefully.
 
 Alternatively, users may want to the run manager to stop waiting on one or more runs that are progressing slowly but don’t want to quit running the pestpp-xxx tool. In this case, users can create the “pest.stp” file and put a “4” as the first whitespace-delimited token on the first line. In the case, the run manager will mark any remaining runs as fails and return control to the calling program. This program will then continue its execution and remove the pest.stp file. In this way, the next time the run manager is called, the pest.stp file is gone and execution will continue.
 
-**panther_transfer_on_finish/panther_transfer_on_fail**
+Two further values are supported exclusive by the parallel run manager and they are related to model run preemption described elsewhere in this guide. They do not stop anything; they act on the batch of runs that is in progress.
+
+A “5” as the first token in pest.stp file asks every agent that is currently running a model for whatever model outputs can be read so far, exactly as the *preemption_poll_interval_minutes* polling does (section 5.3.5). The runs are not disturbed. The manager reports how many agents were asked, and “pest.stp” is removed so that the request is not repeated on the next pass of the scheduling loop.  Following this operation, the current partial observations are written into the runstorage file, which can be processed by pyEMU. 
+
+A “6” in the pest.stp file is used to communicate to the run manager a specific model run that a users wants to have abandoned.  So a “6” followed by a whitespace and then a second integer that is a “runid”, as defined in the runstorage file and in the run management record file, for example “6 41”, kills that one run and abandons it. This is the surgical form of the “4” command: where “4” gives up on every outstanding run, “6” gives up on the one run that is holding everything else up. A “6” with no run identifier after it is reported and ignored.
+
+#### <a id='s9-3-5-12' />5.3.5.12 panther_transfer_on_finish/panther_transfer_on_fail
+
 In some cases, users may want to retrieve one or more model output files from the agent working directories and collect those files in the master directory. For example, users may want an entire model output binary file for further processing after a successful model run. Or, if a model run fails to complete, users may wish to see certain model input/output files to diagnose issues. In a parallel run setting, both of these tasks can be difficult to complete. To support these use cases, the PEST++ tools allow transferring files from the agent directories to the master directory through the *panther_transfer_on_finish* and *panther_transfer_on_fail* options. Both of these options can be supplied as comma-separated lists of files or single file names. After successful completion or run failure, respectively, the panther run manager will transfer the nominated files found in the agent control file to the master working directory. This is worth saying again – the values of *panther_transfer_on_finish* and *panther_transfer_on_fail* listed in the agent’s control file are transferred to the master. This approach allows users to potentially transfer different files from each agent. To avoid naming conflicts in the master directory, the name of the file saved in the master directory is prepended with a unique tag staring with “ftx\_” and a counter. Additional metadata information including agent hostname, agent working directory, run manager run id value, run manager group id value and run manager information text (this information text usually includes information like realization name from pestpp-ies/pestpp-da and parameter name for Jacobian filling and global sensitivity analysis) are added to the run management record file along with the unique “ftx\_” tag, to that users can piece together which agent and in what context a file originated. Users are encouraged to study the .rmr file because it lists several valuable pieces of information regarding any file transfers.
 
-**panther_poll_interval**
+#### <a id='s9-3-5-13' />5.3.5.13 panther_poll_interval
+
 Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an integer value of seconds to sleep. By default, this value is 1 second.
 
-**panther_persistent_workers**
+#### <a id='s9-3-5-14' />5.3.5.14 panther_persistent_workers
+
 Part of the run management design for panther is that workers persist for the duration of any long-term PESTPP run. All PESTPP-XXX programs have iterative steps involved that can result in idle workers at some times. With long and potentially variable runtimes the worker idle time can be significant. As users start to pay for cloud resources, for example, that idle time can be wasteful. *panther_persistent_workers* is a Boolean parameter (default value is True) that, if False, will shut down workers when no more forward runs are requested. This decreases idle time of workers but also requires users to manually restart workers for the next batch of forward runs as, at completion of a batch, all workers will be shut down. It is recommended to set *panther_master_timeout_milliseconds* to a higher value (\>=1000) if setting *panther_persistent_workers* to False to prevent overloading the master.
 
 
-**panther_master_timeout_milliseconds**
+#### <a id='s9-3-5-15' />5.3.5.15 panther_master_timeout_milliseconds
+
 In situations where the forward model runtime is very short, it is advantageous to have the panther master be as responsive as possible. But in other situations, where network traffic is heavy and latency is high, it is important for the panther master to be patience when communicating with workers. The *panther_master_timeout_milliseconds* option controls how quickly the panther master responds to requests. The default is 500 milliseconds. If users are experiencing “deadlock” on the master, you may need to increase the value.
 
-**panther_master_echo_interval_milliseconds**
+#### <a id='s9-3-5-16' />5.3.5.16 panther_master_echo_interval_milliseconds
+
 In situations where the forward model runtime is very short, allowing the master to echo as quickly as workers communicate can slow down responsiveness of physical host machine. The panther_master_echo_interval\_*milliseconds* option controls how often the panther master reports to the terminal screen. Default is 500 milliseconds.
+
+#### <a id='s9-3-5-17' />5.3.5.17 panther_ping_interval_secs()
+
+The manager pings each agent periodically to confirm that it is still alive and to hold the connection open. This variable sets that interval, in seconds; its default value is 60. It is read when the run manager is created, so it cannot be changed once execution is under way.
+
+#### <a id='s9-3-5-18' />5.3.5.18 condor_submit_file()
+
+PESTPP-GLM only. If a value is supplied, PESTPP-GLM uses the HTCondor-aware form of the PANTHER manager and submits its agents using the named HTCondor submit file; the file must exist when execution commences. If no value is supplied, agents are started by the user in the usual way.
+
+#### <a id='s9-3-5-19' />5.3.5.19 save_all_runs()
+
+If supplied as *true*, every model run undertaken over the course of the analysis is copied into a permanent binary storage file named *case.allruns.rns*. Its default value is *false*. See section 5.4.2.
+
+#### <a id='s9-3-5-20' />5.3.5.20 preemption_poll_interval_minutes()
+
+An inequality observation can be violated long before a model run finishes. Where that is so, the run is a foregone conclusion: its results will be discarded when they arrive, and every minute it continues is an agent not doing useful work. Preemption ends such a run early.
+
+Nominate the observations that are worth watching using the *drop_violations* column of the observation data section (section 9.2.7), then supply *preemption_poll_interval_minutes* with the interval, in minutes, at which running models should be asked what they have so far. Its default value is zero, which disables preemption altogether. On that cadence the manager asks each agent that is running a model for whatever model outputs can be read at that moment; each reply is tested against the nominated observations using the same violation test that is applied to a completed run, and a run that is already violating is killed and abandoned. Because the test is the same one, a run abandoned this way is a run that would have been discarded on arrival, so preemption is a saving in wall-clock time and should not change the outcome of the analysis.
+
+This variable is honored by PESTPP-IES, PESTPP-DA, PESTPP-MOU and PESTPP-SQP. Supplying it without nominating any observations, or nominating only observations that carry zero weight, is reported as an error rather than silently ignored. Partial results are a PANTHER concept: the serial and external run managers have no agents to ask, and agents built before this facility existed are skipped rather than asked.
+
+#### <a id='s9-3-5-21' />5.3.5.21 panther_worker_partial_obs_command()
+
+A command that an agent runs in its own working directory before it reads model output files for a partial reply, for example to make a still-running model flush its output. If no value is supplied, no command is run. Only used when preemption is active.
+
+#### <a id='s9-3-5-22' />5.3.5.22 panther_worker_status_file()
+
+The name of a file in an agent's working directory. The last few characters of this file are sent to the manager with each partial reply, so that a model's own progress reporting can be seen at the manager. If no value is supplied, no status text is sent. Only used when preemption is active.
 
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
@@ -2564,6 +2653,14 @@ This file can be a handy diagnostic, especially in highly parameterized or ensem
 ### <a id='s9-4-2' />5.4.2 All Runs Storage File
 
 By default, the temporary run storage files described above hold only the current batch of runs and are removed when PESTPP-XXX exits gracefully. If you would rather keep a permanent record of *every* model run undertaken over the entire course of an analysis, supply the *save_all_runs()* control variable as *true* (its default value is *false*). When this option is activated, the run manager copies each completed run into an additional binary storage file named *case.allruns.rns*. Unlike the temporary *case.rns*, *case.rnu* and *case.rnj* files, this file is retained after PESTPP-XXX finishes, and it accumulates runs across all iterations or batches rather than being overwritten each iteration. It uses the same binary format as *case.rns*, so it can be read and processed with pyEMU. The *save_all_runs()* option is honored by all programs of the PEST++ suite. On graceful completion, PESTPP-XXX prints a summary of the *case.allruns.rns* file to the screen and to the run record file.
+
+## <a id='s9-4-3' />5.5 PEST++ API
+
+As well as the executables described above, the PEST++ suite can now be built as a shared library with a C interface, so the tools can be driven in-process instead of being launched as programs, not dissimilar to the MODFLOW-6 API. The release bundle carries the library in bin, the header in include and a Python layer in python. Two modules are provided: pestpp_lib.py, a thin binding with one method per library function, and pestpp.py, which presents each tool as a class working in pandas and pyEMU objects.
+
+Using the shared library affords control over the loop the executables run internally, including initialization, solving algorithms, and run management. A caller program using the API can evaluate the initial ensemble, examine it, change it, and carry on; can take one iteration at a time, changing observation weights or algorithmic variables between iterations; and can take ownership of every batch of model runs, so no model run happens inside a library call that the caller did not ask for.  Users can change a number of PEST++ settings at runtime if desired.
+
+The API is at an early stage and is not yet published as a package on PyPI. See python/README.md in the release bundle for installation and a description of both layers, and the notebooks in examples for worked cases.
 
 # <a id='s10' />6. PESTPP-GLM
 
@@ -2597,16 +2694,9 @@ Tikhonov regularization may be introduced to an inverse problem to promulgate pa
 
 If regularization constraints are referenced explicitly in equation 6.1, it becomes
 
-$\begin{bmatrix}
-\mathbf{h} \\
-\mathbf{h}_{r}
-\end{bmatrix} = \ \begin{bmatrix}
-\mathbf{Z} \\
-\mathbf{Z}_{r}
-\end{bmatrix}\mathbf{k} + \ \begin{bmatrix}
-\mathbf{\varepsilon} \\
-\mathbf{\varepsilon}_{\mathbf{r}}
-\end{bmatrix}\ $ (6.2)
+[<u>h</u> ; <u>h</u><sub>r</sub>] = [Z ; Z<sub>r</sub>]<u>k</u> + [<u>ε</u> ; <u>ε</u><sub>r</sub>] (6.2)
+
+where the square brackets denote column-wise concatenation: the regularization observations <u>h</u><sub>r</sub> are appended below the measurements <u>h</u>, the regularization sensitivities Z<sub>r</sub> below Z, and the regularization noise <u>ε</u><sub>r</sub> below <u>ε</u>.
 
 In equation 6.2, the elements of h<sub>r</sub> are “regularization observations” (which can include the “observed” values of prior information equations). They normally penalize departure from a preferred parameter condition. This condition may be comprised of a set of values that parameters should adopt unless there is information to the contrary in the calibration dataset. ε<sub>r</sub> is the “noise” associated with this condition; it reflects the tolerance of a modeller for departures from this condition incurred by the necessity for model outputs to fit a calibration dataset. Generally a modeller does not know this tolerance ahead of the calibration process. Instead, he/she knows his/her tolerance for model-to-measurement misfit, and is prepared to adjust his/her tolerance for parameter departures from preferred values (at least to some extent) on that basis.
 
@@ -2616,8 +2706,8 @@ We employ the symbol <u>k</u> to designate the parameter set (hopefully of minim
 
 In equation 6.3 Q is a weight matrix ascribed to measurement noise while Q<sub>r</sub> is a weight matrix ascribed to “regularization noise”. Ideally
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathbf{Q} \propto C(\mathbf{\varepsilon}) " title="\Large \mathbf{Q} \propto C(\mathbf{\varepsilon})" />  (6.4a)  <br>
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathbf{Q}_{r}\mathbf{\propto}C\left( \mathbf{\varepsilon}_{r} \right) " title="\Large \mathbf{Q}_{r}\mathbf{\propto}C\left( \mathbf{\varepsilon}_{r} \right)" />  (6.4b)  <br>
+Q ∝ C(ε)  (6.4a)  <br>
+Q<sub>r</sub> ∝ C(ε<sub>r</sub>)  (6.4b)  <br>
 where C() signifies a covariance matrix. The *μ*<sup>2</sup> term in equation 6.3 accommodates flexibility in the strength with which regularization constraints are enforced. Like PEST, PESTPP-GLM is given permission to calculate the value of *μ*<sup>2</sup> itself. It is referred to herein as the “regularization weight factor”.
 
 In practice, the Jacobian matrix J replaces the Z matrix of equation (6.3). This is the matrix of partial derivatives of model outputs with respect to parameter values. As such, it constitutes a local linearization of the action of the model. As was discussed in previous chapters of this manual, the Jacobian matrix is filled through finite parameter differencing. Where parameters are large in number, this can be by far the most laborious component of the inversion process.
@@ -2651,6 +2741,10 @@ The value that is assigned to *μ*<sup>2</sup> strongly influences the inversion
 When using PESTPP-GLM (and PEST), a user does not have to choose a value for *μ*<sup>2</sup> him/herself. Instead, he/she must choose a value for the target measurement objective function. This is the PEST variable PHIMLIM that appears in the “regularization” section of the PEST control file. PESTPP-GLM then calculates the regularization weight factor itself. This is done through an iterative procedure that is controlled by the values supplied for the PHIMACCEPT, WFINIT, WFMIN, WFMAX, WFFAC and WFTOL regularization control variables that are described in section 4.16 of this document. These play the same roles for PESTPP-GLM that they do for PEST.
 
 As was discussed in section 4.16, the level of fit that can be achieved with a calibration dataset is often difficult to predict. To accommodate this, it may be useful to endow PHIMLIM with a very low value (for example 1.0E-10). This allows you to find out just how good a fit you can get with the calibration dataset, possibly at the cost of over-fitting that dataset. At the same time, the value of the FRACPHIM control variable should be left at its default of 0.2, or set somewhere in the 0.1 to 0.3 range. If FRACPHIM is set to a value greater than zero, PESTPP-GLM adjusts the target measurement objective function internally to be FRACPHIM times the current value of the actual measurement objective function. Hence regularization is operative, notwithstanding the pursuit of what may turn out to be too good a fit with the calibration dataset. Then, on a subsequent PESTPP-GLM run, PHIMLIM should be set about five percent greater than the best measurement objective function attained through the preceding “range finder” run.
+
+FRACPHIM and PHIMLIM cooperate while the measurement objective function is descending: FRACPHIM governs while phi is far from the goal, and PHIMLIM takes over near it. Neither has any notion of phi having stopped improving. If phi plateaus above PHIMLIM, the target stays at FRACPHIM times the current phi and is therefore permanently out of reach; the only lever available to the weight-factor search is the weight itself, so it drives the weight to WFMIN every iteration and the regularization objective function is annihilated.
+
+The *reg_use_achievable_target* control variable, which is active by default, closes that gap. It asks PESTPP-GLM never to demand a larger reduction than the previous iteration actually delivered. It can only relax a target, never tighten one, so a run that is converging is unaffected. It applies only when phi has genuinely stalled (this iteration's phi is at least 99 percent of the previous one) and only where FRACPHIM is the binding term. When it fires, the run record file records the original target, the relaxed target and the ratio that triggered it. Set it to false to restore the previous behaviour.
 
 ### <a id='s10-1-3' />6.2.3 Inter-Regularization Group Weighting
 
@@ -2902,6 +2996,8 @@ Note also that the number of control variables may change with time. Refer to th
 | *glm_normal_form(diag)*           | string                 | The form of the normal matrix to use. Can be “ident” (identity matrix lambda scaling), “diag” (use the diagonal of X<sup>t</sup>QX for lambda scaling), “prior” (scale with the inverse of the prior parameter covariance matrix), or "HP" (similar to diag but attempts to more closely resemble the exact normal matrix scaling formula from PEST_HP). Default is diag.                                                                                                                                |
 | *glm_hp_lambdas(false)*           | string                 | Flag that controls whether to override normal GLM lambda determination with PEST_HP-style lambdas and lambda scale vectors. Default is false.                 
 | *glm_panther_lambdas(false)*           | string                 | Flag that controls whether to add or remove from lambdas and lambda_scale_fac as needed depending on the number of agents currently connected to panther. Mutually exclusive with *glm_hp_lambdas*. *glm_hp_lambdas* will override *glm_panther_lambdas* if both are set to true. Does nothing if running in serial. Default is false.                                                                                                                                                                                            |
+| *reg_use_achievable_target(true)*           | boolean                | Allow PESTPP-GLM to relax the target measurement objective function for an iteration when the measurement objective function has stalled and FRACPHIM, rather than PHIMLIM, is setting that target. See section 6.2.2. Default is true. |
+| *max_reg_iter(20)*           | integer                | The maximum number of iterations of the numerical procedure that finds the regularization weight factor for an iteration. See section 4.16. Default is 20. |
 
 Table 6.2 PESTPP-GLM control variables. Variables which control parallel run management can be supplied in addition to these. See section 5.3.5.
 
@@ -3008,12 +3104,12 @@ V<sub>T</sub> = V<sub>T</sub>(y) = sum<sub>i</sub>(V<sub>i</sub>) + sum<sub>i</s
 
 where
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{i} = V\left( E\left( y|x_{i} \right) \right) " title="\Large V_{i} = V\left( E\left( y|x_{i} \right) \right)" />  (7.4)  <br>
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{ij} = V\left( E\left( y|x_{i},x_{j} \right) \right) - V_{i} - V_{j}\  " title="\Large V_{ij} = V\left( E\left( y|x_{i},x_{j} \right) \right) - V_{i} - V_{j}\ " />  (7.5)  <br>
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{ijk} = V\left( E\left( y|x_{i},x_{j},x_{k} \right) \right) - V_{i} - V_{j} - V_{k} - V_{ij} - V_{ik} - V_{jk}\  " title="\Large V_{ijk} = V\left( E\left( y|x_{i},x_{j},x_{k} \right) \right) - V_{i} - V_{j} - V_{k} - V_{ij} - V_{ik} - V_{jk}\ " />  (7.6)  <br>
+V<sub>i</sub> = V(E(y|x<sub>i</sub>))  (7.4)  <br>
+V<sub>ij</sub> = V(E(y|x<sub>i</sub>,x<sub>j</sub>)) – V<sub>i</sub> – V<sub>j</sub>  (7.5)  <br>
+V<sub>ijk</sub> = V(E(y|x<sub>i</sub>,x<sub>j</sub>,x<sub>k</sub>)) – V<sub>i</sub> – V<sub>j</sub> – V<sub>k</sub> – V<sub>ij</sub> – V<sub>ik</sub> – V<sub>jk</sub>  (7.6)  <br>
 etc.
 
-In the above equations, the expression $V\left( E\left( y|x_{i} \right) \right)$ should be interpreted as “the variance with respect to *x<sub>i</sub>* of the expected value of *y*, with the latter calculated at multiple values at which *x<sub>i</sub>* is fixed while every other parameter is varied”. Similar interpretations apply to higher order terms in the above equations. *V<sub>i</sub>* expresses the so-called “first order” dependence of *y* on *x<sub>i</sub>*. Meanwhile, *V<sub>ij</sub>* expresses the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* together; note that the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* individually is subtracted from the first term on the right of this equation in order to obtain the collective variance.
+In the above equations, the expression V(E(y|x<sub>i</sub>)) should be interpreted as “the variance with respect to *x<sub>i</sub>* of the expected value of *y*, with the latter calculated at multiple values at which *x<sub>i</sub>* is fixed while every other parameter is varied”. Similar interpretations apply to higher order terms in the above equations. *V<sub>i</sub>* expresses the so-called “first order” dependence of *y* on *x<sub>i</sub>*. Meanwhile, *V<sub>ij</sub>* expresses the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* together; note that the dependence of *y* on *x<sub>i</sub>* and *x<sub>j</sub>* individually is subtracted from the first term on the right of this equation in order to obtain the collective variance.
 
 Application of the Method of Sobol culminates in the calculation of so-called “sensitiv­ity indices”. The first order sensitivity index for parameter *i*, (i.e., *S<sub>i</sub>*), is defined as the ratio of its first order variance to the total variance of *y*. That is
 
@@ -3383,6 +3479,9 @@ Note also that the number of control variables may change with time. Refer to th
 | *opt_stack_size(0)*             | integer  | Number of realizations to use in the stack. If positive, stack-based chance constraints are used. If *opt_par_stack* is not supplied, *opt_stack_size* realizations are drawn from the Prior. If *opt_par_stack* is supplied and the stack in that file is larger than *opt_stack_size*, the stack is truncated to *opt_stack_size*.                                                                                                                          |
 | *opt_par_stack()*               | string   | File containing a parameter stack. The file extension is used to determining CSV for binary (JCB) format. The stack in this file must constrain all adjustable parameters.                                                                                                                                                                                                                                                                                    |
 | *opt_obs_stack()*               | string   | File containing an observation stack. The file extension is used to determining CSV for binary (JCB) format. Supplying this file will forego evaluating the stack for the first iteration and possibly subsequent iterations depending on the value if *opt_recalc_chance_every*                                                                                                                                                                              |
+| *opt_include_bnd_pi(true)*      | boolean  | Augment the prior information constraints with a pair of constraints per decision variable holding it within its bounds. This is what keeps the linear program from being unbounded, so it should only be set false when the bounds are enforced some other way. Default is true. |
+| *opt_iter_derinc_fac(1.0)*      | real     | Factor by which the DERINC of every decision variable is multiplied after the first SLP iteration, so that response-matrix increments can be tightened as the solution is approached. Must be greater than 0.0 and no greater than 1.0. Default is 1.0, which leaves DERINC alone. |
+| *rand_seed(358183147)*         | unsigned integer  | Seed for the random number generator. Used for drawing the parameter stack when stack-based chance constraints are active. Also accepted as *random_seed*. |
 
 Table 8.2 PESTPP-OPT control variables. Parallel run management variables can be supplied in addition to these. See section 5.3.5.
 
@@ -3640,7 +3739,7 @@ This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. 
 
 
 
-<img src="./media/image6.emf" style="width:6.28022in;height:3.83791in" />
+<img src="./media/image6_fig93.png" style="width:6.28022in;height:3.83791in" alt="Reinflation compared with standard iterations" />
 
 Figure 9.3 – A contrived example showing how standard and reinflation iterations compare. Standard iterations (A/D) quickly collapse, (B/E) using a reinflation with 1 polish iteration yields a high parameter posterior variance, especially for hydraulic conductivity. (C/F) A reinflation at iteration 4 followed by several additional iterations yields nearly the same posterior as standard iterations for this simple mildly nonlinear problem.
 
@@ -3742,7 +3841,7 @@ The situation is different, however, when many parameter fields comprising an en
 
 The number of realizations that comprise the ensemble subset used for lambda testing is set by the value of the *ies_subset_size()* control variable, which is given a default value of -10, which indicates to use 10% of the current number of realizations for subset testing; experience has shown this is a pretty good default value in most cases. During each iteration of the ensemble smoother process, values of the Marquardt lambda used for testing realization upgrades are determined by applying a set of multipliers to the best lambda found during the previous iteration. These multipliers are provided through the *ies_lambda_mults()* control variable. A comma separated list of multipliers should be supplied by the user as arguments to this keyword; at least one of these multipliers should be less than 1.0 while, or course, one of them should be greater than 1.0. Line search factors (otherwise known as scale factors) that are applied to each of these lambdas can also be supplied. If so, this is done through the *lambda_scale_fac()* control variable, the same variable that is used by PESTPP-GLM. As for *ies_lambda_mults()*, scale factors should be supplied as a comma-separated list of numbers spanning a range from below 1.0 to greater than 1.0. The total number of model runs required to test parameter upgrades during a given iteration is thus *ies_subset_size()* times the number of multipliers supplied with the *ies_lambda_mults()* control variable times the number of factors supplied with the *lambda_scale_fac()* control variable.
 
-The value of the Marquardt lambda to use during the first iteration of the ensemble smoother process can be supplied through the *ies_initial_lambda()* control variable. Lambda multipliers supplied through *ies_lambda_mults()* are applied to this value during the first iteration of this process. The PESTPP-IES default value for *ies_initial_lambda()* is $10^{floor\left( \log_{10}\frac{\mu_{Փ}}{2n} \right)}$ where *μ*<sub>Փ</sub> is the mean of objective functions achieved using realizations comprising the initial ensemble, and *n* is the number of non-zero-weighted observations featured in the “observation data” section of the PEST control file.
+The value of the Marquardt lambda to use during the first iteration of the ensemble smoother process can be supplied through the *ies_initial_lambda()* control variable. Lambda multipliers supplied through *ies_lambda_mults()* are applied to this value during the first iteration of this process. The PESTPP-IES default value for *ies_initial_lambda()* is 10<sup>floor(log<sub>10</sub>(μ<sub>Φ</sub>/2n))</sup> where *μ*<sub>Փ</sub> is the mean of objective functions achieved using realizations comprising the initial ensemble, and *n* is the number of non-zero-weighted observations featured in the “observation data” section of the PEST control file.
 
 Suppose for example that the following lines appear in a PESTPP-IES control file.
 
@@ -4227,6 +4326,21 @@ Note also that the number of control variables may change with time. Refer to th
 <td>bool</td>
 <td>Flag to use phi-based lambda each iteration (instead just for the initial phi).</td>
 </tr>
+<tr class="odd">
+<td><em>ies_loc_type(local)</em></td>
+<td>string</td>
+<td>The form of localization to apply. Only “local”, meaning local analysis, is supported; “covariance” is deprecated and is reset to local analysis with a warning. Also accepted as <em>ies_localization_type</em>. Default is “local”.</td>
+</tr>
+<tr class="even">
+<td><em>ies_localize_how(parameters)</em></td>
+<td>string</td>
+<td>Whether the localized solve is decomposed by parameters or by observations. Only “parameters” is supported; “observations” is deprecated and is reset to “parameters” with a warning. Default is “parameters”.</td>
+</tr>
+<tr class="odd">
+<td><em>ies_localizer_forgive_missing(false)</em></td>
+<td>bool</td>
+<td>Tolerate a localizer matrix whose rows or columns name parameters or observations that are not in the active set, rather than stopping. Useful when one localizer is reused across analyses, or when observations are activated part way through. Also accepted as <em>ies_localizer_forgive_extra</em>. Default is false.</td>
+</tr>
 
 </tbody>
 </table>
@@ -4302,7 +4416,7 @@ PSO, in its most basic form, i.e., as a single-objective optimization algorithm,
 
 minimize *f<sub>0</sub>(x),* subject to *fi(x)* less than or equal to *b<sub>i,</sub> i* = 1,…,m (11.1)
 
-where, $\mathbf{x}$ is a vector of decision variables (which could be model parameters as part of a calibration exercise, or the groundwater extraction rates for management optimization, or etc.), $f_{0}$ is a scalar objective function, and $f_{i}$ is a scalar constraint function.
+where, **x** is a vector of decision variables (which could be model parameters as part of a calibration exercise, or the groundwater extraction rates for management optimization, or etc.), *f*<sub>0</sub> is a scalar objective function, and *f<sub>i</sub>* is a scalar constraint function.
 
 While PSO is effective for solving single-objective nonlinear programming problems as in Equation (11.1), its true power actually lies mainly in its ability to handle multi-objective optimization problems, integer programming problems, and potentially many other applications like posterior predictive uncertainty quantification. This document will focus on the use of PSO for multi-objective optimization. Multi-objective optimization involves the evaluation of a Preto front, which graphically illustrates the trade-off in one objective function over another objective function(s). This can be useful to decision-makers as real-world management problems rarely consist of only a single objective, and furthermore, multi-objective optimization can be used as a hypothesis testing mechanism or as means of incorporating prior knowledge about parameter values into the model calibration process.
 
@@ -4310,17 +4424,17 @@ The multi-objective optimization version of PSO (MOPSO) is included in PESTPP-PS
 
 minimize {*f*i(x),…,*f<sub>n</sub>*(x)}, subject to *fi(x) i* = n+1,…,m (11.2)
 
-where, $n$ is the number of objective functions for which a Pareto front is evaluated (currently PESTPP-PSO is limited to two objective functions, but future developments are under way to increase this number), $m$ is the total number of objectives (that is, there are $m - n$ constraints).
+where, *n* is the number of objective functions for which a Pareto front is evaluated (currently PESTPP-PSO is limited to two objective functions, but future developments are under way to increase this number), *m* is the total number of objectives (that is, there are *m* – *n* constraints).
 
 When filling a Pareto front with a discrete set of non-dominated solutions, PSO becomes very efficient due its ability to “swarm” across the Pareto front, along with the memory-like properties of the swarm itself, which are maintained within a *repository*. In contrast to the single-objective basic form of PSO, which requires numerous simulation-model runs for convergence relative to other gradient-based algorithms, MOPSO on the other hand, is likely to be more efficient than other multi-objective optimization algorithms available.
 
 The use of PSO for integer programming can be seen throughout the clinical trials literature with applications in experimental design. Integer programming via PSO is not yet included in this version of PESTPP-PSO, but remains a topic of future development. Additionally, the use of PSO in a Monte Carlo context for predictive uncertainty quantification also remains a topic of future development.
 
 **Basic**
-PSO is an evolutionary algorithm that operates on the socio-cognitive behavior of individuals within a swarm. Individuals, or particles, “move” within decision space based on three components, (1) the momentum of the movement from the previous iteration, (2) the location in decision space that has had the best performance for that particle so far, in terms of the objective function as defined by Equation (11.1) (cognitive component), and (3) the location in decision space associated with the best performance observed by the entire swarm thus far (social component). A particle’s position in decision space is simply defined as the vector of values for the decision variables currently assigned to that particle. The term “decision variables” is used here to indicate that PSO is applicable to any form of optimization problem, e.g., calibration, management, design, etc., and therefore “parameters” are considered decision variables as well. The movement (or velocity) of a particle at a particular iteration, $t + 1$, is defined as,
+PSO is an evolutionary algorithm that operates on the socio-cognitive behavior of individuals within a swarm. Individuals, or particles, “move” within decision space based on three components, (1) the momentum of the movement from the previous iteration, (2) the location in decision space that has had the best performance for that particle so far, in terms of the objective function as defined by Equation (11.1) (cognitive component), and (3) the location in decision space associated with the best performance observed by the entire swarm thus far (social component). A particle’s position in decision space is simply defined as the vector of values for the decision variables currently assigned to that particle. The term “decision variables” is used here to indicate that PSO is applicable to any form of optimization problem, e.g., calibration, management, design, etc., and therefore “parameters” are considered decision variables as well. The movement (or velocity) of a particle at a particular iteration, *t* + 1, is defined as,
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;v_{ij}^{(t + 1)} = \omega^{(t)}v_{ij}^{(t)} + c_{1}r_{1}\left( z_{ij}^{(t)} - p_{ij}^{(t)} \right) + c_{2}r_{2}\left( z_{ig}^{(t)} - p_{ij}^{(t)} \right) " title="\Large v_{ij}^{(t + 1)} = \omega^{(t)}v_{ij}^{(t)} + c_{1}r_{1}\left( z_{ij}^{(t)} - p_{ij}^{(t)} \right) + c_{2}r_{2}\left( z_{ig}^{(t)} - p_{ij}^{(t)} \right)" />  (X.3)  <br>
-where, subscript $i$ denotes the decision variable index, subscript $j$ denotes the particle index, $v$ is the velocity, $\omega$ is the inertia, $c_{1}$ is the cognitive constant, $c_{2}$ is the social constant, $r$ is a random value taken from the interval \[0,1\], $z_{ij}$ is the best position observed by particle $j$ for parameter $i$ (often referred to as the personal best or “*p*-best” position for particle $j$), $g$ is the index of the best *p*-best position in the swarm or neighbourhood (often referred to as the global best, or “*g*-best” position), and $p$ represents the current position of the particle in decision space.
+v<sub>ij</sub><sup>(t+1)</sup> = ω<sup>(t)</sup>v<sub>ij</sub><sup>(t)</sup> + c<sub>1</sub>r<sub>1</sub>(z<sub>ij</sub><sup>(t)</sup> – p<sub>ij</sub><sup>(t)</sup>) + c<sub>2</sub>r<sub>2</sub>(z<sub>ig</sub><sup>(t)</sup> – p<sub>ij</sub><sup>(t)</sup>)  (X.3)  <br>
+where, subscript *i* denotes the decision variable index, subscript *j* denotes the particle index, *v* is the velocity, ω is the inertia, *c*<sub>1</sub> is the cognitive constant, *c*<sub>2</sub> is the social constant, *r* is a random value taken from the interval \[0,1\], *z<sub>ij</sub>* is the best position observed by particle *j* for parameter *i* (often referred to as the personal best or “*p*-best” position for particle *j*), *g* is the index of the best *p*-best position in the swarm or neighbourhood (often referred to as the global best, or “*g*-best” position), and *p* represents the current position of the particle in decision space.
 
 The basic single-objective PSO algorithm proceeds by updating each particle’s position by adding the velocity according to Equation (11.3) to each particle’s position iteratively until the particles have “stopped moving”, or a specified number of iterations have commenced. Defining the point where particles stop moving can be based on multiple criteria – the reader is referred to the definitions of the control variables for PESTPP-PSO for more details. Additionally, the swarm must be initialized (iteration 0), which can be done automatically via PESTPP-PSO or externally as the user desires (see the INITP control variable and Section 11.2.3)
 
@@ -4328,9 +4442,9 @@ While basic PSO can approach such a problem, like all other optimization methods
 
 ### <a id='s14-4-1' />11.1.1 Multi-Objective Particle Swarm Optimization
 
-Multi-objective optimization studies often have numerous factors to consider, and some of these factors may be considered objectives (a Pareto front is desired for their trade-offs), or they may be considered as constraints (they are given a limit for which they cannot exceed). Generally, one could consider constraints as objectives in this context, as they can be mixed and matched depending on the perspective of the optimization problem (Equation 11.2). Additionally, the upper limit of the constraints may be perturbed slightly to examine its effects on the Pareto front; such constraints are often referred to as epsilon ($\varepsilon$) constraints.
+Multi-objective optimization studies often have numerous factors to consider, and some of these factors may be considered objectives (a Pareto front is desired for their trade-offs), or they may be considered as constraints (they are given a limit for which they cannot exceed). Generally, one could consider constraints as objectives in this context, as they can be mixed and matched depending on the perspective of the optimization problem (Equation 11.2). Additionally, the upper limit of the constraints may be perturbed slightly to examine its effects on the Pareto front; such constraints are often referred to as epsilon (ε) constraints.
 
-Most multi-objective optimization problems in practice generally do not consider more than three objective functions when mapping a Pareto front. This is because higher-dimensional problems suffer from the “curse of dimensionality”, which often requires an infeasible number of model simulations in order to adequately span the front. Additionally, Pareto fronts with a dimension higher than three are difficult to visualize and hence, difficult to use for decision-support. Arguably, most studies can get by with just a two-dimensional Pareto front, with the remaining factors, or objectives, being handled as $\varepsilon$-constraints (see *Siade et al*, (2019) for a real-world example of this process).
+Most multi-objective optimization problems in practice generally do not consider more than three objective functions when mapping a Pareto front. This is because higher-dimensional problems suffer from the “curse of dimensionality”, which often requires an infeasible number of model simulations in order to adequately span the front. Additionally, Pareto fronts with a dimension higher than three are difficult to visualize and hence, difficult to use for decision-support. Arguably, most studies can get by with just a two-dimensional Pareto front, with the remaining factors, or objectives, being handled as ε-constraints (see *Siade et al*, (2019) for a real-world example of this process).
 
 MOPSO, like most multi-objective optimization algorithms in use today, approximates the Pareto front using a discrete set of *non-dominated* decision-variable vectors (or decision vectors). A non-dominated decision vector is a position in decision space that is not dominated by any other position in decision space. That is, there is no other feasible decision vector that performs better than a non-dominated decision vector for all objective functions. In other words, a non-dominated solution will perform better than all other positions in decision space for at least one of its objective functions. The set of all non-dominated decision vectors therefore forms the weakly Pareto optimal set, and their associated objective function values form the Pareto front.
 
@@ -4487,9 +4601,9 @@ This real variable sets the maximum velocity allowed for the decision variables.
 
 *IINERT, FINERT,* and *INITER*
 
-The first two real variables are the initial (IINERT, $\omega^{(0)}$) and final (FINERT, $\omega^{(\text{INITER})}$) inertia values of the PSO algorithm (Equation 11.1). The third variable is an integer value representing the iteration upon which the inertia should be set to FINERT. The inertia is therefore varied linearly over the course of the PSO algorithm as follows (at iteration $t$),
+The first two real variables are the initial (IINERT, ω<sup>(0)</sup>) and final (FINERT, ω<sup>(INITER)</sup>) inertia values of the PSO algorithm (Equation 11.1). The third variable is an integer value representing the iteration upon which the inertia should be set to FINERT. The inertia is therefore varied linearly over the course of the PSO algorithm as follows (at iteration *t*),
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\omega^{(t)} = \omega^{(0)} + \left( \omega^{(\text{INITER})} - \omega^{(0)} \right)\left( t/\text{INITER} \right) " title="\Large \omega^{(t)} = \omega^{(0)} + \left( \omega^{(\text{INITER})} - \omega^{(0)} \right)\left( t/\text{INITER} \right)" />  (X.4)  <br>
+ω<sup>(t)</sup> = ω<sup>(0)</sup> + (ω<sup>(INITER)</sup> – ω<sup>(0)</sup>)(t/INITER)  (X.4)  <br>
 The inertia value for all subsequent iterations, after INITER, is held constant at FINERT. The value for IINERT should be greater than FINERT; a good example would be 0.7 and 0.4, respectively. These values should range between greater than zero and one.
 
 *NEIBR* and *NNEIBR*
@@ -4498,11 +4612,11 @@ These integer variables tell PESTPP-PSO if neighborhoods are used, and if so, th
 
 *OBJNME* and *OBJMETH*
 
-OBJNME is a character string and the name of the objective function being minimized ($f_{0}$ in Equation 11.1). This name must coincide with an observation group name specified in the PEST control file. OBJMETH determines whether the objective function represents a sum of squares (i.e., for calibration) or a general objective function that should be comprised of a single “observation” which comprises the objective function itself. For the former, OBJMETH should be set to 1, and for the latter, set to 2. A user may wish to produce their own post-processed objective function value given a set of decision variables, e.g., for maximizing remediation of a contaminated site. In this case, the user should input their calculated objective function as a single “observation” comprising the objective function seen by PESTPP-PSO with OBJMETH set to 2. This will be common for problems that are not calibration problems, and thus do not need a sum of squared residuals.
+OBJNME is a character string and the name of the objective function being minimized (*f*<sub>0</sub> in Equation 11.1). This name must coincide with an observation group name specified in the PEST control file. OBJMETH determines whether the objective function represents a sum of squares (i.e., for calibration) or a general objective function that should be comprised of a single “observation” which comprises the objective function itself. For the former, OBJMETH should be set to 1, and for the latter, set to 2. A user may wish to produce their own post-processed objective function value given a set of decision variables, e.g., for maximizing remediation of a contaminated site. In this case, the user should input their calculated objective function as a single “observation” comprising the objective function seen by PESTPP-PSO with OBJMETH set to 2. This will be common for problems that are not calibration problems, and thus do not need a sum of squared residuals.
 
 *CONNME, CONMETH,* and *UPLIM*
 
-CONNME is a character variable that defines the names of the constraints that are to be maintained during optimization ($f_{i}$ in Equation 11.1). Each CONNME must correspond with an observation group in the PEST control file. CONMETH is similar to OBJMETH and determines if a constraint is comprised of a sum of squared residuals (enter a 1), or a general constraint that is treated as is (enter a 2). UPLIM is simply the upper limit applied to that constraint ($b_{i}$ in Equation 11.1). Constraints with a lower limit can be converted to ones with an upper limit by simply multiplying the constraint value and its associated lower limit value by a -1.
+CONNME is a character variable that defines the names of the constraints that are to be maintained during optimization (*f<sub>i</sub>* in Equation 11.1). Each CONNME must correspond with an observation group in the PEST control file. CONMETH is similar to OBJMETH and determines if a constraint is comprised of a sum of squared residuals (enter a 1), or a general constraint that is treated as is (enter a 2). UPLIM is simply the upper limit applied to that constraint (*b<sub>i</sub>* in Equation 11.1). Constraints with a lower limit can be converted to ones with an upper limit by simply multiplying the constraint value and its associated lower limit value by a -1.
 
 ### <a id='s14-5-3' />11.2.3 Pareto Mode
 
@@ -4552,17 +4666,17 @@ This integer flag sets the repository management method employed. A value of 1 i
 
 *RFIT*
 
-This real variable represents the maximum value that the exponent, $\alpha$, can take during fitness calculations; see equation below (based on Equation (6) of *Siade et al*, (2019)),
+This real variable represents the maximum value that the exponent, α, can take during fitness calculations; see equation below (based on Equation (6) of *Siade et al*, (2019)),
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;f_{j}^{adj} = f_{j}^{\alpha(t)} " title="\Large f_{j}^{adj} = f_{j}^{\alpha(t)}" />  (11.5)  <br>
-where, $f_{j}^{adj}$ is the adjusted fitness for the $j$-th repository position, $f_{j}$ is the fitness for the $j$-th repository position, and $t$ is the iteration count. At each iteration, each particle in the repository is given a value for fitness (ranging from 0 to 1), which is based on the diversity of non-dominated solutions obtained thus far. For example, a repository position that is relatively “far” from other repository positions (in objective space) will be assigned a high fitness value close to 1, and vice versa. The definition of what is meant by “far” will depend on the repository management method used, i.e., REPMODE. This fitness value is then raised to the exponent, $\alpha$. Therefore, a high value for $\alpha$ will have little effect on fitness values close to 1, but those having small fitness values will be reduced even further, which prevents them from being selected as a *g*-best position for particles in the swarm during the roulette wheel selection step (*Siade et al*., 2019). Therefore, high values of $\alpha$ will cause the algorithm to focus primarily on promoting diversity, which can be important when the repository positions have nearly converged on the true Pareto front. RFIT values around 2.0 seem to work well.
+f<sub>j</sub><sup>adj</sup> = f<sub>j</sub><sup>α(t)</sup>  (11.5)  <br>
+where, *f<sub>j</sub><sup>adj</sup>* is the adjusted fitness for the *j*-th repository position, *f<sub>j</sub>* is the fitness for the *j*-th repository position, and *t* is the iteration count. At each iteration, each particle in the repository is given a value for fitness (ranging from 0 to 1), which is based on the diversity of non-dominated solutions obtained thus far. For example, a repository position that is relatively “far” from other repository positions (in objective space) will be assigned a high fitness value close to 1, and vice versa. The definition of what is meant by “far” will depend on the repository management method used, i.e., REPMODE. This fitness value is then raised to the exponent, α. Therefore, a high value for α will have little effect on fitness values close to 1, but those having small fitness values will be reduced even further, which prevents them from being selected as a *g*-best position for particles in the swarm during the roulette wheel selection step (*Siade et al*., 2019). Therefore, high values of α will cause the algorithm to focus primarily on promoting diversity, which can be important when the repository positions have nearly converged on the true Pareto front. RFIT values around 2.0 seem to work well.
 
 *RRAMP*
 
-This real variable affects how $\alpha$ is adjusted at each iteration based on repository size,
+This real variable affects how α is adjusted at each iteration based on repository size,
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\alpha(t) = 1.0 + \left( \frac{\text{exp}\left( RRAMP*p_{full} \right) - 1.0}{\text{exp(}RRAMP) - 1.0} \right)(RFIT - 1.0) " title="\Large \alpha(t) = 1.0 + \left( \frac{\text{exp}\left( RRAMP*p_{full} \right) - 1.0}{\text{exp(}RRAMP) - 1.0} \right)(RFIT - 1.0)" />  (11.6)  <br>
-where, $p_{full}$ is the percentage of the repository that is full. When the repository only has three positions, all fitness values are 1, so the value of $\alpha$ has no effect. Once the repository size becomes four or greater, the value for $\alpha$ begins to increase as a function of how full the repository is. The base value for $\alpha$ is 1.0, and then increases toward RFIT until the repository is full, in which case $\alpha$ equals RFIT. The value for RRAMP affects how quickly RFIT is reached. RRAMP cannot be 0.0; however, values close to 0.0 will yield an approximately linear increase in $\alpha$. Negative values for RRAMP will cause $\alpha$ to approach RFIT more quickly, and the opposite applies to positive values. If you wish to have a constant value for $\alpha$ simply set RRAMP to a very large negative number, such as -5.0E+02; this will cause RFIT to be reached immediately. The converse is true for large positive values, i.e., $\alpha$ will remain at 1.0 and then suddenly jump to RFIT when the repository is full. The absolute value for RRAMP should not exceed 5.0E+02.
+α(t) = 1.0 + [(exp(RRAMP·p<sub>full</sub>) – 1.0) / (exp(RRAMP) – 1.0)](RFIT – 1.0)  (11.6)  <br>
+where, *p<sub>full</sub>* is the percentage of the repository that is full. When the repository only has three positions, all fitness values are 1, so the value of α has no effect. Once the repository size becomes four or greater, the value for α begins to increase as a function of how full the repository is. The base value for α is 1.0, and then increases toward RFIT until the repository is full, in which case α equals RFIT. The value for RRAMP affects how quickly RFIT is reached. RRAMP cannot be 0.0; however, values close to 0.0 will yield an approximately linear increase in α. Negative values for RRAMP will cause α to approach RFIT more quickly, and the opposite applies to positive values. If you wish to have a constant value for α simply set RRAMP to a very large negative number, such as -5.0E+02; this will cause RFIT to be reached immediately. The converse is true for large positive values, i.e., α will remain at 1.0 and then suddenly jump to RFIT when the repository is full. The absolute value for RRAMP should not exceed 5.0E+02.
 
 *PTONME* and *PTOLIM*
 
@@ -4919,6 +5033,7 @@ Variables discussed in section 5.3.5 that control parallel run management are no
 | *Da_stop_cycle()*               | integer  | The cycle number to stop PESTPP-DA on. If not supplied, PESTPP-DA will process all cycles found.                                                                                                                                                                                                                                                                                   |
 | *Da_use_simulated_states(true)* | bool     | Use the simulated states at the end of each cycle as the initial states for the next cycle. This option should only be set to False for cases that include both initial and final state parameters quantities. As mentioned above, users are caution against setting this option to False.                                                                                         |
 | *Da_noptmax_schedule*           | string   | A two column ascii filename. The columns in this file should be integers can be space, tab, comma delimited. The integers correspond to the cycle number and noptmax value to use. For cycles that are not listed in the is file, the value of noptmax in the control file is used. In this way, users can control how many iterations should be used for each assimilation cycle. |
+| *Da_parameter_cycle_table()*    | string   | A csv file that supplies parameter values by cycle, in the same form as the observation and weight cycle tables described in section 12.2.4. Parameters listed in it take the tabulated value for each cycle. If not supplied, parameter values do not vary by cycle. |
 
 Table 12.2. PESTPP-DA specific control arguments. PESTPP-DA shares all other control arguments with PESTPP-IES
 
@@ -5000,6 +5115,8 @@ PESTPP-MOU also supports self-adaptive differential evolution, where the differe
 PESTPP-MOU also supports surrogate-assisted multiobjective optimization (SAMOO). Users are referred to *Macasieb et al*, (2025) for the discussion of theories and description of the full algorithm. SAMOO performs two sets of MOO: the inner and outer iterations. Although this means that they each require their own PEST control files, both these iterations are facilitated using PESTPP-MOU. However, the inner iterations 
 runs a surrogate model (preferably a Gaussian Process Regression (GPR) model) while the outer iteration executes the deterministic model. These models must be correctly reflected in the "model command line" section of their respective PEST control file. During the dominance sorting process in the inner iteration, the uncertainty of the emulator (i.e., GPR) needs to be considered through Probabilistic Pareto Dominance (PPD) evaluation. PPD looks into the overlap of confidence ellipsoids of GPR prediction of objective function values to decide which are probabilistically "better" individuals. This can be enabled by passing *NSGA_PPD* in the *mou_env_selector* argument. Moreover, the level of confidence for determining which individuals are probabilistically "better" must also be specified through the *mou_ppd_beta* (recommended value: between 0.5-0.7). Lastly, as PPD accounts for uncertainty of GPR prediction of the objective values, the standard deviation of GPR predictions must also be reported by the GPR; hence, each emulated objective observation must have a corresponding standard deviation observation in the "observation data" section of the PEST control file. This can be done either: by adding an observation that is the objective name with suffix “\_SD” for each emulated observation, or by supplying the objective standard deviation observation name (does not necessarily need to end in “\_SD”) under the "link_to" column of their respective objective observation name in the observation data external file.
 
+
+PESTPP-MOU also honors the *drop_violations* column of the observation data section, which is described for PESTPP-IES in section 9.2.7. Any member of a population whose simulated outputs violate an observation nominated in that column is removed from the population when its run is processed, rather than being carried forward and penalized. As in PESTPP-IES, the nomination respects observation weights, so a nominated observation with a weight of zero is not enforced. The same nomination also decides which runs may be abandoned before they finish when preemption is active; see *preemption_poll_interval_minutes* in section 5.3.5.
 
 ### <a id='s16-2-6' />13.2.5 Running PESTPP-MOU
 
@@ -5130,9 +5247,9 @@ Variables discussed in section 5.3.5 that control parallel run management are no
   | *Mou_pso_inertia(0.7, 0.4, 0)* | double | The particle swarm omega values: IINERT, FINERT, INITER, respectively. If INITER is 0.0, inertia is kept constant throughout iterations. |
   | *Mou_pso_social_const(2.0)* | double | The particle swarm social constant. Default is 2.0 |
   | *Mou_pso_vmax_factor(0.8)* | double | The particle swarm VMAX. Default value is 0.8. |
-  | *Mou_pso_alpha(1.0)* | double | Exponent $\alpha$ for pso fitness calculation. If set to 0.0, it is adjusted every iteration starting from $\alpha=1.0$ to RFIT. Default value is 1.0 |
-  | *Mou_pso_rramp(-500)* | double | The particle swarm RRAMP variable that affects how $\alpha$ is adjusted each iteration (if $\alpha = 0.0$ is passed). Default value is -500. |
-  | *Mou_pso_rfit(2.0)* | double | The maximum value that the particle swarm $\alpha$ can take, if it is adjusted. |
+  | *Mou_pso_alpha(1.0)* | double | Exponent α for pso fitness calculation. If set to 0.0, it is adjusted every iteration starting from α = 1.0 to RFIT. Default value is 1.0 |
+  | *Mou_pso_rramp(-500)* | double | The particle swarm RRAMP variable that affects how α is adjusted each iteration (if α = 0.0 is passed). Default value is -500. |
+  | *Mou_pso_rfit(2.0)* | double | The maximum value that the particle swarm α can take, if it is adjusted. |
   | *Mou_pso_dv_bound_handling(clamp)* | text | Method used to restore generated out of bound decision variable values. Values can be: "clamp": set to the nearest bound, "reperturb": keep drawing perturbations until it is within bounds; "hybrid": combination of clamp and reperturb. Default is "hybrid". |
   | *Mou_population_schedule()* | text | A two column ascii file that defines the size of the population to use for each generation. Generations not listed use *mou_population_size*. This can be useful for finding a group of feasible initial population individuals. |
   | *Mou_simplex_reflections(10)* | int | Number of poor performing individuals to reflect. Must be less than the population size minus 1. Default is 10. |
@@ -5142,6 +5259,13 @@ Variables discussed in section 5.3.5 that control parallel run management are no
   | *Opt_chance_schedule()* | text | A two column ascii file that defines when to re-evaluate chances. Generations not listed are set to false. This can be useful to have more granular control regarding chance evaluation. |
   | *Mou_ppd_beta()* | boolean | Level of confidence required for probabilistic Pareto dominance sorting when NSGA_PPD is used as environmental selector. Default is 0.50. |
   | *Opt_use_robust(false)* | boolean | Flag to use robust optimization instead of chance constraints: each population member is paired with its own realization of the uncertain parameters and no risk shifting is done. Mutually exclusive with a non-neutral *opt_risk*. Requires uncertain parameters (an adjustable group not listed in *opt_dec_var_groups*) and a stack, from either *opt_par_stack* or *opt_stack_size*. See section 13.2.2. Default is false. |
+  | *Mou_max_nn_search()* | int | The number of nearest neighbours examined when crowding distance is calculated for probabilistic Pareto dominance sorting. Defaults to *mou_population_size*. |
+  | *Mou_fit_gamma(0.25)* | double | The confidence level used in the crowding-distance calculation for probabilistic Pareto dominance sorting. If set to zero, it is derived from *mou_ppd_beta* and *mou_fit_epsilon* instead. Default is 0.25. |
+  | *Mou_fit_epsilon(0.05)* | double | Used with *mou_ppd_beta* to derive the confidence level when *mou_fit_gamma* is zero. Default is 0.05. |
+  | *Mou_hypervolume_extreme(1.0e+10)* | double | The value assigned to the hypervolume partition of an extreme (boundary) solution, which has no finite hypervolume of its own. Default is 1.0e+10. |
+  | *Mou_outer_repo_obs_file()* | text | A csv file of nondominated solutions from a previous outer iteration, used to seed the hypervolume partitions when probabilistic Pareto dominance is active. If not supplied, the partitions start empty. |
+  | *Mou_shuffle_fixed_pars(false)* | boolean | Shuffle the per-member values of fixed parameters across the new population each generation, rather than keeping each member's fixed values with it. Only has an effect when the population carries per-member fixed parameter values. Default is false. |
+  | *Rand_seed(358183147)* | unsigned integer | Seed for the random number generator. Used for drawing the initial population, for the generators, for any chance-constraint stack, and for the member pairing under *opt_use_robust*. Also accepted as *random_seed*. |
 
                         
 Table 13.2. PESTPP-MOU specific control arguments. PESTPP-MOU shares many other control arguments with PESTPP-OPT
@@ -5312,6 +5436,8 @@ If the optimization process encounters persistent infeasibility or stagnation, P
 PESTPP-SQP employs multiple termination criteria to ensure comprehensive convergence assessment. The algorithm monitors stagnation in both objective function reduction and constraint improvement, evaluates KKT consistency for active constraints to verify optimality conditions, and supports standard PEST stop-file handling for user-controlled termination. This multi-faceted approach ensures that optimization continues only when meaningful progress is possible while providing reliable convergence guarantees for well-posed problems.
 
 
+PESTPP-SQP honors the *drop_violations* column of the observation data section, which is described for PESTPP-IES in section 9.2.7. A realization whose simulated outputs violate an observation nominated in that column is dropped when its run is processed, at whichever stage of the iteration the run was made, so that it takes no part in the gradient estimate or the line search. The nomination respects observation weights, so a nominated observation with a weight of zero is not enforced. The same nomination also decides which runs may be abandoned before they finish when preemption is active; see *preemption_poll_interval_minutes* in section 5.3.5.
+
 ### <a id='s17-2-5' />14.2.5 Running PESTPP-SQP
 
 PESTPP-SQP runs like other PEST++ tools:
@@ -5454,6 +5580,10 @@ Variables discussed in section 5.3.5 that control parallel run management are no
 | *sqp_max_reinflation_cond_num(500.0)* | real     | Maximum covariance matrix condition number permitted before reinflation is triggered. |
 | *sqp_save_cov_every(-1)*              | integer  | Save the adaptive covariance matrix every N iterations. -1 disables saving. |
 | *sqp_cma_stepsize_control(false)*     | boolean  | Enable experimental step-size adaptation via a sigma evolution path. Disabled by default. |
+| *sqp_search_method(line)*             | text     | How the step length along the search direction is chosen. “line”, “line_search” or “ls” performs a line search over *sqp_alpha_mults*; “trust_region”, “trust” or “tr” uses a trust region instead. Default is “line”. |
+| *sqp_cma_bound_handling(reject)*      | text     | What to do with an adaptive-covariance draw that falls outside the decision variable bounds. “reject” redraws the whole vector, up to a maximum number of attempts; “reflect” folds the offending decision variable back inside its bounds; “clip” pins it to the bound. Default is “reject”, but on problems with many decision variables whole-vector rejection can dominate the run time, and “reflect” or “clip” is then the better choice. |
+| *sqp_use_ies_infeas(false)*           | boolean  | If the initial solution violates the constraints, use the PESTPP-IES-based feasibility search to find a feasible point before the optimization proper begins. See also *sqp_max_consec_infeas_ies* and *sqp_seek_feas_max_iter*. Default is false. |
+| *rand_seed(358183147)*                | unsigned integer | Seed for the random number generator. Used for drawing the decision-variable ensemble, for the adaptive covariance draws, and for any chance-constraint stack. Also accepted as *random_seed*. |
 
 
 

@@ -94,3 +94,6 @@ examples/nb_*/
 pestpp-glm_benchmarks/*/master_user_lambdas/
 
 __pycache__/
+
+# windows explorer thumbnail cache
+Thumbs.db

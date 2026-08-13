@@ -401,7 +401,10 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_ies_bad_phi(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_ies_bad_phi(std::numeric_limits<double>::max()); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_ies_bad_phi(); return ss.str(); } },
-    OptionSpec{ "PREEMPTION_POLL_INTERVAL_MINUTES", {}, OptType::DOUBLE, "", false,
+    //panther, even though it is the tools that read it: partial results are a panther-only
+    //idea (the serial and external managers have no workers to ask), so the option is inert
+    //without agents and belongs with the rest of the panther options
+    OptionSpec{ "PREEMPTION_POLL_INTERVAL_MINUTES", {}, OptType::DOUBLE, "panther", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_preemption_poll_interval_minutes(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_preemption_poll_interval_minutes(0.0); },
         [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_preemption_poll_interval_minutes(); return ss.str(); } },
