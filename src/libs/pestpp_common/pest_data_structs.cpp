@@ -391,13 +391,15 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 	arg_map[key] = value;
 		
 
-	//retired with svd-assist - see get_retired_message() in pest_options_registry.cpp, which
-	//carries the same refusal for the registry path.  Both paths must agree: self_verify()
-	//compares them option by option.
+	//deprecated with svd-assist - accepted and ignored so that old control files still read.
+	//both paths must agree: self_verify() compares them option by option, so the registry
+	//entries print the same thing.
 	if ((key=="MAX_N_SUPER") || (key=="SUPER_EIGTHRESH") || (key=="SUPER_EIGTHRES") ||
 		(key=="N_ITER_BASE") || (key=="N_ITER_SUPER"))
 	{
-		throw runtime_error(PestppOptions::get_retired_message(key));
+		string nm = (key=="SUPER_EIGTHRES") ? "SUPER_EIGTHRESH" : key;
+		cout << "++" << nm << " is deprecated and no longer supported (svd-assist has been "
+			"removed from pestpp-glm)...ignoring" << endl;
 	}
 	else if (key=="SVD_PACK"){
 
@@ -418,7 +420,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 	}
 		
 	else if ((key == "SUPER_RELPARMAX") || (key == "MAX_SUPER_FRZ_ITER")){
-		throw runtime_error(PestppOptions::get_retired_message(key));
+		cout << "++" << key << " is deprecated and no longer supported (svd-assist has been "
+			"removed from pestpp-glm)...ignoring" << endl;
 	}
 
 	else if (key == "MAX_RUN_FAIL"){
@@ -517,7 +520,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 	}
 	else if (key == "GLM_REBASE_SUPER")
 	{
-		throw runtime_error(PestppOptions::get_retired_message(key));
+		cout << "++GLM_REBASE_SUPER is deprecated and no longer supported (svd-assist has been "
+			"removed from pestpp-glm)...ignoring" << endl;
 	}
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);

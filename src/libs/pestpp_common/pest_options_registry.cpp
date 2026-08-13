@@ -195,6 +195,40 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++MAT_INV is deprecated (JtQJ is the only form now supported) and no longer supported...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions&){},
         [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    //svd-assist is gone from pestpp-glm - super parameters are no longer formed - but these
+    //keywords are all over historical pest control files, and reading an old control file has
+    //to keep working.  so they are accepted and ignored with a warning, like the other
+    //deprecated options above, rather than refused by name: a refusal happens inside
+    //process_ctl_file(), which is before the ++debug_parse_only exit, so it would take out the
+    //"can pest++ still read this file" tests along with everything else.
+    OptionSpec{ "N_ITER_BASE", {}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++N_ITER_BASE is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    OptionSpec{ "N_ITER_SUPER", {}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++N_ITER_SUPER is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    OptionSpec{ "MAX_N_SUPER", {}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++MAX_N_SUPER is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    OptionSpec{ "SUPER_EIGTHRESH", {"SUPER_EIGTHRES"}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++SUPER_EIGTHRESH is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    OptionSpec{ "SUPER_RELPARMAX", {}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++SUPER_RELPARMAX is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    OptionSpec{ "MAX_SUPER_FRZ_ITER", {}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++MAX_SUPER_FRZ_ITER is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
+    OptionSpec{ "GLM_REBASE_SUPER", {}, OptType::CUSTOM, "glm", false,
+        [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ cout<<"++GLM_REBASE_SUPER is deprecated and no longer supported (svd-assist has been removed from pestpp-glm)...ignoring"<<endl; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions&){},
+        [](const PestppOptions& o)->string{ return "(deprecated)"; } },
     OptionSpec{ "OPT_OBJ_FUNC", {"OPT_OBJECTIVE_FUNCTION"}, OptType::CUSTOM, "opt", false,
         [](PestppOptions& o,const string& value,const string& org_value)->PestppOptions::ARG_STATUS{ convert_ip(value,o.opt_obj_func); o.org_opt_obj_func=org_value; return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_opt_obj_func(string()); o.set_org_opt_obj_func(string()); },
@@ -1115,15 +1149,9 @@ string PestppOptions::get_retired_message(const string& name)
         return "++de_pop_size has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou: ++mou_population_size.";
     if (key == "DE_MAX_GEN")
         return "++de_max_gen has been retired along with the pestpp-glm differential evolution implementation. Use pestpp-mou and set noptmax to the number of generations.";
-    //svd-assist went the same way.  pestpp-glm stopped forming super parameters a long time
-    //ago - it threw "SVD-Assist detected" at startup if any of these were set - so the options
-    //were doing nothing except making the manual promise a feature that isnt there.
-    if ((key == "N_ITER_SUPER") || (key == "N_ITER_BASE") || (key == "MAX_N_SUPER") ||
-        (key == "SUPER_EIGTHRESH") || (key == "SUPER_EIGTHRES") || (key == "SUPER_RELPARMAX") ||
-        (key == "MAX_SUPER_FRZ_ITER") || (key == "GLM_REBASE_SUPER"))
-        return "++" + lower_cp(key) + " has been retired along with svd-assist in pestpp-glm. "
-               "Super parameters are no longer formed. For dimension reduction, use "
-               "pestpp-ies, or reduce the parameterization itself.";
+    //the svd-assist options are NOT here on purpose - they are deprecated-and-ignored rather
+    //than refused by name, because old control files carry them and still have to be readable.
+    //see the registry entries.
     if (key == "SQP_RISK")
         return "++sqp_risk has been retired. It was both a risk value AND the switch that "
                "selected ensemble-based shifting, so it silently overrode opt_risk. Use "
@@ -1288,7 +1316,10 @@ bool PestppOptions::self_verify(ostream& os)
         {"OPT_DIRECTION","MAX"},{"OPT_OBJ_FUNC","obj"},{"OPT_CHANCE_POINTS","ALL"},
         {"IES_RUN_REALNAME","base"},{"MOU_ENV_SELECTOR","nsga"},{"MOU_MATING_SELECTOR","tournament"},
         {"MOU_PSO_DV_BOUND_HANDLING","reflect"},{"MOU_RESAMPLE_COMMAND","cmd"},
-        {"UPGRADE_AUGMENT","1"},{"UPGRADE_BOUNDS","1"},{"AUTO_NORM","1"},{"MAT_INV","1"} };
+        {"UPGRADE_AUGMENT","1"},{"UPGRADE_BOUNDS","1"},{"AUTO_NORM","1"},{"MAT_INV","1"},
+        {"N_ITER_BASE","1"},{"N_ITER_SUPER","1"},{"MAX_N_SUPER","1"},
+        {"SUPER_EIGTHRESH","1"},{"SUPER_RELPARMAX","1"},{"MAX_SUPER_FRZ_ITER","1"},
+        {"GLM_REBASE_SUPER","1"} };
     for (const auto& s : get_option_registry())
     {
         string p = (s.type==OptType::CUSTOM) ? custom_probe[s.name] : probe[s.type];

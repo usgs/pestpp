@@ -2575,6 +2575,8 @@ Like all versions of the PEST++ suite, PESTPP-GLM is written in C++. PESTPP-GLM 
 
 Like PEST, PESTPP-GLM undertakes highly parameterized inversion. It once also offered global optimization through the differential evolution (DE) method; that implementation has been removed, and the *global_opt* and *de_\** control variables that selected it are now refused with a message pointing at PESTPP-MOU, which carries a maintained DE generator.
 
+PESTPP-GLM once also formed super parameters internally (“SVD-assist”). That has been removed as well. Unlike the DE variables, the keywords that controlled it - *n_iter_base*, *n_iter_super*, *max_n_super*, *super_eigthresh*, *super_relparmax*, *max_super_frz_iter* and *glm_rebase_super* - are still accepted, because they appear in a great many existing PEST control files that have to remain readable. Each is reported as deprecated and then ignored. Users who want SVD-assist should use the PEST utilities; users who want dimension reduction within the PEST++ suite should look at PESTPP-IES.
+
 ## <a id='s10-1b' />6.2 Highly Parameterized Inversion
 
 ### <a id='s10-1-1' />6.2.1 Basic Equations
