@@ -18,6 +18,39 @@
 #include "EnsembleSmoother.h"
 
 
+namespace
+{
+	//the one place that knows how ++save_dense and ++save_binary map onto a file extension, so
+	//every ensemble sqp writes lands in the same format.  same three-way choice, and the same
+	//precedence, that ies and mou use: dense wins, then jcb, then csv.
+	//
+	//a template rather than an Ensemble& because to_csv()/to_binary()/to_dense() are NOT
+	//virtual: ParameterEnsemble and ObservationEnsemble each shadow them (par back-transforms
+	//to ctl space, obs writes transposed), so taking the base type here would compile and then
+	//silently write the wrong thing.
+	template <typename EnsembleType>
+	string write_ensemble(EnsembleType& en, const string& stem, const PestppOptions& ppo)
+	{
+		string fname;
+		if (ppo.get_save_dense())
+		{
+			fname = stem + ".bin";
+			en.to_dense(fname);
+		}
+		else if (ppo.get_save_binary())
+		{
+			fname = stem + ".jcb";
+			en.to_binary(fname);
+		}
+		else
+		{
+			fname = stem + ".csv";
+			en.to_csv(fname);
+		}
+		return fname;
+	}
+}
+
 bool SqpFilter::accept(double obj_val, double violation_val, double violation_padded, Parameters p, Observations o, string rname, int iter, bool keep)
 {
 	FilterRec candidate{ obj_val, violation_val,iter, p, o, rname, violation_padded };
@@ -402,7 +435,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 				throw_sqp_error(string("error processing dv csv file"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin") == 0))
 		{
 			message(1, "loading dv ensemble from binary file", dv_file);
 			try
@@ -411,17 +444,17 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			}
 			catch (const exception &e)
 			{
-				ss << "error processing dv jcb file: " << e.what();
+				ss << "error processing dv binary file: " << e.what();
 				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_sqp_error(string("error processing dv jcb file"));
+				throw_sqp_error(string("error processing dv binary file"));
 			}
 		}
 		else
 		{
-			ss << "unrecognized dv ensemble file extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized dv ensemble file extension " << par_ext << ", looking for csv, jcb, jco or bin";
 			throw_sqp_error(ss.str());
 		}
 
@@ -836,7 +869,7 @@ bool SeqQuadProgram::initialize_restart()
 			throw_sqp_error(string("error processing restart obs csv"));
 		}
 	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin") == 0))
 	{
 		message(1, "loading restart obs ensemble from binary file", obs_restart_csv);
 		try
@@ -855,7 +888,7 @@ bool SeqQuadProgram::initialize_restart()
 	}
 	else
 	{
-		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, jco or bin";
 		throw_sqp_error(ss.str());
 	}
 	
@@ -1179,9 +1212,9 @@ void SeqQuadProgram::initialize()
 			message(0, "control file parameter value run failed...bummer");
 			throw_sqp_error("control file parameter value run failed");
 		}
-		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
+		string obs_csv = write_ensemble(_oe, file_manager.get_base_filename() + ".obs",
+			pest_scenario.get_pestpp_options());
 		message(1, "saving results from control file parameter value run to ", obs_csv);
-		_oe.to_csv(obs_csv);
 		Eigen::VectorXd o = _oe.get_real_vector(BASE_REAL_NAME);
 		current_obs = pest_scenario.get_ctl_observations();
 		current_obs.update_without_clear(_oe.get_var_names(), o);
@@ -1691,16 +1724,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	dv.check_for_normal("initial transformed dv ensemble");
 	ss.str("");
 
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << ".0.par.jcb";
-		dv.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << ".0.par.csv";
-		dv.to_csv(ss.str());
-	}
+	ss << write_ensemble(dv, file_manager.get_base_filename() + ".0.par",
+		pest_scenario.get_pestpp_options());
 	message(1, "saved initial dv ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("observation ensemble");
@@ -1721,9 +1746,9 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		_pe.reserve(vector<string>(), dv.get_var_names());
 		_pe.set_trans_status(dv.get_trans_status());
 		_pe.append(MEAN_REAL_NAME, pars);
-		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
+		string par_csv = write_ensemble(_pe, file_manager.get_base_filename() + ".mean.par",
+			pest_scenario.get_pestpp_options());
 		message(1, "saving mean dv values to ", par_csv);
-		_pe.to_csv(par_csv);
 		dv_base = _pe;
 		dv_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
@@ -1740,9 +1765,9 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 			message(0, "mean dv value run failed...bummer");
 			return;
 		}
-		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
+		string obs_csv = write_ensemble(_oe, file_manager.get_base_filename() + ".mean.obs",
+			pest_scenario.get_pestpp_options());
 		message(1, "saving results from mean dv value run to ", obs_csv);
-		_oe.to_csv(obs_csv);
 
 
         Eigen::VectorXd o = _oe.get_real_vector(MEAN_REAL_NAME);
@@ -1780,16 +1805,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	ObservationEnsemble combined_oe = combine_obs_and_pi(oe, dv);
 
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << ".0.obs.jcb";
-		combined_oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << ".0.obs.csv";
-		combined_oe.to_csv(ss.str());
-	}
+	ss << write_ensemble(combined_oe, file_manager.get_base_filename() + ".0.obs",
+		pest_scenario.get_pestpp_options());
 	message(1, "saved initial obs ensemble to", ss.str());
 
 	save_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
@@ -3709,7 +3726,6 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 
 	dv_candidates.enforce_bounds(performance_log, false);
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 
 	if (!recalc)
 		dv_to_save = dv_candidates;
@@ -3732,7 +3748,8 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 		}
 	}
 
-	dv_candidates.to_csv(ss.str());
+	ss << write_ensemble(dv_candidates, file_manager.get_base_filename() + "." + to_string(iter)
+		+ ".dv_candidates", pest_scenario.get_pestpp_options());
 	message(1, "saved trust region candidate ensemble to:", ss.str());
 
 	Eigen::VectorXd v1, v2;
@@ -3790,8 +3807,8 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 
 	ObservationEnsemble combined_oe_candidates = combine_obs_and_pi(oe_to_save, dv_to_save);
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
-	combined_oe_candidates.to_csv(ss.str());
+	ss << write_ensemble(combined_oe_candidates, file_manager.get_base_filename() + "."
+		+ to_string(iter) + ".oe_candidates", pest_scenario.get_pestpp_options());
 	message(1, "saved trust region candidate ensemble obs to:", ss.str());
 
 	ParameterEnsemble dv_all = dv;
@@ -4098,8 +4115,6 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 		dv_candidates.enforce_bounds(performance_log, false);
 
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
-	
 	const vector<string> cand_real_names = dv_candidates.get_real_names();
 	if (!recalc)
 		dv_to_save = dv_candidates;
@@ -4281,14 +4296,14 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 	}
 
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
-	dv_to_save.to_csv(ss.str());
+	ss << write_ensemble(dv_to_save, file_manager.get_base_filename() + "." + to_string(iter)
+		+ ".dv_candidates", pest_scenario.get_pestpp_options());
 	message(1, "saved candidate decvar/parameter ensemble to: ", ss.str());
 
 	ObservationEnsemble combined_oe_candidates = combine_obs_and_pi(oe_to_save, dv_to_save);
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
-	combined_oe_candidates.to_csv(ss.str());
+	ss << write_ensemble(combined_oe_candidates, file_manager.get_base_filename() + "."
+		+ to_string(iter) + ".oe_candidates", pest_scenario.get_pestpp_options());
 	message(1, "saved candidate ensemble obs to: ", ss.str());
 
 	ParameterEnsemble dv_all = dv;
@@ -5616,29 +5631,13 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
-		_oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".obs.csv";
-		_oe.to_csv(ss.str());
-	}
+	ss << write_ensemble(_oe, file_manager.get_base_filename() + "." + to_string(iter) + ".obs",
+		pest_scenario.get_pestpp_options());
 	frec << "      obs ensemble saved to " << ss.str() << endl;
 	cout << "      obs ensemble saved to " << ss.str() << endl;
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
-		_dv.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-		_dv.to_csv(ss.str());
-	}
+	ss << write_ensemble(_dv, file_manager.get_base_filename() + "." + to_string(iter) + ".par",
+		pest_scenario.get_pestpp_options());
 	if (save_base)
 	{
 		save_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, iter);
