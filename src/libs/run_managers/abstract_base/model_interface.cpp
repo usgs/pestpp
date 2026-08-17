@@ -11,6 +11,10 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+#include <cerrno>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
 #include <sstream>
 #include <thread>
 #include <unordered_set>
@@ -1239,6 +1243,163 @@ string TemplateFile::read_line( ifstream& f_tpl)
  *
  * @return Description.
  */
+/**
+ * @brief PROTOTYPE: turn an output-file token into a double, or say why not.
+ *
+ * See the header for what this is for. The order matters: a straight parse first, so anything
+ * that reads correctly today reads identically, and only then the fortran repair.
+ *
+ * The repair is narrow ON PURPOSE. The whole risk of a fall-back like this is that it turns
+ * something that is not a number into a number - "10-20" into 1.0e-19, a date into a
+ * magnitude - and hands back a confident wrong answer, which is worse than the refusal it
+ * replaced. So it insists on all of:
+ *
+ *   - a mantissa with a decimal point in it, which is what kills "10-20" and "2024-01-15";
+ *     every fortran E/ES/D descriptor writes the point
+ *   - exactly one exponent sign, after at least one mantissa digit, not at the very end
+ *   - nothing but digits after that sign, at most three of them (a double cannot need more:
+ *     the extreme exponents are 308 and 324)
+ *   - nothing left over
+ *
+ * A 'd' or 'D' exponent marker is handled by the same path, since it fails for the same
+ * reason and is the same fortran-ism.
+ */
+bool InstructionFile::try_parse_double(const string& token, double& value, string& why)
+{
+	value = 0.0;
+	why.clear();
+	if (token.empty())
+	{
+		why = "empty token";
+		return false;
+	}
+
+	//classify what strtod made of a candidate string.  errno rather than the return value
+	//alone, because a subnormal and a genuine small number are not distinguishable after the
+	//fact, and inf could have been written literally
+	auto convert = [&](const string& text, double& out, string& problem) -> bool
+	{
+		errno = 0;
+		const char* start = text.c_str();
+		char* end = nullptr;
+		double v = strtod(start, &end);
+		if (end == start)
+		{
+			problem = "no number found";
+			return false;
+		}
+		//trailing whitespace is fine; anything else is left-over junk
+		while ((*end != '\0') && (isspace((unsigned char)*end) != 0))
+			end++;
+		if (*end != '\0')
+		{
+			problem = "left-over chars: '" + string(end) + "'";
+			return false;
+		}
+		if (isnan(v))
+		{
+			problem = "not a number";
+			return false;
+		}
+		if (isinf(v))
+		{
+			//either "inf" was written literally or the exponent is past DBL_MAX.  both mean
+			//the model has no answer for us, and both must stay refusals
+			problem = "value overflows a double";
+			return false;
+		}
+		if ((errno == ERANGE) || ((v != 0.0) && (!isnormal(v))))
+		{
+			//underflow: subnormal, or all the way to zero.  ERANGE alone is not enough to
+			//call it underflow - overflow sets it too - but inf was already handled above
+			out = 0.0;
+			return true;
+		}
+		out = v;
+		return true;
+	};
+
+	string problem;
+	if (convert(token, value, problem))
+		return true;
+
+	//straight parse failed - try the fortran forms
+	string repaired = token;
+	bool has_marker = false;
+	for (size_t i = 0; i < repaired.size(); i++)
+	{
+		if ((repaired[i] == 'd') || (repaired[i] == 'D'))
+		{
+			repaired[i] = 'E';
+			has_marker = true;
+			break;
+		}
+		if ((repaired[i] == 'e') || (repaired[i] == 'E'))
+		{
+			has_marker = true;
+			break;
+		}
+	}
+	if (!has_marker)
+	{
+		//no exponent marker at all: look for the exponent's sign, which must sit after the
+		//mantissa rather than in front of it
+		size_t sign_pos = string::npos;
+		int n_signs = 0;
+		for (size_t i = 1; i < repaired.size(); i++)
+		{
+			if ((repaired[i] == '+') || (repaired[i] == '-'))
+			{
+				n_signs++;
+				sign_pos = i;
+			}
+		}
+		bool ok = (n_signs == 1) && (sign_pos != string::npos) && (sign_pos + 1 < repaired.size());
+		if (ok)
+		{
+			string mantissa = repaired.substr(0, sign_pos);
+			string exponent = repaired.substr(sign_pos + 1);
+			//the mantissa must contain a digit AND a decimal point, and the exponent must be
+			//nothing but one to three digits
+			bool m_digit = false, m_point = false;
+			for (auto c : mantissa)
+			{
+				if (isdigit((unsigned char)c) != 0) m_digit = true;
+				else if (c == '.') m_point = true;
+			}
+			//EXACTLY three digits, not "up to three".  fortran drops the E/D only when the
+			//exponent needs three digits - a one or two digit exponent always keeps its
+			//marker, zero-padded (1e-99 goes out as E-99, never as -99), and that holds for
+			//es/e/en/d/g editing and at any field width.  so anything with a shorter exponent
+			//was not written by a fortran format, and reading "1.5-2" as 0.015 would be
+			//inventing a number out of what is much more likely a subtraction or a range.
+			bool e_digits = (exponent.size() == 3);
+			for (auto c : exponent)
+				if (isdigit((unsigned char)c) == 0)
+					e_digits = false;
+			if (m_digit && m_point && e_digits)
+				repaired.insert(sign_pos, "E");
+			else
+				ok = false;
+		}
+		if (!ok)
+		{
+			why = problem;
+			return false;
+		}
+	}
+	if (repaired == token)
+	{
+		why = problem;
+		return false;
+	}
+	string second_problem;
+	if (convert(repaired, value, second_problem))
+		return true;
+	why = second_problem;
+	return false;
+}
+
 string InstructionFile::read_ins_line(ifstream& f_ins)
 {
 	if (f_ins.bad())
@@ -1811,28 +1972,14 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	}
 	int len = (info.second.second - info.second.first) + 1;
 	temp = last_out_line.substr(info.second.first, len);
-	size_t idx = 0;
-	try
+	string why;
+	if ((!try_parse_double(temp, value, why)) && (info.first != "DUM"))
 	{
-		//pest_utils::convert_ip(temp, value);
-		value = stod(temp,&idx);
-	}
-	catch (...)
-	{
-		if (info.first != "DUM")
-		throw_ins_error("error casting fixed observation instruction '" + token + "' from output string '" + temp + "' on line '" + line + "'",ins_line_num, out_line_num);
-	}
-	if ((info.first != "DUM") && (idx != temp.size()))
-	{
-		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruction: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruction: '" + token + "': " + why, ins_line_num, out_line_num);
 	}
 	int pos = line.find(temp);
 	if (pos == string::npos)
 		throw_ins_error("internal error: string t: '"+temp+"' not found in line: '"+line+"'",ins_line_num,out_line_num);
-	if ((value != 0.0) && (!isnormal(value)))
-	{
-		throw_ins_error("casting '" + temp + "' to double yielded denormal value on line '" + line + "' for fixed observation instruction '" + token + "'", ins_line_num, out_line_num);
-	}
 	line = line.substr(pos + temp.size());
 	
 	return pair<string, double>(info.first,value);
@@ -1868,28 +2015,14 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 		throw_ins_error("no non-whitespace char found before end index in semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num,out_line_num);
 	pest_utils::tokenize(last_out_line.substr(pos), tokens);
 	temp = tokens[0];
-	size_t idx = 0;
-	try
+	string why;
+	if ((!try_parse_double(temp, value, why)) && (info.first != "DUM"))
 	{
-		//pest_utils::convert_ip(temp, value);
-		value = stod(temp,&idx);
-	}
-	catch (...)
-	{
-		if (info.first != "DUM")
-			throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
-	}
-	if ((info.first != "DUM") && (idx != tokens[0].size()))
-	{
-		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruction: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruction: '" + token + "': " + why, ins_line_num, out_line_num);
 	}
 	pos = line.find(temp);
 	if (pos == string::npos)
 		throw_ins_error("internal error: temp '" + temp + "' not found in line: '" + line + "'", ins_line_num, out_line_num);
-	if ((value != 0.0) && (!isnormal(value)))
-	{
-		throw_ins_error("casting '" + temp + "' to double yielded denormal value for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
-	}
 	line = line.substr(pos + temp.size());
 	return pair<string, double>(info.first,value);
 }
@@ -1917,29 +2050,15 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value = 1.0e+30;
-	std::size_t idx = 0;
-	try
+	string why;
+	if ((!try_parse_double(tokens[0], value, why)) && (name != "DUM"))
 	{
-		//pest_utils::convert_ip(tokens[0], value);
-		value = stod(tokens[0],&idx);
-	}
-	catch (...)
-	{
-		if (name != "DUM")
-			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruction: '"+token+"'", ins_line_num, out_line_num);
-	}
-	if ((name != "DUM") && (idx != tokens[0].size()))
-	{
-		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruction: '" + token + "', left-over chars: '" + tokens[0].substr(idx,tokens[0].size())+"'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruction: '" + token + "': " + why, ins_line_num, out_line_num);
 	}
 	int pos = line.find(tokens[0]);
 	if (pos == string::npos)
 	{
 		throw_ins_error("internal error: could not find free obs token '"+tokens[0]+"'", ins_line_num, out_line_num);
-	}
-	if ((value != 0.0) && (!isnormal(value)))
-	{
-		throw_ins_error("casting '" + tokens[0] + "' to double yielded denormal value for free instruction: '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + tokens[0].size());
 

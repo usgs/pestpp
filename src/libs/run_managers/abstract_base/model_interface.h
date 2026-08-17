@@ -89,6 +89,38 @@ public:
 	void try_read_output_file(const string& output_filename, Observations& obs,
 		vector<string>& missing, vector<string>& problems);
 	void set_additional_delimiters(string delims) { additional_delimiters = delims; }
+
+	/**
+	 * @brief What the three obs instructions do when they turn a token into a double.
+	 *
+	 * PROTOTYPE. Static and public so it can be tested on its own rather than only through an
+	 * instruction file - this is the one place a model's output becomes a number, so it wants
+	 * hammering directly.
+	 *
+	 * Two things it does that a bare stod() does not:
+	 *
+	 * 1. The FORTRAN fall-back. `Ew.d`/`ESw.d` drop the 'E' once the exponent needs three
+	 *    digits, so a model writes `0.3000000-309` or `3.0000000-310`, and 'D' exponents are
+	 *    still common in older code. Both are rejected by stod(). This is only ever tried
+	 *    AFTER a straight parse has failed, so nothing that reads correctly today changes.
+	 *    It is deliberately narrow - see the .cpp - because the failure mode of a loose
+	 *    fall-back is inventing a plausible number out of something that is not one.
+	 *
+	 * 2. Underflow rounds to zero instead of being refused. A subnormal carries so few
+	 *    significant bits that it is noise, and a model that produced one is telling us its
+	 *    answer is zero. Overflow, inf and nan are still refused: those are not small, they
+	 *    are wrong.
+	 *
+	 * strtod() rather than stod() underneath on purpose: stod() throws out_of_range on
+	 * underflow, which destroys the value before we can decide it is a zero.
+	 *
+	 * @param token  the string lifted out of the output file
+	 * @param value  the number, on success
+	 * @param why    on failure, what was wrong, for the caller's error message
+	 * @return true if token is a number we are willing to use
+	 */
+	static bool try_parse_double(const string& token, double& value, string& why);
+
 private:
 	/// The parse, writing into a caller-owned Observations so a throw does not destroy what
 	/// was read. Both public readers are thin wrappers over this.

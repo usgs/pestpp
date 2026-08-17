@@ -1493,6 +1493,57 @@ def ins_missing_e_test():
         raise Exception("should have failed")
 
 
+def ins_fortran_missing_e_test():
+    """the other half of ins_missing_e_test: fortran's OWN missing-e form must read.
+
+    'Ew.d'/'ESw.d' drop the 'E' once the exponent needs three digits, so a model writing
+    with e15.7 emits '0.3000000-309'.  that has to be readable, while the form with no
+    decimal point ('12345-123', see ins_missing_e_test) has to stay an error - without the
+    point there is nothing to tell an exponent from a subtraction or a date.
+    """
+    import os
+    import shutil
+    import numpy as np
+    import pyemu
+    t_d = os.path.join("tplins_test_1","test_fortran_missing_e")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+    bd = os.getcwd()
+    os.chdir(t_d)
+    # o1: e-less and normal.  o2: e-less and subnormal, which rounds to zero.  o3: ordinary
+    with open("model.output.bak",'w') as f:
+        f.write("  0.3000000-307\n")
+        f.write("  0.3000000-309\n")
+        f.write("    1.0000000E+00\n")
+    with open("model.output.ins",'w') as f:
+        f.write("pif ~\nl1 !o1!\nl1 !o2!\nl1 !o3!\n")
+    with open("model.input.tpl",'w') as f:
+        f.write("ptf ~\np1 ~   p1   ~\n")
+    with open("forward_run.py",'w') as f:
+        f.write("import shutil\n")
+        f.write("shutil.copy2('model.output.bak','model.output')\n")
+    shutil.copy2("model.output.bak","model.output")
+    pst = pyemu.Pst.from_io_files("model.input.tpl","model.input",
+                                 "model.output.ins","model.output")
+    pst.parameter_data.loc[:,"partrans"] = "none"
+    pst.observation_data.loc[:,"weight"] = 1.0
+    pst.model_command = "python forward_run.py"
+    pst.control_data.noptmax = 0
+    pst.write("test.pst")
+    os.chdir(bd)
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=t_d)
+    res = pyemu.Pst(os.path.join(t_d,"test.pst")).res
+    assert res is not None,"no residuals file"
+    o1 = res.loc["o1","modelled"]
+    o2 = res.loc["o2","modelled"]
+    o3 = res.loc["o3","modelled"]
+    assert np.isclose(o1,3.0e-308,rtol=1.0e-12),"e-less normal read as {0}".format(o1)
+    assert o2 == 0.0,"e-less subnormal should round to zero, got {0}".format(o2)
+    assert np.isclose(o3,1.0),"ordinary value read as {0}".format(o3)
+    print("ins_fortran_missing_e_test passed: {0}, {1}, {2}".format(o1,o2,o3))
+
+
 def prep_ends():
     model_d = "mf6_freyberg"
     base_d = scratch_template(os.path.join(model_d, "template"))

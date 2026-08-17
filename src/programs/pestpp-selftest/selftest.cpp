@@ -17,6 +17,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <limits>
 #include "pest_data_structs.h"
 #include "Pest.h"
 #include "FileManager.h"
@@ -848,6 +849,539 @@ static void test_instruction_file_tolerant_read()
  * makes partial results usable at all: ANY value reported must equal what the strict reader
  * gets from the complete file. Absent is fine. Different is not.
  */
+/**
+ * @brief PROTOTYPE policy: what a token from an output file is allowed to become.
+ *
+ * This is the narrowest, most dangerous code in the model interface - it is where a model's
+ * text becomes the number phi is computed from - so it gets tested three ways: the policy
+ * function on its own, then through all three obs instructions, then through the tolerant
+ * reader. The rule being pinned has two halves:
+ *
+ *   - the whole NORMAL double range round-trips bit-for-bit, and underflow becomes zero
+ *     rather than an error, because a subnormal is noise and a model that produced one is
+ *     telling us its answer is zero;
+ *   - overflow, inf and nan stay refusals, and - the part that matters most - a string that
+ *     is not a number must never come back AS a number. Every "must refuse" case below is
+ *     there because some plausible-looking piece of text could otherwise be turned into a
+ *     confident wrong answer.
+ *
+ * The fortran fall-back is why that last risk exists at all: `Ew.d` drops the 'E' when the
+ * exponent needs three digits, so "0.3000000-309" has to be readable, but "10-20" must not
+ * become 1.0e-19.
+ */
+static void test_parse_double_policy()
+{
+    cout << "[output doubles: normals round-trip, underflow -> 0, junk stays refused]" << endl;
+    const double dmax = numeric_limits<double>::max();
+    const double dmin = numeric_limits<double>::min();
+
+    // ---- readable, and exactly ------------------------------------------------------------
+    vector<pair<string, double>> exact = {
+        {"0", 0.0}, {"0.0", 0.0}, {"-0.0", 0.0},
+        {"1", 1.0}, {"-1", -1.0}, {"1.5", 1.5}, {"-1.5", -1.5},
+        {"1.0e0", 1.0}, {"1.0E0", 1.0}, {"1e10", 1.0e10}, {"1E-10", 1.0e-10},
+        {"  2.5  ", 2.5},                       // leading/trailing whitespace is fine
+        {"1.5       ", 1.5},                    // a fixed-width field brings its blanks along
+        {"\t1.5\t", 1.5},
+        {"1.7976931348623157e+308", dmax},      // DBL_MAX
+        {"-1.7976931348623157e+308", -dmax},
+        {"2.2250738585072014e-308", dmin},      // smallest normal
+        {"-2.2250738585072014e-308", -dmin},
+        {"1.0e-307", 1.0e-307}, {"1.0e+307", 1.0e+307},
+        {"1.0e-100", 1.0e-100}, {"1.0e+100", 1.0e+100},
+        {"3.14159265358979", 3.14159265358979},
+        {"1.0d0", 1.0},                         // fortran D exponent
+        {"1.0D-10", 1.0e-10},
+        {"-2.5D+02", -250.0},
+        {"0.3000000-307", 0.3000000e-307},      // fortran e15.7, E dropped, still normal
+        {"0.1000000-100", 0.1000000e-100},      // e-less but an ordinary normal number
+        {"1.0000000+100", 1.0000000e+100},
+        {"1.0000000-099", 1.0e-99},             // three-digit exponent with a leading zero
+        {"-0.5000000+300", -0.5e300},
+    };
+    for (auto& c : exact)
+    {
+        double v = -12345.0;
+        string why;
+        bool ok = InstructionFile::try_parse_double(c.first, v, why);
+        CHK(ok, "'" + c.first + "' must be readable (got: " + why + ")");
+        if (ok)
+            CHK(v == c.second, "'" + c.first + "' must read exactly");
+    }
+
+    // ---- readable, and zero: every flavour of underflow -----------------------------------
+    vector<string> to_zero = {
+        "1.0e-310",                     // subnormal
+        "-1.0e-310",
+        "4.9406564584124654e-324",      // denorm_min
+        "1.0e-320",
+        "1.0e-400",                     // underflows all the way
+        "-1.0e-400",
+        "1.0e-4000",
+        "0.1000000-320",                // fortran forms underflow too
+        "0.3000000-309",                // 3e-310 - looks ordinary, is subnormal
+        "3.0000000-310",
+        "1.0D-310",
+    };
+    for (auto& t : to_zero)
+    {
+        double v = -12345.0;
+        string why;
+        bool ok = InstructionFile::try_parse_double(t, v, why);
+        CHK(ok, "underflow '" + t + "' must be read as zero, not refused (got: " + why + ")");
+        if (ok)
+            CHK(v == 0.0, "underflow '" + t + "' must be exactly zero, got " + to_string(v));
+    }
+
+    // ---- refused: too big, not a number, or not a number AT ALL ---------------------------
+    // the second group is the important one. each of these could be turned into a number by a
+    // careless fall-back, and every one of them would be a silent wrong answer
+    vector<string> refused = {
+        "1.0e+309", "-1.0e+309", "1.0e400", "1.7976931348623157e+309",   // overflow
+        "inf", "-inf", "Inf", "INF", "nan", "NaN", "-nan",               // not numbers
+        "infinity",
+        "", " ", "\t", "abc", "--1.0", "1.0.0", "1.0e", "1.0e+", "e10", ".",
+        "1.0e+10x", "1.0 2.0", "1,5",
+        "10-20",              // no decimal point: must NOT become 1.0e-19
+        "1-2",                // ditto
+        "2024-01-15",         // a date, two signs
+        "1.0-2-3",            // two exponent signs
+        "1.0-",               // sign at the end
+        "-1.0-",
+        "1.0-2.5",            // exponent is not an integer
+        "1.0-1234",           // four exponent digits: no double needs one
+        "1.5-2",              // one exponent digit: fortran keeps the E below 100, so this
+        "1.0-99",             // two digits: ditto - E-99 is what a model actually writes
+        "0.3000000-99",
+        "-1.5-2",
+        ".-309",              // no mantissa digit
+        "+-1.0",
+        "1.0e-310e5",
+    };
+    for (auto& t : refused)
+    {
+        double v = -12345.0;
+        string why;
+        bool ok = InstructionFile::try_parse_double(t, v, why);
+        CHK(!ok, "'" + t + "' must be refused, not turned into " + to_string(v));
+        if (!ok)
+            CHK(!why.empty(), "a refusal of '" + t + "' must say why");
+    }
+
+    // ---- what fortran actually writes ----------------------------------------------------
+    // taken from gfortran output: the E/D is dropped only when the exponent needs three
+    // digits. one and two digit exponents keep the marker, zero-padded, so they arrive in a
+    // form strtod reads on its own and never touch the fall-back at all
+    vector<pair<string, double>> fortran_real_output = {
+        {"1.0000000E+00", 1.0},          {"1.0000000E-05", 1.0e-5},
+        {"1.0000000E-09", 1.0e-9},       {"1.0000000E-99", 1.0e-99},
+        {"0.1000000E-98", 0.1e-98},      {"0.1000000E-99", 0.1e-99},
+        {"0.1000000D+01", 1.0},          {"0.1000000D-98", 0.1e-98},
+        {"0.1000000D-99", 0.1e-99},      {"0.1000E-99", 0.1e-99},
+        {"1.0000000-100", 1.0e-100},     {"0.1000000-306", 0.1e-306},
+        {"0.1000000+101", 0.1e101},      {"0.1000000+309", 0.1e309},
+        {"0.1000-306", 0.1e-306},        {"1.0000000+308", 1.0e308},
+        {"100.0000000-102", 100.0e-102}, {"10.0000000E-06", 10.0e-6},
+        {"100.0000000+306", 100.0e306},  {"1.0000000000000000E-099", 1.0e-99},
+    };
+    for (auto& c : fortran_real_output)
+    {
+        double v = -12345.0;
+        string why;
+        bool ok = InstructionFile::try_parse_double(c.first, v, why);
+        CHK(ok, "gfortran writes '" + c.first + "', so it must be readable (got: " + why + ")");
+        if (ok)
+            CHK(v == c.second, "'" + c.first + "' must read exactly");
+    }
+
+    // ---- the fall-back must never change what already worked ------------------------------
+    // anything strtod reads on its own has to come back identical, fall-back or no fall-back
+    vector<string> already_fine = {
+        "1.0e-10", "1.0E-10", "-3.25e+07", "0.0001", "123456789.123456789",
+        "1.0e-307", "9.9e307", "0.5", "-0.5"
+    };
+    for (auto& t : already_fine)
+    {
+        double v = 0.0, direct = strtod(t.c_str(), nullptr);
+        string why;
+        CHK(InstructionFile::try_parse_double(t, v, why), "'" + t + "' must stay readable");
+        CHK(v == direct, "'" + t + "' must read the same as a plain strtod");
+    }
+
+    // ---- every decade, both signs, straight through ---------------------------------------
+    for (int e = -307; e <= 307; e += 1)
+    {
+        ostringstream os;
+        os << "1.0e" << e;
+        double v = 0.0, expect = strtod(os.str().c_str(), nullptr);
+        string why;
+        CHK(InstructionFile::try_parse_double(os.str(), v, why) && (v == expect),
+            "decade " + os.str() + " must round-trip");
+        ostringstream neg;
+        neg << "-1.0e" << e;
+        expect = strtod(neg.str().c_str(), nullptr);
+        CHK(InstructionFile::try_parse_double(neg.str(), v, why) && (v == expect),
+            "decade " + neg.str() + " must round-trip");
+    }
+
+    // ---- and the e-less form of every three-digit decade ----------------------------------
+    // this is exactly what a fortran model writes with e15.7 / es15.7
+    for (int e = 100; e <= 307; e += 1)
+    {
+        for (int sign = -1; sign <= 1; sign += 2)
+        {
+            ostringstream eless, with_e;
+            eless  << "0.3000000" << (sign < 0 ? "-" : "+") << e;
+            with_e << "0.3000000E" << (sign < 0 ? "-" : "+") << e;
+            double got = 0.0, expect = 0.0;
+            string why, why2;
+            bool ok = InstructionFile::try_parse_double(eless.str(), got, why);
+            bool ok_e = InstructionFile::try_parse_double(with_e.str(), expect, why2);
+            CHK(ok == ok_e, "fortran form " + eless.str() + " must be as readable as " + with_e.str());
+            if (ok && ok_e)
+                CHK(got == expect, "fortran form " + eless.str() + " must equal " + with_e.str());
+        }
+    }
+}
+
+/**
+ * @brief The same policy, but through actual instruction files.
+ *
+ * The policy function being right is not enough: all three obs instructions have to route
+ * through it, and DUM has to keep swallowing whatever it lands on.
+ */
+static void test_instruction_file_extreme_doubles()
+{
+    cout << "[instruction files: all three obs instructions share the policy]" << endl;
+    const string ins_name = "selftest_extreme.ins";
+    const string out_name = "selftest_extreme.out";
+    const double dmax = numeric_limits<double>::max();
+
+    struct Case { string text; bool readable; double expect; };
+    vector<Case> cases = {
+        {"1.7976931348623157e+308", true, dmax},
+        {"2.2250738585072014e-308", true, numeric_limits<double>::min()},
+        {"0.3000000-307",           true, 0.3000000e-307},   // fortran, no E, normal
+        {"0.3000000-309",           true, 0.0},              // fortran, no E, underflows
+        {"1.0D-10",                 true, 1.0e-10},          // fortran D exponent
+        {"1.0e-310",                true, 0.0},              // subnormal -> zero
+        {"1.0e-400",                true, 0.0},              // underflow -> zero
+        {"1.0e+309",                false, 0.0},             // overflow -> refused
+        {"nan",                     false, 0.0},
+        {"inf",                     false, 0.0},
+        {"10-20",                   false, 0.0},             // must not become 1e-19
+    };
+
+    // free format
+    {
+        ofstream f(ins_name);
+        f << "pif ~" << endl;
+        f << "l1 !v!" << endl;
+    }
+    for (auto& c : cases)
+    {
+        { ofstream f(out_name); f << " " << c.text << endl; }
+        InstructionFile ins(ins_name);
+        double got = -12345.0;
+        bool threw = false;
+        try { got = ins.read_output_file(out_name).get_rec("V"); }
+        catch (const exception&) { threw = true; }
+        if (c.readable)
+        {
+            CHK(!threw, "free instruction must read '" + c.text + "'");
+            if (!threw)
+                CHK(got == c.expect, "free instruction must read '" + c.text + "' exactly");
+        }
+        else
+            CHK(threw, "free instruction must refuse '" + c.text + "'");
+    }
+
+    // fixed and semi-fixed. the column range is derived from the text rather than written
+    // out: a range one short turns "...e-324" into "...e-32", an ordinary number, and the
+    // test would pass for the wrong reason
+    for (int which = 0; which < 2; ++which)
+    {
+        string kind = (which == 0 ? "fixed" : "semi-fixed");
+        char open_tag = (which == 0 ? '[' : '(');
+        char close_tag = (which == 0 ? ']' : ')');
+        for (auto& c : cases)
+        {
+            if (c.text.find(' ') != string::npos)
+                continue;
+            {
+                ofstream f(ins_name);
+                f << "pif ~" << endl;
+                f << "l1 " << open_tag << "v" << close_tag << "1:" << c.text.size() << endl;
+            }
+            { ofstream f(out_name); f << c.text << endl; }
+            InstructionFile ins(ins_name);
+            double got = -12345.0;
+            bool threw = false;
+            try { got = ins.read_output_file(out_name).get_rec("V"); }
+            catch (const exception&) { threw = true; }
+            if (c.readable)
+            {
+                CHK(!threw, kind + " instruction must read '" + c.text + "'");
+                if (!threw)
+                    CHK(got == c.expect, kind + " instruction must read '" + c.text + "' exactly");
+            }
+            else
+                CHK(threw, kind + " instruction must refuse '" + c.text + "'");
+        }
+    }
+
+    // A fixed-width field carries the blanks in its column range, and the value has to be
+    // readable anyway. This CHANGED with the policy: the old idx != temp.size() check refused
+    // "1.5    " outright, so any [obs]a:b whose range ran past the number was an error.
+    {
+        ofstream f(ins_name);
+        f << "pif ~" << endl;
+        f << "l1 [v]1:10" << endl;
+    }
+    for (auto& padded : vector<string>{"1.5       ", "     1.5  ", "       1.5"})
+    {
+        { ofstream f(out_name); f << padded << endl; }
+        InstructionFile ins(ins_name);
+        double got = 0.0;
+        bool threw = false;
+        try { got = ins.read_output_file(out_name).get_rec("V"); }
+        catch (const exception&) { threw = true; }
+        CHK(!threw, "a fixed field padded with blanks ('" + padded + "') must still read");
+        if (!threw)
+            CHK(got == 1.5, "a fixed field padded with blanks must read 1.5");
+    }
+    // but blanks are the only thing allowed to trail: a second token in the field is junk
+    {
+        ofstream f(out_name); f << "1.5    2.5" << endl;
+    }
+    {
+        InstructionFile ins(ins_name);
+        bool threw = false;
+        try { ins.read_output_file(out_name); }
+        catch (const exception&) { threw = true; }
+        CHK(threw, "a fixed field holding two numbers must be refused, not silently halved");
+    }
+
+    // DUM still swallows anything, including what everything else refuses
+    {
+        ofstream f(ins_name);
+        f << "pif ~" << endl;
+        f << "l1 !dum! !v!" << endl;
+    }
+    {
+        ofstream f(out_name); f << " nan 1.5" << endl;
+    }
+    {
+        InstructionFile ins(ins_name);
+        bool threw = false;
+        double got = 0.0;
+        try { got = ins.read_output_file(out_name).get_rec("V"); }
+        catch (const exception&) { threw = true; }
+        CHK(!threw, "DUM must swallow a token the policy refuses");
+        if (!threw)
+            CHK(got == 1.5, "the observation after a refused DUM token must still read");
+    }
+
+    // the tolerant reader agrees with the strict one, case for case
+    for (auto& c : cases)
+    {
+        {
+            ofstream f(ins_name);
+            f << "pif ~" << endl;
+            f << "l1 !v!" << endl;
+        }
+        { ofstream f(out_name); f << " " << c.text << endl; }
+        InstructionFile ins(ins_name);
+        Observations obs;
+        vector<string> missing, problems;
+        ins.try_read_output_file(out_name, obs, missing, problems);
+        if (c.readable)
+        {
+            CHK(obs.find("V") != obs.end(), "tolerant read must also read '" + c.text + "'");
+            if (obs.find("V") != obs.end())
+                CHK(obs.get_rec("V") == c.expect, "tolerant read of '" + c.text + "' must agree with strict");
+            CHK(problems.empty(), "a readable '" + c.text + "' is not a problem");
+        }
+        else
+        {
+            CHK(obs.find("V") == obs.end(), "a refused '" + c.text + "' must not appear in a tolerant read");
+            CHK(missing.size() == 1 && missing[0] == "V", "the refused observation must be named as missing");
+            CHK(problems.size() == 1, "the refusal of '" + c.text + "' must be reported, not thrown");
+        }
+    }
+
+    remove(ins_name.c_str());
+    remove(out_name.c_str());
+}
+
+/**
+ * @brief A fixed instruction must not be talked into a misread.
+ *
+ * Fixed instructions are the ones with a real misread hazard: the column range is written by
+ * hand, so it can slice a number anywhere, and whatever falls inside the range is what gets
+ * converted. The fortran fall-back widens what converts, which makes this worth its own test.
+ *
+ * The case that must fail is a decimal point in the EXPONENT - "0.3000000-30.9" and friends.
+ * A fall-back that accepted it would be reading "0.3000000-30" and quietly dropping the ".9",
+ * or worse inventing an exponent of -30.9, and either way handing back a number the model
+ * never wrote. It must fail by all three routes into the parser: no exponent marker at all, a
+ * 'D' marker, and an 'E' marker that never needed the fall-back in the first place.
+ *
+ * Worth knowing WHICH guard earns its keep here, because it is not the obvious one. Mutating
+ * the exponent-is-digits-only rule to allow '.' does not break these cases: after the 'E' is
+ * inserted, strtod stops at the '.' and the left-over-chars check in convert() refuses the
+ * string anyway. The digits-only rule pulls its weight elsewhere - the LENGTH half of it is
+ * what refuses "1.0-1234", which would otherwise become 1.0e-1234, underflow, and be reported
+ * as a perfectly innocent zero. Three layers, and each one is load-bearing for something:
+ * the mantissa must have a decimal point ("10-20"), the exponent is at most three digits
+ * ("1.0-1234"), and nothing may be left over ("0.3000000-30.9").
+ */
+static void test_fixed_instruction_misreads()
+{
+    cout << "[fixed instructions: a decimal in the exponent is not a number]" << endl;
+    const string ins_name = "selftest_misread.ins";
+    const string out_name = "selftest_misread.out";
+
+    vector<string> must_fail = {
+        "0.3000000-30.9",   // e-less, decimal in the exponent
+        "0.3000000+30.9",
+        "1.0-2.5",          // the short form of the same thing
+        "1.0D-2.5",         // ...with a fortran D marker
+        "1.0E-2.5",         // ...and with the marker it already had, which never went through
+        "1.0-2.5.5",        // more than one decimal in the exponent
+        "0.3000000-.309",   // exponent is nothing but a decimal and digits
+    };
+    for (auto& text : must_fail)
+    {
+        {
+            ofstream f(ins_name);
+            f << "pif ~" << endl;
+            f << "l1 [v]1:" << text.size() << endl;
+        }
+        { ofstream f(out_name); f << text << endl; }
+        InstructionFile ins(ins_name);
+        bool threw = false;
+        double got = -12345.0;
+        try { got = ins.read_output_file(out_name).get_rec("V"); }
+        catch (const exception&) { threw = true; }
+        CHK(threw, "fixed instruction must refuse '" + text
+            + "' rather than read it as " + to_string(got));
+
+        // and the same string must be refused by the policy on its own, and through free and
+        // semi-fixed, so no route into the parser is softer than the others
+        double v = -12345.0;
+        string why;
+        CHK(!InstructionFile::try_parse_double(text, v, why),
+            "the policy must refuse '" + text + "' directly too");
+        for (int which = 0; which < 2; ++which)
+        {
+            {
+                ofstream f(ins_name);
+                f << "pif ~" << endl;
+                if (which == 0)
+                    f << "l1 !v!" << endl;
+                else
+                    f << "l1 (v)1:" << text.size() << endl;
+            }
+            { ofstream f(out_name); f << (which == 0 ? " " : "") << text << endl; }
+            InstructionFile ins2(ins_name);
+            bool threw2 = false;
+            try { ins2.read_output_file(out_name); }
+            catch (const exception&) { threw2 = true; }
+            CHK(threw2, string(which == 0 ? "free" : "semi-fixed")
+                + " instruction must refuse '" + text + "' as well");
+        }
+    }
+
+    // A comma where a digit belongs is refused by a FIXED instruction, because the column
+    // range hands the whole field over including the comma. Free format is different on
+    // purpose: the comma is one of its token delimiters so that csv output can be read at all,
+    // so "0.3000000-30,9" is the token "0.3000000-30" followed by something free format never
+    // looks at. Both behaviours are right, and they are not the same behaviour.
+    {
+        const string with_comma = "0.3000000-30,9";
+        {
+            ofstream f(ins_name);
+            f << "pif ~" << endl;
+            f << "l1 [v]1:" << with_comma.size() << endl;
+        }
+        { ofstream f(out_name); f << with_comma << endl; }
+        {
+            InstructionFile ins(ins_name);
+            bool threw = false;
+            try { ins.read_output_file(out_name); }
+            catch (const exception&) { threw = true; }
+            CHK(threw, "a fixed field holding '" + with_comma + "' must be refused");
+        }
+        double v = -12345.0;
+        string why;
+        CHK(!InstructionFile::try_parse_double(with_comma, v, why),
+            "the policy must refuse '" + with_comma + "' as one token");
+        {
+            ofstream f(ins_name);
+            f << "pif ~" << endl;
+            f << "l1 !v!" << endl;
+        }
+        {
+            //free format splits at the comma, so the token is "0.3000000-30" - and that has a
+            //two digit exponent, which fortran would have written as E-30, so the exactly-
+            //three-digits rule refuses it. the two instruction types reach the same answer by
+            //different routes: fixed refuses the whole field, free refuses what is left of it
+            InstructionFile ins(ins_name);
+            bool threw = false;
+            try { ins.read_output_file(out_name).get_rec("V"); }
+            catch (const exception&) { threw = true; }
+            CHK(threw, "free format refuses the token before the comma: a 2-digit e-less exponent");
+        }
+    }
+
+    // Clipping the exponent IS caught, and by the exactly-three-digits rule rather than by
+    // anything that knows about column ranges: "0.3000000-307" read over 1:12 leaves
+    // "0.3000000-30", a two digit e-less exponent, which fortran never writes. Same for 1:11.
+    for (int end_col : vector<int>{12, 11})
+    {
+        {
+            ofstream f(ins_name);
+            f << "pif ~" << endl;
+            f << "l1 [v]1:" << end_col << endl;
+        }
+        { ofstream f(out_name); f << "0.3000000-307" << endl; }
+        InstructionFile ins(ins_name);
+        bool threw = false;
+        double got = -12345.0;
+        try { got = ins.read_output_file(out_name).get_rec("V"); }
+        catch (const exception&) { threw = true; }
+        CHK(threw, "a fixed range clipping the exponent (1:" + to_string(end_col)
+            + ") must be refused, not read as " + to_string(got));
+    }
+
+    // The misread that CANNOT be caught, recorded so nobody assumes it is protected against:
+    // a column range that stops before the exponent starts. "0.3000000-307" over 1:9 is
+    // "0.3000000", which is 0.3 - a real number, 308 orders of magnitude off, and nothing in
+    // the string says anything was cut. Only the range is wrong and the reader cannot see the
+    // range. If this ever starts throwing, that is an improvement and this check should be
+    // updated to say so.
+    {
+        {
+            ofstream f(ins_name);
+            f << "pif ~" << endl;
+            f << "l1 [v]1:9" << endl;
+        }
+        { ofstream f(out_name); f << "0.3000000-307" << endl; }
+        InstructionFile ins(ins_name);
+        double got = 0.0;
+        bool threw = false;
+        try { got = ins.read_output_file(out_name).get_rec("V"); }
+        catch (const exception&) { threw = true; }
+        CHK(!threw, "a range stopping before the exponent still yields a number (known limitation)");
+        if (!threw)
+            CHK(got == 0.3, "the clipped read is 0.3, not the 3e-308 the model wrote (known limitation)");
+    }
+
+    remove(ins_name.c_str());
+    remove(out_name.c_str());
+}
+
 static void test_instruction_file_partial_reads_are_never_wrong()
 {
     cout << "[instruction files: a partial read is incomplete, never wrong]" << endl;
@@ -1730,6 +2264,9 @@ int main()
     test_subset_names_survive_membership_change();
     test_read_file_tail();
     test_instruction_file_tolerant_read();
+    test_parse_double_policy();
+    test_instruction_file_extreme_doubles();
+    test_fixed_instruction_misreads();
     test_instruction_file_partial_reads_are_never_wrong();
     test_model_interface_partial_across_files();
     test_instruction_file_partial_real_case();
