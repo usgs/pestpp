@@ -29,6 +29,7 @@
 #include "MOEA.h"
 #include "SQP.h"
 #include "model_interface.h"
+#include "network_package.h"
 #include "utilities.h"
 #include "RunStorage.h"
 
@@ -1236,6 +1237,53 @@ static void test_instruction_file_extreme_doubles()
  * the mantissa must have a decimal point ("10-20"), the exponent is at most three digits
  * ("1.0-1234"), and nothing may be left over ("0.3000000-30.9").
  */
+/**
+ * @brief Who the master will send REQ_PARTIAL to.
+ *
+ * Getting this wrong is expensive in both directions. Answering "no" for an agent that can
+ * report partials means preemption silently does nothing - which is the bug this test was
+ * written for: the capability was announced only in READY, and an agent does not send READY
+ * until it has FINISHED a run, so the master skipped it for the whole of the first run.
+ * Answering "yes" for an agent that cannot is worse: REQ_PARTIAL reaches an in-run loop that
+ * treats it as corrupt and kills the run.
+ *
+ * So the recogniser has to be exact, and it has to say no to anything it does not positively
+ * recognise. The strings below are the real ones from PantherAgent: the handshake LINPACK
+ * text, the two READY texts, and what an older agent sends in their place.
+ */
+static void test_partial_capability_handshake()
+{
+    cout << "[panther: an agent's partial-results capability is recognised before its first run]" << endl;
+
+    // what a current agent sends
+    CHK(NetPackage::advertises_partial(NetPackage::PARTIAL_CAPABILITY_TAG),
+        "the LINPACK handshake text must advertise support");
+    CHK(NetPackage::advertises_partial(string("lets do it ") + NetPackage::PARTIAL_CAPABILITY_TAG),
+        "the post-run READY text must advertise support");
+    CHK(NetPackage::advertises_partial(string("run completed ") + NetPackage::PARTIAL_CAPABILITY_TAG),
+        "a run-status READY text must advertise support");
+
+    // what an older agent sends in the same places: LINPACK carried an empty string and READY
+    // carried the status text on its own
+    CHK(!NetPackage::advertises_partial(""),
+        "an older agent's empty LINPACK text must NOT advertise support");
+    CHK(!NetPackage::advertises_partial("lets do it"),
+        "an older agent's READY text must NOT advertise support");
+    CHK(!NetPackage::advertises_partial("run completed"),
+        "an older agent's run-status READY must NOT advertise support");
+
+    // and nothing that merely looks similar counts, because a false yes kills runs
+    for (auto& txt : vector<string>{"partial", "partial=", "partial=0", "partials=1", "PARTIAL=1",
+                                    "no partial", "1=partial", "partia1=1"})
+        CHK(!NetPackage::advertises_partial(txt),
+            "'" + txt + "' must not be mistaken for the capability tag");
+
+    // the tag is a substring match on free-form text, so it must still be found when the agent
+    // has something else to say
+    CHK(NetPackage::advertises_partial(string("host=abc ") + NetPackage::PARTIAL_CAPABILITY_TAG + " dir=/tmp"),
+        "the tag must be found among other free-form text");
+}
+
 static void test_fixed_instruction_misreads()
 {
     cout << "[fixed instructions: a decimal in the exponent is not a number]" << endl;
@@ -2267,6 +2315,7 @@ int main()
     test_parse_double_policy();
     test_instruction_file_extreme_doubles();
     test_fixed_instruction_misreads();
+    test_partial_capability_handshake();
     test_instruction_file_partial_reads_are_never_wrong();
     test_model_interface_partial_across_files();
     test_instruction_file_partial_real_case();

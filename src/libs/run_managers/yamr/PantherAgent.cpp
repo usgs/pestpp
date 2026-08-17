@@ -1034,7 +1034,14 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		{
 			report("received REQ_LINPACK",true);
 			//linpack_wrap();
-			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,"");
+			// LINPACK is the first message the master parses from us, and it happens BEFORE
+			// the first run is handed out, so this is where partial-results support has to be
+			// announced. It used to be announced only in READY, which an agent does not send
+			// until it has FINISHED a run - so the master skipped it for the whole of the
+			// first run, which is exactly the run a user wants to interrupt. The text is
+			// free-form and an older master ignores it.
+			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,
+				NetPackage::PARTIAL_CAPABILITY_TAG);
 			char data;
 			err = send_message(net_pack, &data, 0);
 			if (err.first != 1)

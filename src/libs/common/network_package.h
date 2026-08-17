@@ -32,9 +32,21 @@ public:
 
 	std::vector<std::string> pack_strings;
 	const static int DESC_LEN = 1001;
-	/// Announced by an agent in its READY text, and looked for by the master, to decide
-	/// whether REQ_PARTIAL is safe to send to it. See AgentInfoRec::get_supports_partial().
+	/// Announced by an agent in the free-form text of its LINPACK and READY messages, and
+	/// looked for by the master, to decide whether REQ_PARTIAL is safe to send to it. See
+	/// AgentInfoRec::get_supports_partial().
 	static constexpr const char* PARTIAL_CAPABILITY_TAG = "partial=1";
+	/// Does this message text advertise partial-results support?
+	///
+	/// Both places the master asks live in the same if/else chain, and the answer has to be
+	/// the same in both: an agent that says so during the handshake and an agent that says so
+	/// after a run are equally able to answer REQ_PARTIAL. Sending REQ_PARTIAL to one that
+	/// cannot is not a no-op - it treats the message as corrupt and kills the run - so this
+	/// says no for anything it does not positively recognise, empty text included.
+	static bool advertises_partial(const std::string& info_txt)
+	{
+		return info_txt.find(PARTIAL_CAPABILITY_TAG) != std::string::npos;
+	}
 	const static int NULL_DA_CYCLE = -9999;
 	const static int FILE_TRANS_BUF_SIZE = 102400;
 	std::pair<int,std::string> send(int sockfd, const void *data, int64_t data_len_l);

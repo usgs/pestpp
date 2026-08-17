@@ -1983,6 +1983,10 @@ void RunManagerPanther::process_message(int i_sock)
 	{
 		agent_info_iter->end_linpack();
 		agent_info_iter->set_state(AgentInfoRec::State::LINPACK_RCV);
+		// the handshake is the earliest we can learn this, and it has to be learned here: the
+		// next thing that happens to this agent is being given a run
+		if (NetPackage::advertises_partial(net_pack.get_info_txt()))
+			agent_info_iter->set_supports_partial(true);
 		stringstream ss;
 		ss << "new agent ready:" << agent_info_iter->get_hostname() << "$" << agent_info_iter->get_work_dir() << " socket:" << agent_info_iter->get_socket_name() ;
 		report(ss.str(), false);
@@ -1994,8 +1998,9 @@ void RunManagerPanther::process_message(int i_sock)
 		// an agent that can answer REQ_PARTIAL says so here. An older one never does, and
 		// that is what keeps us from sending it a message its in-run loop would treat as
 		// corrupt and kill the run over.
-		string ready_txt = net_pack.get_info_txt();
-		if (ready_txt.find(NetPackage::PARTIAL_CAPABILITY_TAG) != string::npos)
+		// also checked at LINPACK above, which is where a fresh agent is picked up; this
+		// covers an agent that reconnects and goes straight back to work
+		if (NetPackage::advertises_partial(net_pack.get_info_txt()))
 			agent_info_iter->set_supports_partial(true);
 	}
 
