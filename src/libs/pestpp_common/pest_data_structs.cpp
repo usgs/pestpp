@@ -986,9 +986,11 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	convert_ip(value, ies_bad_phi_sigma);
 	return true;
 	}
-	else if (key == "PREEMPTION_POLL_INTERVAL_MINUTES")
+	else if ((key == "REQUEST_PARTIAL_OBS_INTERVAL") || (key == "PREEMPTION_POLL_INTERVAL_MINUTES"))
 	{
-	convert_ip(value, preemption_poll_interval_minutes);
+	passed_args.insert("REQUEST_PARTIAL_OBS_INTERVAL");
+	passed_args.insert("PREEMPTION_POLL_INTERVAL_MINUTES");
+	convert_ip(value, request_partial_obs_interval);
 	return true;
 	}
 	else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
@@ -2229,7 +2231,7 @@ os << endl << "...pestpp-swp options:" << endl;
 	os << "ies_num_reals: " << ies_num_reals << endl;
 	os << "ies_bad_phi: " << ies_bad_phi << endl;
 	os << "ies_bad_phi_sigma: " << ies_bad_phi_sigma << endl;
-	os << "preemption_poll_interval_minutes: " << preemption_poll_interval_minutes << endl;
+	os << "request_partial_obs_interval: " << request_partial_obs_interval << endl;
 	os << "ies_include_base: " << ies_include_base << endl;
 	os << "ies_use_empirical_prior: " << ies_use_empirical_prior << endl;
 	os << "ies_group_draws: " << ies_group_draws << endl;
@@ -2470,7 +2472,7 @@ void PestppOptions::set_defaults_legacy()
 	set_ies_num_reals(50);
 	set_ies_bad_phi(std::numeric_limits<double>::max());
 	set_ies_bad_phi_sigma(std::numeric_limits<double>::max());
-	set_preemption_poll_interval_minutes(0.0);
+	set_request_partial_obs_interval(0.0);
 	set_ies_include_base(true);
 	set_ies_use_empirical_prior(false);
 	set_ies_group_draws(true);

@@ -404,10 +404,10 @@ const std::vector<OptionSpec>& PestppOptions::get_option_registry()
     //panther, even though it is the tools that read it: partial results are a panther-only
     //idea (the serial and external managers have no workers to ask), so the option is inert
     //without agents and belongs with the rest of the panther options
-    OptionSpec{ "PREEMPTION_POLL_INTERVAL_MINUTES", {}, OptType::DOUBLE, "panther", false,
-        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_preemption_poll_interval_minutes(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
-        [](PestppOptions& o){ o.set_preemption_poll_interval_minutes(0.0); },
-        [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_preemption_poll_interval_minutes(); return ss.str(); } },
+    OptionSpec{ "REQUEST_PARTIAL_OBS_INTERVAL", {"PREEMPTION_POLL_INTERVAL_MINUTES"}, OptType::DOUBLE, "panther", false,
+        [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_request_partial_obs_interval(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
+        [](PestppOptions& o){ o.set_request_partial_obs_interval(0.0); },
+        [](const PestppOptions& o)->string{ std::ostringstream ss; ss<<o.get_request_partial_obs_interval(); return ss.str(); } },
     OptionSpec{ "IES_BAD_PHI_SIGMA", {}, OptType::DOUBLE, "ies", false,
         [](PestppOptions& o,const string& value,const string&)->PestppOptions::ARG_STATUS{ double x; convert_ip(value,x); o.set_ies_bad_phi_sigma(x); return PestppOptions::ARG_STATUS::ARG_ACCEPTED; },
         [](PestppOptions& o){ o.set_ies_bad_phi_sigma(std::numeric_limits<double>::max()); },

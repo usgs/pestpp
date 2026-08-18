@@ -932,9 +932,9 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_scheduling_loop(RUN_UN
 			terminate_reason = RUN_UNTIL_COND::NO_OPS;
 			break;
 		}
-		// preemption: ask the workers what they have, on the cadence the user set. Sent from
-		// HERE, so the replies land in this same loop on this same thread.
-		if (screen_poll_due())
+		// ask the workers what they have, on the cadence the user set. Sent from HERE, so the
+		// replies land in this same loop on this same thread.
+		if (partial_poll_due())
 			request_partial_results(vector<int>());
 		init_agents();
 		//schedule runs on available nodes

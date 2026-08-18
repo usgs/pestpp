@@ -609,27 +609,73 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 					string status_txt;
 					const string& status_file = pest_scenario.get_pestpp_options()
 						.get_panther_worker_status_file();
-					if (!status_file.empty())
+					if (status_file.empty())
+					{
+						// the single most likely reason a master's rmr shows no status line,
+						// and it is invisible from the master: this option is read from the
+						// control file THIS AGENT parsed, so a stale .pst in the agent
+						// directory silently means no status. said once per agent rather than
+						// once per request, because requests can arrive every second
+						if (!status_file_reported)
+						{
+							status_file_reported = true;
+							report("no 'panther_worker_status_file' in this agent's control "
+								"file, so no model status will be sent with partial results",
+								false);
+						}
+					}
+					else
 					{
 						try
 						{
-							// way below DESC_LEN on purpose. the question is "what is the model
-							// doing right now", and asking for the full 1000 bytes answers
-							// "what has it done so far" instead - one try against a progress log
-							// came back with 35 timesteps of history, which buries the current
-							// one. it also goes into the master's rmr file once per request per
-							// agent, and partials can get asked for every second, so how wide
-							// this line is actually costs something with a lot of agents. a
-							// couple of lines is what "last reported" means.
-							const int STATUS_CHARS = 120;
+							// fill the packet. read_file_tail() bounds its OUTPUT to this many
+							// chars - newlines are already collapsed to " | " by then, and it
+							// cuts from the FRONT at a line boundary so the newest text is what
+							// survives - and reset() carries DESC_LEN-1 printable chars. so
+							// asking for exactly that transfers as much of the model's own words
+							// as the wire allows, and cannot be silently shortened by reset().
+							//
+							// this was 120, which is a couple of lines: enough for "what is the
+							// model doing right now" and not enough for anything else. the cost
+							// of the full width is volume - it lands in the master's rmr once
+							// per request per agent, so a one second poll across many agents
+							// writes a lot of rmr. ++preemption_poll_interval_minutes is the
+							// knob for that, since it decides how often this happens at all.
+							const int STATUS_CHARS = NetPackage::DESC_LEN - 1;
 							status_txt = pest_utils::read_file_tail(status_file, STATUS_CHARS);
-							if (!status_txt.empty())
+							// say what was captured BEFORE it goes anywhere. if the master's
+							// rmr has no status line, this is what tells you which end lost
+							// it: an agent that read nothing, an agent that read something,
+							// or an agent that never got the option
+							if (status_txt.empty())
+							{
+								report("'panther_worker_status_file' '" + status_file
+									+ "' yielded no text to send (missing, empty, or nothing "
+									"printable in the last " + to_string(STATUS_CHARS)
+									+ " chars)", false);
+							}
+							else
+							{
 								pss << " | status: " << status_txt;
+								report("captured " + to_string(status_txt.size())
+									+ " chars from 'panther_worker_status_file' '" + status_file
+									+ "' to send with partial results: '" + status_txt + "'",
+									false);
+							}
+						}
+						catch (const exception& e)
+						{
+							// reporting status must never cost the caller its partial results,
+							// but it should not vanish either - this used to be silent, which
+							// left "no status in the rmr" with no way to tell why
+							report(string("error reading 'panther_worker_status_file' '")
+								+ status_file + "' (partial results still sent): " + e.what(),
+								false);
 						}
 						catch (...)
 						{
-							// same deal as the rest of this block - reporting status should
-							// never cost the caller its partial results
+							report("unknown error reading 'panther_worker_status_file' '"
+								+ status_file + "' (partial results still sent)", false);
 						}
 					}
 

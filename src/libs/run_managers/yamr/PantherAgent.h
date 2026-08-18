@@ -93,6 +93,8 @@ private:
 	Pest pest_scenario;
 
 	void report(const string& _message, bool to_cout);
+	/// so the "no status file configured" note is written once per agent, not once per request
+	bool status_file_reported = false;
 
 	void transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc, string tag);
 

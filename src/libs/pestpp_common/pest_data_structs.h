@@ -590,8 +590,12 @@ public:
 	 *
 	 * PANTHER only; the serial run manager has no worker to ask.
 	 */
-	void set_preemption_poll_interval_minutes(double val) { preemption_poll_interval_minutes = val; }
-	double get_preemption_poll_interval_minutes() const { return preemption_poll_interval_minutes; }
+	/// How often, in MINUTES, to ask running agents for whatever model outputs they can read
+	/// so far. Zero disables it. Independent of 'drop_violations': partial results are worth
+	/// having on their own, and are only judged when the tool has nominated something to
+	/// judge them against.
+	void set_request_partial_obs_interval(double val) { request_partial_obs_interval = val; }
+	double get_request_partial_obs_interval() const { return request_partial_obs_interval; }
 	double get_ies_bad_phi_sigma() const { return ies_bad_phi_sigma; }
 	void set_ies_bad_phi_sigma(double _ies_bad_phi_sigma) { ies_bad_phi_sigma = _ies_bad_phi_sigma; }
 	bool get_ies_include_base() const { return ies_include_base; }
@@ -1020,7 +1024,7 @@ private:
 	int ies_num_reals;	
 	double ies_bad_phi;
 	double ies_bad_phi_sigma;
-	double preemption_poll_interval_minutes;
+	double request_partial_obs_interval;
 	bool ies_include_base;
 	bool ies_use_empirical_prior;
 	bool ies_group_draws;

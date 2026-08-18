@@ -126,15 +126,33 @@ public:
 	 * Called only from the scheduling loop, on the thread that entered the run manager - see
 	 * is_batch_open() for why that is not an accident.
 	 */
-	void set_run_screener(std::function<RunVerdict(int, Observations&, const std::set<std::string>&)> fn,
-		double poll_interval_sec)
+	void set_run_screener(std::function<RunVerdict(int, Observations&, const std::set<std::string>&)> fn)
 	{
 		screener_fn = fn;
-		screen_interval = poll_interval_sec;
-		screen_last = std::chrono::system_clock::time_point::min();
 	}
+
+	/**
+	 * @brief How often to ask running agents what they have so far, in SECONDS. 0 disables.
+	 *
+	 * Deliberately separate from set_run_screener(). Asking for partial results and judging
+	 * them are two different things: a run needs 'drop_violations' observations before there
+	 * is anything to judge it against, but partial results are worth having with or without
+	 * them - they are what the rmr reports as progress and what the api hands back through
+	 * pestpp_get_run_partial_info(). Bundling the two meant ++request_partial_obs_interval
+	 * silently did nothing unless something had been nominated.
+	 */
+	void set_partial_request_interval(double interval_sec)
+	{
+		partial_interval = interval_sec;
+		partial_last = std::chrono::system_clock::time_point::min();
+	}
+	bool partial_requests_enabled() const { return partial_interval > 0.0; }
+
+	/// Is there a predicate to judge a partial reply with, and is judging switched on?
+	/// No longer conditioned on the poll interval: a reply can also arrive because the user
+	/// asked for one with 'pest.stp' 5, and a violating run is worth abandoning either way.
 	bool screening_enabled() const
-	{ return (bool)screener_fn && (screen_interval > 0.0) && screen_active; }
+	{ return (bool)screener_fn && screen_active; }
 
 	/**
 	 * @brief Suspend screening for batches where abandoning a run would change the ANSWER.
@@ -317,25 +335,27 @@ public:
 protected:
 	std::function<RunAction(const RunProgress&)> progress_fn;
 	std::function<RunVerdict(int, Observations&, const std::set<std::string>&)> screener_fn;
-	double screen_interval = 0.0;
 	bool screen_active = true;
 	std::set<int> screen_exempt;   ///< run ids the screen must never abandon; see above
-	std::chrono::system_clock::time_point screen_last =
+	double partial_interval = 0.0;
+	std::chrono::system_clock::time_point partial_last =
 		std::chrono::system_clock::time_point::min();
 
-	/// Is another round of asking due? Advances the clock when it says yes.
-	bool screen_poll_due()
+	/// Is another round of asking due? Advances the clock when it says yes. Depends only on
+	/// the interval - whether anything will be JUDGED is a separate question, asked when the
+	/// reply lands.
+	bool partial_poll_due()
 	{
-		if (!screening_enabled())
+		if (!partial_requests_enabled())
 			return false;
 		std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-		if (screen_last != std::chrono::system_clock::time_point::min())
+		if (partial_last != std::chrono::system_clock::time_point::min())
 		{
-			std::chrono::duration<double> since = now - screen_last;
-			if (since.count() < screen_interval)
+			std::chrono::duration<double> since = now - partial_last;
+			if (since.count() < partial_interval)
 				return false;
 		}
-		screen_last = now;
+		partial_last = now;
 		return true;
 	}
 	double progress_min_interval = 0.0;

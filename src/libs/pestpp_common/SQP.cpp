@@ -1133,28 +1133,36 @@ int SeqQuadProgram::initialize_prepare()
 	// file - read from the scenario so it cannot depend on any construction order
 	violation_obs = ViolationDetector::read_nominated(pest_scenario);
 	viol_detector = ViolationDetector(&pest_scenario);
-	string preempt_err = ViolationDetector::check_preemption_config(pest_scenario);
-	if (preempt_err.size() > 0)
-		throw_sqp_error(preempt_err);
+	string partial_warn = ViolationDetector::check_partial_obs_config(pest_scenario);
+	if (partial_warn.size() > 0)
+		message(0, partial_warn);
 
-    // Install the preemption screener: the tool supplies the PREDICATE, the run manager owns
-    // the mechanics. The same violation test the process-time drop uses, so a run abandoned
-    // mid-flight is one that would have been dropped on arrival anyway - which is what keeps
-    // screening a saving in wall-clock rather than a change in results.
-    double _poll_min = pest_scenario.get_pestpp_options().get_preemption_poll_interval_minutes();
-    if ((_poll_min > 0.0) && (violation_obs.size() > 0))
+    // Two independent things. The interval says how often to ASK agents what they have so far,
+    // and stands on its own: partial results are what the rmr reports as progress and what the
+    // api hands back, with or without anything to judge them against. The screener is the
+    // judging half, and only exists when 'drop_violations' observations were nominated - it is
+    // the same violation test the process-time drop uses, so a run abandoned mid-flight is one
+    // that would have been dropped on arrival anyway.
+    double _poll_min = pest_scenario.get_pestpp_options().get_request_partial_obs_interval();
+    if (_poll_min > 0.0)
+    {
+        run_mgr_ptr->set_partial_request_interval(_poll_min * 60.0);
+        stringstream _pss;
+        _pss << "asking agents for partial results every " << _poll_min << " minute(s)";
+        if (violation_obs.size() == 0)
+            _pss << " (reporting only - no 'drop_violations' observations are nominated, so "
+                 << "no run will be abandoned)";
+        message(1, _pss.str());
+    }
+    if (violation_obs.size() > 0)
     {
         run_mgr_ptr->set_run_screener(
             [this](int run_id, Observations& sim, const set<string>& valid) -> RunVerdict
             {
                 return viol_detector.is_violating(sim, valid, violation_obs)
                     ? RunVerdict::ABANDON : RunVerdict::KEEP;
-            },
-            _poll_min * 60.0);
-        stringstream _pss;
-        _pss << "preemption enabled: asking workers for partial results every " << _poll_min
-             << " minute(s) and abandoning runs that already violate a nominated observation";
-        message(1, _pss.str());
+            });
+        message(1, "runs that already violate a nominated observation will be abandoned");
     }
 
 	if (violation_obs.size() > 0)

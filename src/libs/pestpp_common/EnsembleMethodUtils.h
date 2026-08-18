@@ -124,18 +124,20 @@ public:
 	static vector<string> read_nominated(Pest& scenario);
 
 	/**
-	 * @brief Enforce the preemption precondition. Returns "" if fine, else why not.
+	 * @brief Is the partial-obs configuration self-consistent? Returns "" if fine, else what
+	 *        looks wrong. A WARNING, not a refusal.
 	 *
-	 * 'preemption_poll_interval_minutes' says how often to ask workers what they have so far
-	 * and abandon runs already violating. That is only meaningful if something has been
-	 * nominated to judge them against, AND that observation carries a non-zero weight - a
-	 * zero-weighted observation is excluded from every violation test, so nominating one and
-	 * nothing else would poll the workers forever and never be able to abandon anything.
+	 * 'request_partial_obs_interval' says how often to ask agents what they have so far. That
+	 * stands on its own - the results are reported and are available through the api - so
+	 * asking without any 'drop_violations' observations is a perfectly ordinary thing to do
+	 * and is not flagged at all.
 	 *
-	 * Shared so all four tools refuse the same configuration for the same reason, rather than
-	 * three of them refusing it and one polling pointlessly.
+	 * What IS worth saying out loud is a nomination that can never fire: the violation test
+	 * skips zero-weighted observations, so nominating nothing but those means runs will be
+	 * polled and judged and never abandoned, which is not what the user asked for. Shared so
+	 * all four tools say the same thing about the same configuration.
 	 */
-	static string check_preemption_config(Pest& scenario);
+	static string check_partial_obs_config(Pest& scenario);
 
 private:
 	Pest* pest_scenario;
