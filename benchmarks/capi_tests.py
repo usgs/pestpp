@@ -1398,19 +1398,23 @@ def capi_partial_status_file_test():
             "the master logged {0} partial replies but none carried the status file text - "
             "info_txt is being dropped somewhere between the agent and the record file. "
             "sample: {1}".format(len(lines), lines[0] if lines else ""))
-        # the tail must be the NEWEST text, not the file's whole history: asking for the full
-        # DESC_LEN budget came back as 35 timesteps at once, which buries the current one
-        # bounded, and bounded by the AGENT rather than by NetPackage truncating it: the whole
-        # log came back at first, which buries the current timestep and is written once per
-        # request per agent
+        # the tail is bounded by the AGENT, at the full packet width, rather than by NetPackage
+        # truncating it - a silent cut by reset() would drop text with nothing to say it had.
+        # DESC_LEN is 1001, so the payload is at most 1000 printable chars
         for l in with_status:
             tail = l.split("observations", 1)[1].strip()
-            assert len(tail) <= 140, (
-                "the status tail should be recent progress, not the whole log "
-                "({0} chars): {1}".format(len(tail), tail))
+            assert len(tail) <= 1000, (
+                "the status tail must fit the packet, and be cut by the agent rather than by "
+                "NetPackage ({0} chars): {1}".format(len(tail), tail))
             # and it must not start mid-line - an arbitrary cut leaves an orphan fragment
             assert tail.startswith("solving timestep"), (
                 "the status tail should start at a line boundary, got: '{0}'".format(tail))
+        # and it must be worth reading: a status file with plenty to say should come back with
+        # plenty of it, not a fragment of one line
+        longest = max(len(l.split("observations", 1)[1].strip()) for l in with_status)
+        assert longest > 200, (
+            "the status text should carry real context, not a fragment - longest reply was "
+            "only {0} chars".format(longest))
         # it tracks the run: later replies report later timesteps than the first
         def last_step(l):
             return int(l.rsplit("solving timestep", 1)[1].split("of")[0].strip())

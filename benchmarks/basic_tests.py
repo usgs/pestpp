@@ -3078,18 +3078,18 @@ if __name__ == "__main__":
 
 
 def preemption_poll_config_test():
-    """'preemption_poll_interval_minutes' requires something it can actually act on.
+    """'request_partial_obs_interval' asks for partial results; judging them is separate.
 
-    The option says how often to ask workers what they have so far and abandon runs already
-    violating a nominated observation. Two ways to set it and get nothing:
+    Asking stands on its own - the replies are reported and are available through the api -
+    so setting the interval with nothing nominated by 'drop_violations' is an ordinary way to
+    use it and must simply work.
 
-      1. no observation nominated with 'drop_violations' at all
-      2. observations nominated, but every one of them zero-weighted - the violation test
-         skips those, so no run could ever be abandoned
+    What is still worth saying out loud is a nomination that can never fire: the violation
+    test skips zero-weighted observations, so nominating nothing but those means runs get
+    polled and judged and never abandoned. That is a warning, not a refusal, because the run
+    is otherwise fine. The same shared check runs in every tool that asks for partials.
 
-    Both would poll the workers for the life of the run and never be able to do anything, so
-    both are refused at startup rather than discovered as a puzzling absence of effect. The
-    same shared check runs in every tool that supports preemption.
+    The older option name is still accepted, and one case below uses it to prove that.
     """
     import re as _re
     t_d = os.path.join("preempt_cfg")
@@ -3118,7 +3118,7 @@ def preemption_poll_config_test():
     base.model_command = ["python forward_run.py"]
     base.control_data.noptmax = 1
 
-    def _write(name, nominate, weight):
+    def _write(name, nominate, weight, old_option_name=False):
         pst = base.get()
         obs = pst.observation_data
         obs.loc[:, "weight"] = 1.0
@@ -3129,7 +3129,15 @@ def preemption_poll_config_test():
             obs.loc[:, "drop_violations"] = False
             obs.loc["o1", "drop_violations"] = True
             obs.loc["o1", "weight"] = weight
-        pst.pestpp_options["preemption_poll_interval_minutes"] = 1.0
+        # both names reach the same option, so supplying both is a duplicate-key error -
+        # and pst.get() hands back options that share state with the template, so a name set
+        # by an earlier case would still be here
+        pst.pestpp_options.pop("preemption_poll_interval_minutes", None)
+        pst.pestpp_options.pop("request_partial_obs_interval", None)
+        if old_option_name:
+            pst.pestpp_options["preemption_poll_interval_minutes"] = 1.0
+        else:
+            pst.pestpp_options["request_partial_obs_interval"] = 1.0
         pst.pestpp_options["ies_num_reals"] = 6
         pst.pestpp_options["mou_population_size"] = 6
         pst.pestpp_options["sqp_num_reals"] = 6
@@ -3153,37 +3161,48 @@ def preemption_poll_config_test():
         # newest wins: a relative/installed path resolves to whatever release binary is around
         return max([os.path.abspath(c) for c in cands], key=os.path.getmtime)
 
-    def _run_expect_refusal(tool, pst_name, needle):
+    def _run_expect_ok(tool, pst_name, needle=None, absent=None, must_complete=False):
+        """what the tool SAYS about the partial-obs configuration, in the rec file.
+
+        must_complete is off by default on purpose: this toy case is two parameters and two
+        observations, which is not a runnable pestpp-mou or pestpp-sqp problem (mou wants an
+        objective group naming convention it cannot satisfy). Those tools used to stop at the
+        configuration check, so it never came up. What is being tested here is what the tool
+        decides about the configuration, which is written to the rec before any of that.
+        """
         tool_exe = _find_tool(tool)
-        failed = False
         try:
             pyemu.os_utils.run("{0} {1}".format(tool_exe, pst_name), cwd=t_d)
         except Exception:
-            failed = True
-        assert failed, "{0} should have refused: {1}".format(tool, needle)
+            if must_complete:
+                raise
         rec = open(os.path.join(t_d, pst_name.replace(".pst", ".rec"))).read()
-        assert needle in rec, \
-            "{0} refused, but not for the stated reason ({1}):\n{2}".format(
-                tool, needle, rec[-2500:])
+        if needle is not None:
+            assert needle in rec, \
+                "{0} ran but did not report '{1}':\n{2}".format(tool, needle, rec[-2500:])
+        if absent is not None:
+            assert absent not in rec, \
+                "{0} should not have said '{1}':\n{2}".format(tool, absent, rec[-2500:])
 
-    # 1. nothing nominated
+    # 1. nothing nominated: asking for partials is reporting-only, and perfectly legal
     _write("nonom.pst", nominate=False, weight=1.0)
     for tool in ("pestpp-ies", "pestpp-mou", "pestpp-sqp"):
-        _run_expect_refusal(tool, "nonom.pst", "no observations are nominated")
+        _run_expect_ok(tool, "nonom.pst", needle="reporting only")
 
-    # 2. nominated but zero-weighted
+    # 2. nominated but zero-weighted: runs, and warns that nothing can ever be abandoned
     _write("zerowt.pst", nominate=True, weight=0.0)
     for tool in ("pestpp-ies", "pestpp-mou", "pestpp-sqp"):
-        _run_expect_refusal(tool, "zerowt.pst", "NONE of them carry a non-zero weight")
+        _run_expect_ok(tool, "zerowt.pst", needle="NONE of them carry a non-zero weight")
 
-    # 3. properly configured: accepted (no refusal message at all)
-    good = _write("good.pst", nominate=True, weight=1.0)
-    ies_exe = _find_tool("pestpp-ies")
-    pyemu.os_utils.run("{0} good.pst".format(ies_exe), cwd=t_d)
-    rec = open(os.path.join(t_d, "good.rec")).read()
-    assert "preemption_poll_interval_minutes" not in rec or \
-        "no observations are nominated" not in rec, \
-        "a properly configured case was refused:\n" + rec[-2000:]
+    # 3. properly configured: runs, and says runs may be abandoned rather than reporting-only
+    _write("good.pst", nominate=True, weight=1.0)
+    _run_expect_ok("pestpp-ies", "good.pst", needle="will be abandoned",
+                   absent="reporting only", must_complete=True)
+
+    # 4. the retired name still reaches the same option
+    _write("oldname.pst", nominate=True, weight=1.0, old_option_name=True)
+    _run_expect_ok("pestpp-ies", "oldname.pst", needle="asking agents for partial results",
+                   must_complete=True)
 
 
 def preemption_screening_test():
