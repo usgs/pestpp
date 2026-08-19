@@ -13,6 +13,7 @@
 #include "system_variables.h"
 #include "utilities.h"
 #include <regex>
+#include <filesystem>
 #include "network_package.h"
 #include "OutputFileWriter.h"
 #include "Pest.h"
@@ -453,6 +454,47 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
     // them as this run's. That is not hypothetical: it abandoned a non-violating realization on
     // one platform and not another, because the window is only a few instructions wide.
     mi.mark_outputs_stale();
+
+    // Same hazard, same window, for the status file: whatever the LAST run wrote is still on
+    // disk right now, and a REQ_PARTIAL answered in the first moments of this run would read
+    // it and report the previous realization's progress as if it were this one's. The model
+    // is about to start writing its own, so remove what is there first - the same way
+    // ModelInterface::remove_existing() clears the model input and output files.
+    //
+    // Never fatal, unlike the model files. A stale or undeletable status file makes the
+    // progress text wrong; it does not make the RESULTS wrong, and losing a run over a
+    // cosmetic file would be a poor trade.
+    const string& status_file_to_clear = pest_scenario.get_pestpp_options()
+        .get_panther_worker_status_file();
+    if (!status_file_to_clear.empty())
+    {
+        try
+        {
+            // one call: true means it was there and is gone, false means there was nothing
+            // to remove, and the error_code is set only on a real failure. no separate
+            // existence test, so nothing can change between the two
+            std::error_code ec;
+            bool was_removed = std::filesystem::remove(status_file_to_clear, ec);
+            if (ec)
+                report("WARNING: could not remove existing 'panther_worker_status_file' '"
+                    + status_file_to_clear + "': " + ec.message() + " - a partial reply early "
+                    "in this run may report the previous run's progress", false);
+            else if (was_removed)
+                report("removed existing 'panther_worker_status_file' '"
+                    + status_file_to_clear + "' before starting the run", false);
+        }
+        catch (const exception& e)
+        {
+            report(string("WARNING: error removing existing 'panther_worker_status_file' '")
+                + status_file_to_clear + "': " + e.what(), false);
+        }
+        catch (...)
+        {
+            report("WARNING: unknown error removing existing 'panther_worker_status_file' '"
+                + status_file_to_clear + "'", false);
+        }
+    }
+
     thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, std::ref(run_exception),
                       &pars, &obs);
 

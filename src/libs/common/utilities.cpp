@@ -6,6 +6,7 @@
 #include <string>
 #include <cctype>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -767,6 +768,20 @@ void read_par(ifstream &fin, Parameters &pars)
 
 bool check_exist_in(std::string filename)
 {
+	// is_regular_file FIRST, and then still open it.  the two answer different questions and
+	// both matter: on posix an ifstream opens a DIRECTORY quite happily and reports good(),
+	// so the open on its own says "yes, readable" for a path that windows rejects - the same
+	// control file then behaves differently on two platforms.  and is_regular_file on its own
+	// only says a directory entry of the right kind is there, not that this process can get at
+	// the bytes, which is what permissions, ACLs and a windows sharing lock decide.
+	//
+	// the error_code overload rather than the throwing one: a path that cannot be examined is
+	// a "no", not a reason to bring the run down.
+	std::error_code ec;
+	if (!std::filesystem::is_regular_file(filename, ec))
+	{
+		return false;
+	}
 	std::ifstream f(filename.c_str());
 	if (f.good())
 	{

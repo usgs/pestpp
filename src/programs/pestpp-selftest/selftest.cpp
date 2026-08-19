@@ -18,6 +18,7 @@
 #include <sstream>
 #include <fstream>
 #include <limits>
+#include <filesystem>
 #include "pest_data_structs.h"
 #include "Pest.h"
 #include "FileManager.h"
@@ -1251,6 +1252,76 @@ static void test_instruction_file_extreme_doubles()
  * recognise. The strings below are the real ones from PantherAgent: the handshake LINPACK
  * text, the two READY texts, and what an older agent sends in their place.
  */
+/**
+ * @brief What "is this file available to read" has to mean, on every platform.
+ *
+ * check_exist_in() is the read-side gate in front of jco files, covariance files, instruction
+ * files and model output files, so a wrong answer either hides a missing file or refuses a
+ * present one. Two ways to get it wrong, and it needs both halves to avoid them:
+ *
+ *   - an ifstream ALONE opens a directory quite happily on posix and reports good(), while
+ *     windows refuses it. that is the same control file behaving differently on two machines,
+ *     which is the worst kind of portability bug because it only shows up on someone else's.
+ *   - is_regular_file ALONE says a directory entry of the right kind exists, not that this
+ *     process can read the bytes.
+ *
+ * And the property that must never come back: ASKING must not CHANGE anything. The write-side
+ * check_exist_out() opens an ofstream, so it creates what is missing and truncates what is
+ * not - that is fine where it is used, because the caller is about to delete the file either
+ * way, but it must never creep into the read path.
+ */
+static void test_file_availability_checks()
+{
+    cout << "[file checks: a directory is not a readable file, and asking changes nothing]" << endl;
+    const string fname = "selftest_avail.txt";
+    const string dname = "selftest_avail_dir";
+    error_code ec;
+
+    // a real file with content
+    {
+        ofstream f(fname);
+        f << "content that must survive being asked about" << endl;
+    }
+    uintmax_t before = std::filesystem::file_size(fname, ec);
+    CHK(pest_utils::check_exist_in(fname), "a readable regular file must pass check_exist_in");
+    CHK(std::filesystem::file_size(fname, ec) == before,
+        "check_exist_in must not change the file it is asked about");
+
+    // a directory: posix lets an ifstream open one, so this is the case the is_regular_file
+    // half exists for
+    std::filesystem::create_directory(dname, ec);
+    CHK(!pest_utils::check_exist_in(dname),
+        "a DIRECTORY must not answer yes to check_exist_in - an ifstream alone says it does");
+    {
+        // ...and prove the naked open really is the trap being guarded against, so this test
+        // still means something if someone simplifies the implementation
+        ifstream d(dname.c_str());
+        bool naked_open_says_yes = d.good();
+        CHK(pest_utils::check_exist_in(dname) != naked_open_says_yes || !naked_open_says_yes,
+            "check_exist_in must not agree with a bare ifstream about a directory");
+    }
+
+    // something that is not there
+    const string missing = "selftest_avail_missing.txt";
+    std::filesystem::remove(missing, ec);
+    CHK(!pest_utils::check_exist_in(missing), "a missing file must not pass check_exist_in");
+    CHK(!std::filesystem::exists(missing, ec),
+        "asking about a missing file must not CREATE it");
+
+    // removal is one call, and 'already gone' is not a failure
+    {
+        ofstream f(fname);
+        f << "about to be removed" << endl;
+    }
+    CHK(std::filesystem::remove(fname, ec) && (!ec),
+        "removing an existing file reports true with no error");
+    CHK((!std::filesystem::remove(fname, ec)) && (!ec),
+        "removing a file that is already gone is false, NOT an error");
+
+    std::filesystem::remove_all(dname, ec);
+    std::filesystem::remove(fname, ec);
+}
+
 static void test_partial_capability_handshake()
 {
     cout << "[panther: an agent's partial-results capability is recognised before its first run]" << endl;
@@ -2315,6 +2386,7 @@ int main()
     test_parse_double_policy();
     test_instruction_file_extreme_doubles();
     test_fixed_instruction_misreads();
+    test_file_availability_checks();
     test_partial_capability_handshake();
     test_instruction_file_partial_reads_are_never_wrong();
     test_model_interface_partial_across_files();

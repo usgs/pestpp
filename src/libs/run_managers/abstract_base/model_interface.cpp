@@ -744,20 +744,34 @@ void ModelInterface::remove_existing()
 	{
 		vector<string> failed_file_vec;
 		failed_file_op = false;
+		// One call, not check-then-act. std::filesystem::remove() returns true when it
+		// deleted something and false when there was nothing there, and only sets the
+		// error_code on a real failure - so "already gone" is not an error and there is no
+		// window between the test and the removal for anything to change.
+		//
+		// It also stops the test from being destructive. The check_exist_out() this replaced
+		// opens an ofstream, which CREATES the file when it is missing and TRUNCATES it when
+		// it is not, so the old pair created every absent model file purely in order to
+		// delete it again.
+		std::error_code ec;
 		for (auto& out_file : outfile_vec)
 		{
-			if ((pest_utils::check_exist_out(out_file)) && (remove(out_file.c_str()) != 0))
+			std::filesystem::remove(out_file, ec);
+			if (ec)
 			{
 				failed_file_vec.push_back(out_file);
 				failed_file_op = true;
+				ec.clear();
 			}
 		}
 		for (auto& in_file : inpfile_vec)
 		{
-			if ((pest_utils::check_exist_out(in_file)) && (remove(in_file.c_str()) != 0))
+			std::filesystem::remove(in_file, ec);
+			if (ec)
 			{
 				failed_file_vec.push_back(in_file);
 				failed_file_op = true;
+				ec.clear();
 			}
 		}
 		if (failed_file_op)
