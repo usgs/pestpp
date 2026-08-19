@@ -209,10 +209,10 @@ void Localizer::update_obs_info_from_mat(Mat& mat, vector<vector<string>>& obs_m
 				dups.push_back(o);
 			dup_check.emplace(o);
 		}
-		else if (obgnme_map.find(o) != obgnme_map.end())
+		else if (auto og_it = obgnme_map.find(o); og_it != obgnme_map.end())
 		{
 
-			if (obgnme_map[o].size() == 0) {
+			if (og_it->second.size() == 0) {
                 if (!forgive_missing) {
                     cout << "Localizer::process_mat() error: listed observation group '" << o <<
                          "' has no non-zero weight observations" << endl;
@@ -226,9 +226,9 @@ void Localizer::update_obs_info_from_mat(Mat& mat, vector<vector<string>>& obs_m
             }
             else
             {
-                    obs_map.push_back(obgnme_map[o]);
+                    obs_map.push_back(og_it->second);
 
-                    for (auto &oo : obgnme_map[o]) {
+                    for (auto &oo : og_it->second) {
                         obs2row_map[oo] = i;
                         if (dup_check.find(oo) != dup_check.end())
                             dups.push_back(oo);
@@ -273,17 +273,17 @@ void Localizer::update_par_info_from_mat(Mat& mat, vector<vector<string>>& par_m
 				dups.push_back(p);
 			dup_check.emplace(p);
 		}
-		else if (pargp_map.find(p) != pargp_map.end())
+		else if (auto pg_it = pargp_map.find(p); pg_it != pargp_map.end())
 		{
-			par_map.push_back(pargp_map[p]);
-			if (pargp_map[p].size() == 0) {
+			par_map.push_back(pg_it->second);
+			if (pg_it->second.size() == 0) {
 			    cout << "Localizer::process_mat() error:  listed parameter group '" << p <<
                         "' has no adjustable parameters" << endl;
                 throw runtime_error("Localizer::process_mat() error:  listed parameter group '" + p +
                                     "' has no adjustable parameters");
             }
 
-			for (auto& pp : pargp_map[p])
+			for (auto& pp : pg_it->second)
 			{
 				par2col_map[pp] = i;
 				if (dup_check.find(pp) != dup_check.end())
@@ -455,10 +455,9 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 		{
 			for (Eigen::SparseMatrix<double>::InnerIterator it(*mat.e_ptr(), k); it; ++it)
 			{
-				if (idx_map.find(it.col()) == idx_map.end())
-					idx_map[it.col()] = vector<int>{ (int)it.row() };
-				else
-					idx_map[it.col()].push_back(it.row());
+				// [] starts a new column with an empty vector, so both branches are the
+				// same push_back - one lookup instead of two
+				idx_map[it.col()].push_back(it.row());
 			}
 		}
 		//populate the localizer map
@@ -483,10 +482,8 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 		{
 			for (Eigen::SparseMatrix<double>::InnerIterator it(*mat.e_ptr(), k); it; ++it)
 			{
-				if (idx_map.find(it.row()) == idx_map.end())
-					idx_map[it.row()] = vector<int>{ (int)it.col() };
-				else
-					idx_map[it.row()].push_back(it.col());
+				// same as above - [] seeds the empty vector for us
+				idx_map[it.row()].push_back(it.col());
 			}
 		}
 		//populate the localizer map
@@ -994,8 +991,9 @@ void AutoAdaLocThread::work(int thread_id)
         par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
         if (list_obs.size() > 0)
         {
-            if (list_obs.find(par_names[jpar]) != list_obs.end())
-                sobs = list_obs[par_names[jpar]]; // dont use at here - this way, any missing pars just get no obs
+            // any missing par just gets no obs - thats the else branch
+            if (auto lo_it = list_obs.find(par_names[jpar]); lo_it != list_obs.end())
+                sobs = lo_it->second;
             else
                 sobs.clear();
             use_list_obs = true;
@@ -1163,12 +1161,13 @@ Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<strin
  */
 Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col_name, vector<string> &obs_names)
 {
-	if (colname2col_map.find(col_name) == colname2col_map.end()) {
+	auto col_it = colname2col_map.find(col_name);
+	if (col_it == colname2col_map.end()) {
         cout << "Localizer::get_obsdiff_hadamard_matrix error: col_name not found in localizer matrix: " << col_name << endl;
         throw runtime_error(
                 "Localizer::get_obsdiff_hadamard_matrix error: col_name not found in localizer matrix: " + col_name);
     }
-	int idx = colname2col_map.at(col_name);
+	int idx = col_it->second;
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->col(idx);
 	Eigen::MatrixXd loc(obs_names.size(), num_reals);
 	loc.setZero();
@@ -1191,12 +1190,13 @@ Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col
  */
 Eigen::MatrixXd Localizer::get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names)
 {
-	if (rowname2row_map.find(row_name) == rowname2row_map.end()) {
+	auto row_it = rowname2row_map.find(row_name);
+	if (row_it == rowname2row_map.end()) {
         cout << "Localizer::get_pardiff_hadamard_matrix error: row_name not found in localizer matrix: " << row_name << endl;
         throw runtime_error(
                 "Localizer::get_pardiff_hadamard_matrix error: row_name not found in localizer matrix: " + row_name);
     }
-	int idx = rowname2row_map.at(row_name);
+	int idx = row_it->second;
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->row(idx);
 	Eigen::MatrixXd loc(par_names.size(), num_reals);
 	loc.setZero();

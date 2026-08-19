@@ -51,10 +51,11 @@ bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& o
 	for (const auto& item : this_real_map)
 	{
 		//if even one realization name is not common, we are done here
-		if (other_real_map.find(item.first) == other_real_map.end())
+		auto orm_it = other_real_map.find(item.first);
+		if (orm_it == other_real_map.end())
 			return false;
 		//if this realization name is not at the same location then we do need to reorder
-		if (item.second != other_real_map.at(item.first))
+		if (item.second != orm_it->second)
 			need_to_align = true;
 	}
 	//if we made it to here and need_to_align is false, then two ensembles are already row aligned
@@ -190,11 +191,12 @@ void Ensemble::add_2_row_ip(const string& real_name,const Eigen::VectorXd& row_v
         throw_ensemble_error("Ensemble::add_2_row_ip(): dimensions don't match");
 
     map<string,int> real_map = get_real_map();
-    if (real_map.find(real_name) == real_map.end())
+    auto rm_it = real_map.find(real_name);
+    if (rm_it == real_map.end())
     {
         throw_ensemble_error("Ensemble::add_2_row_ip(): real name '"+real_name+"' not found");
     }
-    reals.row(real_map.at(real_name)) += row_vec;
+    reals.row(rm_it->second) += row_vec;
 }
 
 /**
@@ -1223,9 +1225,10 @@ Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
 {
 	update_var_map();
-	if (var_map.find(var_name) == var_map.end())
+	auto vm_it = var_map.find(var_name);
+	if (vm_it == var_map.end())
 		throw_ensemble_error("Ensemble::get_var_vector(): var_name not found: " + var_name);
-	return reals.col(var_map[var_name]);
+	return reals.col(vm_it->second);
 
 }
 
@@ -4483,13 +4486,13 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 			var_name = var_names[j];
 			lb = std::numeric_limits<double>::lowest();
 			ub = 1.79769e+308;//std::numeric_limits<double>::max();
-			if (lower_bnd.find(var_name) != lower_bnd.end())
+			if (auto lb_it = lower_bnd.find(var_name); lb_it != lower_bnd.end())
 			{
-				lb = lower_bnd[var_name];
+				lb = lb_it->second;
 			}
-			if (upper_bnd.find(var_name) != upper_bnd.end())
+			if (auto ub_it = upper_bnd.find(var_name); ub_it != upper_bnd.end())
 			{
-				ub = upper_bnd[var_name];
+				ub = ub_it->second;
 			}
 			frec << var_name << " " << lb << " " << ub << endl;
 			col = reals.col(j);
@@ -5088,16 +5091,18 @@ bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, dou
 	{
 		return false;
 	}
-	if (fixed_info.find(pname) == fixed_info.end())
+	auto fi_it = fixed_info.find(pname);
+	if (fi_it == fixed_info.end())
 	{
 		return false;
 	}
-	if (fixed_info.at(pname).find(rname) == fixed_info.at(pname).end())
+	auto rn_it = fi_it->second.find(rname);
+	if (rn_it == fi_it->second.end())
 	{
 		return false;
 	}
 
-	value = fixed_info.at(pname).at(rname);
+	value = rn_it->second;
 	return true;
 }
 
@@ -5118,12 +5123,13 @@ map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
 	{
 		return map<string, double>();
 	}
-	if (fixed_info.find(pname) == fixed_info.end())
+	auto fi_it = fixed_info.find(pname);
+	if (fi_it == fixed_info.end())
 	{
 		throw runtime_error("FixedParInfo::get_par_fixed_values(): pname '"+pname+"' not in fixed_info");
 	}
 
-	return fixed_info.at(pname);
+	return fi_it->second;
 }
 
 /**
@@ -5148,11 +5154,14 @@ vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<s
 	int c = 0;
 	for (auto& name : pnames)
 	{
-		if (fixed_info.find(name) == fixed_info.end())
+		// one lookup per level - this used to walk fixed_info four times for every name
+		auto fi_it = fixed_info.find(name);
+		if (fi_it == fixed_info.end())
 			throw runtime_error("FixedParInfo::get_real_fixed_values(): pname '" + name +"' not in fixed_info");
-		if (fixed_info.at(name).find(rname) == fixed_info.at(name).end())
+		auto rn_it = fi_it->second.find(rname);
+		if (rn_it == fi_it->second.end())
 			throw runtime_error("FixedParInfo::get_real_fixed_values(): rname '" + rname + "' not in fixed_info");
-		real_vals[c] = fixed_info.at(name).at(rname);
+		real_vals[c] = rn_it->second;
 		c++;
 	}
 	return real_vals;
@@ -5369,11 +5378,12 @@ void FixedParInfo::update_realizations(const vector<string>& other_var_names, co
 	}
 	for (int j = 0; j < other_var_names.size(); j++)
 	{
-		if (fixed_info.find(other_var_names[j]) == fixed_info.end())
+		auto fi_it = fixed_info.find(other_var_names[j]);
+		if (fi_it == fixed_info.end())
 			continue;
 		for (int i = 0; i < other_real_names.size(); i++)
 		{
-			fixed_info.at(other_var_names[j])[other_real_names[i]] = other_mat(i, j);
+			fi_it->second[other_real_names[i]] = other_mat(i, j);
 		}
 	}
 }
@@ -5387,9 +5397,9 @@ void FixedParInfo::update_par_values(const map<string, double>& pval_map)
 {
 	for (auto& p : pval_map)
 	{
-		if (fixed_info.find(p.first) != fixed_info.end())
+		if (auto fi_it = fixed_info.find(p.first); fi_it != fixed_info.end())
 		{
-			for (auto& pm : fixed_info.at(p.first))
+			for (auto& pm : fi_it->second)
 			{
 				pm.second = p.second;
 			}

@@ -2262,10 +2262,11 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
         pair<string, double> tt_item;
         for (const auto& ipar : upgrade_ctl_pars)
         {
-            if (items.find(ipar.first) == items.end())
+            auto item_it = items.find(ipar.first);
+            if (item_it == items.end())
                 continue;
 
-            tt_item = items.at(ipar.first);
+            tt_item = item_it->second;
 
             p_new = ipar.second;
             p_org = current_ctl_pars.get_rec(ipar.first);

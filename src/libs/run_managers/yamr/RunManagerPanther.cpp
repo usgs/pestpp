@@ -1586,9 +1586,9 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
 
 	agent_info_set.erase(agent_info_iter);
 	socket_to_iter_map.erase(i_sock);
-	if (open_file_socket_map.find(i_sock) != open_file_socket_map.end())
+	if (auto sock_it = open_file_socket_map.find(i_sock); sock_it != open_file_socket_map.end())
     {
-	    string fname = open_file_socket_map.at(i_sock);
+	    string fname = sock_it->second;
 
 		pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fname,new ofstream));
 		auto it = open_file_trans_streams.find(fname);
@@ -2465,10 +2465,10 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(new_master_filename.begin(),new_master_filename.end(),' ','-');
     replace(new_master_filename.begin(),new_master_filename.end(),'\t','-');
 
-    if (org_new_master_fxt_map.find(master_filename) == org_new_master_fxt_map.end())
+    // try_emplace tells us whether it went in, so no second lookup to find out
+    if (org_new_master_fxt_map.try_emplace(master_filename, new_master_filename).second)
     {
         nftx++;
-        org_new_master_fxt_map[master_filename] = new_master_filename;
     }
     else
     {

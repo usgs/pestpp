@@ -413,11 +413,8 @@ const std::map<std::string,std::vector<int>> RunManagerAbstract::get_run_info_ma
     for (int id=0; id<n_runs; ++id)
     {
         file_stor.get_info(id,status,info,info_val);
-        if (run_info_map.find(info)==run_info_map.end())
-        {
-            run_info_map[info] = vector<int>();
-        }
-        run_info_map.at(info).push_back(id);
+        // [] seeds the empty vector for a new info string
+        run_info_map[info].push_back(id);
     }
     return run_info_map;
 }

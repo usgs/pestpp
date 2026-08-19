@@ -556,9 +556,9 @@ void OutputFileWriter::scenario_obs_csv(ostream& os, map<string,double> alt_weig
 	{
 		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
         weight = obs_rec->weight;
-        if (alt_weights.find(obs_name) != alt_weights.end())
+        if (auto aw_it = alt_weights.find(obs_name); aw_it != alt_weights.end())
         {
-            weight = alt_weights[obs_name];
+            weight = aw_it->second;
         }
 		os << lower_cp(obs_name) << "," << obs.get_rec(obs_name) << "," << lower_cp(obs_rec->group) << "," << weight << endl;
 	}
@@ -836,9 +836,9 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 		for (auto& b : obs_name_vec)
 		{
             weight = oi.get_observation_rec_ptr(b)->weight;
-            if (alt_weights.find(b) != alt_weights.end())
+            if (auto aw_it = alt_weights.find(b); aw_it != alt_weights.end())
             {
-                weight = alt_weights.at(b);
+                weight = aw_it->second;
             }
 			obs_val = obs.get_rec(b);
 			sim_val = sim.get_rec(b);
@@ -855,9 +855,9 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 		for (auto& b : obs_name_vec)
 		{
             weight = oi.get_observation_rec_ptr(b)->weight;
-            if (alt_weights.find(b) != alt_weights.end())
+            if (auto aw_it = alt_weights.find(b); aw_it != alt_weights.end())
             {
-                weight = alt_weights.at(b);
+                weight = aw_it->second;
             }
 			obs_val = obs.get_rec(b);
 			sim_val = sim.get_rec(b);

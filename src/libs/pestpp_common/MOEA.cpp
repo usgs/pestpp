@@ -199,18 +199,21 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
  */
 bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType envtyp)
 {
-    if (infeas.find(first) != infeas.end())
+	// look both up once - this is the sort comparator, so it runs n log n times a generation
+	auto first_it = infeas.find(first);
+	auto second_it = infeas.find(second);
+    if (first_it != infeas.end())
 	{	//if both are infeas, select the solution that is less infeasible
-		if (infeas.find(second) != infeas.end())
+		if (second_it != infeas.end())
 		{
-			if (infeas[first] > infeas[second])
+			if (first_it->second > second_it->second)
 				return false;
 			else
 				return true;
 		}
 		return false;
 	}
-	if (infeas.find(second) != infeas.end())
+	if (second_it != infeas.end())
 		return true;
 	if (envtyp == MouEnvType::NSGA)
 		return compare_two_nsga(first, second);
@@ -843,26 +846,29 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 	ofstream& sum = file_manager.get_ofstream(sum_tag);
 	for (auto member : op.get_real_names())
 	{
-		if (member_struct.find(member) == member_struct.end())
+		// one lookup for the member, then reuse it - the loops below used to re-find the
+		// member for every objective
+		auto ms_it = member_struct.find(member);
+		if (ms_it == member_struct.end())
 			continue;
 		sum << generation << "," << pest_utils::lower_cp(member);
 		for (auto obj : *obs_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * ms_it->second[obj];
 		}
 		for (auto obj : *pi_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * ms_it->second[obj];
 		}
 		if (prob_pareto)
 		{
 			for (auto objsd : *obs_obj_sd_names_ptr)
 			{
-				sum << "," << member_struct[member].at(objsd);
+				sum << "," << ms_it->second.at(objsd);
 			}
 			for (auto objsd : *obs_obj_sd_names_ptr)
 			{
-				sum << "," << member_struct[member].at(objsd + "_SYN");
+				sum << "," << ms_it->second.at(objsd + "_SYN");
 			}
 		}
 		sum << "," << member_front_map[member];
@@ -872,9 +878,9 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
-		if (infeas.find(member) != infeas.end())
+		if (auto inf_it = infeas.find(member); inf_it != infeas.end())
 		{
-			sum << "," << 0 << "," << infeas[member];
+			sum << "," << 0 << "," << inf_it->second;
 		}
 		else
 		{
@@ -1467,8 +1473,8 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitne
 		_fitness_map[sol_map.first] = _unconstrained_fitness_map[sol_map.first];
 
 		//include scaled infeasibility sum in fitness...
-		if (infeas.find(sol_map.first) != infeas.end())
-			_fitness_map[sol_map.first] += (infeas[sol_map.first] / (max_infeas + 2.0)); // +2.0 to make sure it is less than 0.5, similar to distance penalty
+		if (auto inf_it = infeas.find(sol_map.first); inf_it != infeas.end())
+			_fitness_map[sol_map.first] += (inf_it->second / (max_infeas + 2.0)); // +2.0 to make sure it is less than 0.5, similar to distance penalty
 	}
 	return pair<map<string, double>, map<string, double>>(_fitness_map,_unconstrained_fitness_map);
 
@@ -2377,18 +2383,20 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 	for (auto pi_obj : pi_obj_names)
 	{
 		change_summary[pi_obj] = map<string, double>();
-		if (previous_obj_summary.find(pi_obj) == previous_obj_summary.end())
+		auto prev_it = previous_obj_summary.find(pi_obj);
+		if (prev_it == previous_obj_summary.end())
 			throw_moea_error("obj_func_change_report() error: pi obj '" + pi_obj + "' not in previous summary");
-		if (current_obj_summary.find(pi_obj) == current_obj_summary.end())
+		auto cur_it = current_obj_summary.find(pi_obj);
+		if (cur_it == current_obj_summary.end())
 			throw_moea_error("obj_func_change_report() error: pi obj '" + pi_obj + "' not in current summary");
 		ss << left << setw(max_len) << pi_obj;
 		for (auto tag : tags)
 		{
-			change = previous_obj_summary[pi_obj][tag] - current_obj_summary[pi_obj][tag];
-			if ((previous_obj_summary[pi_obj][tag] <= 0.0) || (change == 0.0))
+			change = prev_it->second[tag] - cur_it->second[tag];
+			if ((prev_it->second[tag] <= 0.0) || (change == 0.0))
 				percent_change = 0.0;
 			else
-				percent_change = 100.0 * (change / previous_obj_summary[pi_obj][tag]);
+				percent_change = 100.0 * (change / prev_it->second[tag]);
 			
 			ss << right << setw(12) << change;
 			ss << setw(12) << percent_change;
@@ -3374,9 +3382,9 @@ int MOEA::initialize_prepare()
                     if (oset.find(sdobs) == oset.end())
                     {
                         found = false;
-                        if (obslink.find(obj_name) != obslink.end())
+                        if (auto link_it = obslink.find(obj_name); link_it != obslink.end())
                         {
-                            sdobs = obslink.at(obj_name);
+                            sdobs = link_it->second;
                             if (oset.find(sdobs) != oset.end())
                             {
                                 found = true;
@@ -4374,8 +4382,8 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		for (auto obj_name : obs_obj_names)
 		{
 			//if this is a max obj
-			if ((obj_dir_mult.find(obj_name) != obj_dir_mult.end()) &&
-				(obj_dir_mult[obj_name] == -1.0))
+			if (auto dir_it = obj_dir_mult.find(obj_name); (dir_it != obj_dir_mult.end()) &&
+				(dir_it->second == -1.0))
 				obj_extrema.push_back(_op.get_var_vector(obj_name).maxCoeff());
 			else
 				obj_extrema.push_back(_op.get_var_vector(obj_name).minCoeff());
@@ -4597,11 +4605,11 @@ void MOEA::assign_par_reals(ParameterEnsemble& _pop)
 		//carry forward whatever was already held for this realization
 		for (auto& fname : all_fixed)
 		{
-			if (existing.find(fname) != existing.end())
+			if (auto ex_it = existing.find(fname); ex_it != existing.end())
 			{
-				map<string, double>& per_real = existing.at(fname);
-				if (per_real.find(rname) != per_real.end())
-					rvals[fname] = per_real.at(rname);
+				map<string, double>& per_real = ex_it->second;
+				if (auto pr_it = per_real.find(rname); pr_it != per_real.end())
+					rvals[fname] = pr_it->second;
 			}
 		}
 		for (auto& uname : unc_names)
@@ -4614,8 +4622,7 @@ void MOEA::assign_par_reals(ParameterEnsemble& _pop)
 		//anything still unaccounted for would trip add_realization()'s completeness check;
 		//fall back to the control value rather than let it throw
 		for (auto& fname : all_fixed)
-			if (rvals.find(fname) == rvals.end())
-				rvals[fname] = pest_scenario.get_ctl_parameters().get_rec(fname);
+			rvals.try_emplace(fname, pest_scenario.get_ctl_parameters().get_rec(fname));
 
 		_pop.get_fixed_info().add_realization(rname, rvals);
 		prl << rname << "," << iter << "," << unc_stack_real_names[idx] << endl;

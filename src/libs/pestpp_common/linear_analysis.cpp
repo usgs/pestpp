@@ -69,8 +69,8 @@ map<string, double> get_obj_comps(string &filename)
 					pest_utils::tokenize(line, tokens);
 					pest_utils::convert_ip(tokens[4], resid);
 					pest_utils::convert_ip(tokens[5], weight);
-					if (obj_comps.find(tokens[1]) != obj_comps.end())obj_comps[tokens[1]] += pow(resid * weight, 2);
-					else obj_comps[tokens[1]] = pow(resid * weight, 2);
+					// [] starts a new component at 0.0, so both branches are the same +=
+					obj_comps[tokens[1]] += pow(resid * weight, 2);
 				}
 				break;
 			}
@@ -127,8 +127,8 @@ pair<ObservationInfo,map<string,double>> normalize_weights_by_residual(Pest &pes
 	map<string, double> obs_std = pest_scenario.get_ext_file_double_map(efile_name, sname);
 	map<string,vector<pest_utils::ExternalCtlFile>>& efiles_map = pest_scenario.get_efiles_map();
 	vector<pest_utils::ExternalCtlFile> obs_efiles;
-	if (efiles_map.find(efile_name) != efiles_map.end()) {
-		obs_efiles = efiles_map.at(efile_name);
+	if (auto ef_it = efiles_map.find(efile_name); ef_it != efiles_map.end()) {
+		obs_efiles = ef_it->second;
 	}
 	set<string> col_set;
 	map<string,string> idx_map;
@@ -151,10 +151,10 @@ pair<ObservationInfo,map<string,double>> normalize_weights_by_residual(Pest &pes
 		else if (new_weight >= numeric_limits<double>::max())
 			new_weight = 1.0e+30;
 		obs_info.set_weight(oname, new_weight);
-		if (obs_std.find(oname) != obs_std.end()) {
+		if (auto os_it = obs_std.find(oname); os_it != obs_std.end()) {
 			new_weight = 1.0 / new_weight;
-			if (new_weight < obs_std.at(oname))
-				new_weight = obs_std.at(oname);
+			if (new_weight < os_it->second)
+				new_weight = os_it->second;
 			else if (new_weight <= numeric_limits<double>::min())
 				new_weight = 1e-30;
 			else if (new_weight >= numeric_limits<double>::max())

@@ -272,10 +272,10 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	++i_run;
 	*/
 	string base = "__base__";
-	if (par_run_map.find(base) != par_run_map.end())
+	if (auto base_it = par_run_map.find(base); base_it != par_run_map.end())
 	{
-		run_manager.get_model_parameters(par_run_map[base][0], base_run.ctl_pars);
-		bool success = run_manager.get_observations_vec(par_run_map[base][0], base_run.obs_vec);
+		run_manager.get_model_parameters(base_it->second[0], base_run.ctl_pars);
+		bool success = run_manager.get_observations_vec(base_it->second[0], base_run.obs_vec);
 		if (!success)
 		{
 			throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));

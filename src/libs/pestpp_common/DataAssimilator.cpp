@@ -680,8 +680,8 @@ void write_global_phi_info(int icycle, ofstream& f_phi, DataAssimilator& da, vec
 	map<string, double> final_actual = da.get_phi_handler().get_phi_map(L2PhiHandler::phiType::ACTUAL);
 	for (auto rname : init_real_names)
 	{
-		if (final_actual.find(rname) != final_actual.end())
-			f_phi << "," << final_actual.at(rname);
+		if (auto fa_it = final_actual.find(rname); fa_it != final_actual.end())
+			f_phi << "," << fa_it->second;
 		else
 			f_phi << ",";
 	}

@@ -862,10 +862,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					tokens_to_par_group_rec(f_rec, par_group_tokens);
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
+				efiles_map[section].push_back(efile);
  
 			}
 			else if (section == "PARAMETER GROUPS")
@@ -978,8 +977,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						temp_tied_map[row_map.at(pcol)] = row_map.at("PARTIED");
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
 				efiles_map[section].push_back(efile);
 	
 			}
@@ -1011,10 +1010,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					tokens_to_obs_group_rec(f_rec, obs_group_tokens);
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-				{
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
-				}	
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
 				efiles_map[section].push_back(efile);
 			}
 
@@ -1068,8 +1065,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					tokens_to_obs_rec(f_rec, obs_tokens);
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
 				efiles_map[section].push_back(efile);
 			}
 
@@ -1102,10 +1099,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					tokens_to_pi_rec(f_rec, pi_tokens);
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);	
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
+				efiles_map[section].push_back(efile);	
 			}
 
 		
@@ -1159,10 +1155,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					//model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);	
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
+				efiles_map[section].push_back(efile);	
 			
 			}
 
@@ -1212,10 +1207,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					
 				}
 				efile.keep_cols(efile_keep_cols);
-				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+				// [] default-constructs the vector for a new section, so the find-and-seed
+				// was doing nothing but a second lookup
+				efiles_map[section].push_back(efile);
 			
 			}
 			else if (section == "MODEL INPUT/OUTPUT")
@@ -1540,8 +1534,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					continue;
 				}
 				gname = ctl_parameter_info.get_parameter_rec_ptr(pname)->group;
-				if (group_map.find(gname) == group_map.end())
-					group_map[gname] = vector<string>();
+				// same as the efiles_map sections - [] seeds the empty vector
 				group_map[gname].push_back(pname);
 			}
 

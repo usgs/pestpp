@@ -1577,10 +1577,11 @@ pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vec
 	for (int i=0;i<cnames.size();i++)
 	{
 		cname = cnames[i];
-		if (sim.find(cname) != sim.end())
+		if (auto sim_it = sim.find(cname); sim_it != sim.end())
 		{
-			rhs[i] = obs[cname];
-			resid[i] = sim[cname] - obs[cname];
+			double oval = obs[cname];
+			rhs[i] = oval;
+			resid[i] = sim_it->second - oval;
 		}
 		else if (constraints_pi.find(cname) != constraints_pi.end())
 		{
@@ -1703,9 +1704,10 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
 		//would silently insert and return 0 for a missing name, so a constraint absent from
 		//(or misnamed in) the stack would be shifted by an unrelated stack column (index 0)
 		//with no error.  require an explicit match instead.
-		if (var_map.find(name) == var_map.end())
+		auto vm_it = var_map.find(name);
+		if (vm_it == var_map.end())
 			throw_constraints_error("constraint '" + name + "' not found in the stack ensemble columns - cannot compute stack-based chance shift");
-		int cidx = var_map.at(name);
+		int cidx = vm_it->second;
 		// the realized values of this stack are the anomalies added to the
 		//current constraint value - this assumes the current value
 		//is the mean of the stack distribution
@@ -2057,9 +2059,9 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		ss << setw(14) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs.get_rec(name);
 		ss << setw(15) << current_obs.get_rec(name);
-		if (infeas_dist.find(name) != infeas_dist.end())
+		if (auto inf_it = infeas_dist.find(name); inf_it != infeas_dist.end())
 		{
-			ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+			ss << setw(11) << "false" << setw(15) << inf_it->second;
 		}
 		else
 		{
@@ -2135,9 +2137,9 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
-			if (infeas_dist.find(name) != infeas_dist.end())
+			if (auto inf_it = infeas_dist.find(name); inf_it != infeas_dist.end())
 			{
-				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				ss << setw(11) << "false" << setw(15) << inf_it->second;
 			}
 			else
 			{
@@ -2191,9 +2193,9 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << constraints_obs.get_rec(name);
 			ss << setw(15) << current_obs.get_rec(name);
-			if (infeas_dist.find(name) != infeas_dist.end())
+			if (auto inf_it = infeas_dist.find(name); inf_it != infeas_dist.end())
 			{
-				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				ss << setw(11) << "false" << setw(15) << inf_it->second;
 				obs_infeas++;
 			}
 			else
@@ -2233,9 +2235,9 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
-			if (infeas_dist.find(name) != infeas_dist.end())
+			if (auto inf_it = infeas_dist.find(name); inf_it != infeas_dist.end())
 			{
-				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+				ss << setw(11) << "false" << setw(15) << inf_it->second;
 				pi_infeas++;
 			}
 			else

@@ -614,8 +614,8 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             map<double,int> counts;
             for (auto& score : composite_score)
             {
-                if (counts.find(score.second) == counts.end())
-                    counts[score.second] = 0;
+                // [] on a map<double,int> starts a new key at 0, so the find-and-seed is
+                // three lookups doing the work of one
                 counts[score.second]++;
             }
             for (auto& score : composite_score)
@@ -1064,8 +1064,8 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
             //hand the center realization's neighborhood-ranking weights to solve() so the
             //localized upgrade threads can scale realization contributions (empty if not weighting)
-            if (mm_real_weight_map.find(real_name) != mm_real_weight_map.end())
-                mm_current_weights = mm_real_weight_map.at(real_name);
+            if (auto mm_it = mm_real_weight_map.find(real_name); mm_it != mm_real_weight_map.end())
+                mm_current_weights = mm_it->second;
             else
                 mm_current_weights.resize(0);
             solve(num_threads, cur_lam, use_glm_form, pe_real, loc_map);
@@ -1178,10 +1178,10 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     //(in center_on-anomaly form, so the center realization's column is ~zero), aligned to
     //pe_real_names = the [self, neighbors] subset order.
     double mm_weight_sum = -1.0;
-    if ((center_on.size() > 0) && (mm_real_weight_map.find(center_on) != mm_real_weight_map.end())
-        && (mm_real_weight_map.at(center_on).size() == par_diff.cols()))
+    if (auto mm_it = mm_real_weight_map.find(center_on); (center_on.size() > 0) && (mm_it != mm_real_weight_map.end())
+        && (mm_it->second.size() == par_diff.cols()))
     {
-        Eigen::VectorXd swvec = mm_real_weight_map.at(center_on).cwiseSqrt();
+        Eigen::VectorXd swvec = mm_it->second.cwiseSqrt();
         for (int j = 0; j < par_diff.cols(); j++)
         {
             par_diff.col(j) *= swvec[j];
@@ -1820,9 +1820,9 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         //row 0 (weight 1, zero deviation).  mm_weight_sum is the effective sample size, passed to
         //ensemble_solution so the scale factor uses sum(w) instead of num_reals.
         double mm_weight_sum = -1.0;
-        if (real_weight_map.find(key) != real_weight_map.end())
+        if (auto rw_it = real_weight_map.find(key); rw_it != real_weight_map.end())
         {
-            Eigen::VectorXd swvec = real_weight_map.at(key).cwiseSqrt();
+            Eigen::VectorXd swvec = rw_it->second.cwiseSqrt();
             for (int i=0;i<par_diff.rows();i++)
             {
                 par_diff.row(i) *= swvec[i];
@@ -2229,18 +2229,21 @@ ViolationDetector::ViolationDetector(Pest* _pest_scenario)
 		}
         else
         {
-            if ((extfile_gt.find(oname) != extfile_gt.end()) &&
-                    (extfile_lt.find(oname) != extfile_lt.end()))
+            // look each one up once and reuse the iterators - the chain below used to hit
+            // both maps up to three times for the same name
+            auto gt_it = extfile_gt.find(oname);
+            auto lt_it = extfile_lt.find(oname);
+            if ((gt_it != extfile_gt.end()) && (lt_it != extfile_lt.end()))
             {
-                double_obs_bounds[oname] = pair<double,double>(extfile_gt.at(oname),extfile_lt.at(oname));
+                double_obs_bounds[oname] = pair<double,double>(gt_it->second,lt_it->second);
             }
-            else if (extfile_gt.find(oname) != extfile_gt.end())
+            else if (gt_it != extfile_gt.end())
             {
-                gt_obs_bounds[oname] = extfile_gt.at(oname);
+                gt_obs_bounds[oname] = gt_it->second;
             }
-            else if (extfile_lt.find(oname) != extfile_lt.end())
+            else if (lt_it != extfile_lt.end())
             {
-                lt_obs_bounds[oname] = extfile_lt.at(oname);
+                lt_obs_bounds[oname] = lt_it->second;
             }
         }
     }
@@ -2551,9 +2554,9 @@ map<string,double> L2PhiHandler::get_swr_map(ObservationEnsemble& oe, string rea
     if (real_name.size() > 0)
     {
         map<string,int> real_map = oe.get_real_map();
-        if (real_map.find(real_name) != real_map.end())
+        if (auto rm_it = real_map.find(real_name); rm_it != real_map.end())
         {
-            mean_vec = resid.row(real_map[real_name]);
+            mean_vec = resid.row(rm_it->second);
         }
         else
         {
@@ -3218,17 +3221,18 @@ void L2PhiHandler::report_group(bool echo) {
         pmmn_map[g] = 1e+300;
         for (auto& o : obs_group_phi_map)
         {
-            if (actual.find(o.first) == actual.end())
+            auto act_it = actual.find(o.first);
+            if (act_it == actual.end())
             {
                 continue;
             }
             tot = tot + o.second[g];
-            if (actual[o.first] > 0)
-                ptot = ptot + (o.second[g]/actual[o.first]);
+            if (act_it->second > 0)
+                ptot = ptot + (o.second[g]/act_it->second);
             mx_map[g] = max(mx_map[g],o.second[g]);
             mmn_map[g] = min(mmn_map[g],o.second[g]);
-            pmx_map[g] = max(pmx_map[g],(o.second[g]/actual[o.first]));
-            pmmn_map[g] = min(pmmn_map[g],(o.second[g]/actual[o.first]));
+            pmx_map[g] = max(pmx_map[g],(o.second[g]/act_it->second));
+            pmmn_map[g] = min(pmmn_map[g],(o.second[g]/act_it->second));
             c++;
         }
         tot = tot / (double)c;
@@ -3239,13 +3243,14 @@ void L2PhiHandler::report_group(bool echo) {
 
         for (auto& o : obs_group_phi_map)
         {
-            if (actual.find(o.first) == actual.end())
+            auto act_it = actual.find(o.first);
+            if (act_it == actual.end())
             {
                 continue;
             }
             v = v + (pow(o.second[g] - tot,2));
-            if (actual[o.first] > 0)
-                pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
+            if (act_it->second > 0)
+                pv = pv + (pow(ptot - (o.second[g]/act_it->second),2));
         }
         if (v != 0)
             std_map[g] = sqrt(v/(double)(c-1));
@@ -3989,8 +3994,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 	for (auto &n : base_pe_ptr->get_var_names())
 	{
 		group = gi.get_group_name(n);
-		if (pargp2par_map.find(group) == pargp2par_map.end())
-			pargp2par_map[group] = set<string>();	
+		// [] starts a new group with an empty set, so the find-and-seed was doing nothing
 		pargp2par_map[group].emplace(n);
 	}
 }
@@ -4122,10 +4126,7 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
     for (auto& pname : _pe.get_pest_scenario_ptr()->get_ctl_parameters())
     {
         group = pi->get_parameter_rec_ptr(pname.first)->group;
-        if (results.find(group) == results.end())
-        {
-            results[group] = 0;
-        }
+        results.try_emplace(group, 0);
     }
 
     double demon = 0.0;
@@ -5811,9 +5812,10 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
 	vector<string> misaligned;
 	for (const auto& item : pe_map)
 	{
-		if (oe_map.find(item.first) == oe_map.end())
+		auto oe_it = oe_map.find(item.first);
+		if (oe_it == oe_map.end())
 			continue;
-		if (item.second != oe_map[item.first])
+		if (item.second != oe_it->second)
 			misaligned.push_back(item.first);
 	}
 	if (misaligned.size() > 0)
@@ -7344,9 +7346,9 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsembl
 
 		for (int i = 0; i < obs_dyn_state_names.size(); i++)
 		{
-			if (init_to_final_par.find(par_dyn_state_names[i]) != init_to_final_par.end())
+			if (auto itf_it = init_to_final_par.find(par_dyn_state_names[i]); itf_it != init_to_final_par.end())
 			{
-				final_par_dyn_state_names.push_back(init_to_final_par.at(par_dyn_state_names[i]));
+				final_par_dyn_state_names.push_back(itf_it->second);
 				final_obs_dyn_state_names.push_back(obs_dyn_state_names[i]);
 
 			}

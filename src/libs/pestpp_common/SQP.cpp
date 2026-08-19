@@ -1929,9 +1929,10 @@ int SeqQuadProgram::prep_4_ensemble_grad_prepare()
 	vector<string> misaligned;
 	for (const auto& item : pe_map)
 	{
-		if (oe_map.find(item.first) == oe_map.end())
+		auto oe_it = oe_map.find(item.first);
+		if (oe_it == oe_map.end())
 			continue;
-		if (item.second != oe_map[item.first])
+		if (item.second != oe_it->second)
 			misaligned.push_back(item.first);
 	}
 	if (misaligned.size() > 0)
@@ -5198,11 +5199,12 @@ bool SeqQuadProgram::solve_new_ensemble()
 		constraint_jco_en[d] = constraint_mat_en[d].first.e_ptr()->toDense();
 		current_obj_en[d] = get_obj_value(dv_vals, obs_vals);
 
-		if (hessian_en.find(d) == hessian_en.end())
-			hessian_en[d] = hessian;
+		// try_emplace only builds the value when the key is new, so an existing hessian
+		// isnt copied just to be looked up again
+		auto he_it = hessian_en.try_emplace(d, hessian).first;
 		
 		Covariance backup_hessian = hessian;
-		hessian = hessian_en[d];
+		hessian = he_it->second;
 		used_hessian = Covariance();
 
 		pair<Eigen::VectorXd, Eigen::VectorXd> x = calc_search_direction_vector(dv_vals, obs_vals, grad, &constraint_jco_en[d], &cnames_en[d]);
@@ -5270,9 +5272,9 @@ bool SeqQuadProgram::solve_new_ensemble()
 		cnames = cnames_en[selected_ls_parent];
 		prev_constraint_mat = current_constraint_mat;
 		lambda = lm_en[selected_ls_parent];
-		if (hessian_en.find(selected_ls_parent) != hessian_en.end())
+		if (auto he_it = hessian_en.find(selected_ls_parent); he_it != hessian_en.end())
 		{
-			hessian = hessian_en[selected_ls_parent];
+			hessian = he_it->second;
 		}
 		BASE_SCALE_FACTOR = 1.0;
 	}

@@ -1795,9 +1795,9 @@ void Covariance::from_parameter_bounds(ofstream& frec, const vector<string> &par
 		{
 			continue;
 		}
-		if (par_std.find(par_name) != par_std.end())
+		if (auto ps_it = par_std.find(par_name); ps_it != par_std.end())
 		{
-			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(par_std[par_name], 2.0)));
+			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(ps_it->second, 2.0)));
 			row_names.push_back(par_name);
 			col_names.push_back(par_name);
 			i++;
@@ -1849,9 +1849,9 @@ void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 		vector<string> remove;
 		for (auto pname : pest_scenario.get_ctl_ordered_par_names())
 		{
-			if (par_std.find(pname) != par_std.end())
+			if (auto ps_it = par_std.find(pname); ps_it != par_std.end())
 			{
-				if (par_std[pname] <= 0.0)
+				if (ps_it->second <= 0.0)
 				{
                     ParameterRec::TRAN_TYPE t = pi.get_parameter_rec_ptr(pname)->tranform_type;
                     if ((t != ParameterRec::TRAN_TYPE::FIXED) && (t != ParameterRec::TRAN_TYPE::TIED)) {
@@ -1861,7 +1861,7 @@ void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
                     }
 				}
 				else
-					frec << pname << ' ' << par_std[pname] << endl;
+					frec << pname << ' ' << ps_it->second << endl;
 			}
 				
 		}
@@ -1919,9 +1919,9 @@ void Covariance::from_observation_weights(ofstream& frec, const vector<string>& 
 	{
 		pest_utils::upper_ip(obs_name);
 		obs_rec = obs_info.get_observation_rec_ptr(obs_name);
-		if (obs_std.find(obs_name) != obs_std.end())
+		if (auto os_it = obs_std.find(obs_name); os_it != obs_std.end())
 		{
-			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(obs_std[obs_name], 2)));
+			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(os_it->second, 2)));
 			row_names.push_back(obs_name);
 			col_names.push_back(obs_name);
 			i++;
@@ -1997,14 +1997,14 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 		}
 		for (auto oname : pest_scenario.get_ctl_ordered_obs_names())
 		{
-			if (obs_std.find(oname) != obs_std.end())
+			if (auto os_it = obs_std.find(oname); os_it != obs_std.end())
 			{
-				if ((obs_std[oname] <= 0.0) && (oi.get_weight(oname) > 0.0))				{
+				if ((os_it->second <= 0.0) && (oi.get_weight(oname) > 0.0))				{
 					frec << "Warning: observation " << oname << " 'standard_deviation' less than or equal to zero, using weight" << endl;
 					remove.push_back(oname);
 				}
 				else if (echo)
-					frec << oname << ' ' << obs_std[oname] << endl;
+					frec << oname << ' ' << os_it->second << endl;
 			}
 		}
 		for (auto r : remove)

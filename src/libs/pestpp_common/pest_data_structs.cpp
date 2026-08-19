@@ -2756,10 +2756,11 @@ double ObservationInfo::get_weight(const string &obs_name) const
 
 void ObservationInfo::set_weight(const string &obs_name, double value)
 {
-	if (observations.find(obs_name) == observations.end())
+	auto obs_it = observations.find(obs_name);
+	if (obs_it == observations.end())
 		throw PestError("ObservationInfo::set_weight() error: observation\
 			    " + obs_name + " not found");
-	observations[obs_name].weight = value;
+	obs_it->second.weight = value;
 }
 
 string ObservationInfo::get_group(const string &obs_name) const

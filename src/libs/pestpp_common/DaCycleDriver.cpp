@@ -207,10 +207,10 @@ bool DaCycleDriver::begin_cycle()
 	ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
 
 	//check for entries in the par cycle table
-	if (par_cycle_info.find(icycle) != par_cycle_info.end())
+	if (auto pci_it = par_cycle_info.find(icycle); pci_it != par_cycle_info.end())
 	{
 		performance_log->log_event("updating pars using da par cycle table info");
-		map<string, double> cycle_map = par_cycle_info[icycle];
+		const map<string, double>& cycle_map = pci_it->second;
 		for (const auto& item : cycle_map)
 		{
 			base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
@@ -218,13 +218,13 @@ bool DaCycleDriver::begin_cycle()
 		}
 	}
 	//check for entries in the obs cycle table
-	if (obs_cycle_info.find(icycle) != obs_cycle_info.end())
+	if (auto oci_it = obs_cycle_info.find(icycle); oci_it != obs_cycle_info.end())
 	{
 		performance_log->log_event("updating obs using da obs cycle table info");
-		map<string, double> cycle_map = obs_cycle_info[icycle];
+		const map<string, double>& cycle_map = oci_it->second;
 		map<string, double> weight_cycle_map;
-		if (weight_cycle_info.find(icycle) != weight_cycle_info.end())
-			weight_cycle_map = weight_cycle_info[icycle];
+		if (auto wci_it = weight_cycle_info.find(icycle); wci_it != weight_cycle_info.end())
+			weight_cycle_map = wci_it->second;
 		ObservationInfo oi = parent_scenario.get_ctl_observation_info();
 		childPest.set_observation_info(oi);
 		for (auto tbl_obs_name : obs_in_tbl)
@@ -239,8 +239,8 @@ bool DaCycleDriver::begin_cycle()
 				childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name,
 					cycle_map.at(tbl_obs_name));
 				//check if this obs is in this cycle's weight info
-				if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
-					oi.set_weight(tbl_obs_name, weight_cycle_map.at(tbl_obs_name));
+				if (auto wm_it = weight_cycle_map.find(tbl_obs_name); wm_it != weight_cycle_map.end())
+					oi.set_weight(tbl_obs_name, wm_it->second);
 			}
 		}
 		childPest.set_observation_info(oi);
@@ -317,9 +317,9 @@ bool DaCycleDriver::begin_cycle()
 		curr_pe.get_eigen(vector<string>(), act_par_names), curr_pe.get_real_names(), act_par_names);
 	cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 	cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_info());
-	if (par_cycle_info.find(icycle) != par_cycle_info.end())
+	if (auto pci_it = par_cycle_info.find(icycle); pci_it != par_cycle_info.end())
 	{
-		map<string, double> cycle_info = par_cycle_info.at(icycle);
+		map<string, double> cycle_info = pci_it->second;
 		cycle_curr_pe.get_fixed_info().update_par_values(cycle_info);
 	}
 	da->set_pe(cycle_curr_pe);
