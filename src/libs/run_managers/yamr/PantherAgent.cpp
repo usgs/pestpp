@@ -1190,7 +1190,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 							pest_scenario.assign_da_cycles(frec);
 							Pest childPest = pest_scenario.get_child_pest(da_cycle);
 							const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
-							Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
+							const Parameters& cur_ctl_parameters = childPest.get_ctl_parameters();
 							vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
 							sort(par_names.begin(), par_names.end());
 							vector<string> obs_names = childPest.get_ctl_observations().get_keys();

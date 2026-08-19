@@ -364,7 +364,7 @@ vector<string> PriorInformation::get_keys() const
 int PriorInformation::get_nnz_pi() const
 {
 	int nnz = 0;
-	for (auto pi : prior_info_map)
+	for (const auto& pi : prior_info_map)
 	{
 		if (pi.second.get_weight() > 0.0)
 			nnz++;

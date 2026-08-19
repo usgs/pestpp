@@ -617,7 +617,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			//build the nz_obs obs_cov
 			if (nz_obs_names.size() != 0)
 			{
-				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+				const ObservationInfo& oi = pest_scenario.get_ctl_observation_info();
 				map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
 				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}

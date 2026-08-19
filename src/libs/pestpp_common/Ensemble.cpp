@@ -3027,7 +3027,7 @@ void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 	// add the "base" if its not in the real names already
 	if (find(real_names.begin(), real_names.end(), BASE_REAL_NAME) == real_names.end())
 	{
-		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		const Parameters& pars = pest_scenario_ptr->get_ctl_parameters();
 		v = pars.get_data_eigen_vec(fixed_names);
 		pfinfo.add_realization(BASE_REAL_NAME, v, fixed_names);
 		/*for (auto fname : fixed_names)

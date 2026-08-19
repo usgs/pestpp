@@ -3984,7 +3984,7 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 				Eigen::VectorXd step = solve_constrained_trust_region_step(H, real_grad, A_real, candidate_trust_radius);
 				Eigen::VectorXd current_dv_vec = dvs_subset->get_real_vector(real_name);
 
-				ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
+				const ParameterInfo& par_info = pest_scenario.get_ctl_parameter_info();
 				Parameters lbnd = par_info.get_low_bnd(dv_names);
 				Parameters ubnd = par_info.get_up_bnd(dv_names);
 				ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
@@ -4964,7 +4964,7 @@ bool SeqQuadProgram::recalc_search_direction_vector(const string& rname, Paramet
 			Eigen::VectorXd unscaled_search_d = search_d_en[rname];
 			if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
 			{
-				ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
+				const ParameterInfo& par_info = pest_scenario.get_ctl_parameter_info();
 				Parameters lbnd = par_info.get_low_bnd(dv_names);
 				Parameters ubnd = par_info.get_up_bnd(dv_names);
 				ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
@@ -5146,7 +5146,7 @@ bool SeqQuadProgram::solve_new_ensemble()
 	double rangesq = -1.0;
 	if (pest_scenario.get_pestpp_options().get_sqp_rescale_search_dir())
 	{
-		ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
+		const ParameterInfo& par_info = pest_scenario.get_ctl_parameter_info();
 		Parameters lbnd = par_info.get_low_bnd(dv_names);
 		Parameters ubnd = par_info.get_up_bnd(dv_names);
 		ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();

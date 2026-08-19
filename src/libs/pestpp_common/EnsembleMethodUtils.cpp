@@ -2300,7 +2300,8 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
 	assert(names.size() == resid.cols());
 
 	map<string, double> lt_vals,gt_vals;
-	Observations obs = pest_scenario->get_ctl_observations();
+	// reference, not a copy - this runs on every partial reply and we only read from it
+	const Observations& obs = pest_scenario->get_ctl_observations();
 	for (auto &n : lt_obs_names)
 		lt_vals[n] = obs.get_rec(n);
 	for (auto &n : gt_obs_names)
@@ -2316,7 +2317,7 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
 	double val,val2;
 	Eigen::VectorXd col, scol;
 
-    for (auto const iv : double_obs_bounds)
+    for (const auto& iv : double_obs_bounds)
     {
         idx = idxs[iv.first];
         col = resid.col(idx);
@@ -2329,7 +2330,7 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
         resid.col(idx) = col;
     }
 
-	for (auto const iv : lt_vals)
+	for (const auto& iv : lt_vals)
 	{
 		idx = idxs[iv.first];
 		col = resid.col(idx);
@@ -2343,7 +2344,7 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
 	}
 
 
-    for (auto const iv : lt_obs_bounds)
+    for (const auto& iv : lt_obs_bounds)
     {
         idx = idxs[iv.first];
         col = resid.col(idx);
@@ -2360,7 +2361,7 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
 
 
     //Eigen::MatrixXd temp = resid;
-	for (auto const iv : gt_vals)
+	for (const auto& iv : gt_vals)
 	{
 		idx = idxs[iv.first];
 		col = resid.col(idx);
@@ -2370,7 +2371,7 @@ void ViolationDetector::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::Ma
 		resid.col(idx) = col;
 	}
 
-    for (auto const iv : gt_obs_bounds)
+    for (const auto& iv : gt_obs_bounds)
     {
         idx = idxs[iv.first];
         col = resid.col(idx);
@@ -2402,7 +2403,8 @@ bool ViolationDetector::is_violating(Observations& sim, const set<string>& valid
     if (names.size() == 0)
         return false;
 
-    Observations obs = pest_scenario->get_ctl_observations();
+    // reference, not a copy - same reason as apply_ineq_constraints above
+    const Observations& obs = pest_scenario->get_ctl_observations();
     Eigen::MatrixXd sim_row(1, names.size());
     Eigen::MatrixXd resid(1, names.size());
     for (int i = 0; i < (int)names.size(); i++)
@@ -2709,7 +2711,7 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 	{
 		par_group_idx_map.clear();
 		vector<string> pars = pe_base->get_var_names();
-		ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
+		const ParameterInfo& pi = pest_scenario->get_ctl_parameter_info();
 		for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
 		{
 			idx.clear();
@@ -2788,7 +2790,7 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, Obse
     {
         par_group_idx_map.clear();
         vector<string> pars = pe_base->get_var_names();
-        ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
+        const ParameterInfo& pi = pest_scenario->get_ctl_parameter_info();
         for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
         {
             idx.clear();

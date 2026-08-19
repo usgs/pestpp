@@ -307,7 +307,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	list<JacobianRun> run_list;
     int nfailed = 0;
 	
-	for (auto par_run : par_run_map)
+	for (const auto& par_run : par_run_map)
     {
 		for (auto rid : par_run.second)
 		{
