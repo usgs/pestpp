@@ -322,7 +322,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 				frec << "Note: the following decision variables contain 'mean' value information that will be used in place of " << endl;
 				frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
 				double lb, ub;
-				for (auto par_mean : par_means)
+				for (const auto& par_mean : par_means)
 				{
 					if (draw_dv_par.find(par_mean.first) != draw_dv_par.end())
 					{
@@ -364,7 +364,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			if (par_means.size() > 0)
 			{
 				double lb, ub;
-				for (auto par_mean : par_means)
+				for (const auto& par_mean : par_means)
 				{
 					if (draw_unc_par.find(par_mean.first) != draw_unc_par.end())
 					{
@@ -582,7 +582,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		ParameterEnsemble dv_full(&pest_scenario, &rand_gen, temp, dv.get_real_names(), ctl_adj_par_names);
 		dv_full.set_trans_status(ParameterEnsemble::transStatus::NUM);
 		dv.update_var_map();
-		for (auto d : dv.get_var_map())
+		for (const auto& d : dv.get_var_map())
 		{
 			Eigen::VectorXd col = dv.get_eigen_ptr()->col(d.second);
 			dv_full.replace_col(d.first, col);
@@ -1927,7 +1927,7 @@ int SeqQuadProgram::prep_4_ensemble_grad_prepare()
 
 	map<string, int> pe_map = dv.get_real_map(), oe_map = oe.get_real_map();
 	vector<string> misaligned;
-	for (auto item : pe_map)
+	for (const auto& item : pe_map)
 	{
 		if (oe_map.find(item.first) == oe_map.end())
 			continue;
@@ -6928,7 +6928,7 @@ void CovMatAdap::update_archives(const ParameterEnsemble& pe, map<string, double
 		}
 	}
 
-	for (auto o : unique_obj_map)
+	for (const auto& o : unique_obj_map)
 	{
 		sorted_obj_map[tag + "|" + o.first] = o.second;
 		sorted_dp_archive.append(tag + "|" + o.first, curr_pe.get_real_vector(o.first));

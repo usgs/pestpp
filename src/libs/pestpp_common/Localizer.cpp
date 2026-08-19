@@ -612,7 +612,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 
 
 	map<string, set<string>> listed_obs;
-	for (auto i : lmap)
+	for (const auto& i : lmap)
 	{
 		set<string> oset(i.second.first.begin(), i.second.first.end());
 		for (auto pname : i.second.second)
@@ -832,7 +832,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	}
 	triplets.clear();
 	vector<int> zeros;
-	for (auto p : par_count)
+	for (const auto& p : par_count)
 		if (p.second == 0)
 			zeros.push_back(p.first);
 	if (zeros.size() > 0) {
@@ -842,7 +842,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 
 
         zeros.clear();
-	for (auto o : obs_count)
+	for (const auto& o : obs_count)
 		if (o.second == 0)
 			zeros.push_back(o.first);
 

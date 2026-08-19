@@ -148,7 +148,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 	for (auto real_name : real_names)
 	{
 		map<string, double> obj_map;
-		for (auto t : temp)
+		for (auto& t : temp)
 		{
 			//obj_map[t.second[real_name]] = t.first;
 			obj_map[t.first] = t.second[real_name];
@@ -274,7 +274,7 @@ void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member
 	vector<string> names;
 	map<string, double> solution_p,solution_q;
 	string name_p,name_q;
-	for (auto m : _member_struct)
+	for (const auto& m : _member_struct)
 		names.push_back(m.first);
 
 	for (int i=0;i<names.size();i++)
@@ -579,14 +579,14 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
                 // 'op' has already been shifted
                 violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
                 end = obs_obj_set.end();
-                for (auto v : violations) {
+                for (const auto& v : violations) {
                     if (obs_obj_set.find(v.first) == end)
                         vsum += pow(v.second * oi->get_weight(v.first), 2);
                 }
                 pars.update_without_clear(pnames, dp.get_real_vector(real_name));
                 violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
                 end = pi_obj_set.end();
-                for (auto v : violations) {
+                for (const auto& v : violations) {
                     if (pi_obj_set.find(v.first) == end)
                         vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(), 2);
                 }
@@ -620,7 +620,7 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
             std::sort(infeas_vec.begin(), infeas_vec.end(),
                       compFunctor);
 
-            for (auto inf : infeas_vec)
+            for (const auto& inf : infeas_vec)
                 infeas_ordered.push_back(inf.first);
         }
 		else
@@ -723,7 +723,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	{
 		frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
 
-		for (auto front : front_map)
+		for (const auto& front : front_map)
 		{
 			if (front.second.size() == 0)
 			{
@@ -743,7 +743,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	vector<string> crowd_ordered_front;
 	crowd_map.clear();
 	member_front_map.clear();
-	for (auto front : front_map)
+	for (auto& front : front_map)
 	{	
 		for (auto m : front.second)
 			member_front_map[m] = front.first;
@@ -940,7 +940,7 @@ map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(Observa
 map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
-	for (auto m : _member_struct)
+	for (const auto& m : _member_struct)
 		members.push_back(m.first);
 	return get_spea2_kth_nn_crowding_distance(members, _member_struct);
 }
@@ -969,7 +969,7 @@ map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(vector<
 	
 	string m = members[0];
 	vector<string> obj_names;
-	for (auto obj_map : _member_struct[m])
+	for (const auto& obj_map : _member_struct[m])
 	{
 		obj_names.push_back(obj_map.first);
 	}
@@ -1030,7 +1030,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(ObservationEn
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
-	for (auto m : _member_struct)
+	for (const auto& m : _member_struct)
 		members.push_back(m.first);
 	return get_cuboid_crowding_distance(members, _member_struct);
 }
@@ -1073,7 +1073,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	for (auto member : members)
 	{
 		crowd_distance_map[member] = 0.0;
-		/*for (auto obj_map : _member_struct[member])
+		/*for (const auto& obj_map : _member_struct[member])
 			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
 		for (auto obj_map : *obs_obj_names_ptr) //need to make sure the SDs are not included
@@ -1084,7 +1084,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	map<string, double> omap;
 	double obj_range;
 
-	for (auto obj_map : obj_member_map)
+	for (const auto& obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
 		//note: for members with identical distances, only the first one gets into the 
@@ -1223,7 +1223,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 	double fitness;
 	vector<double> nonuniq_obj;
 
-	for (auto obj_map : obj_member_map)
+	for (const auto& obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
 		//note: for members with identical distances, only the first one gets into the 
@@ -1251,10 +1251,10 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 		if (omap.size() != crowd_sorted.size())
 		{
-			for (auto o : omap)
+			for (const auto& o : omap)
 			{
 				int count = 0;
-				for (auto cd : crowd_sorted)
+				for (const auto& cd : crowd_sorted)
 					if ((cd.second == o.second) && (cd.first != o.first))
 						count++;
 
@@ -1278,7 +1278,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			map<string, double> curr;
 			vector<string> all_extreme_set;
 
-			for (auto m : incumbent_front_extreme)
+			for (const auto& m : incumbent_front_extreme)
 				curr[m.first] = incumbent_front_extreme[m.first][obj_map.first];
 
 			sortedset curr_sorted(curr.begin(), curr.end(), compFunctor);
@@ -1300,7 +1300,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			{
 				double mx = 0, ei;
 				string endmem;
-				for (auto l : lower_extreme_candidates)
+				for (const auto& l : lower_extreme_candidates)
 				{
 					ei = get_ei(_member_struct[l.first], obj_map.first, lb);
 					if (ei > mx)
@@ -1317,13 +1317,13 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), lower_extreme_candidates[endmem][obj_map.first]) != nonuniq_obj.end())
 					{
 						map<string, double> ext_mems_pd;
-						for (auto l : lower_extreme_candidates)
+						for (const auto& l : lower_extreme_candidates)
 						{
 							if (lower_extreme_candidates[l.first][obj_map.first] != lower_extreme_candidates[endmem][obj_map.first])
 								continue;
 
 							double pd = 1;
-							for (auto m : lower_extreme_candidates)
+							for (const auto& m : lower_extreme_candidates)
 							{
 								if (l.first != m.first)
 									pd *= dominance_probability(_member_struct[l.first], _member_struct[m.first]);
@@ -1333,7 +1333,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 						double mx = 0;
 						string extreme_member_name;
-						for (auto em : ext_mems_pd)
+						for (const auto& em : ext_mems_pd)
 						{
 							if (em.second > mx)
 							{
@@ -1341,7 +1341,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 								extreme_member_name = em.first;
 							}
 						}
-						for (auto em : ext_mems_pd)
+						for (const auto& em : ext_mems_pd)
 						{
 							if (em.first == extreme_member_name)
 								fit_map[em.first] = CROWDING_EXTREME;
@@ -1410,7 +1410,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 		fit_map = get_cuboid_crowding_distance(members, _member_struct);
 
 	vector <pair<string, double>> cs_vec;
-	for (auto cd : fit_map)
+	for (const auto& cd : fit_map)
 	{
 		cs_vec.push_back(cd);
 		/*pair <string, double> pnd {cd.first, probnondom_map[cd.first]};
@@ -1428,7 +1428,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	reverse(cs_vec.begin(), cs_vec.end());
 
 	vector<string> crowd_ordered;
-	for (auto cs : cs_vec)
+	for (const auto& cs : cs_vec)
 		crowd_ordered.push_back(cs.first);
 
 	//TODO: check here that all solutions made it thru the crowd distance sorting
@@ -1482,11 +1482,11 @@ void ParetoObjectives::fill_domination_containers(map<string, map<string, double
 	int domination_counter;
 	vector<string> solutions_dominated, first_front;
 	performance_log->log_event("fill domination containers");
-		for (auto solution_p : _member_struct)
+		for (const auto& solution_p : _member_struct)
 		{
 			domination_counter = 0;
 			solutions_dominated.clear();
-			for (auto solution_q : _member_struct)
+			for (const auto& solution_q : _member_struct)
 			{
 				if (solution_p.first == solution_q.first) //string compare real name
 					continue;
@@ -1530,7 +1530,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map); 
 	vector<string> solutions_dominated, first_front;
 	performance_log->log_event("finding first front");
-	for (auto  num_dom : num_dominating_map)
+	for (const auto& num_dom : num_dominating_map)
 	{	
 		//solution_p is in the first front
 		if (num_dom.second == 0)
@@ -1632,7 +1632,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
  *
  * @return Description.
  */
-double ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
+double ParetoObjectives::dominance_probability(const map<string, double>& first, const map<string, double>& second)
 {
 	double prob_dom = 1;
 
@@ -1679,11 +1679,14 @@ double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<st
  *
  * @return Description.
  */
-bool ParetoObjectives::first_equals_second(map<string, double>& first, map<string, double>& second)
+bool ParetoObjectives::first_equals_second(const map<string, double>& first, const map<string, double>& second)
 {
-	for (auto f : first)
+	for (const auto& f : first)
 	{
-		if (abs(f.second - second[f.first]) >= FLOAT_EPSILON)
+		// see first_dominates_second - find, not [], so a missing objective cant insert
+		auto it = second.find(f.first);
+		double sval = (it == second.end()) ? 0.0 : it->second;
+		if (abs(f.second - sval) >= FLOAT_EPSILON)
 			return false;
 	}
 	return true;
@@ -1697,7 +1700,7 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
  *
  * @return Description.
  */
-bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second)
+bool ParetoObjectives::first_dominates_second(const map<string, double>& first, const map<string, double>& second)
 {
 
 	if (ppd_sort)
@@ -1712,9 +1715,13 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 	}
 	else
 	{
-		for (auto f : first)
+		for (const auto& f : first)
 		{
-			if (f.second > second[f.first] + FLOAT_EPSILON)
+			// find instead of [] - the maps are const now, and a missing objective used to
+			// insert a zero into the caller's copy. same answer, no insert
+			auto it = second.find(f.first);
+			double sval = (it == second.end()) ? 0.0 : it->second;
+			if (f.second > sval + FLOAT_EPSILON)
 				return false;
 		}
 		return true;
@@ -1804,7 +1811,7 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 	}
 	
 	//set partition boundaries: rectangular strips along obj 2
-	for (auto member : _hv_pts)
+	for (const auto& member : _hv_pts)
 	{
 		for (auto obj_map : *obj_names_ptr)
 		{
@@ -1817,7 +1824,7 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 	sortedset hv_parts_sorted(hv_partition.begin(), hv_partition.end(), compFunctor); 
 
 	int i = 0;
-	for (auto hv : hv_parts_sorted)
+	for (const auto& hv : hv_parts_sorted)
 	{
 		hpv.clear();
 		for (auto obj_map : *obj_names_ptr)
@@ -1832,7 +1839,7 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 
 	//get the extreme points of the incumbent front to be used for identifying extreme points of pareto cloud thru ehvi
 	map<string, double> obj_map;
-	for (auto pts : _hv_pts)
+	for (const auto& pts : _hv_pts)
 		obj_map[pts.first] = _hv_pts[pts.first][obj_names_ptr->at(1)];
 
 	sortedset sortedpts(obj_map.begin(), obj_map.end(), compFunctor);
@@ -1855,7 +1862,7 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 	string member;
 	double ehvi_m;
 
-	for (auto m : _member_struct)
+	for (const auto& m : _member_struct)
 	{
 		member = m.first;
 		ehvi_m = get_ehvi(member, _member_struct);
@@ -5354,7 +5361,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	//pso_pbest_op = _op;
 	set<string> duplicates = objectives.get_duplicates();
 
-	for (auto lm : current_pso_lineage_map)
+	for (const auto& lm : current_pso_lineage_map)
 	{
 		
 		f = lm.second; s = lm.first;

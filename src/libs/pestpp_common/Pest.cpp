@@ -1335,7 +1335,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	// handle any tied pars found in external files
 	double numer, demon, ratio;
 	vector<string> missing;
-	for (auto p: temp_tied_map)
+	for (const auto& p : temp_tied_map)
 	{
 		name = p.first;
 		string name_tied = p.second;
@@ -1392,7 +1392,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		{
 			throw runtime_error("error parsing '++' line :'" + *b + "'");
 		}
-		for (auto arg : line_arg_map)
+		for (const auto& arg : line_arg_map)
 		{
 			if (arg_map.find(arg.first) != arg_map.end())
 				dup.push_back(arg.first);
@@ -1412,7 +1412,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	}
 
 	vector<string> invalid;
-	for (auto kv : arg_map)
+	for (const auto& kv : arg_map)
 	{
 		if (kv.second == PestppOptions::ARG_STATUS::ARG_INVALID)
 		{
@@ -1429,7 +1429,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	}
 
 	vector<string> not_accepted;
-	for (auto kv : arg_map)
+	for (const auto& kv : arg_map)
 	{
 		if (kv.second != PestppOptions::ARG_STATUS::ARG_ACCEPTED)
 		{
@@ -1549,7 +1549,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		string tie_to_name;
 		vector<string> to_tie_names;
 		vector<string>::const_iterator first, last;
-		for (auto gm : group_map)
+		for (const auto& gm : group_map)
 		{
 			tie_to_name = gm.second[0];
 			new_n_adj_par++;
@@ -1650,6 +1650,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		last_ctl_pars = last_active_ctl_pars;
 
 	}
+	// a copy on purpose - p.second gets adjusted below as scratch (zero value, facorig) and
+	// those adjustments must NOT land back in upgrade_ctl_pars
 	for (auto p : upgrade_ctl_pars)
 	{
 		/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
@@ -2010,7 +2012,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 
 		}
 		vector<string> missing, obs_vec;
-		for (auto pp: obs_cycle_dci_map)
+		for (const auto& pp : obs_cycle_dci_map)
 		{
 			obs_vec.push_back(pp.first);
 		}
@@ -2794,7 +2796,7 @@ map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, doubl
 	 const ParameterRec *p_rec;
 	 ParameterInfo &pinfo = ctl_parameter_info;
 	 double v;
-	 for (auto p : pars)
+	 for (const auto& p : pars)
 	 {
 		 p_rec = pinfo.get_parameter_rec_ptr(p.first);
 		 v = (p_rec->ubnd - (tol * p_rec->ubnd));
@@ -3327,7 +3329,7 @@ map<string, double> Pest::get_ext_file_double_map(const string& section_name, co
 	map<string, string> str_map = get_ext_file_string_map(section_name, col_name);
 	map<string, double> val_map;
 	double val;
-	for (auto sval : str_map)
+	for (const auto& sval : str_map)
 	{
 		try
 		{

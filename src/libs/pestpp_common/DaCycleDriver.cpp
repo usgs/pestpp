@@ -211,7 +211,7 @@ bool DaCycleDriver::begin_cycle()
 	{
 		performance_log->log_event("updating pars using da par cycle table info");
 		map<string, double> cycle_map = par_cycle_info[icycle];
-		for (auto item : cycle_map)
+		for (const auto& item : cycle_map)
 		{
 			base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
 			childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
@@ -261,7 +261,7 @@ bool DaCycleDriver::begin_cycle()
 	ParameterInfo pi = parent_scenario.get_ctl_parameter_info();
 
 	int nadj_par = 0;
-	for (auto par : par1)
+	for (const auto& par : par1)
 	{
 		if (cycle_in_range(icycle, pi.get_parameter_rec_ptr(par.first)->dci))
 		{
@@ -278,7 +278,7 @@ bool DaCycleDriver::begin_cycle()
 
 	ObservationInfo oi = childPest.get_ctl_observation_info();
 	cycle_nnz_obs = 0;
-	for (auto o : childPest.get_ctl_observations())
+	for (const auto& o : childPest.get_ctl_observations())
 	{
 		if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
 			cycle_nnz_obs++;
@@ -354,7 +354,7 @@ bool DaCycleDriver::begin_cycle()
 			cycle_curr_noise.update_var_map();
 			Observations org_obs = parent_scenario.get_ctl_observations();
 			map<string, int> vmap = cycle_curr_noise.get_var_map();
-			for (auto o : childPest.get_ctl_observations())
+			for (const auto& o : childPest.get_ctl_observations())
 			{
 				if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
 				{

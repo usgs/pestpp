@@ -5809,7 +5809,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
 	//just check to see if common real names are found but are not in the same location
 	map<string, int> pe_map = pe.get_real_map(), oe_map = oe_base.get_real_map();
 	vector<string> misaligned;
-	for (auto item : pe_map)
+	for (const auto& item : pe_map)
 	{
 		if (oe_map.find(item.first) == oe_map.end())
 			continue;
@@ -9132,7 +9132,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 			frec << "Note: the following parameters contain 'mean' value information that will be used in place of " << endl;
 			frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
 			double lb, ub;
-			for (auto par_mean : par_means)
+			for (const auto& par_mean : par_means)
 			{
 				if (draw_par.find(par_mean.first) != draw_par.end())
 				{
@@ -10425,7 +10425,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
 	map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
 	map<string, double> cur_phi_map;
-	for (auto p : *phi_map)
+	for (const auto& p : *phi_map)
 		cur_phi_map[p.first] = p.second;
 
 	//now get a phi map of the new phi values
@@ -10581,7 +10581,7 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 		//include idx for lowest and highest phi reals
 		if (subset_idxs.size() < nreal_subset)
 		{
-			for (auto phi : phis)
+			for (const auto& phi : phis)
 			{
 				if (find(subset_idxs.begin(), subset_idxs.end(), phi.second) == subset_idxs.end())
 				{

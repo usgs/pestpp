@@ -2180,9 +2180,12 @@ bool ExternalCtlFile::isduplicated(string col_name)
 	if (cnames.find(col_name) == cnames.end())
 		throw_externalctrlfile_error("isduplicated() error: col_name '" + col_name + "' not in col_names");
 	cnames.clear();
-	for (auto kv : data)
+	for (const auto& kv : data)
 	{
-		cnames.insert(kv.second[col_name]);
+		// find, not [] - the row is const now, and a row missing this column used to insert
+		// an empty string into the copy and hand back "". same answer, no insert
+		auto it = kv.second.find(col_name);
+		cnames.insert(it == kv.second.end() ? string() : it->second);
 	}
 	if (cnames.size() != data.size())
 		return true;

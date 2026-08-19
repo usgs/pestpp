@@ -2285,7 +2285,7 @@ string Constraints::mou_population_observation_constraint_summary(int iter, Obse
         {
             current_obs.update(names, eigenvec_2_stlvec(oe.get_real_vector(real)));
             infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
-            for (auto in : infeas_dist)
+            for (const auto& in : infeas_dist)
                 infeas_count[in.first]++;
         }
 
@@ -2374,7 +2374,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 
 
 			}
-            for (auto in : infeas_dist)
+            for (const auto& in : infeas_dist)
                 infeas_count[in.first]++;
 		}
 		//report prior information constraints
@@ -3457,7 +3457,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	stringstream ss;
 	
 	vector<string> names1, names2;
-	for (auto real_info : current_pe.get_real_map())
+	for (const auto& real_info : current_pe.get_real_map())
 	{
 
 		par_vec = current_pe.get_real_vector(real_info.first);

@@ -48,7 +48,7 @@ bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& o
 {
 	map<string, int> other_real_map = other.get_real_map(), this_real_map = get_real_map();
 	bool need_to_align = false;
-	for (auto item : this_real_map)
+	for (const auto& item : this_real_map)
 	{
 		//if even one realization name is not common, we are done here
 		if (other_real_map.find(item.first) == other_real_map.end())
@@ -358,7 +358,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			for (int i = 0; i < var_names.size(); i++)
 				idx_map[var_names[i]] = i;
 			vector<string> group_keys;
-			for (auto gi : grouper)
+			for (const auto& gi : grouper)
 				group_keys.push_back(gi.first);
 			DrawThread worker(plog, cov, &draws, group_keys, grouper);
 			int num_threads = pest_scenario_ptr->get_pestpp_options().get_ies_num_threads();

@@ -778,7 +778,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 		file_manager.rec_ofstream() << ss.str() << endl;
 	}
 	upgrade_active_ctl_pars = notfrozen_upgrade_active_ctl_pars;
-	for (auto p : prev_frozen_active_ctl_pars)
+	for (const auto& p : prev_frozen_active_ctl_pars)
 		upgrade_active_ctl_pars[p.first] = p.second;
 
 	performance_log->log_event("checking for denormal floating point values");
@@ -1783,7 +1783,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Eigen::VectorXd par_vals;
 			vector<string> pe_names = fosm_real_info.first.get_var_names();
 			vector<string> oe_names = fosm_obs_info.first.get_var_names();
-			for (auto info : fosm_obs_info.second)
+			for (const auto& info : fosm_obs_info.second)
 			{
 				
 				if (info.second < best_upgrade_run.get_phi(*regul_scheme_ptr))
@@ -2260,7 +2260,7 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
         tt->reverse(upgrade_ctl_pars);
         auto items = tt->get_items();
         pair<string, double> tt_item;
-        for (auto ipar : upgrade_ctl_pars)
+        for (const auto& ipar : upgrade_ctl_pars)
         {
             if (items.find(ipar.first) == items.end())
                 continue;

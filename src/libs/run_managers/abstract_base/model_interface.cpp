@@ -897,7 +897,7 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			continue;
 		}
 		tpl_line_map = parse_tpl_line(line);
-		for (auto t : tpl_line_map)
+		for (const auto& t : tpl_line_map)
 		{
 			name = t.first;
 			//if (pnames.find(name) == end)
@@ -1013,7 +1013,7 @@ unordered_set<string> TemplateFile::get_names(ifstream& f)
 			break;
 		line = read_line(f);
 		tpl_line_info = parse_tpl_line(line);
-		for (auto t : tpl_line_info)
+		for (const auto& t : tpl_line_info)
 			names.insert(t.first);
 	}
 	return names;

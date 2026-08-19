@@ -410,7 +410,7 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 
 	}
 	/*os << "PEST++ arguments:" << endl;
-	for (auto pp_arg : pest_scenario.get_pestpp_options().get_arg_map())
+	for (const auto& pp_arg : pest_scenario.get_pestpp_options().get_arg_map())
 		os << setw(0) << pp_arg.first << " = " << pp_arg.second << endl;*/
 
 

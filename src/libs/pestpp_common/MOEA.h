@@ -96,11 +96,11 @@ private:
 	PerformanceLog* performance_log;
 	//vector<string> obj_names;
 	vector<string> sort_members_by_crowding_distance(int front, vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
-	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
+	bool first_dominates_second(const map<string, double>& first, const map<string, double>& second);
 	map<string, map<string, double>> get_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	void drop_duplicates(map<string, map<string, double>>& _member_struct);
 	
-	bool first_equals_second(map<string, double>& first, map<string, double>& second);
+	bool first_equals_second(const map<string, double>& first, const map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
 	map<string, double> get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct);
@@ -147,7 +147,7 @@ private:
 	
 
 	//PPD-related stuff
-	double dominance_probability(map<string, double>& first, map<string, double>& second);
+	double dominance_probability(const map<string, double>& first, const map<string, double>& second);
 	double dominance_prob_adhoc(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
 	double ppd_beta;
