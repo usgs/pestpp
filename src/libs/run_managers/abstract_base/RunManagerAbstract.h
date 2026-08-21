@@ -38,11 +38,15 @@ class Observations;
  * @brief Abstract base class for all PEST++ run managers.
  *
  * Manages the lifecycle of model runs including parameter distribution,
- * run execution, result collection, and failure tracking.  Two RunStorage
+ * run execution, result collection, and failure tracking.  Three RunStorage
  * instances are maintained: \c file_stor for the primary run storage file
- * (*case.rns*) and \c failed_file_stor for the failed-run storage file
- * (*case.rnf*).  The failed-run file persists after a successful run so
+ * (*case.rns*), \c failed_file_stor for the failed-run storage file
+ * (*case.rnf*), and \c all_file_stor for the optional "all runs" storage file
+ * (*case.allruns.rns*).  The failed-run file persists after a successful run so
  * that users can inspect which parameter combinations caused model failure.
+ * The all-runs file, enabled via the SAVE_ALL_RUNS control-file option, records
+ * every completed model run (both successes and failures) across all iterations
+ * and also persists after a graceful exit.
  */
 class RunManagerAbstract
 {
@@ -99,6 +103,16 @@ public:
 	virtual int get_num_failed_stored() { return failed_file_stor.get_nruns(); }
 	/** @brief Return the filename of the failed-run storage file (*case.rnf*). */
 	virtual std::string get_failed_run_filename() { return failed_file_stor.get_filename(); }
+	/** @brief Enable/disable recording every completed run to the all-runs storage file (*case.allruns.rns*). */
+	virtual void set_save_all_runs(bool _save_all_runs) { save_all_runs = _save_all_runs; }
+	/** @brief Return true if all completed runs are being recorded to the all-runs storage file. */
+	virtual bool get_save_all_runs() const { return save_all_runs; }
+	/** @brief Return a const reference to the all-runs storage (*case.allruns.rns*). */
+	virtual const RunStorage& get_all_runstorage_ref() const;
+	/** @brief Return the number of runs recorded in the all-runs storage file. */
+	virtual int get_num_all_stored() { return all_file_stor.get_nruns(); }
+	/** @brief Return the filename of the all-runs storage file (*case.allruns.rns*). */
+	virtual std::string get_all_run_filename() { return all_file_stor.get_filename(); }
 	virtual void print_run_summary(std::ostream &fout) { file_stor.print_run_summary(fout); }
 	//virtual Observations get_init_run_obs() { return init_run_obs; }
 	virtual std::vector<double> get_init_sim() { return init_sim;  }
@@ -111,6 +125,8 @@ protected:
 	int cur_group_id;  // used in some of the derived classes (ie PANTHER)
 	RunStorage file_stor;          ///< Primary run storage (*case.rns*).
 	RunStorage failed_file_stor;   ///< Failed-run storage (*case.rnf*). Persists after graceful exit.
+	RunStorage all_file_stor;      ///< Optional all-runs storage (*case.allruns.rns*). Persists after graceful exit.
+	bool save_all_runs = false;    ///< When true, every completed run is copied into all_file_stor.
 	RUN_MGR_TYPE mgr_type;
 	std::vector<std::string> comline_vec;
 	std::vector<std::string> tplfile_vec;
@@ -127,6 +143,14 @@ protected:
 	 * @param run_id  The run manager ID of the failed run.
 	 */
 	virtual void update_run_failed(int run_id);
+	/**
+	 * @brief If SAVE_ALL_RUNS is enabled, copy a completed run (its parameters,
+	 *        observations, metadata and status) from the primary storage into the
+	 *        all-runs storage file (*case.allruns.rns*).  No-op when disabled.
+	 *
+	 * @param run_id  The run manager ID of the completed run.
+	 */
+	void record_all_run(int run_id);
 };
 
 #endif /*  RUNMANAGERABSTRACT_H */

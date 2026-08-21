@@ -2196,6 +2196,7 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 		double run_time = 0;
 		Serialization::unserialize(net_pack.get_data(), pars, get_par_name_vec(), obs, get_obs_name_vec(), run_time);
 		file_stor.update_run(run_id, pars, obs);
+		record_all_run(run_id);
 		agent_info_iter->set_state(AgentInfoRec::State::COMPLETE);
 		//slave_info_iter->set_state(SlaveInfoRec::State::WAITING);
 		use_run = true;

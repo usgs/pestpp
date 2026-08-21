@@ -49,12 +49,31 @@ static string make_failed_filename(const string& stor_filename) {
 	return fn;
 }
 
+/**
+ * @brief Derive the all-runs storage filename from the primary storage filename.
+ *
+ * Replaces the *.rns* extension with *.allruns.rns*, or appends *.allruns.rns*
+ * if no *.rns* extension is found.  The resulting name is distinct from the
+ * primary *case.rns* file, so it is not removed by the run-storage cleanup.
+ *
+ * @param stor_filename  The primary run storage filename (*case.rns*).
+ * @return The corresponding all-runs storage filename (*case.allruns.rns*).
+ */
+static string make_all_filename(const string& stor_filename) {
+	string fn = stor_filename;
+	size_t pos = fn.rfind(".rns");
+	if (pos != string::npos) fn.replace(pos, 4, ".allruns.rns");
+	else fn += ".allruns.rns";
+	return fn;
+}
+
 RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
 	const vector<string> _tplfile_vec, const vector<string> _inpfile_vec,
 	const vector<string> _insfile_vec, const vector<string> _outfile_vec,
 	const string &stor_filename, int _max_n_failure)
   : total_runs(0), max_n_failure(_max_n_failure), file_stor(stor_filename),
     failed_file_stor(make_failed_filename(stor_filename)),
+    all_file_stor(make_all_filename(stor_filename)),
     comline_vec(_comline_vec), tplfile_vec(_tplfile_vec),
     inpfile_vec(_inpfile_vec), insfile_vec(_insfile_vec), outfile_vec(_outfile_vec)
 {
@@ -79,6 +98,8 @@ void RunManagerAbstract::initialize(const Parameters &model_pars, const Observat
 {
 	file_stor.reset(model_pars.get_keys(), obs.get_keys(), _filename);
 	failed_file_stor.reset(model_pars.get_keys(), obs.get_keys());
+	if (save_all_runs)
+		all_file_stor.reset(model_pars.get_keys(), obs.get_keys());
 }
 
 /**
@@ -92,6 +113,8 @@ void RunManagerAbstract::initialize(const std::vector<std::string> &par_names, s
 {
 	file_stor.reset(par_names, obs_names, _filename);
 	failed_file_stor.reset(par_names, obs_names);
+	if (save_all_runs)
+		all_file_stor.reset(par_names, obs_names);
 }
 
 /**
@@ -104,8 +127,9 @@ void RunManagerAbstract::reinitialize(const string &_filename)
 	vector<string> par_names = get_par_name_vec();
 	vector<string> obs_names = get_obs_name_vec();
 	file_stor.reset(par_names, obs_names, _filename);
-	// Note: failed_file_stor is intentionally NOT reset here so that
-	// failed runs accumulate across all iterations/batches.
+	// Note: failed_file_stor and all_file_stor are intentionally NOT reset here
+	// so that failed runs and the full run history accumulate across all
+	// iterations/batches.
 }
 
 /**
@@ -121,6 +145,14 @@ void RunManagerAbstract::initialize_restart(const std::string &_filename)
 		failed_file_stor.init_restart(failed_filename);
 	else
 		failed_file_stor.reset(file_stor.get_par_name_vec(), file_stor.get_obs_name_vec());
+	if (save_all_runs)
+	{
+		string all_filename = make_all_filename(_filename);
+		if (pest_utils::check_exist_in(all_filename))
+			all_file_stor.init_restart(all_filename);
+		else
+			all_file_stor.reset(file_stor.get_par_name_vec(), file_stor.get_obs_name_vec());
+	}
 }
 
 /**
@@ -557,7 +589,44 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
 		 int failed_id = failed_file_stor.add_run(pars_vec, info_txt, info_value);
 		 int nfail = -file_stor.get_run_status(run_id);
 		 failed_file_stor.set_run_nfailed(failed_id, nfail);
+		 // also record the permanently-failed run in the all-runs file
+		 record_all_run(run_id);
 	 }
+ }
+
+/**
+ * @brief Copy a completed run from the primary storage into the all-runs
+ *        storage file (*case.allruns.rns*) when SAVE_ALL_RUNS is enabled.
+ *
+ * The run's parameter values, metadata (info_txt, info_value) and completion
+ * status are read back from the primary storage and appended to the all-runs
+ * storage.  Successful runs (status > 0) additionally carry their observation
+ * values; failed runs (status < 0) preserve the failure count in the run-status
+ * byte.  When SAVE_ALL_RUNS is disabled this is a no-op.
+ *
+ * @param run_id  The run manager ID of the completed run.
+ */
+ void RunManagerAbstract::record_all_run(int run_id)
+ {
+	 if (!save_all_runs)
+		 return;
+	 vector<double> pars_vec, obs_vec;
+	 string info_txt;
+	 double info_value;
+	 file_stor.get_run(run_id, pars_vec, obs_vec, info_txt, info_value);
+	 int all_id = all_file_stor.add_run(pars_vec, info_txt, info_value);
+	 int status = file_stor.get_run_status(run_id);
+	 if (status > 0)
+	 {
+		 Observations obs;
+		 obs.insert(all_file_stor.get_obs_name_vec(), obs_vec);
+		 all_file_stor.update_run(all_id, obs);
+	 }
+	 else if (status < 0)
+	 {
+		 all_file_stor.set_run_nfailed(all_id, -status);
+	 }
+	 // status == 0 (never completed) is left in the added (status 0) state
  }
 
  const RunStorage& RunManagerAbstract::get_runstorage_ref() const
@@ -576,6 +645,18 @@ bool RunManagerAbstract::get_observations_vec(int run_id, vector<double> &data_v
  const RunStorage& RunManagerAbstract::get_failed_runstorage_ref() const
  {
 	 return failed_file_stor;
+ }
+
+/**
+ * @brief Return a const reference to the all-runs storage (*case.allruns.rns*).
+ *
+ * When SAVE_ALL_RUNS is enabled the returned RunStorage contains one entry for
+ * every completed model run (both successes and permanent failures) across all
+ * iterations/batches.
+ */
+ const RunStorage& RunManagerAbstract::get_all_runstorage_ref() const
+ {
+	 return all_file_stor;
  }
 
 /**

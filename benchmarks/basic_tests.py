@@ -2167,6 +2167,100 @@ def save_failed_runs_test():
         rnf_file, os.path.getsize(rnf_file)))
 
 
+def _save_all_runs_case(exe_name, base_d, pst_name, setup_fn, work_suffix):
+    """helper for the save_all_runs tests: run <exe_name> on a copy of <base_d>
+    with the SAVE_ALL_RUNS option enabled and assert that the persistent
+    '<case>.allruns.rns' file is created and non-empty (and thus survived the
+    end-of-run storage cleanup)."""
+    ep = exe_path.replace("pestpp-ies", exe_name)
+    if not os.path.exists(ep):
+        print("skipping {0}, exe not found: {1}".format(exe_name, ep))
+        return
+    new_d = os.path.join(os.path.dirname(base_d), "test_save_all_runs_" + work_suffix)
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    pst = pyemu.Pst(os.path.join(new_d, pst_name))
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["save_all_runs"] = True
+    setup_fn(pst, new_d)
+    pst.write(os.path.join(new_d, pst_name))
+    pyemu.os_utils.run("{0} {1}".format(ep, pst_name), cwd=new_d)
+    rns_file = os.path.join(new_d, pst_name.replace(".pst", "") + ".allruns.rns")
+    assert os.path.exists(rns_file), \
+        "{0}: all-runs storage file '{1}' not found".format(exe_name, rns_file)
+    assert os.path.getsize(rns_file) > 0, \
+        "{0}: all-runs storage file '{1}' is empty".format(exe_name, rns_file)
+    print("{0}: {1} exists with size {2}".format(exe_name, rns_file, os.path.getsize(rns_file)))
+
+
+def save_all_runs_ies_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-ies"""
+    base_d = os.path.join("g07", "template")
+
+    def setup(pst, d):
+        pst.pestpp_options["ies_num_reals"] = 5
+
+    _save_all_runs_case("pestpp-ies", base_d, "g07.pst", setup, "ies")
+
+
+def save_all_runs_glm_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-glm"""
+    base_d = os.path.join("g07", "template")
+    _save_all_runs_case("pestpp-glm", base_d, "g07.pst", lambda pst, d: None, "glm")
+
+
+def save_all_runs_sen_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-sen"""
+    base_d = os.path.join("g07", "template")
+    _save_all_runs_case("pestpp-sen", base_d, "g07.pst", lambda pst, d: None, "sen")
+
+
+def save_all_runs_swp_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-swp"""
+    base_d = os.path.join("g07", "template")
+
+    def setup(pst, d):
+        pe = pyemu.ParameterEnsemble.from_uniform_draw(pst, num_reals=6)
+        pe.to_csv(os.path.join(d, "sweep_in.csv"))
+        pst.pestpp_options["sweep_parameter_csv_file"] = "sweep_in.csv"
+
+    _save_all_runs_case("pestpp-swp", base_d, "g07.pst", setup, "swp")
+
+
+def save_all_runs_sqp_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-sqp"""
+    base_d = os.path.join("g07", "template")
+    _save_all_runs_case("pestpp-sqp", base_d, "g07.pst", lambda pst, d: None, "sqp")
+
+
+def save_all_runs_opt_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-opt"""
+    base_d = os.path.join("g07", "template")
+
+    def setup(pst, d):
+        # neutral risk (no chance constraints) and zero-weight objective obs
+        pst.pestpp_options["opt_risk"] = 0.5
+        obs = pst.observation_data
+        obs.loc[obs.obsnme == "obj", "weight"] = 0.0
+
+    _save_all_runs_case("pestpp-opt", base_d, "g07.pst", setup, "opt")
+
+
+def save_all_runs_mou_test():
+    """SAVE_ALL_RUNS produces a non-empty .allruns.rns for pestpp-mou"""
+    base_d = os.path.join("g07", "template")
+
+    def setup(pst, d):
+        pst.pestpp_options["mou_objectives"] = ["obj"]
+        pst.pestpp_options["mou_population_size"] = 10
+        # the objective obs group must encode a direction (minimize)
+        obs = pst.observation_data
+        obs.loc[obs.obsnme == "obj", "obgnme"] = "less_than_obj"
+
+    _save_all_runs_case("pestpp-mou", base_d, "g07.pst", setup, "mou")
+
+
 def version_flag_test():
     """test that all pestpp executables support -v and --version flags"""
     exe_names = ["pestpp-ies", "pestpp-glm", "pestpp-sen", "pestpp-swp",
@@ -2188,7 +2282,15 @@ def version_flag_test():
 
 if __name__ == "__main__":
     #parse_pst_test()
-    basic_test()
+    #basic_test()
+    save_all_runs_ies_test()
+    save_all_runs_glm_test()
+    save_all_runs_sen_test()
+    save_all_runs_swp_test()
+    save_all_runs_sqp_test()
+    save_all_runs_opt_test()
+    save_all_runs_mou_test()
+    #save_failed_runs_test()
     #mf6_v5_glm_test()
     #nonascii_path_test()
 

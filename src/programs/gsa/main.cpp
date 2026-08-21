@@ -219,6 +219,8 @@ int main(int argc, char* argv[])
 			pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 	}
 
+	run_manager_ptr->set_save_all_runs(pest_scenario.get_pestpp_options().get_save_all_runs());
+
 	cout << endl;
 	fout_rec << endl;
 	cout << "using control file: \"" <<  cmdline.ctl_file_name << "\"" << endl;
@@ -454,6 +456,11 @@ int main(int argc, char* argv[])
     fout_rec << "started at " << start_string << endl;
     fout_rec << "finished at " << get_time_string() << endl;
     fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+    if (pest_scenario.get_pestpp_options().get_save_all_runs())
+    {
+        RunStorage::print_persistent_summary(case_name + ".allruns.rns", cout);
+        RunStorage::print_persistent_summary(case_name + ".allruns.rns", fout_rec);
+    }
     fout_rec.close();
     return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;

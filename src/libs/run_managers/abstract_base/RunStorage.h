@@ -91,6 +91,11 @@ public:
 	int get_observations_vec(int run_id, std::vector<double> &data_vec);
 	int get_observations(int run_id, Observations &obs);
 	static void export_diff_to_text_file(const std::string &in1_filename, const std::string &in2_filename, const std::string &out_filename);
+	/** @brief Open a run-storage file by name and print a concise run-count
+	 *  summary (total/successful/failed) to @p fout.  Silently does nothing if
+	 *  the file does not exist, and reports a warning if it cannot be read.
+	 *  Used to echo the all-runs storage contents as a tool exits. */
+	static void print_persistent_summary(const std::string &filename, std::ostream &fout);
 	void free_memory();
 	std::string get_filename() { return filename; }
 	void print_run_summary(std::ostream &fout);
