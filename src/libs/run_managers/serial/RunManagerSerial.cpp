@@ -194,6 +194,7 @@ void RunManagerSerial::run()
 				//message << "(" << success_runs << "/" << nruns << " runs complete)";
 				//std::cout << message.str();
 				file_stor.update_run(i_run, pars, obs);
+				record_all_run(i_run);
 
 			}
 			catch (const std::exception& ex)

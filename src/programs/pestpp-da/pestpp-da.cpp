@@ -709,6 +709,7 @@ int main(int argc, char* argv[])
 			sort(par_names.begin(), par_names.end());
 			vector<string> obs_names = childPest.get_ctl_observations().get_keys();
 			sort(obs_names.begin(), obs_names.end());
+			run_manager_ptr->set_save_all_runs(pest_scenario.get_pestpp_options().get_save_all_runs());
 			run_manager_ptr->initialize(par_names, obs_names);
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
@@ -1019,6 +1020,12 @@ int main(int argc, char* argv[])
         fout_rec << flush;
         cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         cout << flush;
+        if (pest_scenario.get_pestpp_options().get_save_all_runs())
+        {
+            string all_runs_file = file_manager.get_base_filename() + ".allruns.rns";
+            RunStorage::print_persistent_summary(all_runs_file, cout);
+            RunStorage::print_persistent_summary(all_runs_file, fout_rec);
+        }
         fout_rec.close();
         return 0;
 #ifndef _DEBUG

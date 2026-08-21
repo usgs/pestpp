@@ -579,23 +579,29 @@ void sequentialLP::iter_solve()
 	CoinPackedMatrix matrix = jacobian_to_coinpackedmatrix();
     stringstream ss;
 	build_dec_var_bounds();
+    //always use the anomaly (spread) form of the stack-based chance shift: the shifted
+    //constraint value is current_sim + risk-spread, where risk-spread = stack_quantile -
+    //stack_mean.  the alternative "raw" form (shifted value = stack_quantile = stack_mean +
+    //spread) silently injects the (stack_mean - current_sim) base-vs-ensemble-mean bias into
+    //the LP bound, which:
+    //  - is non-conservative: for a less_than constraint it can move the bound BELOW the
+    //    deterministic value whenever the ensemble mean sits below the base run, so the
+    //    chance ("more constrained") optimum ends up with a BETTER objective than the
+    //    deterministic one - which is backwards;
+    //  - contaminates the reported offset with the decision-variable move at postsolve, so
+    //    zero-parameter-variance constraints (e.g. pumping-rate WEL constraints, which are
+    //    pure functions of the decision variables) get a spurious non-zero chance offset;
+    //  - has no analog in the FOSM chance path (current_sim +/- probit*stdev, a margin on
+    //    the base run) and is noise-sensitive to the finite stack's mean.
+    //the anomaly form is >= the deterministic value for less_than (spread >= 0 at risk>0.5)
+    //-> conservative; gives zero offset for zero-variance constraints; and matches FOSM.
     bool use_stack_anamolies = true;
     if ((constraints.get_use_chance()) && (!constraints.get_use_fosm()))
     {
-        if (constraints.should_update_chance(slp_iter))
-        {
-            ss.str("");
-            ss << "...using direct stack simulated results in chance calculations";
-            use_stack_anamolies = false;
-        }
-        else
-        {
-            ss.str("");
-            ss << "...using stack anomalies and current simulated constraint values in chance calculations";
-        }
+        ss.str("");
+        ss << "...using stack anomalies and current simulated constraint values in chance calculations";
         f_rec << ss.str() << endl;
         cout << ss.str() << endl;
-
     }
     pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors(current_pars, current_constraints_sim,use_stack_anamolies);
 	constraints.presolve_report(slp_iter,current_pars, current_constraints_sim);

@@ -390,7 +390,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			message(1, "loading dv ensemble from csv file", dv_file);
 			try
 			{
-				dv.from_csv(dv_file);
+				dv.from_csv(dv_file, true);
 			}
 			catch (const exception &e)
 			{
@@ -402,12 +402,12 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 				throw_sqp_error(string("error processing dv csv file"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || ((par_ext.compare("bin") == 0)))
 		{
 			message(1, "loading dv ensemble from binary file", dv_file);
 			try
 			{
-				dv.from_binary(dv_file);
+				dv.from_binary(dv_file, true);
 			}
 			catch (const exception &e)
 			{
@@ -458,6 +458,27 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			    //throw_sqp_error("not implemented");
 		}
 
+	}
+	//var_map is only populated by update_var_map() - draw()/reserve()/from_csv() and the
+	//`dv = dv_ensemble` assignment set var_names but NOT var_map, so without this call
+	//get_var_map() returns an empty map and every decision variable is wrongly reported as
+	//"missing in the dv en".
+	dv.update_var_map();
+	map<string,int> dvmap = dv.get_var_map();
+	map<string,int>::iterator dvend = dvmap.end();
+	vector<string> missing;
+	for (auto& n : dv_names)
+	{
+		if (dvmap.find(n) == dvend)
+			missing.push_back(n);
+	}
+	if (missing.size() > 0)
+	{
+		ss.str("");
+		ss << "the following decision variables are missing in the dv en:" << endl;
+		for (auto& m: missing)
+			ss << m << endl;
+		throw_sqp_error(ss.str());
 	}
 
 	if (dv_names.size() < pest_scenario.get_ctl_ordered_adj_par_names().size())
@@ -1024,10 +1045,14 @@ void SeqQuadProgram::initialize()
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
 	int subset_size = pest_scenario.get_pestpp_options().get_sqp_subset_size();
-	if (subset_size >= 0)
-		use_subset = true;
-	else 
-		use_subset = false;
+	//sqp_subset_size follows the ies convention: a NEGATIVE value is a percentage of the
+	//ensemble size and a POSITIVE value is an absolute count - both request a subset.  only
+	//0 means "no subset, use the full ensemble".  (a subset larger than the ensemble is
+	//handled downstream: reduced to the ensemble size, and get_subset_idxs returns all when
+	//nreal_subset >= size.)  the previous `subset_size >= 0` test wrongly disabled subsetting
+	//for negative values - including the default of -10 - so the requested/default subset
+	//size was computed and reported but never actually applied.
+	use_subset = (subset_size != 0);
 	
 	if (pp_args.find("PAR_SIGMA_RANGE") == pp_args.end())
 	{
@@ -1268,7 +1293,7 @@ void SeqQuadProgram::initialize()
 	filter.set_tol(pest_scenario.get_pestpp_options().get_sqp_filter_tol());
 	filter.update(last_best, v, vpad, current_ctl_dv_values, current_obs, BASE_REAL_NAME, 0);
 
-	if ((v > 0.0) && !use_ensemble_grad)
+	if ((v > 0.0) && (pest_scenario.get_pestpp_options().get_sqp_use_ies_infeas()))
 	{
 	    message(0,"initial solution infeasible, seeking feasible solution");
 		seek_feasible();
@@ -1515,6 +1540,19 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		}
 		else
 			_dv = cma.generate_population(current_ctl_dv_values, dv);
+
+		// perf: attribute the (potentially very expensive) CMA sampling to its own event.
+		// generate_population lives in CovMatAdap (no perf-log access), so without this its
+		// cost was previously mis-attributed to the next event ("adding 'base' ...").  The
+		// draw count exposes bounds-rejection thrashing: each draw is an O(n_dv^2) B*(sqrt(D).z)
+		// product, and whole-vector rejection re-draws up to max_draws times per realization,
+		// which degrades badly in high dimensions.
+		ss.str("");
+		ss << "CMA population generated: " << cma.get_last_generate_draws() << " sample draws for "
+			<< _dv.shape().first << " realizations";
+		if (cma.get_last_generate_clipped() > 0)
+			ss << " (" << cma.get_last_generate_clipped() << " realizations hit max_draws and were clipped to bounds -- bounds-rejection thrashing)";
+		performance_log->log_event(ss.str());
 
 		if (pest_scenario.get_pestpp_options().get_sqp_debug_cma())
 		{
@@ -1932,6 +1970,44 @@ bool SeqQuadProgram::hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k
 
 }
 
+void SeqQuadProgram::dvcov_svd(const Eigen::MatrixXd& dv_anoms, Eigen::MatrixXd& s, Eigen::MatrixXd& U, Eigen::MatrixXd& V)
+{
+	// perf: the dv-covariance pseudoinverse SVD depends only on the dv ensemble anomalies,
+	// which change only at make_gradient_runs.  calc_gradient_vector and calc_objective_hessian
+	// (and the next iteration's regularize path) all need it on the identical anomalies, so
+	// cache the decomposition keyed on the anomalies and reuse it -- this SVD is ~350s per call
+	// at high n_dv.  The exact anomaly compare auto-invalidates the cache when the dv ensemble
+	// changes, so no explicit invalidation is needed.
+	if (cached_dvcov_valid && dv_anoms.rows() == cached_dv_anoms.rows()
+		&& dv_anoms.cols() == cached_dv_anoms.cols() && dv_anoms == cached_dv_anoms)
+	{
+		s = cached_dvcov_s;
+		U = cached_dvcov_U;
+		V = cached_dvcov_V;
+		return;
+	}
+	Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv_anoms.rows() - 1.0) * (dv_anoms.transpose() * dv_anoms);
+	// honor the ++svd_pack option so a run can pin to the deterministic EIGEN (JacobiSVD)
+	// package; RedSVD is a randomized SVD and is not bit-reproducible across platforms.
+	if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::EIGEN)
+	{
+		SVD_EIGEN svd;
+		svd.set_performance_log(performance_log);
+		svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	}
+	else
+	{
+		SVD_REDSVD svd;
+		svd.set_performance_log(performance_log);
+		svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	}
+	cached_dvcov_s = s;
+	cached_dvcov_U = U;
+	cached_dvcov_V = V;
+	cached_dv_anoms = dv_anoms;
+	cached_dvcov_valid = true;
+}
+
 Covariance SeqQuadProgram::calc_objective_hessian()
 {
 	message(1, "starting ensemble hessian approximation for iteration ", iter);
@@ -1951,7 +2027,6 @@ Covariance SeqQuadProgram::calc_objective_hessian()
 
 	performance_log->log_event("computing approximate Hessian from ensemble covariance");
 	Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
-	Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
 	Eigen::MatrixXd obj_anoms(dv.shape().first, 1);
 	if (use_obj_obs) 
@@ -1986,22 +2061,7 @@ Covariance SeqQuadProgram::calc_objective_hessian()
 	// H ~ (1/σ^2_obj) * C_dv^(-1)
 	// this assumes the Hessian is proportional to the inv cov
 	Eigen::MatrixXd s, V, U;
-	// honor the ++svd_pack option so a run can pin to the deterministic EIGEN
-	// (JacobiSVD) package. RedSVD is a randomized SVD and is not bit-reproducible
-	// across platforms for ill-conditioned / aggressively-truncated problems.
-	if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::EIGEN)
-	{
-		SVD_EIGEN svd;
-		svd.set_performance_log(performance_log);
-		svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	}
-	else
-	{
-		SVD_REDSVD svd;
-		svd.set_performance_log(performance_log);
-		svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	}
-
+	dvcov_svd(dv_anoms, s, U, V);  // cached dv-covariance SVD (computed once per dv ensemble)
 
 	Eigen::MatrixXd dv_cov_inv = V * s.asDiagonal().inverse() * U.transpose();
 	double scale_factor = 1.0;
@@ -2377,6 +2437,19 @@ Eigen::MatrixXd SeqQuadProgram::regularize_hessian(const Eigen::MatrixXd& H, con
 {
 	stringstream ss;
 
+	// Perf hoist: within solve_new_ensemble's per-realization loop every realization
+	// regularizes the identical shared Hessian.  When the cache is valid (set once per
+	// iteration by solve_new_ensemble) reuse the result instead of repeating the
+	// O(n_dv^3) eigen-decomposition -- this was ~78% of the per-iteration cost at high n_dv.
+	// The regularization result depends only on H (and constant control-file options); the
+	// context string only affects log messages, so reuse across contexts is safe.
+	if (cached_reg_hessian_valid && H.rows() == cached_reg_hessian.rows()
+		&& H.cols() == cached_reg_hessian.cols())
+	{
+		used_hessian = Covariance(dv_names, cached_reg_hessian.sparseView());
+		return cached_reg_hessian;
+	}
+
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig_H(H);
 	double min_eig_H = eig_H.eigenvalues().minCoeff();
 	const double min_allowed_eig = 1E-6;
@@ -2603,6 +2676,7 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			message(1, "updating CMA with approximate gradient");
 			cma.update(prev_ctl_dv_values, current_ctl_dv_values, iter);
+			performance_log->log_event("CMA covariance update complete (eigen-decomposition of C)");
 
 			if (pest_scenario.get_pestpp_options().get_sqp_save_cov_every() > 0)
 			{
@@ -2904,23 +2978,10 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 		performance_log->log_event("form dv cov matrix");
 		Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, BASE_REAL_NAME);
-		Eigen::MatrixXd dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 
 		performance_log->log_event("svd of dv cov matrix");
 		Eigen::MatrixXd s, V, U, st;
-		// honor ++svd_pack (see note above): pin to deterministic EIGEN when requested.
-		if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::EIGEN)
-		{
-			SVD_EIGEN svd;
-			svd.set_performance_log(performance_log);
-			svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-		}
-		else
-		{
-			SVD_REDSVD svd;
-			svd.set_performance_log(performance_log);
-			svd.solve_ip(dv_cov_matrix, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-		}
+		dvcov_svd(dv_anoms, s, U, V);  // cached dv-covariance SVD (computed once per dv ensemble)
 		Eigen::MatrixXd dv_cov_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
 
 		// Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod(dv_cov_matrix);
@@ -3796,8 +3857,26 @@ FilterRec SeqQuadProgram::trust_region_step(Eigen::VectorXd& grad, map<string, d
 
 	ParameterEnsemble dv_all = dv;
 	ObservationEnsemble oe_all = oe;
-	dv_all.append_other_rows(dv_candidates);
-	oe_all.append_other_rows(oe_candidates);
+	//guard against an empty or mismatched candidate set (no trial radii generated, or all
+	//candidate runs failed) - appending dv candidates that oe lacks would make
+	//pick_from_filter throw on a missing obs vector.  fall back to the current reals + the
+	//base solution in the filter (the incumbent) so the trust region is reduced next pass.
+	if (dv_candidates.shape().first != oe_candidates.shape().first)
+	{
+		message(0, "WARNING: candidate dv (" + to_string(dv_candidates.shape().first) +
+			") and obs (" + to_string(oe_candidates.shape().first) +
+			") ensembles are inconsistent; keeping current solution for this iteration");
+	}
+	else if (oe_candidates.shape().first == 0)
+	{
+		message(0, "WARNING: trust-region candidate ensemble is empty (no trial radii or all "
+			"candidate runs failed); keeping current solution for this iteration");
+	}
+	else
+	{
+		dv_all.append_other_rows(dv_candidates);
+		oe_all.append_other_rows(oe_candidates);
+	}
 
 	bool success;
 	FilterRec result = pick_upgrade_and_update_current(dv_all, oe_all, cma_reset_archive, true);
@@ -4293,9 +4372,30 @@ FilterRec SeqQuadProgram::line_search(map<string, Eigen::VectorXd>& search_d_map
 
 	ParameterEnsemble dv_all = dv;
 	ObservationEnsemble oe_all = oe;
-	dv_all.append_other_rows(dv_candidates);
-	oe_all.append_other_rows(oe_candidates);
-	
+	//only fold candidates into the selection ensembles when we actually have obs for them
+	//and the dv/obs row counts line up.  an empty candidate set (no step lengths were
+	//generated) or a mismatched one (all/partial candidate runs failed) must not be
+	//appended - doing so would leave dv_all with candidate rows that oe_all lacks, and
+	//pick_from_filter would then look up a candidate with no obs vector and throw.  in
+	//that case we select from the current reals plus the base solution held in the filter,
+	//which yields the incumbent and lets the outer loop reduce the step / seek feasibility.
+	if (dv_candidates.shape().first != oe_candidates.shape().first)
+	{
+		message(0, "WARNING: candidate dv (" + to_string(dv_candidates.shape().first) +
+			") and obs (" + to_string(oe_candidates.shape().first) +
+			") ensembles are inconsistent; keeping current solution for this iteration");
+	}
+	else if (oe_candidates.shape().first == 0)
+	{
+		message(0, "WARNING: candidate ensemble is empty (no step lengths generated or all "
+			"candidate runs failed); keeping current solution for this iteration");
+	}
+	else
+	{
+		dv_all.append_other_rows(dv_candidates);
+		oe_all.append_other_rows(oe_candidates);
+	}
+
 	return pick_upgrade_and_update_current(dv_all , oe_all, cma_reset_archive, true, dvs_subset, recalc);
 }
 
@@ -4502,23 +4602,43 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	}
 	else  // solve unconstrained QP subproblem
 	{
-		Eigen::MatrixXd H_reg = regularize_hessian(*hessian.e_ptr(), "unconstrained");
-		Eigen::LDLT<Eigen::MatrixXd> ldlt_H(H_reg);
-
-		if (ldlt_H.info() != Eigen::Success || !ldlt_H.isPositive()) {
-			message(1, "WARNING: LDLT failed for unconstrained case, using steepest descent");
-			search_d = -grad_vector;
+		lm = Eigen::VectorXd::Zero(0);
+		// perf: the unconstrained Newton step (-H^-1 grad) is identical for every realization
+		// (shared objective gradient + the once-per-iteration regularized Hessian), so the
+		// O(n_dv^3) LDLT factorization+solve is computed once per iteration and reused.  The
+		// gradient is compared exactly so a realization with a different gradient recomputes.
+		if (cached_unconstrained_valid && grad_vector.size() == cached_unconstrained_grad.size()
+			&& grad_vector == cached_unconstrained_grad)
+		{
+			search_d = cached_unconstrained_search_d;
+			// regularize_hessian (skipped on this cache hit) sets used_hessian as a side effect,
+			// which the caller uses to update hessian_en[d]; restore it so the cached path leaves
+			// identical state to the recomputed path.
+			used_hessian = cached_unconstrained_used_hessian;
 		}
-		else {
-			search_d = ldlt_H.solve(-grad_vector);
-			double dir_dot_grad = search_d.dot(grad_vector);
-			if (dir_dot_grad > 0) {
-				message(2, "WARNING: search direction not descent, using steepest descent");
+		else
+		{
+			Eigen::MatrixXd H_reg = regularize_hessian(*hessian.e_ptr(), "unconstrained");
+			Eigen::LDLT<Eigen::MatrixXd> ldlt_H(H_reg);
+
+			if (ldlt_H.info() != Eigen::Success || !ldlt_H.isPositive()) {
+				message(1, "WARNING: LDLT failed for unconstrained case, using steepest descent");
 				search_d = -grad_vector;
 			}
-		}
+			else {
+				search_d = ldlt_H.solve(-grad_vector);
+				double dir_dot_grad = search_d.dot(grad_vector);
+				if (dir_dot_grad > 0) {
+					message(2, "WARNING: search direction not descent, using steepest descent");
+					search_d = -grad_vector;
+				}
+			}
 
-		lm = Eigen::VectorXd::Zero(0);
+			cached_unconstrained_search_d = search_d;
+			cached_unconstrained_grad = grad_vector;
+			cached_unconstrained_used_hessian = used_hessian;  // capture regularize's side effect
+			cached_unconstrained_valid = true;
+		}
 	}
 	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);
 }
@@ -4769,6 +4889,23 @@ bool SeqQuadProgram::solve_new_ensemble()
 	}
 
 	hessian_en.clear();
+
+	// Perf: regularize the (realization-independent) Hessian ONCE per iteration and cache
+	// it, rather than repeating the O(n_dv^3) eigen-decomposition for every realization in
+	// the loop below (every realization regularizes the identical shared Hessian).  All
+	// regularize_hessian() calls inside the loop -- unconstrained and KKT paths alike --
+	// then hit the cache.  The cache is invalidated after the loop so the post-loop BFGS
+	// update regularizes its (different) Hessian afresh.
+	cached_reg_hessian_valid = false;
+	cached_unconstrained_valid = false;
+	if (!drawn_real_names.empty())
+	{
+		performance_log->log_event("regularizing hessian for iteration (hoisted: single eigen-decomposition, reused across the realization loop)");
+		cached_reg_hessian = regularize_hessian(hessian.e_ptr()->toDense(), "iteration");
+		cached_reg_hessian_valid = true;
+		performance_log->log_event("hessian regularization complete");
+	}
+
 	for (auto d : drawn_real_names)
 	{
 		ss.str("");
@@ -4839,6 +4976,8 @@ bool SeqQuadProgram::solve_new_ensemble()
 				break;
 		}
 	}
+	cached_reg_hessian_valid = false;  // done with per-realization loop; regularize afresh elsewhere (e.g. BFGS update)
+	cached_unconstrained_valid = false;
 
 	FilterRec search = run_search_routine(grad, &_drawn_dvs);
 
@@ -5764,6 +5903,13 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 			{
 				message(0, "WARNING: all dv candidate runs failed");
 				_oe = ObservationEnsemble(&pest_scenario);
+				//drop the corresponding dv candidate rows too so dv_candidates stays
+				//row-consistent with the (now empty) obs ensemble.  otherwise downstream
+				//selection (pick_from_filter) would look up a candidate that has no obs
+				//vector and the ensemble would throw "real name not found".
+				vector<string> all_dv_names = dv_candidates.get_real_names();
+				if (all_dv_names.size() > 0)
+					dv_candidates.drop_rows(all_dv_names);
 			}
 			else
 			{
@@ -6469,8 +6615,24 @@ bool CovMatAdap::should_terminate()
 
 }
 
-ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, ParameterEnsemble _dv) 
-{	
+// Fold a value into [lb, ub] by triangle-wave reflection.  Unlike a single reflection
+// (2*bound - x), this handles arbitrary overshoot (a large violation that would otherwise
+// reflect past the opposite bound) by repeatedly folding into the interval.
+static double reflect_into_bounds(double x, double lb, double ub)
+{
+	double range = ub - lb;
+	if (range <= 0.0)
+		return lb;
+	double t = std::fmod(x - lb, 2.0 * range);
+	if (t < 0.0)
+		t += 2.0 * range;
+	if (t > range)
+		t = 2.0 * range - t;
+	return lb + t;
+}
+
+ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, ParameterEnsemble _dv)
+{
 	vector<string> rnames;
 	vector<string> parnames = _dv.get_var_names();
 	ParameterEnsemble new_reals = _dv;
@@ -6494,6 +6656,13 @@ ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, Parameter
 		}
 	}
 
+	last_generate_draws = 0;
+	last_generate_clipped = 0;
+	// bounds handling for out-of-bounds CMA draws: REJECT (default; redraw the whole vector,
+	// up to max_draws), REFLECT (fold the offending coordinate back into the box), or CLIP
+	// (pin it to the bound).  REFLECT/CLIP accept the first draw and avoid the O(n_dv^2)
+	// whole-vector rejection thrashing that dominates high-dimensional problems.
+	string bound_mode = pest_utils::upper_cp(pest_scenario_ptr->get_pestpp_options().get_sqp_cma_bound_handling());
 	for (const auto& missing_name : missing_rnames)
 	{
 		Eigen::VectorXd x(parnames.size());
@@ -6521,6 +6690,7 @@ ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, Parameter
 
 					x(j) = max(lbnd, min(ubnd, x(j)));
 				}
+				last_generate_clipped++;
 				break;
 			}
 
@@ -6547,10 +6717,17 @@ ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, Parameter
 				}
 
 				if (x(j) < lbnd || x(j) > ubnd) {
-					found = false;
-					break;
+					if (bound_mode == "REFLECT")
+						x(j) = reflect_into_bounds(x(j), lbnd, ubnd);
+					else if (bound_mode == "CLIP")
+						x(j) = max(lbnd, min(ubnd, x(j)));
+					else { // REJECT (default): redraw the whole vector
+						found = false;
+						break;
+					}
 				}
 			}
+			last_generate_draws++;
 			draws++;
 		}
 
@@ -6627,6 +6804,7 @@ ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, Parameter
 
 					x(j) = max(lbnd, min(ubnd, x(j)));
 				}
+				last_generate_clipped++;
 				break;
 			}
 
@@ -6650,10 +6828,17 @@ ParameterEnsemble CovMatAdap::generate_population(Parameters& _curr_m, Parameter
 				}
 
 				if (x(j) < lbnd || x(j) > ubnd) {
-					found = false;
-					break;
+					if (bound_mode == "REFLECT")
+						x(j) = reflect_into_bounds(x(j), lbnd, ubnd);
+					else if (bound_mode == "CLIP")
+						x(j) = max(lbnd, min(ubnd, x(j)));
+					else { // REJECT (default): redraw the whole vector
+						found = false;
+						break;
+					}
 				}
 			}
+			last_generate_draws++;
 			draws++;
 		}
 		new_reals.update_real_ip(rnames[i], x);

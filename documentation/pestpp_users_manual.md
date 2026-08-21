@@ -1,7 +1,7 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.27
+# <a id='s1' />Version 5.2.28
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
@@ -175,6 +175,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [5.3.5 Run Management Control Variables ](#s9-3-5)
     - [5.4 Run Book-Keeping Files](#s9-4)
         - [5.4.1 Failed Run Storage File](#s9-4-1)
+        - [5.4.2 All Runs Storage File](#s9-4-2)
 - [6. PESTPP-GLM](#s10)
     - [6.1 Introduction](#s10-1)
         - [6.2.1 Basic Equations](#s10-1-1)
@@ -2541,6 +2542,10 @@ After running a program of the PEST++ suite, you may notice a number of (possibl
 Unlike the *case.rns*, *case.rnu* and *case.rnj* run storage files described above, which are removed when PESTPP-XXX exits gracefully, the run manager also writes a *case.rnf* file that is left behind on purpose. This file records the parameter values for any model runs that were declared permanently failed – that is, runs that were attempted *max_run_fail()* times without success – so that you can go back after a run and see which parameter combinations the model couldn’t handle. Each entry holds the parameter values that were sent to the model, along with the relevant metadata (for example, the realization name in PESTPP-IES or PESTPP-DA) and the number of times that run was attempted before being given up on. The *case.rnf* file uses the same binary format as the *case.rns* file, so it can be read and processed with pyEMU. It is written incrementally as runs fail, so its contents are available even if PESTPP-XXX is interrupted, and if no runs fail the file is simply left empty.
 
 This file can be a handy diagnostic, especially in highly parameterized or ensemble-based analyses where some parameter combinations can push the model into a state it can’t recover from. By looking at the parameter values in *case.rnf*, you can start to identify the regions of parameter space that are problematic for a given model and use that to tighten parameter bounds, adjust the prior, or revisit the model input files. It can also be useful when standing up PEST++ on a new model for the first time, where it can help flag parameter ranges or combinations that need attention.
+
+### <a id='s9-4-2' />5.4.2 All Runs Storage File
+
+By default, the temporary run storage files described above hold only the current batch of runs and are removed when PESTPP-XXX exits gracefully. If you would rather keep a permanent record of *every* model run undertaken over the entire course of an analysis, supply the *save_all_runs()* control variable as *true* (its default value is *false*). When this option is activated, the run manager copies each completed run into an additional binary storage file named *case.allruns.rns*. Unlike the temporary *case.rns*, *case.rnu* and *case.rnj* files, this file is retained after PESTPP-XXX finishes, and it accumulates runs across all iterations or batches rather than being overwritten each iteration. It uses the same binary format as *case.rns*, so it can be read and processed with pyEMU. The *save_all_runs()* option is honored by all programs of the PEST++ suite. On graceful completion, PESTPP-XXX prints a summary of the *case.allruns.rns* file to the screen and to the run record file.
 
 # <a id='s10' />6. PESTPP-GLM
 
