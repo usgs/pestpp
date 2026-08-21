@@ -2710,9 +2710,7 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 	{
 		if (forgive)
 		{
-			cout << "from_binary() warning: the following adjustable parameter names in the control file are not in the binary parameter ensemble file: " << endl;
-			for (auto& m : missing)
-				cout << m << endl;
+			cout << "from_binary() warning: " << missing.size() << "adjustable parameters are missing from file " << file_name << endl;
 			cout << "forgive is true, so continuing..." << endl;
 
 		}

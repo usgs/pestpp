@@ -1,0 +1,58 @@
+pcf
+* control data 
+restart estimation
+ 10  9   1   0   2 
+ 1   1  single point
+ 10  2  .3  .01  8 
+ 10  10  .001
+ .1
+ 100   .0001  5  3	.01  3 
+ 1   1   1 
+* parameter groups
+decvar	relative              1.0000000000E-02       0.0  switch                2.0000000000E+00       parabolic 
+* parameter data
+x1   	none    relative  	0.42	-10.0	10.0	decvar	1   0   1
+x2	none    relative  	5.28	-10.0	10.0	decvar	1   0   1
+x3   	none    relative  	2.79	-10.0	10.0	decvar	1   0   1
+x4	none    relative  	4.02	-10.0	10.0	decvar	1   0   1
+x5   	none    relative  	5.44	-10.0	10.0	decvar	1   0   1
+x6	none    relative       -2.90	-10.0	10.0	decvar	1   0   1
+x7   	none    relative  	1.75	-10.0	10.0	decvar	1   0   1
+x8	none    relative  	5.77	-10.0	10.0	decvar	1   0   1
+x9   	none    relative  	6.79	-10.0	10.0	decvar	1   0   1
+x10	none    relative  	5.07	-10.0	10.0	decvar	1   0   1
+* Observation groups
+obj_fn
+l_constraint     
+* Observation data
+obj		0.0		1	obj_fn
+g1	 	0.0		1	l_constraint
+g2	 	0.0		1	l_constraint
+g3	 	0.0		1	l_constraint
+g4	 	0.0		1	l_constraint
+g5	 	0.0		1	l_constraint
+g6	 	0.0		1	l_constraint 
+g7	 	0.0		1	l_constraint
+g8	 	0.0		1	l_constraint    
+* model command line
+python forward_run.py
+* model input/output
+par.tpl par.dat
+obs.ins obs.dat
+++opt_obj_func(obj)
+++sqp_update_hessian(true)
+++sqp_alpha_mults(0.001, 0.01, 0.05, 0.1, 0.3, 0.5, 1.0)
+++sqp_num_reals(20)
+++sqp_subset_size(5)
+++par_sigma_range(20)
+++sqp_working_set_tol(0.15)
+++sqp_filter_tol(0.0001)
+++sqp_hess_max_cond_num(1E+10)
+++sqp_scale_down_factor(0.9)
+++sqp_enforce_bounds(false)
+++sqp_rescale_search_dir(true)
+++sqp_viol_pad(0.0)
+++sqp_num_refined_search_pts(2)
+++sqp_max_reinflation_cond_num(1E+6)
+++sqp_debug_enable_constraint_weighted_jco(false)
+++sqp_use_ensemble_approx_hessian(false)

@@ -382,6 +382,8 @@ public:
 	string get_sqp_search_method()const { return sqp_search_method; }
 	void set_sqp_solve_method(string _how) { sqp_solve_method = _how; }
 	string get_sqp_solve_method()const { return sqp_solve_method; }
+	void set_sqp_cma_bound_handling(string _how) { sqp_cma_bound_handling = _how; }
+	string get_sqp_cma_bound_handling()const { return sqp_cma_bound_handling; }
 	void set_sqp_search_method(string _how) { sqp_search_method = _how; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
 	void set_sqp_num_refined_search_pts(int _num_pts) { sqp_num_refined_search_pts = _num_pts; }
@@ -445,6 +447,8 @@ public:
 	void set_sqp_debug_cma(bool _flag) { sqp_debug_cma = _flag; }
 	bool get_sqp_debug_stosag_grad()const { return sqp_debug_stosag_grad; }
 	void set_sqp_debug_stosag_grad(bool _flag) { sqp_debug_stosag_grad = _flag; }
+	bool get_sqp_use_ies_infeas()const { return sqp_use_ies_infeas; }
+	void set_sqp_use_ies_infeas(bool _flag) { sqp_use_ies_infeas = _flag; }
 	
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -568,6 +572,8 @@ public:
 	void set_par_sigma_range(double _par_sigma_range) { par_sigma_range = _par_sigma_range; }
 	bool get_save_binary() const { return save_binary; }
 	void set_save_binary(bool _ies_save_binary) { save_binary = _ies_save_binary; }
+	bool get_save_all_runs() const { return save_all_runs; }
+	void set_save_all_runs(bool _save_all_runs) { save_all_runs = _save_all_runs; }
 	string get_ies_localizer() const { return ies_localizer; }
 	void set_ies_localizer(string _ies_localizer) { ies_localizer = _ies_localizer; }
 	double get_ies_accept_phi_fac() const { return ies_accept_phi_fac; }
@@ -863,6 +869,7 @@ private:
 	string sqp_obs_restart_en;
 	string sqp_search_method;
 	string sqp_solve_method;
+	string sqp_cma_bound_handling;
 	int sqp_num_reals;
 	int sqp_subset_size;
 	bool sqp_update_hessian;
@@ -896,6 +903,7 @@ private:
 	bool sqp_debug_hessian;
 	bool sqp_debug_cma;
 	bool sqp_debug_stosag_grad;
+	bool sqp_use_ies_infeas;
 	
 
 	int mou_population_size;
@@ -961,6 +969,7 @@ private:
 	double par_sigma_range;
 	bool save_binary;
     bool save_dense;
+	bool save_all_runs;
 	string ies_localizer;
 	double ies_accept_phi_fac;
 	double ies_lambda_inc_fac;

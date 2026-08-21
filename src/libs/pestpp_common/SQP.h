@@ -91,6 +91,12 @@ public:
 	void set_parent_num(int mu_new) { mu = mu_new; }
 
 	ParameterEnsemble generate_population(Parameters& _curr_m, ParameterEnsemble _dv);
+	// Diagnostics for the last generate_population() call: total sample draws (a large
+	// value relative to the population size signals bounds-rejection thrashing, which is
+	// O(n_dv^2) per draw and degrades badly in high dimensions) and how many realizations
+	// exhausted max_draws and had to be clipped to bounds.
+	long get_last_generate_draws() const { return last_generate_draws; }
+	int get_last_generate_clipped() const { return last_generate_clipped; }
 	void update_archives(const ParameterEnsemble& pe, map<string, double> obj_map, map<string, double> viol_map, string tag, bool clear = true);
 	void clear_archives();
 	string get_cma_update_summary() const { return cma_update_summary; }
@@ -121,6 +127,8 @@ private:
 	double trace_ratio, det_ratio, frobenius_ratio, max_eigenval_ratio;
 	double trace_ratio_0, det_ratio_0, frobenius_ratio_0, max_eigenval_ratio_0;
 	bool possibly_converged = false;
+	long last_generate_draws = 0;   // total sample draws in the last generate_population() call
+	int last_generate_clipped = 0;  // realizations that hit max_draws and were clipped to bounds
 	
 	ParameterEnsemble sorted_dp_archive;
 	map<string, double> sorted_obj_map;
@@ -262,6 +270,27 @@ private:
 
 	Jacobian_1to1 jco;
 	Covariance hessian, used_hessian;
+	// per-iteration cache of the regularized Hessian.  Within solve_new_ensemble's
+	// per-realization loop every realization regularizes the identical shared Hessian,
+	// so it is computed once per iteration and reused (avoids an O(n_dv^3) eigen-
+	// decomposition per realization -- the dominant cost at high n_dv).
+	Eigen::MatrixXd cached_reg_hessian;
+	bool cached_reg_hessian_valid = false;
+	// per-iteration cache of the UNCONSTRAINED Newton step (-H^-1 grad).  With an empty
+	// working set and a shared objective gradient this is identical for every realization,
+	// so the O(n_dv^3) LDLT factorization+solve is done once per iteration and reused.  The
+	// cached gradient is compared so the cache is skipped if a realization's gradient differs.
+	Eigen::VectorXd cached_unconstrained_search_d;
+	Eigen::VectorXd cached_unconstrained_grad;
+	Covariance cached_unconstrained_used_hessian;  // preserve regularize_hessian's used_hessian side effect on cache hit
+	bool cached_unconstrained_valid = false;
+	// cache of the dv-covariance pseudoinverse SVD (s,U,V).  It depends only on the dv
+	// ensemble anomalies (which change only at make_gradient_runs), yet is needed identically
+	// by calc_gradient_vector and calc_objective_hessian, so it is computed once per dv
+	// ensemble and reused.  Keyed on the anomalies themselves, so it auto-invalidates when
+	// the ensemble changes.  This SVD is ~350s per call at high n_dv.
+	Eigen::MatrixXd cached_dvcov_s, cached_dvcov_U, cached_dvcov_V, cached_dv_anoms;
+	bool cached_dvcov_valid = false;
 	Eigen::VectorXd step_k;
 	string selected_ls_parent, selected_ls_child;
 	map<double, map<string, string>> sv_lineage_map;
@@ -279,6 +308,10 @@ private:
 	bool hessian_update_bfgs(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	bool hessian_update_sr1(Eigen::VectorXd s_k, Eigen::VectorXd y_k, Covariance old_hessian);
 	Covariance calc_objective_hessian();
+	// Cached SVD of the dv-covariance (V*s^-1*U^T is the StoSAG pseudoinverse).  Forms
+	// dv_cov = dv_anoms^T*dv_anoms/(m-1) internally and caches the decomposition keyed on
+	// the anomalies so repeated calls on the same dv ensemble reuse the O(n_dv^3) SVD.
+	void dvcov_svd(const Eigen::MatrixXd& dv_anoms, Eigen::MatrixXd& s, Eigen::MatrixXd& U, Eigen::MatrixXd& V);
 	bool solve_new_ensemble();
 
 	bool seek_feasible();
