@@ -1746,12 +1746,24 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	{
 		throw runtime_error("all upgrade runs failed.");
 	}
-	if (pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false)
+	// Only walk the lambda window when the lambdas are ours to choose. A user who wrote
+	// `lambdas` in the control file asked for those values, and shifting them out from under
+	// them is not an improvement - it is the tool ignoring an instruction. It is also actively
+	// broken for a single value: with one lambda, first == last == best, so the "best is at
+	// the top edge" branch always fires and replaces it with 10x, compounding every iteration.
+	set<string> passed = pest_scenario.get_pestpp_options().get_passed_args();
+	bool user_set_lambdas = passed.find("LAMBDAS") != passed.end();
+	if ((pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false) && (user_set_lambdas))
+	{
+		file_manager.rec_ofstream() << "Not adjusting lambda_vec: 'lambdas' was supplied in the "
+			"control file, so those values are used as given" << std::endl;
+	}
+	if ((pest_scenario.get_pestpp_options().get_glm_hp_lambdas() == false) && (!user_set_lambdas))
 	{
 		// Check if best_lambda is at the edge of lambda_vec
 
 		// regrab lambda_vec
-		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
+		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
 		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
