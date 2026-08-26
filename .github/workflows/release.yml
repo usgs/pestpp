@@ -147,14 +147,22 @@ jobs:
 
       # Named -debug so it cannot be mistaken for the release archive. On windows the pdbs are
       # installed beside the binaries, so this archive carries its own symbols.
+      #
+      # CPACK_INCLUDE_TOPLEVEL_DIRECTORY is ON here and OFF for the release archive, which is
+      # deliberate. The EXECUTABLES have the same names in both - pestpp-ies is pestpp-ies - and
+      # the release archive unpacks straight into bin/, so without a containing directory the
+      # two sets extract on top of each other and the faster binaries are silently replaced by
+      # the slower ones. Unpacking into pestpp-<version>-<ostag>-debug/ keeps them apart.
+      # Renaming the binaries instead was the other option and is worse: every script, model
+      # command line and pyemu exe_path expects the plain names.
       - name: Package diagnostic binaries
         run: |
           cd build-debug
           name="pestpp-${{ steps.version.outputs.version }}-${{ steps.version.outputs.ostag }}-debug"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-              cpack -G ZIP -D CPACK_PACKAGE_FILE_NAME="$name"
+              cpack -G ZIP -D CPACK_PACKAGE_FILE_NAME="$name" -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=ON
           else
-              cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$name"
+              cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$name" -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=ON
           fi
           ls -l pestpp-*-debug.tar.gz pestpp-*-debug.zip 2>/dev/null || true
 
