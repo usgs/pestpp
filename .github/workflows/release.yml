@@ -105,6 +105,72 @@ jobs:
           fi
           ls -l pestpp-*.tar.gz pestpp-*.zip 2>/dev/null || true
 
+      # A second, diagnostic set of binaries alongside the release ones.
+      #
+      # RelWithDebInfo rather than Debug on purpose: the bugs worth chasing here only show up at
+      # ensemble scale, and an -O0 build is too slow to reach them. This is release-speed code
+      # that also carries symbols.
+      #
+      # The point of it is the ASSERTS. CMake puts -DNDEBUG in RelWithDebInfo, which compiles out
+      # every assertion including Eigen's - and Eigen's are the ones that matter, because they
+      # check matrix dimensions and index bounds on every operation. With NDEBUG gone a bad shape
+      # aborts immediately and says what it was, instead of quietly reading off the end of an
+      # allocation and corrupting the heap for someone else to trip over later.
+      #
+      # NDEBUG is removed by REPLACING the per-config flags, not by adding -UNDEBUG to
+      # CMAKE_CXX_FLAGS: those are emitted BEFORE the per-config ones, so -DNDEBUG would just
+      # re-define it and the whole thing would silently do nothing.
+      - name: Build diagnostic binaries
+        run: |
+          mkdir build-debug && cd build-debug
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl \
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="/Zi /O2 /Ob1" ..
+              ninja
+          else
+              cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g" ..
+              make -j2
+          fi
+
+      # The same gate as the release build, but with assertions live - so this one also catches
+      # anything Eigen would object to. A failure here is worth blocking a release for.
+      - name: Self-test diagnostic
+        run: |
+          bin=$(find build-debug -type f \( -name 'pestpp-selftest' -o -name 'pestpp-selftest.exe' \) | head -1)
+          if [[ -z "$bin" ]]; then
+            echo "::notice::no pestpp-selftest in this tree - skipping the diagnostic self-test gate"
+          else
+            "$bin"
+          fi
+
+      # Named -debug so it cannot be mistaken for the release archive. On windows the pdbs are
+      # installed beside the binaries, so this archive carries its own symbols.
+      - name: Package diagnostic binaries
+        run: |
+          cd build-debug
+          name="pestpp-${{ steps.version.outputs.version }}-${{ steps.version.outputs.ostag }}-debug"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+              cpack -G ZIP -D CPACK_PACKAGE_FILE_NAME="$name"
+          else
+              cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$name"
+          fi
+          ls -l pestpp-*-debug.tar.gz pestpp-*-debug.zip 2>/dev/null || true
+
+      # One flat archive, not the loose .pdb tree. The publish job downloads every artifact with
+      # merge-multiple into dist/ and runs `gh release create ... dist/*`, so anything arriving
+      # as a nested directory would be handed to gh as a directory and not as an asset.
+      - name: Package debug symbols
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p symbols
+          find build -name '*.pdb' -exec cp {} symbols/ \;
+          ls -l symbols
+          cd symbols
+          cmake -E tar cf "../build/pestpp-${{ steps.version.outputs.version }}-win-symbols.zip" \
+            --format=zip .
+
       - name: Upload distribution
         uses: actions/upload-artifact@v6
         with:
@@ -112,6 +178,26 @@ jobs:
           path: |
             build/pestpp-*.tar.gz
             build/pestpp-*.zip
+            build-debug/pestpp-*-debug.tar.gz
+            build-debug/pestpp-*-debug.zip
+          if-no-files-found: error
+
+      # Symbols go out twice on purpose.
+      #
+      # A windows crash dump names a module and an address; the pdb is what turns that into a
+      # file and a line, and it only ever matches the one build that produced it - it cannot be
+      # regenerated later for a binary someone already downloaded.
+      #
+      # This artifact is the convenient copy for a build that is never released. The same zip
+      # also rides into dist/ below and is attached to the release itself, which is the copy
+      # that has to last: github artifacts expire on the repo retention setting, release assets
+      # do not.
+      - name: Upload debug symbols
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: pestpp-${{ steps.version.outputs.version }}-win-symbols
+          path: build/pestpp-*-win-symbols.zip
           if-no-files-found: error
 
   publish:

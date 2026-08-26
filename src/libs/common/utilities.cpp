@@ -2488,10 +2488,22 @@ void CmdLine::startup_report(std::ostream &s, string start_string) {
 	s << "in directory: \"" << cwd << "\"" << endl;
 	s << "on host: \"" << w_get_hostname() << "\"" << endl;
 	s << "on a(n) " << opersys << " operating system" << endl;
-#ifdef _DEBUG
-	s << "with debugging configuration" << endl;
+	// what this binary actually is, so a record file identifies its own build.
+	//
+	// this used to key off _DEBUG, which is set by msvc and only when linking the debug
+	// runtime - so every gcc and clang build, and the diagnostic build on every platform,
+	// called itself "release". PESTPP_BUILD_CONFIG comes from cmake, and the assert state is
+	// the part that changes behaviour: with NDEBUG gone, eigen checks its own dimensions and
+	// index bounds on every operation and aborts on a bad one instead of walking off the end.
+#ifdef PESTPP_BUILD_CONFIG
+	s << "build configuration: " << PESTPP_BUILD_CONFIG;
 #else
-	s << "with release configuration" << endl;
+	s << "build configuration: unknown";
+#endif
+#ifdef NDEBUG
+	s << " (asserts off)" << endl;
+#else
+	s << " (asserts ON - diagnostic build, slower than a release build)" << endl;
 #endif
 	if (start_string.size() > 0)
 		s << "started at " << start_string << endl << endl;

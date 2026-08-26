@@ -81,6 +81,34 @@ if("${PESTPP_SOURCE_DIR}" STREQUAL "${PESTPP_BINARY_DIR}")
    message(SEND_ERROR "In-source builds are not allowed")
 endif()
 
+# Debug symbols for the SHIPPED windows build.
+#
+# Without a .pdb, a crash report from a released binary is undiagnosable: a windows crash dump
+# records addresses and the module identity, nothing else, so every pestpp frame in the stack
+# reads pestpp-ies.exe+0x3f2a1 and stops there. The pdb is the table that turns that back into a
+# file and a line. It is never read while the program runs - only by whoever opens the dump.
+#
+# The linker stamps a matching guid into the exe and the pdb, so a pdb only ever works for the
+# exact build that produced it. That is why these have to be kept at release time; they cannot
+# be regenerated for a binary someone downloaded months ago.
+#
+# /Zi is compiler-side debug info and /DEBUG makes the linker write the pdb. Neither changes
+# codegen, so this is the same executable we ship today. /DEBUG DOES turn off the linker's
+# default /OPT:REF and /OPT:ICF though, so put both back explicitly - otherwise the exe grows
+# and stops folding identical code, which would be a real change and not just an extra file.
+if(MSVC)
+  add_compile_options($<$<CONFIG:Release>:/Zi>)
+  add_link_options($<$<CONFIG:Release>:/DEBUG>
+                   $<$<CONFIG:Release>:/OPT:REF>
+                   $<$<CONFIG:Release>:/OPT:ICF>)
+endif()
+
+# Let the binary say which build it is. startup_report() prints this into every record file, so
+# a user sending one back identifies their own build without being asked. $<CONFIG> rather than
+# CMAKE_BUILD_TYPE so it is still right under a multi-config generator, where the build type is
+# not known until build time.
+add_compile_definitions(PESTPP_BUILD_CONFIG="$<CONFIG>")
+
 # Fortran is not required (anymore), but can be enabled using either:
 #  1. ENABLE_Fortran=ON and use whatever default compiler is available
 #  2. CMAKE_Fortran_COMPILER=ifort (or other compiler)
@@ -219,6 +247,13 @@ foreach(_tgt
   list(APPEND _local_install_copies
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
       "$<TARGET_FILE:${_tgt}>" "${_local_install_bin}/")
+  # ship the pdb beside the exe so the archive carries its own symbols. OPTIONAL because
+  # TARGET_PDB_FILE is only written when the linker was asked for one, and MSVC only - the
+  # generator expression is not valid for targets that cannot produce a pdb at all
+  if(MSVC)
+    install(FILES "$<TARGET_PDB_FILE:${_tgt}>"
+            DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
+  endif()
 endforeach()
 
 add_custom_target(local_install
