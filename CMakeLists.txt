@@ -30,9 +30,12 @@ message(STATUS
   "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION_FULL}")
 
 # This logic needs to be considered before project()
-if(MSVC)
-    add_compile_options(/bigobj)
-endif()
+#
+# /bigobj used to live here and did nothing. MSVC is set by compiler identification, which does
+# not happen until project(), so this if() is false on a fresh configure - unlike WIN32 below,
+# which comes from the host and IS set this early. It went unnoticed because SQP.cpp sat just
+# under the object-file section limit without it; adding /Zi pushed it over and the build died
+# with C1128. It is now in the MSVC block AFTER project(). Do not move it back up here.
 set(_change_MSVC_flags FALSE)
 if(WIN32)
   add_compile_definitions(NOMINMAX)
@@ -97,6 +100,9 @@ endif()
 # default /OPT:REF and /OPT:ICF though, so put both back explicitly - otherwise the exe grows
 # and stops folding identical code, which would be a real change and not just an extra file.
 if(MSVC)
+  # every config, not just Release: SQP.cpp exceeds the default section limit once any debug
+  # info is emitted, and the diagnostic RelWithDebInfo build emits it for every file
+  add_compile_options(/bigobj)
   add_compile_options($<$<CONFIG:Release>:/Zi>)
   add_link_options($<$<CONFIG:Release>:/DEBUG>
                    $<$<CONFIG:Release>:/OPT:REF>
