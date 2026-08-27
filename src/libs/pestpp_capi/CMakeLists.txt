@@ -115,13 +115,25 @@ install(FILES pestpp-api.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 # tarball had the library and the header but nothing to call them with, so anybody wanting the
 # friendly layer had to go clone the repo and get the commit right.
 #
-# the files stay flat and importable rather than being made into a package - there is no pip
-# install yet on purpose (see python/README.md), so the way you use these is to put the
-# directory on sys.path. find_library() looks in ../bin relative to itself, which is exactly
-# where the library lands in this layout, so it works out of the tarball with nothing set.
-install(FILES
-  ${CMAKE_SOURCE_DIR}/python/pestpp.py
-  ${CMAKE_SOURCE_DIR}/python/pestpp_lib.py
-  ${CMAKE_SOURCE_DIR}/python/pestpp_progress.py
-  ${CMAKE_SOURCE_DIR}/python/README.md
-  DESTINATION python)
+# It is a PACKAGE now, not three flat modules - that was needed so a wheel could carry the
+# library inside it. Put python/ on sys.path and `import pestpp` works, same as before.
+#
+# find_library() looks for bin/ two levels up from the package, which in this layout is the
+# tarball root - exactly where the library lands - so it still works out of the tarball with
+# nothing set.
+#
+# *.py only: __pycache__ has no business in a release, and _binaries/ is the wheel's way of
+# carrying the library. In the tarball the library is already in bin/ and shipping a second
+# copy would just be two things to keep in step.
+#
+# FILES_MATCHING copies only the .py files but still RECREATES every subdirectory it walks, so
+# the excludes are not redundant - without them the tarball carries empty __pycache__, .claude
+# and _binaries directories.
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/python/pestpp
+  DESTINATION python
+  FILES_MATCHING
+    PATTERN "*.py"
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN ".claude" EXCLUDE
+    PATTERN "_binaries" EXCLUDE)
+install(FILES ${CMAKE_SOURCE_DIR}/python/README.md DESTINATION python)

@@ -1442,15 +1442,33 @@ def fr_timeout_test():
     #df = pyemu.helpers.parse_rmr_file(os.path.join(m_d,"pest.rmr"))
     #print(df.action.to_list())
     oe = pd.read_csv(os.path.join(m_d,"pest.{0}.obs.csv".format(pst.control_data.noptmax)),index_col=0)
-    assert oe.shape[0] == 17 # hard coded to num reals
+
+    # the exact count is NOT knowable from the config. the model fails when rnum % 10 == 0, and
+    # rnum comes from run.info - a run id the run manager assigns as it hands work out across
+    # ten agents. how many multiples of ten come up before the iteration finishes depends on
+    # scheduling, and freezing an agent changes how the rest is distributed. this used to assert
+    # 17 exactly and went red on a loaded runner.
+    #
+    # so pin the RELATIONSHIP, which is what the test is actually about: freeze_on_fail costs
+    # one realization per frozen agent, and it has to cost at least one or nothing was tested.
+    n_reals = oe.shape[0]
+    assert n_reals < 20, "no realizations dropped - freeze_on_fail did nothing"
+    assert n_reals >= 15, oe.shape  # a wide floor; anything lower means something else broke
+    frozen = 20 - n_reals
+    print("frozen agents inferred from dropped realizations:", frozen)
+
+    connected = None
     with open(os.path.join(m_d,"pest.rmr"),'r') as f:
         for line in f:
             if "timeout" in line.lower():
                 raise Exception()
             if line.strip().lower().endswith("agents connected"):
-                num = int(line.strip().split()[0])
+                # take the LAST such line - the count climbs as agents come up, so asserting on
+                # every one of them would judge the run before it had even started
+                connected = int(line.strip().split()[0])
                 print(line.strip())
-                assert num == 7 # hard coded above
+    assert connected is not None, "no 'agents connected' line in the rmr"
+    assert connected == 10 - frozen, (connected, frozen)
 
     rnf_par,rnf_obs,rnf_info = pyemu.helpers.read_pestpp_runstorage(os.path.join(m_d,"pest.rnf"),irun="all",with_metadata=True)
     print(rnf_par)
