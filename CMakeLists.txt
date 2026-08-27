@@ -29,6 +29,37 @@ string(REGEX REPLACE "^([0-9]+\\.[0-9]+\\.[0-9]+).*$" "\\1"
 message(STATUS
   "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION_FULL}")
 
+# Keep the users manual's title page in step with config_os.h.
+#
+# The docs build already injects this when it renders (docs/preprocess_manual.py), so the
+# PUBLISHED manual is never wrong. This is for the copy in the repo - the one github renders
+# when someone browses documentation/ - which otherwise sits at whatever version it was last
+# hand-edited to. It had drifted to 5.2.28 while the code moved on, and nothing said so.
+#
+# The version is a line of its own in the manual, deliberately, so this touches those few
+# characters and nothing else. It used to be the first HEADING, which meant the table of
+# contents mirrored it and two places in two syntaxes had to agree.
+#
+# Only writes when the string actually differs, so a repeat configure leaves the file alone -
+# same mtime, same size, nothing in git status. QUOTE the file contents everywhere below: the
+# manual is full of style="width:6.26806in;height:1.68194in" and an unquoted dereference would
+# treat every semicolon as a cmake list separator and shred the img tags.
+# CMAKE_SOURCE_DIR, not PESTPP_SOURCE_DIR: the latter is set by project(), which has not run
+# yet up here, so it would expand to nothing and the EXISTS check would quietly never fire
+set(_manual "${CMAKE_SOURCE_DIR}/documentation/pestpp_users_manual.md")
+if(EXISTS "${_manual}")
+  file(READ "${_manual}" _manual_text)
+  string(REGEX REPLACE "\nVersion [^\n]*\n" "\nVersion ${PESTPP_VERSION_FULL}\n"
+         _manual_new "${_manual_text}")
+  if(NOT _manual_new STREQUAL _manual_text)
+    file(WRITE "${_manual}" "${_manual_new}")
+    message(STATUS "  users manual version -> ${PESTPP_VERSION_FULL}")
+  endif()
+  unset(_manual_text)
+  unset(_manual_new)
+endif()
+unset(_manual)
+
 # This logic needs to be considered before project()
 #
 # /bigobj used to live here and did nothing. MSVC is set by compiler identification, which does

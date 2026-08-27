@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.30
+# <a id='s1' />PEST++ Users Manual
+
+Version 6.0.0a
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
-
-July 2026
 
 # <a id='s2' />Acknowledgements
 
@@ -76,7 +76,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.30](#s1)
+- [PEST++ Users Manual](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
