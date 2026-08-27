@@ -294,6 +294,10 @@ endif()
 # Copying each target from the BUILD TREE avoids both: the build-tree binary was written at link
 # time rather than milliseconds ago, copy_if_different is one defined operation per file with no
 # glob, and nothing is ever removed, so the directory is never momentarily empty.
+# Ship .dSYM bundles with the binaries (macOS). OFF because they are large - see the note in
+# the target loop below. The diagnostic build turns it on; ordinary builds should not.
+option(PESTPP_MAC_DSYM "Run dsymutil and install .dSYM bundles alongside the binaries" OFF)
+
 set(_local_install_bin "${PESTPP_SOURCE_DIR}/bin/${_ostag}")
 set(_local_install_copies
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${_local_install_bin}")
@@ -313,6 +317,23 @@ foreach(_tgt
     install(FILES "$<TARGET_PDB_FILE:${_tgt}>"
             CONFIGURATIONS RelWithDebInfo Debug
             DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
+  endif()
+
+  # macOS: the same problem, solved differently. -g leaves the DWARF in the .o files and puts
+  # only a map of paths into the binary, so once the build tree is gone the symbols are
+  # unreachable - a mac "diagnostic" build with no dsymutil gives you assertions and an
+  # unreadable stack. dsymutil collects them into a .dSYM bundle keyed to the binary by uuid.
+  #
+  # Behind an OPTION rather than a config check because it is expensive: the bundles run to
+  # roughly 14x the size of the binary, and doing that on every ordinary build would cost
+  # hundreds of megabytes and the time to write them. Only the diagnostic build asks for it.
+  #
+  # Done at INSTALL time, not POST_BUILD: add_custom_command(TARGET ...) only works in the
+  # directory that created the target, and every one of these is created in a subdirectory.
+  # Install time is the better moment anyway - the bundle is written straight into the install
+  # tree, so cpack picks it up with no separate install(DIRECTORY) rule to keep in step.
+  if(APPLE AND PESTPP_MAC_DSYM)
+    install(CODE "execute_process(COMMAND dsymutil \"$<TARGET_FILE:${_tgt}>\" -o \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:${_tgt}>.dSYM\")")
   endif()
 endforeach()
 

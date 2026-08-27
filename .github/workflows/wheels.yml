@@ -8,10 +8,22 @@ name: wheels
 # interpreter and the wheels are tagged py3-none-<platform>. That is why there is no
 # cibuildwheel here: its job is compiling an extension against each python ABI, and there is no
 # extension to compile.
+#
+# PUBLISHING IS MANUAL ONLY. The build jobs run on every push so breakage shows up early, but
+# nothing is uploaded unless someone dispatches the workflow and picks a target. An upload
+# cannot be undone: pypi and testpypi both refuse to re-use a version even after you delete it,
+# so an accidental publish burns that version number permanently.
 on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload the wheels where?'
+        required: true
+        type: choice
+        default: 'nowhere'
+        options: ['nowhere', 'testpypi', 'pypi']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -165,3 +177,30 @@ jobs:
           print('api', info['api_version'], '| pestpp', info['pestpp_version'])
           assert info['error'] is None, info['error']
           "
+
+  # Trusted publishing (OIDC): no api token in secrets. The identity is the repository plus this
+  # workflow filename, registered as a publisher on the index side - which is also why a run
+  # from a fork cannot publish as the upstream project even if someone dispatches it there.
+  publish:
+    name: publish to ${{ inputs.publish }}
+    needs: [linux, native, smoke]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'nowhere'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.publish }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      # smoke has already installed and loaded each of these; this is just to see what is about
+      # to go out, since it cannot be taken back
+      - name: Show what will be uploaded
+        run: ls -l dist
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.publish == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}

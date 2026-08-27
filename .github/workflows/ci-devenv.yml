@@ -119,13 +119,24 @@ jobs:
             # msys leaves a dash alone. the /Zi and /bigobj inside CMakeLists.txt are fine
             # as they are: cmake never passes those through a shell.
             diag_flags="-Zi -O2 -Ob1"
+            extra=""
           else
             diag_flags="-O2 -g"
+            # macOS only. -g leaves the DWARF in the .o files and puts just a map of paths into
+            # the binary, so once this build tree is gone the symbols are unreachable - without
+            # this the mac diagnostic build gives you assertions and an unreadable stack, which
+            # is half of what the other two platforms give you. dsymutil collects them into a
+            # .dSYM bundle matched to the binary by uuid, written straight into the install tree
+            # so cpack carries it in the archive.
+            #
+            # It is not free: the bundles run to roughly 14x the size of the binary, which is
+            # why the option is off by default and only the diagnostic build asks for it.
+            extra="-DPESTPP_MAC_DSYM=ON"
           fi
           pixi run -- cmake -G Ninja -S . -B _build-diag \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="$diag_flags" \
-            -DCMAKE_CXX_COMPILER_WORKS=1
+            -DCMAKE_CXX_COMPILER_WORKS=1 $extra
           pixi run -- cmake --build _build-diag
 
       # CPACK_INCLUDE_TOPLEVEL_DIRECTORY is ON here and OFF for the release archive on purpose:
