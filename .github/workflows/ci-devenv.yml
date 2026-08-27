@@ -80,7 +80,13 @@ jobs:
       - name: Build diagnostic binaries
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            diag_flags="/Zi /O2 /Ob1"
+            # dashes, not slashes. this step runs under git bash, and msys rewrites any
+            # argument that looks like a posix path - /Zi came out the other side as
+            # "C:/Program Files/Git/Zi", which then split on the space and reached the
+            # compiler as two source file names. msvc takes - and / interchangeably, and
+            # msys leaves a dash alone. the /Zi and /bigobj inside CMakeLists.txt are fine
+            # as they are: cmake never passes those through a shell.
+            diag_flags="-Zi -O2 -Ob1"
           else
             diag_flags="-O2 -g"
           fi
