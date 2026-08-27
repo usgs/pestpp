@@ -253,11 +253,15 @@ foreach(_tgt
   list(APPEND _local_install_copies
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
       "$<TARGET_FILE:${_tgt}>" "${_local_install_bin}/")
-  # ship the pdb beside the exe so the archive carries its own symbols. OPTIONAL because
-  # TARGET_PDB_FILE is only written when the linker was asked for one, and MSVC only - the
-  # generator expression is not valid for targets that cannot produce a pdb at all
+  # NOT in Release: the shipped archive stays as lean as it is today, and the release symbols
+  # travel separately - their own zip, uploaded as a ci artifact and attached to the release.
+  # The diagnostic build DOES carry them, since a debugging binary without symbols is pointless.
+  #
+  # OPTIONAL because TARGET_PDB_FILE is only written when the linker was asked for one, and
+  # MSVC only - the generator expression is not valid for a target that cannot produce a pdb.
   if(MSVC)
     install(FILES "$<TARGET_PDB_FILE:${_tgt}>"
+            CONFIGURATIONS RelWithDebInfo Debug
             DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
   endif()
 endforeach()

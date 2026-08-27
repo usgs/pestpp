@@ -105,66 +105,36 @@ jobs:
           fi
           ls -l pestpp-*.tar.gz pestpp-*.zip 2>/dev/null || true
 
-      # A second, diagnostic set of binaries alongside the release ones.
+      # Diagnostic binaries come from the developer-environment workflow, which builds them
+      # for every commit. They are downloaded from that run rather than rebuilt here, so the
+      # release ships exactly the artifacts CI already produced and tested for this sha.
       #
-      # RelWithDebInfo rather than Debug on purpose: the bugs worth chasing here only show up at
-      # ensemble scale, and an -O0 build is too slow to reach them. This is release-speed code
-      # that also carries symbols.
-      #
-      # The point of it is the ASSERTS. CMake puts -DNDEBUG in RelWithDebInfo, which compiles out
-      # every assertion including Eigen's - and Eigen's are the ones that matter, because they
-      # check matrix dimensions and index bounds on every operation. With NDEBUG gone a bad shape
-      # aborts immediately and says what it was, instead of quietly reading off the end of an
-      # allocation and corrupting the heap for someone else to trip over later.
-      #
-      # NDEBUG is removed by REPLACING the per-config flags, not by adding -UNDEBUG to
-      # CMAKE_CXX_FLAGS: those are emitted BEFORE the per-config ones, so -DNDEBUG would just
-      # re-define it and the whole thing would silently do nothing.
-      - name: Build diagnostic binaries
+      # This makes a release DEPEND on a successful developer-environment run for the same
+      # commit. Dispatching a release on a sha whose ci run was cancelled, skipped, or has aged
+      # out of artifact retention will fail here - deliberately and with a clear message, rather
+      # than quietly publishing without the diagnostic set.
+      - name: Find the developer-environment run for this commit
+        id: devenv
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir build-debug && cd build-debug
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-              cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl \
-                -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="/Zi /O2 /Ob1" ..
-              ninja
-          else
-              cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g" ..
-              make -j2
+          run_id=$(gh run list --workflow ci-devenv.yml --commit "${{ github.sha }}" \
+                     --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+            echo "::error::no successful developer-environment run for ${{ github.sha }} -"
+            echo "::error::the diagnostic binaries are built there. re-run that workflow first."
+            exit 1
           fi
+          echo "using developer-environment run $run_id"
+          echo "run_id=$run_id" >> $GITHUB_OUTPUT
 
-      # The same gate as the release build, but with assertions live - so this one also catches
-      # anything Eigen would object to. A failure here is worth blocking a release for.
-      - name: Self-test diagnostic
-        run: |
-          bin=$(find build-debug -type f \( -name 'pestpp-selftest' -o -name 'pestpp-selftest.exe' \) | head -1)
-          if [[ -z "$bin" ]]; then
-            echo "::notice::no pestpp-selftest in this tree - skipping the diagnostic self-test gate"
-          else
-            "$bin"
-          fi
-
-      # Named -debug so it cannot be mistaken for the release archive. On windows the pdbs are
-      # installed beside the binaries, so this archive carries its own symbols.
-      #
-      # CPACK_INCLUDE_TOPLEVEL_DIRECTORY is ON here and OFF for the release archive, which is
-      # deliberate. The EXECUTABLES have the same names in both - pestpp-ies is pestpp-ies - and
-      # the release archive unpacks straight into bin/, so without a containing directory the
-      # two sets extract on top of each other and the faster binaries are silently replaced by
-      # the slower ones. Unpacking into pestpp-<version>-<ostag>-debug/ keeps them apart.
-      # Renaming the binaries instead was the other option and is worse: every script, model
-      # command line and pyemu exe_path expects the plain names.
-      - name: Package diagnostic binaries
-        run: |
-          cd build-debug
-          name="pestpp-${{ steps.version.outputs.version }}-${{ steps.version.outputs.ostag }}-debug"
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-              cpack -G ZIP -D CPACK_PACKAGE_FILE_NAME="$name" -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=ON
-          else
-              cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME="$name" -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=ON
-          fi
-          ls -l pestpp-*-debug.tar.gz pestpp-*-debug.zip 2>/dev/null || true
+      - name: Download diagnostic binaries
+        uses: actions/download-artifact@v6
+        with:
+          name: diagnostic-${{ matrix.os }}
+          path: build-debug
+          run-id: ${{ steps.devenv.outputs.run_id }}
+          github-token: ${{ github.token }}
 
       # One flat archive, not the loose .pdb tree. The publish job downloads every artifact with
       # merge-multiple into dist/ and runs `gh release create ... dist/*`, so anything arriving

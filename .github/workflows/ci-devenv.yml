@@ -45,11 +45,72 @@ jobs:
       #     pixi run install-modflow
   
       - name: Build release
-        run: pixi run build-release 
+        run: pixi run build-release
 
       # - name: Test pestpp
       #   run: |
       #     pixi run test
+
+      # Version and ostag, read the same way release.yml reads them, so the diagnostic archive
+      # this job produces is named exactly what the release workflow will look for.
+      - name: Read version and ostag
+        id: version
+        run: |
+          version=$(grep -oE '#define PESTPP_VERSION "[^"]+"' src/libs/common/config_os.h \
+                    | sed -E 's/.*"(.*)"/\1/')
+          if [[ -z "$version" ]]; then
+            echo "::error::could not read PESTPP_VERSION from src/libs/common/config_os.h"
+            exit 1
+          fi
+          if [[ $RUNNER_OS == "Linux" ]]; then ostag="linux"
+          elif [[ $RUNNER_OS == "macOS" ]]; then ostag="mac"
+          else ostag="win"; fi
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "ostag=$ostag" >> $GITHUB_OUTPUT
+
+      # Diagnostic binaries - release speed, symbols on, and NDEBUG REMOVED so eigen checks its
+      # own matrix dimensions and index bounds on every operation instead of reading off the end
+      # of an allocation and corrupting the heap for something else to trip over later.
+      #
+      # Built here rather than in the release workflow so one exists for every commit, not only
+      # for releases: when a user hits something you want to hand them a binary today.
+      #
+      # NDEBUG goes by REPLACING the per-config flags. Adding -UNDEBUG to CMAKE_CXX_FLAGS does
+      # nothing - those are emitted before the per-config ones, so -DNDEBUG just re-defines it.
+      - name: Build diagnostic binaries
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            diag_flags="/Zi /O2 /Ob1"
+          else
+            diag_flags="-O2 -g"
+          fi
+          pixi run -- cmake -G Ninja -S . -B _build-diag \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="$diag_flags" \
+            -DCMAKE_CXX_COMPILER_WORKS=1
+          pixi run -- cmake --build _build-diag
+
+      # CPACK_INCLUDE_TOPLEVEL_DIRECTORY is ON here and OFF for the release archive on purpose:
+      # the executables have the SAME names in both, and the release archive unpacks straight
+      # into bin/, so without a containing directory these would extract on top of a release
+      # install and silently replace fast binaries with slow ones.
+      - name: Package diagnostic binaries
+        run: |
+          name="pestpp-${{ steps.version.outputs.version }}-${{ steps.version.outputs.ostag }}-debug"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then gen=ZIP; else gen=TGZ; fi
+          pixi run -- cpack --config _build-diag/CPackConfig.cmake -G $gen -B _build-diag \
+            -D CPACK_PACKAGE_FILE_NAME="$name" -D CPACK_INCLUDE_TOPLEVEL_DIRECTORY=ON
+          ls -l _build-diag/pestpp-*-debug.* || true
+
+      # Consumed by release.yml, which downloads it from this run rather than rebuilding.
+      - name: Upload diagnostic binaries
+        uses: actions/upload-artifact@v6
+        with:
+          name: diagnostic-${{ matrix.os }}
+          path: |
+            _build-diag/pestpp-*-debug.tar.gz
+            _build-diag/pestpp-*-debug.zip
+          if-no-files-found: error
 
       - name: Upload binaries
         uses: actions/upload-artifact@v6
