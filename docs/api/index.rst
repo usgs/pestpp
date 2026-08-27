@@ -5,6 +5,7 @@ C++ API Reference
    :maxdepth: 1
    :caption: Libraries
 
+   capi
    common
    pestpp_common
    run_managers

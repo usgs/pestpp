@@ -9,6 +9,7 @@ OUTPUT_DIRECTORY       = docs/_doxygen
 
 # Input source directories (project code only, not third-party Eigen)
 INPUT                  = src/libs/common \
+                         src/libs/pestpp_capi \
                          src/libs/pestpp_common \
                          src/libs/run_managers \
                          src/programs/gsa \
@@ -46,6 +47,10 @@ XML_PROGRAMLISTING     = NO
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = NO
+# PESTPP_API expands to __declspec/__attribute__ visibility markup that sphinx's C++
+# parser cannot read - every capi signature came through as an invalid declaration.
+# Expanding it to nothing leaves the plain C prototype, which parses.
+PREDEFINED             = PESTPP_API=
 
 # Source browsing
 SOURCE_BROWSER         = NO

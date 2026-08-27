@@ -1,0 +1,75 @@
+name: docs
+
+# Read the Docs builds and publishes the documentation itself - the webhook fires on push and
+# .readthedocs.yaml is the whole deployment. This workflow does NOT deploy anything. It exists
+# because RTD only tells you about a problem after the push has landed, and it is configured
+# with fail_on_warning: false, so a heading whose anchor stopped matching, a figure that was
+# never committed, or a doxygen input that moved all render as a broken page rather than a
+# failed build.
+#
+# So this runs the same steps RTD runs, with warnings promoted to errors, before merge.
+# Keep the steps here in step with .readthedocs.yaml - if they drift, a green check here stops
+# meaning anything about what RTD will do.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # doxygen generates the xml that breathe reads for the C++ and C api pages. Same package
+      # .readthedocs.yaml installs through apt_packages.
+      - name: Install doxygen
+        run: sudo apt-get update && sudo apt-get install -y doxygen
+
+      - name: Install python requirements
+        run: pip install -r docs/requirements.txt
+
+      # The three pre_build jobs from .readthedocs.yaml, in the same order.
+      - name: Doxygen
+        run: doxygen Doxyfile
+
+      - name: Preprocess users manual
+        run: |
+          python docs/preprocess_manual.py \
+            documentation/pestpp_users_manual.md docs/users_manual_processed.md
+
+      - name: Stage manual media
+        run: |
+          mkdir -p docs/media
+          cp -r documentation/media/. docs/media/
+
+      # NO -W for now, deliberately. The build currently carries 96 pre-existing warnings: 88
+      # duplicate C++ declarations, because the api pages document both foo.cpp and foo.h for
+      # the same entities so breathe emits everything twice, and 6 template signatures in
+      # utilities.h that sphinx's C++ parser cannot read. None of that is new - rtd has been
+      # publishing through it with fail_on_warning: false - but turning warnings into errors
+      # today would just make this job red on arrival and get it ignored.
+      #
+      # So this catches a build that FAILS, which is still worth having: a missing doxygen
+      # input, a broken include, a media directory that moved. Once the 88 duplicates are
+      # cleaned up (document the header, not the header AND the implementation - see
+      # docs/api/capi.rst), put -W --keep-going back and it becomes a real gate.
+      - name: Sphinx build
+        run: sphinx-build -b html docs docs/_build/html
+
+      # Handy when the build fails on something layout-related and the log is not enough.
+      - name: Upload rendered html
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: docs-html
+          path: docs/_build/html
+          if-no-files-found: warn

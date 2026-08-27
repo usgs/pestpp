@@ -98,7 +98,7 @@ with Ies.from_pst("pest.pst", workdir="my_case") as ies:
     ies.initialize()
     while not ies.should_terminate:
         ies.solve()
-        print(ies.iteration, ies.phi.mean())
+        print(ies.iteration, ies.phi)
     ies.finalize()
 ```
 

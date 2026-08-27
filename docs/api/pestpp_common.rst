@@ -75,12 +75,6 @@ SVD Solvers
 .. doxygenfile:: SVDSolver.h
    :project: pestpp
 
-.. doxygenfile:: SVDASolver.cpp
-   :project: pestpp
-
-.. doxygenfile:: SVDASolver.h
-   :project: pestpp
-
 .. doxygenfile:: SVD_PROPACK.cpp
    :project: pestpp
 
@@ -220,12 +214,6 @@ Supporting Components
    :project: pestpp
 
 .. doxygenfile:: ModelRunPP.h
-   :project: pestpp
-
-.. doxygenfile:: DifferentialEvolution.cpp
-   :project: pestpp
-
-.. doxygenfile:: DifferentialEvolution.h
    :project: pestpp
 
 .. doxygenfile:: eigen_tools.cpp

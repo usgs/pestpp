@@ -12,9 +12,13 @@ build:
       - doxygen Doxyfile
       # Preprocess users manual: convert HTML anchors to MyST targets
       - python docs/preprocess_manual.py documentation/pestpp_users_manual.md docs/users_manual_processed.md
-      # Copy users manual media assets so Sphinx places them at _build/html/media/
-      - mkdir -p docs/_manual_assets/media
-      - cp -r documentation/media/. docs/_manual_assets/media/
+      # Stage the manual's media where its own <img src="media/..."> references point, so
+      # sphinx resolves them at BUILD time and handles them as real images. Copying them to a
+      # side directory and relying on html_extra_path also renders correctly, but sphinx cannot
+      # see them while checking, so every figure warned "image file not readable" - which under
+      # -W is a failure, and without -W hides a genuinely missing figure in the same noise.
+      - mkdir -p docs/media
+      - cp -r documentation/media/. docs/media/
 
 sphinx:
   configuration: docs/conf.py
