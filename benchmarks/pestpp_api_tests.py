@@ -23,7 +23,7 @@ from fixture_utils import scratch_template
 _BENCH = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
-from pestpp_lib import NOISE_EN  # noqa: E402
+from pestpp.pestpp_lib import NOISE_EN  # noqa: E402
 from pestpp import (  # noqa: E402
     Ies, Da, Mou, Sqp, Glm, Opt, IterationStep, PestppError, ExpiredViewError, find_library,
     run_ies, PHI_ACTUAL,
@@ -1306,7 +1306,7 @@ def api_progress_renders_in_a_terminal_test():
     """
     import io
     sys.path.insert(0, os.path.join(_REPO, "python"))
-    import pestpp_progress as pp
+    from pestpp import pestpp_progress as pp
 
     class _Tty(io.StringIO):
         def isatty(self):
@@ -1344,7 +1344,7 @@ def api_progress_renders_in_a_terminal_test():
 def api_progress_is_inert_when_disabled_test():
     """progress=False costs nothing and every hook is still safe to call."""
     sys.path.insert(0, os.path.join(_REPO, "python"))
-    import pestpp_progress as pp
+    from pestpp import pestpp_progress as pp
 
     bar = pp.auto(False)
     assert type(bar) is pp.Progress, type(bar)
@@ -1375,7 +1375,7 @@ def api_progress_renders_in_a_notebook_test():
     src = (
         "import sys\n"
         "sys.path.insert(0, {0!r})\n"
-        "import pestpp_progress as pp\n"
+        "from pestpp import pestpp_progress as pp\n"
         "print('in_notebook:', pp.in_notebook())\n"
         "bar = pp.auto(True)\n"
         "print('renderer:', type(bar).__name__)\n"
@@ -1411,7 +1411,7 @@ def api_progress_during_a_real_run_test():
     """
     import io
     sys.path.insert(0, os.path.join(_REPO, "python"))
-    import pestpp_progress as pp
+    from pestpp import pestpp_progress as pp
 
     wd = _case("api_progress_run", noptmax=1, num_reals=6)
     sink = io.StringIO()

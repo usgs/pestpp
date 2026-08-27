@@ -130,6 +130,25 @@ endif()
 # codegen, so this is the same executable we ship today. /DEBUG DOES turn off the linker's
 # default /OPT:REF and /OPT:ICF though, so put both back explicitly - otherwise the exe grows
 # and stops folding identical code, which would be a real change and not just an extra file.
+# Linux: fold the C++ runtime into the binaries, the way holy-build-box does.
+#
+# NOT glibc. glibc stays dynamic, deliberately. Statically linking it breaks NSS, which glibc
+# implements by dlopen'ing libnss_*.so at runtime - and getaddrinfo goes through NSS, which is
+# how a PANTHER agent resolves the master by hostname (PantherAgent.cpp). A static glibc build
+# would either fail those lookups or end up needing the very glibc it was trying to avoid.
+#
+# libstdc++ and libgcc are the ones worth folding in. A binary built with a newer gcc asks the
+# host for a GLIBCXX_3.4.xx symbol version it may not have, and that is the usual way a linux
+# build dies on someone else's machine - more often than glibc itself. Folding them in removes
+# the question. The remaining floor is glibc alone, set by whatever image the build ran in.
+#
+# Safe for the shared library too: the C ABI passes no C++ types, so a host process with its own
+# libstdc++ never meets ours. That is the same argument that makes /MT safe on windows - see the
+# ownership note in pestpp-api.h.
+if(UNIX AND NOT APPLE)
+  add_link_options(-static-libstdc++ -static-libgcc)
+endif()
+
 if(MSVC)
   # every config, not just Release: SQP.cpp exceeds the default section limit once any debug
   # info is emitted, and the diagnostic RelWithDebInfo build emits it for every file

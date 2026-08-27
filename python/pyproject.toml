@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pestpp"
+description = "Python interface to the PEST++ suite of parameter estimation and uncertainty analysis tools"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "PEST++ Development Team" }]
+keywords = ["pest", "pest++", "parameter estimation", "uncertainty", "data assimilation"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3",
+]
+
+# numpy, pandas and pyemu are all imported at MODULE scope by the pestpp package itself, so
+# `import pestpp` fails without them - they are required, not optional. pyemu is easy to
+# misread as optional: it is imported inside a try/except that raises a friendly ImportError,
+# which looks like a lazy import and is not.
+#
+# IPython is genuinely lazy - pestpp_progress only reaches for it when rendering in a notebook -
+# so it stays an extra.
+#
+# The thin ctypes layer, pestpp.pestpp_lib, needs only numpy. Someone who wants just that still
+# pays for pandas and pyemu here, which is the price of shipping one distribution.
+dependencies = ["numpy", "pandas", "pyemu"]
+
+# the version is read from src/libs/common/config_os.h by setup.py, the same single definition
+# cmake, cpack and the docs build use. Nothing here restates it.
+dynamic = ["version"]
+
+[project.optional-dependencies]
+notebook = ["ipython"]
+
+[project.urls]
+Homepage = "https://github.com/usgs/pestpp"
+Documentation = "https://pestpp.readthedocs.io"
+Source = "https://github.com/usgs/pestpp"
+
+[tool.setuptools]
+# _binaries/ holds the compiled C ABI library. It is EMPTY in the source tree and in an sdist -
+# the wheel job drops the platform's pestpp-api.<so|dylib|dll> in before building. A wheel
+# without it installs and imports fine and then fails at find_library(), which is the same
+# error a source checkout gives when pest++ has not been built.
+packages = ["pestpp"]
+
+[tool.setuptools.package-data]
+pestpp = ["_binaries/*"]

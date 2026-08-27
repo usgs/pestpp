@@ -52,7 +52,7 @@ except ImportError as e:                                     # pragma: no cover
         "Install it with `pip install pyemu`.") from e
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pestpp_lib import (  # noqa: E402
+from .pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, _UNSET,
     PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
     STACK_PAR_EN, STACK_OBS_EN, NESTED_PAR_EN, MEMBER_STACK_EN,
@@ -62,7 +62,7 @@ from pestpp_lib import (  # noqa: E402
     WORKER_COMPLETED, WORKER_FAILED, WORKER_TIMED_OUT,
 )
 
-from pestpp_progress import Progress, auto as _progress_auto  # noqa: E402
+from .pestpp_progress import Progress, auto as _progress_auto  # noqa: E402
 
 # Bound to _Tool so from_pst() reports the SUBCLASS it was called on: Ies.from_pst() infers
 # as Ies, Mou.from_pst() as Mou. Without it a classmethod returning cls() is opaque to jedi
@@ -85,7 +85,7 @@ __all__ = [
 # bug report shouldnt need the heavier dependency just to tell us which library they were
 # running. re-exported here since `from pestpp import find_library` is how people already
 # import it.
-from pestpp_lib import find_library, api_info  # noqa: E402,F401
+from .pestpp_lib import find_library, api_info  # noqa: E402,F401
 
 
 # ---- name case ----------------------------------------------------------------------------
@@ -449,7 +449,7 @@ class _Tool:
         line search issues several run batches per iteration, so neither can be split this way
         and both raise.
         """
-        from pestpp_lib import PESTPP_RETRY
+        from .pestpp_lib import PESTPP_RETRY
         if defer_runs:
             with self._q():
                 return self._lib.solve_prepare()
@@ -468,7 +468,7 @@ class _Tool:
         ``defer_runs=False`` (the default) runs them internally and completes the iteration in
         one call.
         """
-        from pestpp_lib import PESTPP_RETRY
+        from .pestpp_lib import PESTPP_RETRY
         with self._q():
             status, pending = self._lib.solve_finish(defer_runs)
         return self._step(retried=(status == PESTPP_RETRY), pending_runs=pending)
@@ -1293,7 +1293,7 @@ class Candidate:
 
     @property
     def _en_id(self) -> int:
-        from pestpp_lib import CANDIDATE_EN
+        from .pestpp_lib import CANDIDATE_EN
         return CANDIDATE_EN + self.index
 
     def par_df(self, lower: bool = False) -> pd.DataFrame:

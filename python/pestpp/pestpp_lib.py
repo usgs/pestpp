@@ -161,14 +161,25 @@ def find_library(lib_path: str | None = None) -> str:
             else "pestpp-api.dylib" if "darwin" in plat or "macos" in plat
             else "pestpp-api.so")
     here = os.path.dirname(os.path.abspath(__file__))
-    roots = [os.path.join(os.path.dirname(here), "build"), os.path.join(here, "..", "..", "build")]
+
+    # A wheel carries the library inside the package. Checked FIRST and returned outright,
+    # because a pip-installed copy has no build tree to search and the mtime contest below is
+    # meaningless there - the shipped library is the only one there is, by construction.
+    shipped = os.path.join(here, "_binaries", name)
+    if os.path.exists(shipped):
+        return shipped
+
+    # the package now sits at <repo>/python/pestpp/, so the repo root is two levels up - not
+    # one, as it was when these modules were flat files in python/
+    repo = os.path.dirname(os.path.dirname(here))
+    roots = [os.path.join(repo, "build"), os.path.join(repo, "build_asan")]
 
     # An installed copy next to the executables COMPETES on mtime; it does not win outright.
     # Short-circuiting to it meant a stale install silently shadowed a fresh build - the
     # symptom is an AttributeError from ctypes about a symbol that plainly exists in the
     # source, which sends you looking in exactly the wrong place.
     found = []
-    for cand in (os.path.join(os.path.dirname(here), "bin", name),):
+    for cand in (os.path.join(repo, "bin", name),):
         if os.path.exists(cand):
             found.append(os.path.abspath(cand))
     for root in roots:

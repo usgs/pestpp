@@ -27,7 +27,7 @@ import pyemu
 _BENCH = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_BENCH)
 sys.path.insert(0, os.path.join(_REPO, "python"))
-from pestpp_lib import (  # noqa: E402
+from pestpp.pestpp_lib import (  # noqa: E402
     PestppLib, PestppError, PESTPP_OK, PAR_EN, OBS_EN, NOISE_EN, WEIGHTS_EN,
     RM_SERIAL, RM_PANTHER, RM_EXTERNAL,
     TOOL_IES, TOOL_DA, TOOL_MOU, TOOL_SQP, TOOL_GLM, WORKER_COMPLETED,
@@ -630,7 +630,7 @@ def capi_run_manager_selection_test():
 def capi_create_options_validation_test():
     """Bad create options are rejected with a message, not a crash or a silent default."""
     import ctypes
-    from pestpp_lib import CreateOptions
+    from pestpp.pestpp_lib import CreateOptions
 
     lib = PestppLib.__new__(PestppLib)          # no handle needed for these
     lib.lib = ctypes.CDLL(_find_library())
@@ -675,7 +675,7 @@ def capi_struct_size_honoured_test():
     is short: anything the library reads past `ctl_file` is memory this test does not own.
     """
     import ctypes
-    from pestpp_lib import CreateOptions
+    from pestpp.pestpp_lib import CreateOptions
 
     class ShortCreateOptions(ctypes.Structure):
         """pestpp_create_options as it looked before working_dir/run_manager/panther_port."""
@@ -727,7 +727,7 @@ def capi_status_codes_test():
     positive is a failure.
     """
     import ctypes
-    from pestpp_lib import (PESTPP_BUFFER_TOO_SMALL, PESTPP_INVALID_ARGUMENT,
+    from pestpp.pestpp_lib import (PESTPP_BUFFER_TOO_SMALL, PESTPP_INVALID_ARGUMENT,
                             PESTPP_INVALID_STATE, PESTPP_NOT_SUPPORTED, PESTPP_INVALID_HANDLE)
 
     wd = _setup("capi_status_codes")
@@ -1050,7 +1050,7 @@ def capi_output_redirect_is_lifo_test():
     cannot be dup2'd over stdout either.
     """
     import ctypes
-    from pestpp_lib import PESTPP_INVALID_ARGUMENT, PESTPP_INVALID_STATE
+    from pestpp.pestpp_lib import PESTPP_INVALID_ARGUMENT, PESTPP_INVALID_STATE
 
     lib = ctypes.CDLL(_find_library())
     lib.pestpp_redirect_output.argtypes = (ctypes.c_char_p, ctypes.POINTER(ctypes.c_int))
@@ -1108,7 +1108,7 @@ def capi_unknown_option_is_reported_test():
     has to be asked for explicitly by passing `found`.
     """
     import ctypes
-    from pestpp_lib import PESTPP_INVALID_ARGUMENT
+    from pestpp.pestpp_lib import PESTPP_INVALID_ARGUMENT
 
     wd = _setup("capi_unknown_option")
     with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
