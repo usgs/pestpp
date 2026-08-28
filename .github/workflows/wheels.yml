@@ -1,0 +1,206 @@
+name: wheels
+
+# Builds the pip-installable wheels. This does NOT publish - it proves the wheels build and
+# import, and leaves them as artifacts.
+#
+# One wheel per PLATFORM, not per python version. The library is loaded with ctypes and links
+# nothing from CPython - `nm -u` finds no _Py symbols - so the same binary serves every
+# interpreter and the wheels are tagged py3-none-<platform>. That is why there is no
+# cibuildwheel here: its job is compiling an extension against each python ABI, and there is no
+# extension to compile.
+#
+# PUBLISHING IS MANUAL ONLY. The build jobs run on every push so breakage shows up early, but
+# nothing is uploaded unless someone dispatches the workflow and picks a target. An upload
+# cannot be undone: pypi and testpypi both refuse to re-use a version even after you delete it,
+# so an accidental publish burns that version number permanently.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload the wheels where?'
+        required: true
+        type: choice
+        default: 'nowhere'
+        options: ['nowhere', 'testpypi', 'pypi']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Linux has to be built inside a manylinux image. A wheel tagged linux_x86_64 is REJECTED by
+  # pypi outright, and the tag is only honest if the library's glibc requirement is old enough
+  # to match - which is what building in the image and then checking with auditwheel gives.
+  linux:
+    name: linux wheel (manylinux)
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the shared library
+        run: |
+          /opt/python/cp312-cp312/bin/pip install --quiet cmake ninja
+          export PATH="/opt/python/cp312-cp312/bin:$PATH"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target pestpp_capi
+
+      - name: Stage the library into the package
+        run: |
+          mkdir -p python/pestpp/_binaries
+          lib=$(find build -name 'pestpp-api.so' | head -1)
+          test -n "$lib" || { echo "::error::pestpp-api.so was not built"; exit 1; }
+          cp "$lib" python/pestpp/_binaries/
+
+      # auditwheel is the check, not a formality: it inspects what the library actually links
+      # against and REFUSES to apply a manylinux tag the binary does not deserve. If the glibc
+      # requirement is too new this fails here rather than at someone's pip install.
+      - name: Build and repair the wheel
+        run: |
+          export PATH="/opt/python/cp312-cp312/bin:$PATH"
+          pip install --quiet build auditwheel
+          python -m build --wheel python --outdir dist_raw
+          auditwheel repair dist_raw/*.whl --plat manylinux_2_28_x86_64 -w dist
+          ls -l dist
+
+      - name: Show what the wheel requires
+        run: |
+          export PATH="/opt/python/cp312-cp312/bin:$PATH"
+          auditwheel show dist/*.whl
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheel-linux
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # macos and windows need no container and no repair: the library links only system libraries
+  # (libc++/libSystem on mac), and the windows dll is built against the STATIC msvc runtime
+  # (PESTPP_MSVC_STATIC_RUNTIME defaults ON) so it carries no redistributable dependency.
+  #
+  # The wheel is retagged rather than built with a platform tag: setuptools has no extension
+  # module to infer one from, so it produces py3-none-any - a PURE PYTHON tag, which would let
+  # pip install a mac binary on linux. `wheel tags` rewrites it to the truth.
+  native:
+    name: ${{ matrix.os }} wheel
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14,     plat: macosx_11_0_arm64 }
+          - { os: windows-2022, plat: win_amd64 }
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Setup windows compiler
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build the shared library
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmake -S . -B build -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl \
+              -DCMAKE_BUILD_TYPE=Release
+          else
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          fi
+          cmake --build build --target pestpp_capi
+
+      - name: Stage the library into the package
+        run: |
+          mkdir -p python/pestpp/_binaries
+          lib=$(find build -name 'pestpp-api.dylib' -o -name 'pestpp-api.dll' | head -1)
+          test -n "$lib" || { echo "::error::the shared library was not built"; exit 1; }
+          cp "$lib" python/pestpp/_binaries/
+
+      - name: Build and tag the wheel
+        run: |
+          pip install --quiet build wheel
+          python -m build --wheel python --outdir dist
+          wheel tags --platform-tag ${{ matrix.plat }} --remove dist/*.whl
+          ls -l dist
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheel-${{ matrix.os }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # A wheel that builds but cannot find its own library is the failure worth catching, and it
+  # only shows up on install - so install it somewhere with no source tree and load the library
+  # for real.
+  smoke:
+    name: install and load
+    needs: [linux, native]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, artifact: wheel-linux }
+          - { os: macos-14,      artifact: wheel-macos-14 }
+          - { os: windows-2022,  artifact: wheel-windows-2022 }
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist
+
+      # deliberately NOT in a checkout: find_library() falls back to searching a build tree, so
+      # running this beside the sources could pass on a library the wheel does not contain
+      - name: Install and load
+        shell: bash
+        run: |
+          python -m pip install --quiet dist/*.whl
+          cd "$HOME"
+          python -c "
+          import pestpp
+          from pestpp.pestpp_lib import find_library, api_info
+          lib = find_library()
+          print('library:', lib)
+          assert 'site-packages' in lib, 'wheel did not supply its own library: ' + lib
+          info = api_info()
+          print('api', info['api_version'], '| pestpp', info['pestpp_version'])
+          assert info['error'] is None, info['error']
+          "
+
+  # Trusted publishing (OIDC): no api token in secrets. The identity is the repository plus this
+  # workflow filename, registered as a publisher on the index side - which is also why a run
+  # from a fork cannot publish as the upstream project even if someone dispatches it there.
+  publish:
+    name: publish to ${{ inputs.publish }}
+    needs: [linux, native, smoke]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'nowhere'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.publish }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      # smoke has already installed and loaded each of these; this is just to see what is about
+      # to go out, since it cannot be taken back
+      - name: Show what will be uploaded
+        run: ls -l dist
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.publish == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
