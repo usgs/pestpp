@@ -45,14 +45,22 @@ jobs:
           /opt/python/cp312-cp312/bin/pip install --quiet cmake ninja
           export PATH="/opt/python/cp312-cp312/bin:$PATH"
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target pestpp_capi
+          cmake --build build
 
-      - name: Stage the library into the package
+      - name: Stage the library and tools into the package
         run: |
           mkdir -p python/pestpp/_binaries
           lib=$(find build -name 'pestpp-api.so' | head -1)
           test -n "$lib" || { echo "::error::pestpp-api.so was not built"; exit 1; }
           cp "$lib" python/pestpp/_binaries/
+          # the command line tools go in too, so `pip install pestpp` puts pestpp-ies and
+          # friends on PATH via the console scripts in pyproject.toml
+          for t in glm ies opt sen swp mou sqp da; do
+            exe=$(find build -type f -name "pestpp-$t" | head -1)
+            test -n "$exe" || { echo "::error::pestpp-$t was not built"; exit 1; }
+            cp "$exe" python/pestpp/_binaries/
+          done
+          ls -l python/pestpp/_binaries/
 
       # auditwheel is the check, not a formality: it inspects what the library actually links
       # against and REFUSES to apply a manylinux tag the binary does not deserve. If the glibc
@@ -114,14 +122,20 @@ jobs:
           else
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           fi
-          cmake --build build --target pestpp_capi
+          cmake --build build
 
-      - name: Stage the library into the package
+      - name: Stage the library and tools into the package
         run: |
           mkdir -p python/pestpp/_binaries
           lib=$(find build -name 'pestpp-api.dylib' -o -name 'pestpp-api.dll' | head -1)
           test -n "$lib" || { echo "::error::the shared library was not built"; exit 1; }
           cp "$lib" python/pestpp/_binaries/
+          for t in glm ies opt sen swp mou sqp da; do
+            exe=$(find build -type f \( -name "pestpp-$t" -o -name "pestpp-$t.exe" \) | head -1)
+            test -n "$exe" || { echo "::error::pestpp-$t was not built"; exit 1; }
+            cp "$exe" python/pestpp/_binaries/
+          done
+          ls -l python/pestpp/_binaries/
 
       - name: Build and tag the wheel
         run: |
@@ -177,6 +191,9 @@ jobs:
           print('api', info['api_version'], '| pestpp', info['pestpp_version'])
           assert info['error'] is None, info['error']
           "
+          # the console scripts are the point of shipping the executables - check one actually
+          # runs from PATH rather than merely existing in the package
+          pestpp-ies --version || pestpp-ies 2>&1 | head -3
 
   # Trusted publishing (OIDC): no api token in secrets. The identity is the repository plus this
   # workflow filename, registered as a publisher on the index side - which is also why a run

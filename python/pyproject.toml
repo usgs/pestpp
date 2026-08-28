@@ -32,6 +32,23 @@ dependencies = ["numpy", "pandas", "pyemu"]
 # cmake, cpack and the docs build use. Nothing here restates it.
 dynamic = ["version"]
 
+# The command line tools. pip writes a stub for each of these into the environment's bin/ (or
+# Scripts/ on windows), so `pip install pestpp` puts pestpp-ies and friends on PATH - which is
+# what people expect and what the wheel did not do at first.
+#
+# They cannot point at the binaries directly: an entry point names a python callable, and these
+# are native executables. pestpp._exe hands over to the real thing - see the notes there about
+# the executable bit and why posix execs rather than spawns.
+[project.scripts]
+pestpp-glm = "pestpp._exe:glm"
+pestpp-ies = "pestpp._exe:ies"
+pestpp-opt = "pestpp._exe:opt"
+pestpp-sen = "pestpp._exe:sen"
+pestpp-swp = "pestpp._exe:swp"
+pestpp-mou = "pestpp._exe:mou"
+pestpp-sqp = "pestpp._exe:sqp"
+pestpp-da  = "pestpp._exe:da"
+
 [project.optional-dependencies]
 notebook = ["ipython"]
 
