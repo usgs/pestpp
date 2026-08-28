@@ -29,10 +29,21 @@ jobs:
   build:
     name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Linux builds INSIDE manylinux, not on the runner. A binary compiled against the runner's
+    # glibc only runs on that glibc or newer, which quietly excludes rhel/rocky 8, debian 11 and
+    # ubuntu 20.04 - a lot of institutional and hpc machines. The image sets the floor at glibc
+    # 2.28, and CMakeLists.txt statically links libstdc++/libgcc on linux so the c++ runtime
+    # stops being a second, separate version dependency.
+    #
+    # container is '' for mac and windows, which github treats as "no container".
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-14, windows-2022]
+        include:
+          - { os: ubuntu-22.04, container: 'quay.io/pypa/manylinux_2_28_x86_64' }
+          - { os: macos-14,     container: '' }
+          - { os: windows-2022, container: '' }
     outputs:
       version: ${{ steps.version.outputs.version }}
     defaults:
@@ -44,6 +55,14 @@ jobs:
       - name: Setup windows compiler
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+
+      # The manylinux image ships several pythons, none of them on PATH, and no system cmake.
+      # Written to GITHUB_PATH so every later step in this job sees them.
+      - name: Setup manylinux toolchain
+        if: matrix.container != ''
+        run: |
+          /opt/python/cp312-cp312/bin/pip install --quiet cmake ninja
+          echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
 
       - name: Read version and ostag
         id: version
@@ -105,6 +124,50 @@ jobs:
           fi
           ls -l pestpp-*.tar.gz pestpp-*.zip 2>/dev/null || true
 
+      # Diagnostic binaries come from the developer-environment workflow, which builds them
+      # for every commit. They are downloaded from that run rather than rebuilt here, so the
+      # release ships exactly the artifacts CI already produced and tested for this sha.
+      #
+      # This makes a release DEPEND on a successful developer-environment run for the same
+      # commit. Dispatching a release on a sha whose ci run was cancelled, skipped, or has aged
+      # out of artifact retention will fail here - deliberately and with a clear message, rather
+      # than quietly publishing without the diagnostic set.
+      - name: Find the developer-environment run for this commit
+        id: devenv
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --workflow ci-devenv.yml --commit "${{ github.sha }}" \
+                     --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+            echo "::error::no successful developer-environment run for ${{ github.sha }} -"
+            echo "::error::the diagnostic binaries are built there. re-run that workflow first."
+            exit 1
+          fi
+          echo "using developer-environment run $run_id"
+          echo "run_id=$run_id" >> $GITHUB_OUTPUT
+
+      - name: Download diagnostic binaries
+        uses: actions/download-artifact@v6
+        with:
+          name: diagnostic-${{ matrix.os }}
+          path: build-debug
+          run-id: ${{ steps.devenv.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      # One flat archive, not the loose .pdb tree. The publish job downloads every artifact with
+      # merge-multiple into dist/ and runs `gh release create ... dist/*`, so anything arriving
+      # as a nested directory would be handed to gh as a directory and not as an asset.
+      - name: Package debug symbols
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p symbols
+          find build -name '*.pdb' -exec cp {} symbols/ \;
+          ls -l symbols
+          cd symbols
+          cmake -E tar cf "../build/pestpp-${{ steps.version.outputs.version }}-win-symbols.zip" \
+            --format=zip .
+
       - name: Upload distribution
         uses: actions/upload-artifact@v6
         with:
@@ -112,6 +175,26 @@ jobs:
           path: |
             build/pestpp-*.tar.gz
             build/pestpp-*.zip
+            build-debug/pestpp-*-debug.tar.gz
+            build-debug/pestpp-*-debug.zip
+          if-no-files-found: error
+
+      # Symbols go out twice on purpose.
+      #
+      # A windows crash dump names a module and an address; the pdb is what turns that into a
+      # file and a line, and it only ever matches the one build that produced it - it cannot be
+      # regenerated later for a binary someone already downloaded.
+      #
+      # This artifact is the convenient copy for a build that is never released. The same zip
+      # also rides into dist/ below and is attached to the release itself, which is the copy
+      # that has to last: github artifacts expire on the repo retention setting, release assets
+      # do not.
+      - name: Upload debug symbols
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: pestpp-${{ steps.version.outputs.version }}-win-symbols
+          path: build/pestpp-*-win-symbols.zip
           if-no-files-found: error
 
   publish:
