@@ -945,6 +945,22 @@ PESTPP_API pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_
    specific ones. Pass max_n=0 with NULL arrays to learn the count first, then size and refill.
    Each out array may be NULL if that column is not wanted. `statuses` holds pestpp_run_status.
    `host` names are packed PESTPP_NAME_LEN-wide, like the ensemble name buffers. */
+/* Run failures per HOST, summed across every agent on that host.
+
+   Several agents normally share a machine, so a host that is quietly eating runs - bad node,
+   full disk, a model executable that is not where it should be - shows up as scattered single
+   failures across several agents until they are added together. This adds them together.
+
+   Two parallel arrays, sorted by host name so repeated calls line up. hosts is packed
+   PESTPP_NAME_LEN wide; counts[i] belongs to the host at hosts[i * PESTPP_NAME_LEN].
+
+   Pass hosts=NULL and counts=NULL to learn *n_out and touch nothing. Empty until something
+   fails, which is PESTPP_OK and not an error.
+
+   PANTHER only - the serial and external managers have no hosts to attribute a failure to. */
+PESTPP_API pestpp_status pestpp_get_host_failures(pestpp_handle h, char* hosts, int* counts,
+                                                  int max_n, int* n_out);
+
 PESTPP_API pestpp_status pestpp_get_run_states(pestpp_handle h,
                                                const int* want_ids, int n_want,
                                                int* run_ids, int* statuses, double* elapsed_sec,

@@ -2144,6 +2144,83 @@ def capi_service_runs_failure_test():
                 oe.shape[0], count)
 
 
+def capi_host_failure_count_test():
+    """Failures are tallied per HOST, not per agent, and the running total reaches the rmr.
+
+    Several agents normally share a machine, so a host that is eating every run looks like a
+    handful of unrelated agent failures until they are added up. Three agents on localhost here,
+    a model that always fails, so every failure has to land on the one host entry.
+    """
+    wd = _setup("capi_hostfail", noptmax=1, num_reals=6)
+    # a model that fails every time, the same trick basic_tests uses to force run failures
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.model_command = ['python -c "raise Exception(\'intentional\')"']
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+
+    worker_root = os.path.join(_BENCH, "capi_hostfail_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+    n_workers = 3
+    procs = []
+    agent_exe = _find_agent_exe()
+    # a port of its own - the module-level one belongs to the other panther tests, and two
+    # masters bound to the same port in one run is a confusing way to fail
+    hf_port = port + 7
+
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=hf_port) as ies:
+            for i in range(n_workers):
+                d = os.path.join(worker_root, "worker_{0}".format(i))
+                shutil.copytree(wd, d)
+                log = open(os.path.join(d, "worker.log"), "w")
+                procs.append(subprocess.Popen(
+                    [agent_exe, "pest.pst", "/h", "localhost:{0}".format(hf_port)],
+                    cwd=d, stdout=log, stderr=subprocess.STDOUT))
+
+            # nothing has failed yet, so the container must be empty rather than absent
+            assert ies.get_host_failures() == {}, ies.get_host_failures()
+
+            ies.initialize_prepare()
+            ies.queue_runs()
+            ies.begin_batch()
+            for _ in range(600):
+                if ies.run_slice(0.1):
+                    break
+            ies.end_batch()
+            nfail = ies.process_runs()
+
+            hf = ies.get_host_failures()
+            print("host failures:", hf, "reported failures:", nfail)
+            assert len(hf) == 1, \
+                "three agents on one machine must roll up to ONE host: {0}".format(hf)
+            host, count = next(iter(hf.items()))
+            assert count > 0, hf
+            # every agent is on this machine, so the host total accounts for all of them - it
+            # must not look like a per-agent count
+            assert count >= n_workers, \
+                "host total {0} looks per-agent, not per-host ({1} agents)".format(count, n_workers)
+    finally:
+        for p_ in procs:
+            try:
+                p_.kill()
+            except Exception:
+                pass
+
+    # and the running total is in the record file, climbing as failures accumulate
+    rmr = os.path.join(wd, "pest.rmr")
+    counts = []
+    with open(rmr, "r") as f:
+        for line in f:
+            if "on this host so far" in line:
+                counts.append(int(line.split("-")[-1].strip().split()[0]))
+    assert counts, "no per-host failure lines in the rmr"
+    assert counts == sorted(counts), "the running total should never go backwards: {0}".format(counts)
+    assert counts[0] == 1, "the first failure on a host should report 1: {0}".format(counts[:3])
+    assert "1 failure " in open(rmr).read(), "singular/plural: the first should read '1 failure'"
+    print("rmr per-host totals:", counts[:6], "...", counts[-1] if counts else None)
+
+
 if __name__ == "__main__":
     capi_smoke_test()
     capi_snapshot_roundtrip_test()
@@ -2182,4 +2259,5 @@ if __name__ == "__main__":
     capi_stp_file_commands_test()
     capi_service_runs_yourself_test()
     capi_service_runs_failure_test()
+    capi_host_failure_count_test()
     print("all capi tests passed")

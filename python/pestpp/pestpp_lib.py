@@ -1572,6 +1572,24 @@ class PestppLib:
         arr = np.ctypeslib.as_array(data, shape=(nr * nc,)).reshape((nr, nc), order="F").copy()
         return arr, self._unpack_names(rows.raw, nr), self._unpack_names(cols.raw, nc)
 
+    def get_host_failures(self) -> dict:
+        """Run failures per host, summed across every agent on that host. PANTHER only.
+
+        Empty until something fails. Several agents normally share a machine, so a host that is
+        quietly eating runs shows up as scattered single agent failures until they are added
+        together - which is what this does.
+        """
+        n = c_int()
+        self._check(self.lib.pestpp_get_host_failures(self.handle, None, None, 0, byref(n)),
+                    "pestpp_get_host_failures")
+        if n.value == 0:
+            return {}
+        hosts = create_string_buffer(n.value * self.name_len)
+        counts = (c_int * n.value)()
+        self._check(self.lib.pestpp_get_host_failures(
+            self.handle, hosts, counts, n.value, byref(n)), "pestpp_get_host_failures")
+        return dict(zip(self._unpack_names(hosts.raw, n.value), list(counts)))
+
     def get_obs_groups(self) -> list:
         """The group each observation belongs to, aligned with the obs ensemble columns."""
         n = c_int()

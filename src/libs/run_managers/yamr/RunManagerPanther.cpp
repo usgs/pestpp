@@ -3021,6 +3021,20 @@ void RunManagerPanther::kill_all_active_runs()
 	 list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(socket_fd);
 	 agent_info_iter->add_failed_run();
 	 agent_info_iter->add_failed_run_id(run_id);
+
+	 // Tally by HOST, not by agent. Counted HERE because this is the one funnel every failure
+	 // path goes through - the RUN_FAILED packet, the overdue kill, and kill_runs() all end up
+	 // in this function, so nothing has to be remembered at each of those sites.
+	 //
+	 // Reported on every failure so the record file shows the running total at the moment it
+	 // happened. A host quietly eating runs - bad node, full disk, missing model exe - reads as
+	 // scattered single failures across several agents until they are added together.
+	 const string host = agent_info_iter->get_hostname();
+	 int n_host_fails = ++host_failure_count[host];
+	 stringstream hss;
+	 hss << "run_id:" << run_id << " failed on host:" << host << " - " << n_host_fails
+	     << (n_host_fails == 1 ? " failure" : " failures") << " on this host so far";
+	 report(hss.str(), false);
  }
 
 /**

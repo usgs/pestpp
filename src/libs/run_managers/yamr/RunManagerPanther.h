@@ -296,6 +296,11 @@ private:
 	multimap<int, list<AgentInfoRec>::iterator> active_runid_to_iterset_map;
 	std::deque<int> waiting_runs;
 	std::unordered_multimap<int, int> failure_map;
+	/// Run failures per HOST, summed across every agent on it. Several agents normally share a
+	/// machine, so a host that is failing everything looks like a handful of unrelated agent
+	/// failures until they are added up - which is the point of counting by hostname rather
+	/// than by agent or socket. Keyed by AgentInfoRec::get_hostname().
+	std::unordered_map<std::string, int> host_failure_count;
 	std::set<int> user_cancelled_runs;   ///< runs a caller gave up on; never rescheduled
 	std::set<int> timed_out_runs;        ///< runs killed for running past the overdue threshold
 	std::chrono::system_clock::time_point batch_start_time;
@@ -409,6 +414,14 @@ private:
 	bool ping(int i_sock);
 	bool ping(pest_utils::thread_flag* terminate = nullptr);
 	void report(std::string message,bool to_cout);
+
+public:
+	/// Run failures per host, summed across every agent on that host. Empty until something
+	/// fails. PANTHER only - the serial and external managers have no hosts to attribute to.
+	const std::unordered_map<std::string, int>& get_host_failure_count() const
+	{ return host_failure_count; }
+
+private:
 	
 	/*string get_time_string();
 	string get_time_string_short();*/

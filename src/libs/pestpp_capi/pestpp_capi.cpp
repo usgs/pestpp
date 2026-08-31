@@ -2547,6 +2547,33 @@ pestpp_status pestpp_get_run_time_stats(pestpp_handle h, double* avg_run_sec,
     CAPI_END()
 }
 
+pestpp_status pestpp_get_host_failures(pestpp_handle h, char* hosts, int* counts,
+                                       int max_n, int* n_out)
+{
+    CAPI_BEGIN_OBSERVER_SAFE(h)
+        const auto& hf = panther(s)->get_host_failure_count();
+        int n = (int)hf.size();
+        if (n_out != nullptr) *n_out = n;
+        // size-only call: report the count and touch nothing
+        if ((hosts == nullptr) && (counts == nullptr))
+            return PESTPP_OK;
+        if (max_n < n)
+            too_small("host failure buffers too small; call with both pointers NULL to size "
+                      "them first");
+        // the map is unordered, so sort by name - an unstable order across calls would make
+        // the two parallel arrays impossible to line up with anything the caller kept
+        vector<pair<string,int>> sorted(hf.begin(), hf.end());
+        sort(sorted.begin(), sorted.end(),
+             [](const pair<string,int>& a, const pair<string,int>& b){ return a.first < b.first; });
+        for (int i = 0; i < n; i++)
+        {
+            if (hosts  != nullptr) pack_one_name(sorted[i].first, hosts + (i * PESTPP_NAME_LEN));
+            if (counts != nullptr) counts[i] = sorted[i].second;
+        }
+        return PESTPP_OK;
+    CAPI_END()
+}
+
 pestpp_status pestpp_get_run_states(pestpp_handle h, const int* want_ids, int n_want,
                                     int* run_ids, int* statuses, double* elapsed_sec,
                                     int* n_failures, char* hosts, int max_n, int* n_out)
