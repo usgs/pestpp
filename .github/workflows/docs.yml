@@ -51,19 +51,63 @@ jobs:
           mkdir -p docs/media
           cp -r documentation/media/. docs/media/
 
-      # NO -W for now, deliberately. The build currently carries 96 pre-existing warnings: 88
-      # duplicate C++ declarations, because the api pages document both foo.cpp and foo.h for
-      # the same entities so breathe emits everything twice, and 6 template signatures in
-      # utilities.h that sphinx's C++ parser cannot read. None of that is new - rtd has been
-      # publishing through it with fail_on_warning: false - but turning warnings into errors
-      # today would just make this job red on arrival and get it ignored.
+      # Not -W, because these classes of warning cannot be fixed and cannot be silenced.
+      # Instead every OTHER warning is an error, which is the gate -W was wanted for.
       #
-      # So this catches a build that FAILS, which is still worth having: a missing doxygen
-      # input, a broken include, a media directory that moved. Once the 88 duplicates are
-      # cleaned up (document the header, not the header AND the implementation - see
-      # docs/api/capi.rst), put -W --keep-going back and it becomes a real gate.
+      # Counts below are from a tracked-files-only tree built with what this job installs -
+      # apt doxygen 1.9.8 on ubuntu-24.04, and sphinx 9.1 / breathe 4.36 / myst 5.1 from the
+      # unpinned docs/requirements.txt. 98 warnings, all four classes, nothing else.
+      #
+      # The exempt classes:
+      #
+      #   Duplicate C++ declaration (90) - breathe emits an entity from both the header that
+      #   declares it and the .cpp that defines it. Documenting only one file does not fix it,
+      #   it just loses documentation: dropping the .cpp costs 108 pest_utils free functions
+      #   (check_exist_in, read_binary, tokenize ...), because doxygen files a free function
+      #   under its definition and the header never emits it; dropping the .h costs 4427
+      #   entities, nearly everything, because that is where the classes live. Measured both
+      #   ways. sphinx logs this one with no `type=`, so suppress_warnings cannot reach it.
+      #
+      #   Invalid C++ declaration (6), and one "Parsing of expression failed, using fallback
+      #   parser" - `friend`, two template signatures and a lambda used as a default value,
+      #   none of which sphinx's own C++ parser will read. The code is valid; the parser is
+      #   the limit, and it degrades to a fallback rather than losing the entity.
+      #
+      #   Duplicate explicit target name (1) - "namespacepest__utils", for the same reason:
+      #   the namespace gets a link target from both files that contribute to it. `:no-link:`
+      #   on one of them silences it and takes 54 entities with it.
+      #
+      #   Error in type declaration, capi.rst only (0 today) - the observer callback typedef.
+      #   doxygen 1.9.8 does not emit this; 1.18 renders `typedef int (*pestpp_run_observer_fn)
+      #   (...)` back out as `int(*) pestpp_run_observer_fn (...)`, which the C++ parser will
+      #   not take. Exempted ahead of the day apt moves to a newer doxygen, so that upgrade
+      #   does not turn this job red on its own. The real fix is breathe parsing that header
+      #   in the C domain, which cannot be scoped to one file - breathe_domain_by_extension
+      #   keys off the extension and every C++ header here is also .h. Pinned to capi.rst so
+      #   a type error anywhere else still fails.
+      #
+      # Anything else - a missing doxygen input, a broken include, a document not in any
+      # toctree, a dead reference - fails the job. Verified in both directions: clean on a
+      # tracked-files-only tree, and it does catch an undefined label injected on purpose.
       - name: Sphinx build
-        run: sphinx-build -b html docs docs/_build/html
+        run: |
+          set -o pipefail
+          sphinx-build -b html docs docs/_build/html 2>&1 | tee sphinx.log
+
+          # these warnings are two lines; the continuation carries no WARNING: so only the
+          # first line is ever counted
+          unexpected=$(grep 'WARNING:' sphinx.log \
+                       | grep -v 'Duplicate C++ declaration' \
+                       | grep -v 'Invalid C++ declaration' \
+                       | grep -v 'Parsing of expression failed' \
+                       | grep -v 'Duplicate explicit target name: "namespacepest__utils"' \
+                       | grep -v 'capi\.rst:[0-9]*: WARNING: Error in type declaration' || true)
+          if [[ -n "$unexpected" ]]; then
+            echo "::error::sphinx reported warnings that are not the known breathe/parser noise"
+            echo "$unexpected"
+            exit 1
+          fi
+          echo "no unexpected warnings"
 
       # Handy when the build fails on something layout-related and the log is not enough.
       - name: Upload rendered html

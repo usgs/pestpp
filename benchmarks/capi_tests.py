@@ -2257,6 +2257,16 @@ def capi_host_quarantine_test():
     print("second host will dial", lan_addr)
 
     good_wd = _setup("capi_quar", noptmax=1, num_reals=12)
+
+    # the allowance has to come down for this arrangement to trip at all. a host is screened out
+    # when its failures pass its fair share plus the allowance, and with 2 of the 4 agents on the
+    # bad machine its fair share is half of every failure. at the default of 3 the bad machine
+    # would need 7 failures out of 6 runs, which cannot happen - the test would sit there looking
+    # like the feature was broken. at 1 it trips once the bad machine is 2 clear of its share.
+    _pst = pyemu.Pst(os.path.join(good_wd, "pest.pst"))
+    _pst.pestpp_options["panther_agent_max_failed_run_delta"] = 1
+    _pst.write(os.path.join(good_wd, "pest.pst"), version=2)
+
     worker_root = os.path.join(_BENCH, "capi_quar_workers")
     if os.path.exists(worker_root):
         shutil.rmtree(worker_root)
@@ -2303,30 +2313,45 @@ def capi_host_quarantine_test():
             except Exception:
                 pass
 
+    rmr = open(os.path.join(good_wd, "pest.rmr")).read()
+
     # ASSERT rather than skip. This used to return quietly when the two addresses collapsed to
     # one host name, which made the test report ok whether or not it had checked anything - the
     # exact shape that lets a feature rot untested. On linux 127.0.0.2 has no PTR record, so
     # getnameinfo falls back to the numeric string and the two must come back distinct. If that
     # ever stops being true the test says so instead of passing silently.
-    assert len(hf) >= 2, (
-        "expected two distinct host keys from 127.0.0.1 and {0}, got {1} - without two hosts "
-        "the quarantine check does not apply and this test proves nothing".format(lan_addr, hf))
+    #
+    # The connection lines are what proves it, not the failure counts: the healthy machine never
+    # fails, so it is never in the failure counts at all. Asserting on those was checking
+    # something that cannot happen - it wanted two machines in a list that only records the ones
+    # that fail.
+    seen_hosts = set()
+    for line in rmr.splitlines():
+        if "new connection from:" in line:
+            seen_hosts.add(line.split("new connection from:")[1].rsplit(":", 1)[0])
+    assert len(seen_hosts) >= 2, (
+        "expected two distinct hosts from 127.0.0.1 and {0}, saw {1} - without two hosts the "
+        "quarantine check does not apply and this test proves nothing".format(lan_addr, seen_hosts))
 
-    rmr = open(os.path.join(good_wd, "pest.rmr")).read()
     assert "quarantined -" in rmr, "no host was quarantined:\n" + rmr[-2000:]
     assert "moved to QUARANTINED" in rmr, "agents were not moved out of service"
     assert "run(s) requeued" in rmr, "failed runs were not requeued"
     assert "host(s) quarantined for excess run failures" in rmr, "no end-of-batch summary"
 
-    # the quarantined host must be the one that was failing, not the healthy one
+    # the failing machine is the only one that should have failures against it, and it is the
+    # one that should have been taken out of service
+    assert hf, "no run failures were counted against any host at all"
     bad = max(hf, key=lambda k: hf[k])
-    good = min(hf, key=lambda k: hf[k])
+    healthy = seen_hosts - {bad}
+    assert healthy, "could not tell the two hosts apart: failures {0}, connected {1}".format(
+        hf, seen_hosts)
     for line in rmr.splitlines():
         if "quarantined -" in line:
             assert bad in line, "the WRONG host was quarantined: {0} (failures {1})".format(line, hf)
-            assert good not in line.split("quarantined")[0], \
-                "the healthy host was quarantined: {0}".format(line)
-    print("quarantined the failing host:", bad, "| healthy:", good, hf)
+            for h in healthy:
+                assert h not in line.split("quarantined")[0], \
+                    "the healthy host was quarantined: {0}".format(line)
+    print("quarantined the failing host:", bad, "| healthy:", sorted(healthy), hf)
 
 
 def capi_host_quarantine_disabled_test():

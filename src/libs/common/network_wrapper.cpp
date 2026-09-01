@@ -141,16 +141,43 @@ std::pair<int,std::string> w_getaddrinfo(const char *node, const char *service,
  */
 vector<string> w_getnameinfo_vec(int sockfd, int flags)
 {
-	int err;
-	vector<string> name_info;
 	char host[INET6_ADDRSTRLEN];
 	char port[INET6_ADDRSTRLEN];
 	struct sockaddr_storage addr;
 	socklen_t addr_len = sizeof addr;
-	err = getpeername(sockfd, (struct sockaddr*) &addr, &addr_len);
-	err = getnameinfo((struct sockaddr*) &addr, addr_len, host, sizeof host, port, sizeof port, flags);
-	name_info.push_back(host);
-	name_info.push_back(port);
+
+	// both calls below can fail, and when they do they leave host and port alone. these used
+	// to be read no matter what, which handed back whatever bytes were already sitting in this
+	// scratch space - that junk then got stored as a machine name, counted against that
+	// machine, and passed out through the api, where it is not even readable as text.
+	host[0] = '\0';
+	port[0] = '\0';
+
+	if (getpeername(sockfd, (struct sockaddr*) &addr, &addr_len) == 0)
+	{
+		if (getnameinfo((struct sockaddr*) &addr, addr_len, host, sizeof host,
+			port, sizeof port, flags) != 0)
+		{
+			// there is an address but no name for it - the lookup failed or timed out, which
+			// is normal for a private address on a machine with no reverse dns for it. the
+			// numeric address is a fine label and is always available.
+			host[0] = '\0';
+			port[0] = '\0';
+			if (getnameinfo((struct sockaddr*) &addr, addr_len, host, sizeof host,
+				port, sizeof port, NI_NUMERICHOST | NI_NUMERICSERV) != 0)
+			{
+				host[0] = '\0';
+				port[0] = '\0';
+			}
+		}
+	}
+
+	vector<string> name_info;
+	// last resort, when there is not even an address to work with. tied to the socket so that
+	// two agents in this state stay separate: sharing one name would add their failures
+	// together as if they came from one machine, and could quarantine a machine that was fine.
+	name_info.push_back(host[0] != '\0' ? string(host) : "unknown-host-" + to_string(sockfd));
+	name_info.push_back(port[0] != '\0' ? string(port) : "unknown-port");
 	return name_info;
 }
 

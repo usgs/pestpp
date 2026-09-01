@@ -1518,6 +1518,12 @@ pestpp_status pestpp_create(const pestpp_create_options* opts, pestpp_handle* ou
                 opt.get_panther_echo_interval_milliseconds(),
                 opt.get_panther_persistent_workers(),
                 opt.get_panther_ping_interval_secs()));
+            // not a constructor argument, so it needs the setter - the same call all seven
+            // executables make. without it the option is read and reported but never reaches
+            // the run manager, which then screens on its own default no matter what the control
+            // file says, and the 0 that is meant to switch screening off does nothing.
+            dynamic_cast<RunManagerPanther*>(s->run_manager.get())->set_max_failed_run_delta(
+                opt.get_panther_agent_max_failed_run_delta());
             break;
 
         case PESTPP_RM_EXTERNAL:
