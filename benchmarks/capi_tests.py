@@ -15,6 +15,7 @@ import os
 import re
 import platform
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -2224,18 +2225,36 @@ def capi_host_failure_count_test():
 def capi_host_quarantine_test():
     """A host that fails far more than its share is quarantined and its runs re-queued.
 
-    Two "hosts" out of one machine: agents that dial 127.0.0.1 and agents that dial 127.0.0.2
-    arrive with different peer addresses, so getnameinfo gives the master two distinct host
-    names - it falls back to the numeric form when there is no PTR record, so no NI_NUMERICHOST
-    and no test-only code path is needed. Linux binds all of 127/8 to lo; macos binds only .1,
-    which is why this is linux-only.
+    Two "hosts" out of one machine: the master binds 0.0.0.0, so one group of agents dials
+    127.0.0.1 and the other dials this machine's primary NON-loopback address. They arrive with
+    different peer addresses, and getnameinfo gives the master two distinct host names.
+
+    A second LOOPBACK address does not work, which is what this test originally tried. Ubuntu
+    resolves the whole 127.0.0.0/8 block to "localhost" through systemd's nss-myhostname, so
+    127.0.0.1 and 127.0.0.2 collapse to one host key and the quarantine check - which needs more
+    than one host - never applies. A non-loopback address is not given that treatment.
+
+    No production change is needed for any of this: the master already accepts either address,
+    and the host name it derives is whatever getnameinfo returns.
 
     The two groups get DIFFERENT pest.pst files - an agent runs the model command from its own
     working directory - so one group fails everything and the other works normally.
     """
     if platform.system() != "Linux":
-        print("skipping host quarantine test: needs 127.0.0.2, which only linux binds by default")
+        print("skipping host quarantine test: only exercised on linux for now")
         return
+
+    # the address the OS would use to reach the outside world. no packets are sent and no dns is
+    # consulted - connect() on a udp socket just fixes the local end so getsockname can be read
+    _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        _s.connect(("8.8.8.8", 80))
+        lan_addr = _s.getsockname()[0]
+    finally:
+        _s.close()
+    assert not lan_addr.startswith("127."), \
+        "no non-loopback address found ({0}) - the two-host arrangement needs one".format(lan_addr)
+    print("second host will dial", lan_addr)
 
     good_wd = _setup("capi_quar", noptmax=1, num_reals=12)
     worker_root = os.path.join(_BENCH, "capi_quar_workers")
@@ -2265,7 +2284,7 @@ def capi_host_quarantine_test():
             for i in range(n_good):
                 procs.append(_worker(i, "127.0.0.1", fail=False))
             for i in range(n_bad):
-                procs.append(_worker(100 + i, "127.0.0.2", fail=True))
+                procs.append(_worker(100 + i, lan_addr, fail=True))
 
             ies.initialize_prepare()
             ies.queue_runs()
@@ -2290,8 +2309,8 @@ def capi_host_quarantine_test():
     # getnameinfo falls back to the numeric string and the two must come back distinct. If that
     # ever stops being true the test says so instead of passing silently.
     assert len(hf) >= 2, (
-        "expected two distinct host keys from 127.0.0.1 and 127.0.0.2, got {0} - without two "
-        "hosts the quarantine check does not apply and this test proves nothing".format(hf))
+        "expected two distinct host keys from 127.0.0.1 and {0}, got {1} - without two hosts "
+        "the quarantine check does not apply and this test proves nothing".format(lan_addr, hf))
 
     rmr = open(os.path.join(good_wd, "pest.rmr")).read()
     assert "quarantined -" in rmr, "no host was quarantined:\n" + rmr[-2000:]
