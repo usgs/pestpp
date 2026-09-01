@@ -2154,8 +2154,22 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::READY)
 	{
-		// ready message received from agent
-		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
+		// ready message received from agent. an agent on a quarantined host keeps saying it is
+		// ready, and taking it at its word here is what undid the quarantine - back to WAITING,
+		// picks up more runs, fails them, and the host gets screened out all over again. one
+		// batch quarantined the same host three times over two agents.
+		//
+		// checked against the host rather than the agent's own state on purpose: a run finishing
+		// or being killed sets that state to COMPLETE or KILLED first, so a check for QUARANTINED
+		// would miss it. quarantined_hosts is keyed by host and is never cleared, so it holds.
+		//
+		// this only decides what the agent is allowed to do NEXT. anything it already finished
+		// was stored when the result arrived, and results are taken from any agent regardless of
+		// its state - a run that succeeded on a bad host is still a good run.
+		if (quarantined_hosts.find(agent_info_iter->get_hostname()) == quarantined_hosts.end())
+			agent_info_iter->set_state(AgentInfoRec::State::WAITING);
+		else
+			agent_info_iter->set_state(AgentInfoRec::State::QUARANTINED);
 		// an agent that can answer REQ_PARTIAL says so here. An older one never does, and
 		// that is what keeps us from sending it a message its in-run loop would treat as
 		// corrupt and kill the run over.
