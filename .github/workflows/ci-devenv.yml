@@ -33,7 +33,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - uses: prefix-dev/setup-pixi@v0.9.3
+      - uses: prefix-dev/setup-pixi@v0.10.2
         with:
           pixi-version: v0.58.0
           manifest-path: "pixi.toml"
