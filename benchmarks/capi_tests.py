@@ -2284,11 +2284,14 @@ def capi_host_quarantine_test():
             except Exception:
                 pass
 
-    # if the environment collapsed both addresses to one name there is nothing to compare, and
-    # the feature is not applicable - say so rather than fail on something the test cannot control
-    if len(hf) < 2:
-        print("skipping quarantine assertions: the two loopback addresses resolved to one host", hf)
-        return
+    # ASSERT rather than skip. This used to return quietly when the two addresses collapsed to
+    # one host name, which made the test report ok whether or not it had checked anything - the
+    # exact shape that lets a feature rot untested. On linux 127.0.0.2 has no PTR record, so
+    # getnameinfo falls back to the numeric string and the two must come back distinct. If that
+    # ever stops being true the test says so instead of passing silently.
+    assert len(hf) >= 2, (
+        "expected two distinct host keys from 127.0.0.1 and 127.0.0.2, got {0} - without two "
+        "hosts the quarantine check does not apply and this test proves nothing".format(hf))
 
     rmr = open(os.path.join(good_wd, "pest.rmr")).read()
     assert "quarantined -" in rmr, "no host was quarantined:\n" + rmr[-2000:]
