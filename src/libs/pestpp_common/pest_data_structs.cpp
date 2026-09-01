@@ -1395,6 +1395,12 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, panther_agent_no_ping_timeout_secs);
 		return true;
 	}
+
+	if (key == "PANTHER_AGENT_MAX_FAILED_RUN_DELTA")
+	{
+		convert_ip(value, panther_agent_max_failed_run_delta);
+		return true;
+	}
 	else if (key == "ADDITIONAL_INS_DELIMITERS")
 	{
 		convert_ip(value, additional_ins_delimiters);
@@ -2568,6 +2574,7 @@ void PestppOptions::set_defaults_legacy()
 	set_panther_worker_status_file("");
 	set_reg_use_achievable_target(true);
 	set_panther_agent_no_ping_timeout_secs(-1);
+	set_panther_agent_max_failed_run_delta(3);
 	set_panther_debug_loop(false);
 	set_debug_check_par_en_consistency(false);
 	set_panther_debug_fail_freeze(false);

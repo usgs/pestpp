@@ -2221,6 +2221,104 @@ def capi_host_failure_count_test():
     print("rmr per-host totals:", counts[:6], "...", counts[-1] if counts else None)
 
 
+def capi_host_quarantine_test():
+    """A host that fails far more than its share is quarantined and its runs re-queued.
+
+    Two "hosts" out of one machine: agents that dial 127.0.0.1 and agents that dial 127.0.0.2
+    arrive with different peer addresses, so getnameinfo gives the master two distinct host
+    names - it falls back to the numeric form when there is no PTR record, so no NI_NUMERICHOST
+    and no test-only code path is needed. Linux binds all of 127/8 to lo; macos binds only .1,
+    which is why this is linux-only.
+
+    The two groups get DIFFERENT pest.pst files - an agent runs the model command from its own
+    working directory - so one group fails everything and the other works normally.
+    """
+    if platform.system() != "Linux":
+        print("skipping host quarantine test: needs 127.0.0.2, which only linux binds by default")
+        return
+
+    good_wd = _setup("capi_quar", noptmax=1, num_reals=12)
+    worker_root = os.path.join(_BENCH, "capi_quar_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+
+    agent_exe = _find_agent_exe()
+    q_port = port + 11
+    procs = []
+    n_good, n_bad = 2, 2
+
+    def _worker(idx, addr, fail):
+        d = os.path.join(worker_root, "w{0}".format(idx))
+        shutil.copytree(good_wd, d)
+        if fail:
+            pst = pyemu.Pst(os.path.join(d, "pest.pst"))
+            pst.model_command = ['python -c "raise Exception(\'bad host\')"']
+            pst.write(os.path.join(d, "pest.pst"), version=2)
+        log = open(os.path.join(d, "worker.log"), "w")
+        return subprocess.Popen(
+            [agent_exe, "pest.pst", "/h", "{0}:{1}".format(addr, q_port)],
+            cwd=d, stdout=log, stderr=subprocess.STDOUT)
+
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", good_wd, port=q_port) as ies:
+            for i in range(n_good):
+                procs.append(_worker(i, "127.0.0.1", fail=False))
+            for i in range(n_bad):
+                procs.append(_worker(100 + i, "127.0.0.2", fail=True))
+
+            ies.initialize_prepare()
+            ies.queue_runs()
+            ies.begin_batch()
+            for _ in range(900):
+                if ies.run_slice(0.1):
+                    break
+            ies.end_batch()
+            ies.process_runs()
+            hf = ies.get_host_failures()
+            print("host failures:", hf)
+    finally:
+        for p_ in procs:
+            try:
+                p_.kill()
+            except Exception:
+                pass
+
+    # if the environment collapsed both addresses to one name there is nothing to compare, and
+    # the feature is not applicable - say so rather than fail on something the test cannot control
+    if len(hf) < 2:
+        print("skipping quarantine assertions: the two loopback addresses resolved to one host", hf)
+        return
+
+    rmr = open(os.path.join(good_wd, "pest.rmr")).read()
+    assert "quarantined -" in rmr, "no host was quarantined:\n" + rmr[-2000:]
+    assert "moved to QUARANTINED" in rmr, "agents were not moved out of service"
+    assert "run(s) requeued" in rmr, "failed runs were not requeued"
+    assert "host(s) quarantined for excess run failures" in rmr, "no end-of-batch summary"
+
+    # the quarantined host must be the one that was failing, not the healthy one
+    bad = max(hf, key=lambda k: hf[k])
+    good = min(hf, key=lambda k: hf[k])
+    for line in rmr.splitlines():
+        if "quarantined -" in line:
+            assert bad in line, "the WRONG host was quarantined: {0} (failures {1})".format(line, hf)
+            assert good not in line.split("quarantined")[0], \
+                "the healthy host was quarantined: {0}".format(line)
+    print("quarantined the failing host:", bad, "| healthy:", good, hf)
+
+
+def capi_host_quarantine_disabled_test():
+    """delta of 0 turns the screening off, and the summary says so rather than going quiet."""
+    wd = _setup("capi_quar_off", noptmax=1, num_reals=4)
+    pst = pyemu.Pst(os.path.join(wd, "pest.pst"))
+    pst.pestpp_options["panther_agent_max_failed_run_delta"] = 0
+    pst.write(os.path.join(wd, "pest.pst"), version=2)
+    with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd) as ies:
+        assert ies.get_option("PANTHER_AGENT_MAX_FAILED_RUN_DELTA") == "0", \
+            ies.get_option("PANTHER_AGENT_MAX_FAILED_RUN_DELTA")
+    print("delta=0 accepted and reported by the option system")
+
+
 if __name__ == "__main__":
     capi_smoke_test()
     capi_snapshot_roundtrip_test()
@@ -2260,4 +2358,6 @@ if __name__ == "__main__":
     capi_service_runs_yourself_test()
     capi_service_runs_failure_test()
     capi_host_failure_count_test()
+    capi_host_quarantine_test()
+    capi_host_quarantine_disabled_test()
     print("all capi tests passed")

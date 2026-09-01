@@ -195,6 +195,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             - [5.3.5.20 request_partial_obs_interval()](#s9-3-5-20)
             - [5.3.5.21 panther_worker_partial_obs_command()](#s9-3-5-21)
             - [5.3.5.22 panther_worker_status_file()](#s9-3-5-22)
+            - [5.3.5.23 panther_agent_max_failed_run_delta()](#s9-3-5-23)
     - [5.4 Run Book-Keeping Files](#s9-4)
         - [5.4.1 Failed Run Storage File](#s9-4-1)
         - [5.4.2 All Runs Storage File](#s9-4-2)
@@ -2643,6 +2644,30 @@ A command that an agent runs in its own working directory before it reads model 
 #### <a id='s9-3-5-22' />5.3.5.22 panther_worker_status_file()
 
 The name of a file in an agent's working directory. The last few characters of this file are sent to the manager with each partial reply, so that a model's own progress reporting can be seen at the manager. If no value is supplied, no status text is sent. Only used when preemption is active.
+
+#### <a id='s9-3-5-23' />5.3.5.23 panther_agent_max_failed_run_delta()
+
+When several agents run on more than one machine, a single bad host - a failing disk, a missing model executable, a misconfigured environment - can consume a large share of a run batch. Each of its agents accepts work, fails it, and accepts more. Because the failures are spread across several agents, they can look like unrelated one-off problems rather than one machine at fault.
+
+PEST++ keeps a count of failed runs per host, summed across every agent on that host, and compares each host against the share of failures its size would lead you to expect:
+
+> expected failures = (total failures) &times; (agents on host) &divide; (total agents)
+
+A host is judged an outlier when its failures exceed that expected share by more than `panther_agent_max_failed_run_delta`. Scaling by agent count matters: a machine running eight agents does roughly eight times the work of one running a single agent, and should be expected to produce roughly eight times the failures. Comparing raw counts would penalise the largest machine simply for being the busiest.
+
+The comparison also means that a problem affecting all hosts equally - a model that fails for everyone, or badly chosen parameter bounds - does not trigger it. Every host then sits at its expected share and none is an outlier. Only a *concentration* of failures on one machine is flagged.
+
+When a host is judged an outlier, PEST++ does the following, and reports each step to the run management record file:
+
+- every agent on that host is moved to the QUARANTINED state. The agents remain connected and continue to respond, but are given no further runs. They are not disconnected: an agent that is disconnected simply reconnects and takes more work, and a closed connection reads like a network fault rather than a decision PEST++ made.
+- runs that failed on that host, together with any run active on it at the time, are returned to the waiting queue.
+- the failures recorded against those runs are forgiven, so that they are not counted towards `max_run_fail`. The runs failed because of where they were sent, not because of anything about the runs themselves.
+
+A summary of quarantined hosts is written to the run management record file at the end of each set of runs, listing each host with its failure count, the expected share it exceeded, the number of agents removed, and the number of runs returned to the queue. A line is written when no host has been quarantined, so that its absence is not mistaken for the check not having run.
+
+The check applies only when agents are connected from more than one host, since a single host has nothing to be compared against. This is re-evaluated continually, so the check begins to apply as soon as a second host connects. PEST++ will not quarantine the last host still in service, as this would leave no agents to complete the batch.
+
+The default value is 3. A value of 0 disables the check entirely.
 
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 

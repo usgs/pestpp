@@ -811,6 +811,8 @@ public:
     string get_panther_worker_status_file() const { return panther_worker_status_file; }
     void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
     int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
+    void set_panther_agent_max_failed_run_delta(int _d) { panther_agent_max_failed_run_delta = _d; }
+    int get_panther_agent_max_failed_run_delta() const { return panther_agent_max_failed_run_delta; }
     void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
     bool get_panther_debug_loop() const { return panther_debug_loop; }
     void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
@@ -1114,6 +1116,7 @@ private:
 	string panther_worker_partial_obs_command;
 	string panther_worker_status_file;
 	int panther_agent_no_ping_timeout_secs;
+	int panther_agent_max_failed_run_delta;
 	bool panther_debug_loop;
 	bool debug_check_paren_consistency;		
 	bool panther_debug_fail_freeze;

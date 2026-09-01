@@ -34,7 +34,11 @@
 class AgentInfoRec {
 public:
 	static const int UNKNOWN_ID = -9999;
-	enum class State { NEW, CWD_REQ, CWD_RCV, NAMES_SENT, LINPACK_REQ, LINPACK_RCV, WAITING, ACTIVE, KILLED, KILLED_FAILED, COMPLETE};
+	/// QUARANTINED: connected, pinged, reported - but never handed work again. Set when the
+	/// agent's HOST is judged an outlier source of failures. Deliberately not a disconnect:
+	/// closing the socket makes the agent reconnect and re-offend, and reads to a user like a
+	/// network fault rather than a decision the master made.
+	enum class State { NEW, CWD_REQ, CWD_RCV, NAMES_SENT, LINPACK_REQ, LINPACK_RCV, WAITING, ACTIVE, KILLED, KILLED_FAILED, COMPLETE, QUARANTINED};
 	AgentInfoRec(int _socket_fd);
 	std::vector<std::string> state_strings;
 	int get_socket_fd() const;
@@ -301,6 +305,10 @@ private:
 	/// failures until they are added up - which is the point of counting by hostname rather
 	/// than by agent or socket. Keyed by AgentInfoRec::get_hostname().
 	std::unordered_map<std::string, int> host_failure_count;
+	/// Hosts taken out of service, and why - kept for the end-of-batch summary.
+	std::map<std::string, std::string> quarantined_hosts;
+	/// Failure delta before a host is judged an outlier; 0 disables the check entirely.
+	int max_failed_run_delta = 3;
 	std::set<int> user_cancelled_runs;   ///< runs a caller gave up on; never rescheduled
 	std::set<int> timed_out_runs;        ///< runs killed for running past the overdue threshold
 	std::chrono::system_clock::time_point batch_start_time;
@@ -413,6 +421,12 @@ private:
 	//void erase_agent(int sock_id);
 	bool ping(int i_sock);
 	bool ping(pest_utils::thread_flag* terminate = nullptr);
+	/// Judge whether any host is an outlier source of failures and quarantine it. Called from
+	/// the scheduling loop, NOT from update_run_failed() - that runs while the caller holds an
+	/// agent iterator, and quarantining walks the same container.
+	void quarantine_offending_hosts();
+	/// The end-of-batch summary of what was quarantined, or a line saying nothing was.
+	void report_quarantine_summary();
 	void report(std::string message,bool to_cout);
 
 public:
@@ -420,6 +434,12 @@ public:
 	/// fails. PANTHER only - the serial and external managers have no hosts to attribute to.
 	const std::unordered_map<std::string, int>& get_host_failure_count() const
 	{ return host_failure_count; }
+
+	/// Hosts quarantined this run, mapped to the reason. Empty when none.
+	const std::map<std::string, std::string>& get_quarantined_hosts() const
+	{ return quarantined_hosts; }
+
+	void set_max_failed_run_delta(int d) { max_failed_run_delta = d; }
 
 private:
 	

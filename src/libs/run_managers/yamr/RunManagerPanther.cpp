@@ -82,7 +82,7 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 	failed_pings = 0;
 	failed_runs = 0;
 	state_strings = vector<string>({ "NEW", "CWD_REQ", "CWD_RCV", "NAMES_SENT", "LINPACK_REQ", "LINPACK_RCV", "WAITING", "ACTIVE",
-	"KILLED", "KILLED_FAILED", "COMPLETE" });
+	"KILLED", "KILLED_FAILED", "COMPLETE", "QUARANTINED" });
 	state = State::NEW;
 
 }
@@ -1093,6 +1093,10 @@ void RunManagerPanther::end_batch(RUN_UNTIL_COND terminate_reason)
 				f_rmr << " " << fid << "(" << failure_map.count(fid) << ")";
 		}
 		f_rmr << endl << endl;
+
+		// what the host screening did this batch - always says something, so its absence never
+		// has to be read as either "nothing misbehaved" or "the check never ran"
+		report_quarantine_summary();
 			
 
 		if (init_sim.size() == 0)
@@ -1621,9 +1625,166 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
 /**
  * @brief Schedule runs.
  */
+/**
+ * @brief Quarantine any host that is an outlier source of run failures.
+ *
+ * The test is a SHARE, not a raw count. A host with four agents does roughly four times the work
+ * of a host with one, so it should be expected to produce roughly four times the failures -
+ * comparing raw counts would condemn the busiest node for being busy:
+ *
+ *     expected(h) = total_fails * agents(h) / total_agents
+ *     offending   = fails(h) > expected(h) + delta
+ *
+ * That shape also means a broken MODEL does not trigger it: when everything fails everywhere,
+ * every host sits at its expected share and no one exceeds it. Only CONCENTRATION fires.
+ *
+ * The delta is an absolute cushion so early, small counts cannot trip it - with the default of 3
+ * and two single-agent hosts, one host needs four more failures than its share before it is
+ * judged. 0 disables the check outright.
+ *
+ * Only meaningful with more than one host: with one host there is nothing to compare against and
+ * its share is always the whole population. Evaluated fresh each call, so it starts applying the
+ * moment a second host connects and stops if one goes away.
+ */
+void RunManagerPanther::quarantine_offending_hosts()
+{
+	if (max_failed_run_delta <= 0)
+		return;
+
+	// agents per host, counting only those still in service - a host already quarantined must
+	// not keep inflating total_agents and diluting everyone else's expected share
+	map<string, int> agents_per_host;
+	int total_agents = 0;
+	for (auto it = agent_info_set.begin(); it != agent_info_set.end(); ++it)
+	{
+		if (it->get_state() == AgentInfoRec::State::QUARANTINED)
+			continue;
+		agents_per_host[it->get_hostname()]++;
+		total_agents++;
+	}
+	if ((agents_per_host.size() < 2) || (total_agents == 0))
+		return;
+
+	int total_fails = 0;
+	for (auto& hf : host_failure_count)
+		total_fails += hf.second;
+	if (total_fails == 0)
+		return;
+
+	for (auto& ah : agents_per_host)
+	{
+		const string& host = ah.first;
+		auto fit = host_failure_count.find(host);
+		if (fit == host_failure_count.end())
+			continue;
+		double expected = (double)total_fails * (double)ah.second / (double)total_agents;
+		if ((double)fit->second <= expected + (double)max_failed_run_delta)
+			continue;
+
+		// never take out the last host still working - an empty roster stalls the batch for
+		// ever, which is a worse outcome than tolerating a bad node
+		if (agents_per_host.size() < 2)
+			break;
+
+		stringstream ss;
+		ss << "host:" << host << " quarantined - " << fit->second << " failures against an"
+		   << " expected share of " << setprecision(3) << expected << " over " << ah.second
+		   << " agent(s), exceeding panther_agent_max_failed_run_delta of "
+		   << max_failed_run_delta;
+		report(ss.str(), true);
+
+		// take every agent on it out of service, and gather what failed there
+		set<int> to_requeue;
+		int n_quar = 0;
+		for (auto it = agent_info_set.begin(); it != agent_info_set.end(); ++it)
+		{
+			if ((it->get_hostname() != host) ||
+			    (it->get_state() == AgentInfoRec::State::QUARANTINED))
+				continue;
+			// an active run on a quarantined agent goes back in the queue too - it is running
+			// on a host we have just decided not to trust
+			int rid = it->get_run_id();
+			if ((rid != AgentInfoRec::UNKNOWN_ID) &&
+			    (it->get_state() == AgentInfoRec::State::ACTIVE))
+			{
+				unschedule_run(it);
+				to_requeue.insert(rid);
+			}
+			for (auto frid : it->get_failed_run_ids())
+				to_requeue.insert(frid);
+			it->set_state(AgentInfoRec::State::QUARANTINED);
+			n_quar++;
+		}
+
+		// forgive the failures. these runs are only marked failed because of where they ran, so
+		// letting them keep those strikes would have max_n_failure condemn them for the host's
+		// sins - and the whole point of quarantining is that we no longer believe the host
+		int n_requeued = 0;
+		for (auto rid : to_requeue)
+		{
+			if (run_finished(rid))
+				continue;
+			if (user_cancelled_runs.find(rid) != user_cancelled_runs.end())
+				continue;
+			failure_map.erase(rid);
+			if (find(waiting_runs.begin(), waiting_runs.end(), rid) == waiting_runs.end())
+			{
+				waiting_runs.push_front(rid);
+				n_requeued++;
+			}
+		}
+
+		stringstream qs;
+		qs << "  " << n_quar << " agent(s) on " << host << " moved to QUARANTINED, "
+		   << n_requeued << " run(s) requeued with their failures forgiven";
+		report(qs.str(), true);
+
+		stringstream why;
+		why << fit->second << " failures vs expected " << setprecision(3) << expected
+		    << ", " << n_quar << " agents, " << n_requeued << " runs requeued";
+		quarantined_hosts[host] = why.str();
+
+		agents_per_host[host] = 0;   // no longer in service for the next host's comparison
+	}
+}
+
+/**
+ * @brief End-of-batch summary of quarantined hosts.
+ *
+ * Always says something, including when nothing was quarantined - silence would leave a user
+ * unable to tell "no host misbehaved" from "the check never ran".
+ */
+void RunManagerPanther::report_quarantine_summary()
+{
+	stringstream ss;
+	if (max_failed_run_delta <= 0)
+	{
+		report("host failure screening disabled (panther_agent_max_failed_run_delta = 0)", false);
+		return;
+	}
+	if (quarantined_hosts.empty())
+	{
+		report("no hosts quarantined for excess run failures", false);
+		return;
+	}
+	ss << quarantined_hosts.size() << " host(s) quarantined for excess run failures:";
+	report(ss.str(), true);
+	for (auto& qh : quarantined_hosts)
+	{
+		ss.str("");
+		ss << "   " << qh.first << ": " << qh.second;
+		report(ss.str(), true);
+	}
+}
+
 void RunManagerPanther::schedule_runs()
 {
 	NetPackage net_pack;
+
+	// before handing out work, decide whether any host has earned being taken out of service.
+	// done HERE rather than in update_run_failed(): that runs while process_message() holds an
+	// agent iterator, and this walks and mutates the same container
+	quarantine_offending_hosts();
 
 	std::list<list<AgentInfoRec>::iterator> free_agent_list = get_free_agent_list();
 	int n_responsive_agents = get_n_responsive_agents();

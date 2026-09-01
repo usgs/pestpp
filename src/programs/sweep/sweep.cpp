@@ -701,6 +701,10 @@ int main(int argc, char* argv[])
                     pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
                     pest_scenario.get_pestpp_options().get_panther_persistent_workers(),
 					pest_scenario.get_pestpp_options().get_panther_ping_interval_secs());
+            // host failure screening is a master-side policy, so it is set here rather than threaded
+            // through the constructor's already long parameter list
+            dynamic_cast<RunManagerPanther*>(run_manager_ptr)->set_max_failed_run_delta(
+                pest_scenario.get_pestpp_options().get_panther_agent_max_failed_run_delta());
 		}
 		else if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
