@@ -257,6 +257,20 @@ set(PESTPP_CXX_WARN_FLAGS "${PESTPP_CXX_WARN_FLAGS}"
 # To back out, configure with -DPESTPP_CXX_WARN_FLAGS= to clear it, or drop the offending entry
 # from the list below.
 #
+# One asymmetry to know about: on gcc, -Wuninitialized also turns on -Wmaybe-uninitialized,
+# which is a guess rather than a proof - it fires where gcc cannot see that a loop always runs.
+# It earned its keep once: it found w_sendall and w_recvall returning an unassigned int on a
+# zero-length transfer, on the first CI build after this went in.
+#
+# But it cannot stay an error. Building the whole tree with gcc 16 turns up five more, and not
+# one of them is ours to fix: two are inside libstdc++/libc++ headers (unique_ptr.h, string) and
+# three are in vendored Coin-OR. A warning that fires inside the standard library cannot gate a
+# release build - a compiler upgrade would break the build over code nobody here wrote.
+#
+# So it is turned back off below, AFTER the -Werror flags so it wins. What remains is the
+# definite check, which proves rather than guesses, and which is the one that caught the real
+# defects. Our own code is clean under gcc 16 for both.
+#
 # Detected rather than assumed. -Wself-assign is clang-only, -Winfinite-recursion needs gcc 12
 # or newer, and gcc treats an unknown -W option as a hard error rather than ignoring it - so
 # hardcoding these would break the build on the very compilers we ship from. MSVC accepts none
@@ -269,6 +283,15 @@ foreach(_pestpp_warn_flag -Werror=uninitialized -Werror=infinite-recursion -Werr
     list(APPEND PESTPP_CXX_WARN_FLAGS "${_pestpp_warn_flag}")
   endif()
 endforeach()
+
+# after the loop on purpose - later on the command line, so it overrides the -Werror above for
+# the guessing half of -Wuninitialized. see the note above for why this cannot be an error.
+# clang has no such warning and skips this.
+check_cxx_compiler_flag("-Wno-maybe-uninitialized" PESTPP_HAS_Wno_maybe_uninitialized)
+if(PESTPP_HAS_Wno_maybe_uninitialized)
+  list(APPEND PESTPP_CXX_WARN_FLAGS "-Wno-maybe-uninitialized")
+endif()
+
 message(STATUS "PESTPP_CXX_WARN_FLAGS=${PESTPP_CXX_WARN_FLAGS}")
 
 # Global definitions
