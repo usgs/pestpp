@@ -55,6 +55,139 @@ const std::string OperSys::COMMAND_LINE_APPEND = " & ";
 
 using namespace std;
 
+// OS_MAC has to be tested before OS_LINUX: config_os.h defines BOTH on a mac, so an
+// #ifdef OS_LINUX branch catches macs too and would send them looking for /proc, which
+// is not there.
+#if defined(OS_WIN)
+// Windows.h arrives through system_variables.h
+#elif defined(OS_MAC)
+#include <sys/sysctl.h>
+#include <mach/mach.h>
+#else
+#include <fstream>
+#endif
+
+#if !defined(OS_WIN) && !defined(OS_MAC)
+/** The single number in a one-line file, or -1 if it is not there or is not a number.
+ *
+ * The cgroup files this reads hold the word "max" when no limit is set, which is why a failed
+ * conversion has to be an ordinary answer here rather than an error.
+ */
+static long long read_one_number(const string& path)
+{
+	ifstream f(path);
+	if (!f.good())
+		return -1;
+	string tok;
+	if (!(f >> tok))
+		return -1;
+	try
+	{
+		return stoll(tok);
+	}
+	catch (...)
+	{
+		return -1;
+	}
+}
+#endif
+
+/**
+ * @brief Physical memory on this machine, total and available, in bytes.
+ */
+SysMemory get_system_memory()
+{
+	SysMemory m;
+	m.valid = false;
+	m.total_bytes = 0;
+	m.available_bytes = 0;
+
+#if defined(OS_WIN)
+	MEMORYSTATUSEX s;
+	s.dwLength = sizeof(s);
+	if (GlobalMemoryStatusEx(&s))
+	{
+		m.total_bytes = (long long)s.ullTotalPhys;
+		m.available_bytes = (long long)s.ullAvailPhys;
+		m.valid = true;
+	}
+
+#elif defined(OS_MAC)
+	uint64_t total = 0;
+	size_t len = sizeof(total);
+	if (sysctlbyname("hw.memsize", &total, &len, nullptr, 0) == 0)
+	{
+		m.total_bytes = (long long)total;
+		m.valid = true;
+	}
+	// free pages alone would badly understate this. the system parks memory in inactive and
+	// purgeable pages that it hands straight back when something asks, so those are available
+	// in every sense that matters here.
+	vm_size_t page_size = 0;
+	vm_statistics64_data_t vmstat;
+	mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+	mach_port_t self = mach_host_self();
+	if ((host_page_size(self, &page_size) == KERN_SUCCESS) &&
+	    (host_statistics64(self, HOST_VM_INFO64, (host_info64_t)&vmstat, &count) == KERN_SUCCESS))
+	{
+		m.available_bytes = ((long long)vmstat.free_count + (long long)vmstat.inactive_count +
+		                     (long long)vmstat.purgeable_count) * (long long)page_size;
+	}
+
+#else
+	ifstream f("/proc/meminfo");
+	if (f.good())
+	{
+		// read whole lines rather than streaming key/value/unit: not every line carries a
+		// unit, and one that does not would knock a field-by-field read out of step for
+		// everything after it
+		string line;
+		long long mem_free = -1;
+		while (getline(f, line))
+		{
+			istringstream ss(line);
+			string key;
+			long long value = 0;
+			if (!(ss >> key >> value))
+				continue;
+			if (key == "MemTotal:")
+				m.total_bytes = value * 1024;
+			else if (key == "MemAvailable:")
+				m.available_bytes = value * 1024;
+			else if (key == "MemFree:")
+				mem_free = value * 1024;
+		}
+		// MemAvailable is absent on kernels older than 3.14. MemFree is a poorer answer - it
+		// ignores cache that would be handed back - but it beats reporting nothing at all.
+		if ((m.available_bytes == 0) && (mem_free > 0))
+			m.available_bytes = mem_free;
+		m.valid = (m.total_bytes > 0);
+	}
+
+	// a container or a scheduler caps memory below what the hardware has, and /proc/meminfo
+	// knows nothing about it - it describes the whole host. without this an agent inside a
+	// 4gb container cheerfully reports the machine's 512gb, then gets killed for using 5.
+	long long limit = read_one_number("/sys/fs/cgroup/memory.max");                 // cgroup v2
+	long long usage = read_one_number("/sys/fs/cgroup/memory.current");
+	if (limit < 0)
+	{
+		limit = read_one_number("/sys/fs/cgroup/memory/memory.limit_in_bytes");     // cgroup v1
+		usage = read_one_number("/sys/fs/cgroup/memory/memory.usage_in_bytes");
+	}
+	// v1 with no limit set does not say so, it reports a huge sentinel instead, so a "limit"
+	// at or above what the machine has is not a real cap and is ignored
+	if ((limit > 0) && ((m.total_bytes == 0) || (limit < m.total_bytes)))
+	{
+		m.total_bytes = limit;
+		if (usage >= 0)
+			m.available_bytes = (limit > usage) ? (limit - usage) : 0;
+		m.valid = true;
+	}
+#endif
+
+	return m;
+}
+
 /**
  * @brief String2pathname.
  *

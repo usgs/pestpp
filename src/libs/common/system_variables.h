@@ -34,6 +34,30 @@ public:
 	static bool double_is_invalid(double x);
 };
 
+/** What the machine has, and what it would actually give you right now, in bytes.
+ *
+ * `available` is the number worth acting on. It is not "free" - a healthy machine keeps very
+ * little memory untouched, because anything spare is holding cache it can drop the moment
+ * something asks. Free memory on a busy machine reads near zero while gigabytes are there for
+ * the taking, so acting on it would have you back off when there was no need to.
+ *
+ * `valid` is false when none of it could be read. The numbers are zero then and mean nothing -
+ * check it before using them, rather than treating zero as "no memory".
+ */
+struct SysMemory
+{
+	bool valid;
+	long long total_bytes;
+	long long available_bytes;
+};
+
+/** Physical memory on this machine, or the cap it is being held to.
+ *
+ * Under a container or a scheduler like slurm the cap is what matters, not what the hardware
+ * has - see the comments in the linux branch.
+ */
+SysMemory get_system_memory();
+
 #ifdef OS_WIN
 #include <Windows.h>
 PROCESS_INFORMATION start(std::string &cmd_string);
