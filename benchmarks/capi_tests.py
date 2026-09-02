@@ -2221,6 +2221,32 @@ def capi_host_failure_count_test():
     assert "1 failure " in open(rmr).read(), "singular/plural: the first should read '1 failure'"
     print("rmr per-host totals:", counts[:6], "...", counts[-1] if counts else None)
 
+    # a failing run carries the agent machine's memory and disk back with it. a host that starts
+    # eating runs because it is out of memory or has filled its disk looks, from the master,
+    # exactly like one failing for any other reason - these two numbers are what separates them.
+    #
+    # sampled at the failure, not taken from the handshake, so a machine that degrades hours into
+    # a long run shows it.
+    fail_lines = [ln for ln in open(rmr) if "failed on agent:" in ln]
+    assert fail_lines, "no run-failure lines in the rmr"
+    keys = ["mem_total_mb", "mem_avail_mb", "disk_total_mb", "disk_avail_mb"]
+    for k in keys:
+        assert k + ":" in fail_lines[0], \
+            "{0} missing from the failure line: {1}".format(k, fail_lines[0].strip()[:200])
+
+    # and pyemu has to be able to read them - same contract as the handshake line. a value with a
+    # stray space or a second colon would arrive truncated and still "look" present above.
+    df = pyemu.utils.helpers.parse_rmr_file(rmr)
+    for k in keys:
+        assert k in df.columns, \
+            "pyemu did not pick up {0} from the failure lines - columns: {1}".format(
+                k, list(df.columns))
+        vals = df[k].dropna()
+        assert len(vals) > 0, "{0} is a column but every value is missing".format(k)
+        assert float(vals.iloc[0]) > 0, "{0} came back as {1!r}".format(k, vals.iloc[0])
+    print("failure lines carry machine state: mem_avail_mb={0}, disk_avail_mb={1}".format(
+        df["mem_avail_mb"].dropna().iloc[0], df["disk_avail_mb"].dropna().iloc[0]))
+
 
 def capi_host_quarantine_test():
     """A host that fails far more than its share is quarantined and its runs re-queued.

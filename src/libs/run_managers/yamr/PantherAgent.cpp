@@ -24,6 +24,39 @@ using namespace pest_utils;
 
 int  linpack_wrap(void);
 
+/** What this machine has right now, as key:value tokens ready to drop into an info text.
+ *
+ * Only the agent can answer this - the master is on a different machine and cannot see it.
+ *
+ * key:value tokens, one word each and no second colon, because the master copies them into the
+ * rmr log and pyemu's parse_rmr_file turns every colon-bearing token into a column. megabytes
+ * rather than bytes to keep the numbers short, and whole numbers so there is no decimal
+ * separator to vary by locale.
+ *
+ * A figure that cannot be read is left out entirely rather than sent as zero: zero reads as
+ * "none left", which is worse than saying nothing.
+ *
+ * Leading space so it appends cleanly. Sampled at the moment of the call - which is the point
+ * for a failed run, where the interesting question is what the machine looked like when it
+ * failed, not when the agent started.
+ */
+static string resource_info_txt()
+{
+	stringstream res;
+	const long long to_mb = 1048576;
+	SysMemory mem = get_system_memory();
+	if (mem.valid)
+		res << " mem_total_mb:" << (mem.total_bytes / to_mb)
+		    << " mem_avail_mb:" << (mem.available_bytes / to_mb);
+	// "." on purpose: the agent has already moved into its own working directory, and that is
+	// the disk that fills up, not whichever one holds /
+	SysStorage disk = get_system_storage(".");
+	if (disk.valid)
+		res << " disk_total_mb:" << (disk.total_bytes / to_mb)
+		    << " disk_avail_mb:" << (disk.available_bytes / to_mb);
+	return res.str();
+}
+
 /**
  * @brief P a n t h e r agent.
  *
@@ -1128,30 +1161,11 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			// until it has FINISHED a run - so the master skipped it for the whole of the
 			// first run, which is exactly the run a user wants to interrupt. The text is
 			// free-form and an older master ignores it.
-			// what this machine has to work with, sent along with the capability tag. only the
-			// agent can answer this - the master is on a different machine and cannot see it -
-			// and this handshake is the last quiet moment before runs start arriving.
 			//
-			// key:value tokens, one word each, no second colon: the master copies them into the
-			// rmr log and pyemu's parse_rmr_file turns each into a column. megabytes rather than
-			// bytes to keep the numbers short, and whole numbers so there is no decimal
-			// separator to vary by locale.
-			//
-			// left out entirely when it cannot be read, rather than sent as zero - zero would
-			// read as "no memory left" and is worse than saying nothing.
+			// the machine's memory and disk ride along with the capability tag - this handshake
+			// is the last quiet moment before runs start arriving. see resource_info_txt().
 			stringstream cap;
-			cap << NetPackage::PARTIAL_CAPABILITY_TAG;
-			const long long to_mb = 1048576;
-			SysMemory mem = get_system_memory();
-			if (mem.valid)
-				cap << " mem_total_mb:" << (mem.total_bytes / to_mb)
-				    << " mem_avail_mb:" << (mem.available_bytes / to_mb);
-			// "." on purpose: the agent has already moved into its own working directory, and
-			// that is the disk that fills up, not whichever one holds /
-			SysStorage disk = get_system_storage(".");
-			if (disk.valid)
-				cap << " disk_total_mb:" << (disk.total_bytes / to_mb)
-				    << " disk_avail_mb:" << (disk.available_bytes / to_mb);
+			cap << NetPackage::PARTIAL_CAPABILITY_TAG << resource_info_txt();
 			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0, cap.str());
 			char data = '\0';
 			err = send_message(net_pack, &data, 0);
@@ -1442,7 +1456,17 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "run failed for run_id: " << run_id << " " << info_txt << "  " << final_run_status.second;
 				report(ss.str(), true);
 				ss.str("");
-				ss << "group_id:" << group_id << " run_id:" << run_id << " " << info_txt << " " << final_run_status.second;
+				// the machine's memory and disk go in BEFORE the model's error text, not after.
+				// info text is capped at NetPackage::DESC_LEN and silently truncated past it,
+				// and a model that fails can produce a great deal of error text - putting these
+				// last is how they would go missing on exactly the runs worth explaining.
+				//
+				// a host that starts failing runs because it is out of memory or has filled its
+				// disk looks identical, from the master, to one failing for any other reason.
+				// these two numbers are what tells them apart, and they have to be sampled here,
+				// at the failure, rather than read from the handshake hours earlier.
+				ss << "group_id:" << group_id << " run_id:" << run_id << resource_info_txt()
+				   << " " << info_txt << " " << final_run_status.second;
 				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,ss.str());
 				char data = '\0';
 				err = send_message(net_pack, &data, 0);
