@@ -1210,7 +1210,6 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
 	Localizer::LocTyp loctyp = localizer.get_loctyp();
-	bool use_cov_loc = true;
 	if (loctyp == Localizer::LocTyp::COVARIANCE) {
         throw runtime_error("EnsembleSolver::solve(): 'covariance' localization is deprecated");
     }
@@ -1735,7 +1734,6 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
     unique_lock<mutex> put_guard(put_lock, defer_lock);
 
     vector<string> pe_real_names,oe_real_names;
-    int num_reals;
 
     //form parcov_inv
     Eigen::DiagonalMatrix<double,Eigen::Dynamic> parcov_inv = parcov_inv_vec.asDiagonal();
@@ -1798,7 +1796,6 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         obs_err.resize(0, 0);
         weights.resize(0);
 
-        num_reals = pe_real_names.size();
 
         obs_diff = local_utils::get_matrix_from_map(oe_real_names, obs_diff_map);
         obs_resid = local_utils::get_matrix_from_map(oe_real_names, obs_resid_map);
@@ -1839,7 +1836,6 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
 
         stringstream ss;
 
-        double scale = (1.0 / (sqrt(double(num_reals - 1))));
 
         //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
 
@@ -1996,8 +1992,10 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	double eigthresh;
 	bool use_approx;
 	bool use_prior_scaling;
-	bool use_localizer = false;
-	bool loc_by_obs = true;
+	// use_localizer and loc_by_obs used to live here. they fed the hadamard localizing matrix
+	// block further down, which is commented out and explained there: that form of
+	// localization is deprecated in EnsembleSolver::solve, and live localization is done by
+	// par/obs subsetting per case. they were still being computed and then thrown away.
 
 	while (true)
 	{
@@ -2010,9 +2008,8 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			num_reals = pe_upgrade.shape().first;
 			verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
 			ctrl_guard.unlock();
-			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_localize_how()[0] == 'P')
-			if (how == Localizer::How::PARAMETERS)
-				loc_by_obs = false;
+			// the loc_by_obs assignment that was here went with the variable - see the note at
+			// the top of this function. the break stays: it is what ends this while(true).
 			break;
 		}
 	}
@@ -2053,8 +2050,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		//First get a new case of par and obs names to solve with
 		par_names.clear();
 		obs_names.clear();
-		use_localizer = false;
-		
+
 		while (true)
 		{
 			if (next_guard.try_lock())
@@ -2074,11 +2070,9 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				pair<vector<string>, vector<string>> p = cases.at(key);
 				par_names = p.second;
 				obs_names = p.first;
-				if (localizer.get_use())
-				{
-
-					use_localizer = true;
-				}
+				// the `if (localizer.get_use()) use_localizer = true;` that was here went with
+				// the variable - nothing read it. get_use() is a plain getter, so dropping the
+				// test changes nothing.
 				if ((count % 1000 == 0) && (count > 0))
 				{
 					ss.str("");
@@ -2633,7 +2627,6 @@ Eigen::VectorXd L2PhiHandler::get_q_vector()
 	/*if (act_obs_names.size() == 0)
 		act_obs_names = oe_base->get_var_names();*/
 	q.resize(act_obs_names.size());
-	double w;
 	for (int i = 0; i < act_obs_names.size(); i++)
 	{
 		q(i) = oinfo->get_weight(act_obs_names[i]);
@@ -2949,7 +2942,6 @@ double L2PhiHandler::calc_iqr_thresh(map<string, double> *phi_map, double bad_ph
 	// sort 'em
 	std::sort(values.begin(), values.end());
 	// calc the median depending on vector size
-	double median = calc_median(values);
 
 	// get the total size
 	int const n = values.size();
@@ -3568,9 +3560,14 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	map<string, double> _meas;
 	//Eigen::VectorXd q = get_q_vector();
 	//for (auto &pv : calc_meas(oe, q))
+    // braces because the next line is indented with a tab while this body uses spaces, which
+    // made it read as part of the loop. it is not, and should not be - the mean is over the
+    // whole map once it is filled
     for (auto &pv : calc_meas(oe, weights))
+    {
         _meas[pv.first] = pv.second.sum();
-	double mean = calc_mean(&_meas);
+    }
+    double mean = calc_mean(&_meas);
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
@@ -3746,7 +3743,6 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
     }
 
     set<string> bset(base_real_names.begin(),base_real_names.end());
-    set<string>::iterator end = bset.end();
     string rname;
 
     map<string,double> pmap;
@@ -3964,7 +3960,7 @@ map<string, double> L2PhiHandler::calc_composite(map<string, double> &_meas, map
 	map<string, double> phi_map;
 	string prn, orn;
 	double reg, mea;
-	map<string, double>::iterator meas_end = _meas.end(), regul_end = _regul.end();
+	map<string, double>::iterator meas_end = _meas.end();
 	for (int i = 0; i < oe_base->shape().first; i++)
 	{
 		prn = preal_names[i];
@@ -4180,8 +4176,8 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
 	double mean_diff = 0.0, std_diff = 0.0;
 	double icv = 0.0, ccv = 0.0;
 	double iicv = 0.0, cccv = 0.0;
+	int ndec_cv = 0;   // set and never read - see note at the ndec_cv++ below
 
-	int ndec_cv = 0, dsize=0;
 	double  value1, value2, v;
 	vector<string> pnames = pe.get_var_names();
 	Parameters lb = pe.get_pest_scenario_ptr()->get_ctl_parameter_info().get_low_bnd(pnames);
@@ -4820,7 +4816,7 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 	int nphistp = pest_scenario.get_control_info().nphistp;
 	int nphinored = pest_scenario.get_control_info().nphinored;
 	bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-	double phi, ratio;
+	double ratio;
 	int count = 0;
 	int nphired = 0;
 	//best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
@@ -4853,14 +4849,12 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 		consec_sat = true;
 	}
 
-    int i = 0;
     for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
     	//if ((i>=(iter - current_n_iter_mean)) && (ratio <= phiredstp))
         if (ratio <= phiredstp)
 			count++;
-        i++;
 	}
 	message(1, "number of iterations satisfying phiredstp criteria: ", count);
 	if (count >= nphistp)
@@ -4915,7 +4909,6 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 vector<map<string, int>> EnsembleMethod::queue_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
-	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
 	ss << "queuing " << pe_lams.size() << " ensembles";
 	performance_log->log_event(ss.str());
@@ -4968,7 +4961,6 @@ vector<map<string, int>> EnsembleMethod::queue_lambda_ensembles(vector<Parameter
 vector<ObservationEnsemble> EnsembleMethod::process_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals,
 	vector<double>& scale_vals, vector<map<string, int>>& real_run_ids_vec, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
-	ofstream& frec = file_manager.rec_ofstream();
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
 	vector<ObservationEnsemble> obs_lams;
@@ -5352,7 +5344,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
         {
             ss.str("");
             ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
-            for (const auto it : t)
+            for (const auto& it : t)
             {
                 ss << it.first << "," << it.second << endl;
             }
@@ -5364,7 +5356,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
         {
             ss.str("");
             ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
-            for (const auto it : t)
+            for (const auto& it : t)
             {
                 ss << it.first << "," << it.second << endl;
             }
@@ -5379,7 +5371,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
             ss << "double inequality defined through 'greater_than' and 'less_than' data for " << tt.size() << " observations" << endl;
             ss.str("");
             ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
-            for (const auto it : tt)
+            for (const auto& it : tt)
             {
                 ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
             }
@@ -5595,7 +5587,6 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
 	if (bad_phi < std::numeric_limits<double>::max())
 		message(1, "using bad_phi: ", bad_phi);
 
-	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 
 	if ((pe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
@@ -6041,7 +6032,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
         {
             ss.str("");
             ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
-            for (const auto it : t)
+            for (const auto& it : t)
             {
                 ss << it.first << "," << it.second << endl;
             }
@@ -6053,7 +6044,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
         {
             ss.str("");
             ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
-            for (const auto it : t)
+            for (const auto& it : t)
             {
                 ss << it.first << "," << it.second << endl;
             }
@@ -6066,7 +6057,7 @@ int EnsembleMethod::initialize_prepare(int cycle, bool run, bool use_existing)
         {
             ss.str("");
             ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
-            for (const auto it : tt)
+            for (const auto& it : tt)
             {
                 ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
             }
@@ -6375,7 +6366,7 @@ void EnsembleMethod::initialize_finish(int cycle)
         ss.str("");
         if (t.size() < 50) {
             ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
-            for (const auto it: t) {
+            for (const auto& it: t) {
                 ss << it.first << "," << it.second << endl;
             }
             ss << endl;
@@ -6392,7 +6383,7 @@ void EnsembleMethod::initialize_finish(int cycle)
         ss.str("");
         if (t.size() < 50) {
             ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
-            for (const auto it: t) {
+            for (const auto& it: t) {
                 ss << it.first << "," << it.second << endl;
             }
             ss << endl;
@@ -6411,7 +6402,7 @@ void EnsembleMethod::initialize_finish(int cycle)
         ss.str("");
         if (tt.size() < 50) {
             ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
-            for (const auto it: tt) {
+            for (const auto& it: tt) {
                 ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
             }
             ss << endl;
@@ -7184,7 +7175,6 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         message(1,"using realization "+center_on+" residuals for reweighting (if available");
     else
         message(1,"using mean residuals for reweighting");
-    L2PhiHandler::phiType ptype = L2PhiHandler::phiType::MEAS;
     map<string,double> mean_swr_map = ph.get_swr_map(oe, center_on);
     double cur_mean_phi = 0;
     for (auto& sw : mean_swr_map)
@@ -7421,7 +7411,6 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 	set<string>::iterator end = spar_names.end();
 	par_names.clear();
 	//for (int i = 0; i < obs_names.size(); i++)	
-	double w;
 	for (auto& name : obs_names)
 	{
 
@@ -7633,13 +7622,12 @@ void EnsembleMethod::get_mda_factors(bool last_iter, vector<double>& inflation_f
 	//this function should cover the case where noptmax = 1 (vanilla) also...
 	vector<double> mda_facs, scaled_mda_facs;
 	mda_facs.push_back(pest_scenario.get_pestpp_options().get_ies_mda_init_fac());
-	double tot, ttot;
+	double tot;
 	if (iter == 1)	{
 		
 		tot = 1.0 / mda_facs[0];
 		double dec_fac = pest_scenario.get_pestpp_options().get_ies_mda_dec_fac();// get_ies_mda_dec_fac();
 		
-		ttot = 0.0;
 		for (int i = 1; i < pest_scenario.get_control_info().noptmax; i++)
 		{
 			mda_facs.push_back(mda_facs[i - 1] * dec_fac);
@@ -7650,7 +7638,6 @@ void EnsembleMethod::get_mda_factors(bool last_iter, vector<double>& inflation_f
 		{
 			mda_fac = (1.0 / mda_fac) / tot;
 			scaled_mda_facs.push_back(1.0 / mda_fac);
-			ttot += mda_fac;
 		}
 		mda_lambdas = scaled_mda_facs;
 	}	
@@ -7675,13 +7662,12 @@ void EnsembleMethod::get_mda_factors(bool last_iter, vector<double>& inflation_f
 			mda_lambdas.erase(mda_lambdas.begin()+iter, mda_lambdas.end());
 		}
 		int ii = 1;
-		double tot_fac1, tot_fac2, resid_fac;
+		double tot_fac1, tot_fac2;
 		tot_fac1 = 0;
 		tot_fac2 = 0;
 		scaled_mda_facs.clear();		
 		mda_lambdas[iter - 1] = last_best_lam;
 		tot = 0;
-		ttot = 0;
 		for (auto& mda_fac : mda_lambdas)
 		{		
 			tot += (1.0 / mda_fac);
@@ -7698,13 +7684,11 @@ void EnsembleMethod::get_mda_factors(bool last_iter, vector<double>& inflation_f
 			if (ii < iter)
 			{
 				ii += 1;
-				ttot += 1.0/mda_fac;
 				scaled_mda_facs.push_back(mda_fac);
 				continue;
 			}
 			mda_fac = (1.0-tot_fac1)*(1.0 / mda_fac) / tot_fac2;
 			scaled_mda_facs.push_back(1.0 / mda_fac);
-			ttot += mda_fac;
 			ii += 1;
 		}
 		mda_lambdas = scaled_mda_facs;
@@ -8030,7 +8014,6 @@ UpgradeStatus EnsembleMethod::check_noniterative_shortcut(UpgradeContext& ctx)
 		//move the estimated states to the oe, which will then later be transferred back to the pe
 		ph.update(oe, pe, weights);
         double best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		best_mean_phis.push_back(best_mean);
 
 		return UpgradeStatus::ACCEPTED;
@@ -9417,14 +9400,11 @@ bool EnsembleMethod::initialize_weights()
 	stringstream ss;
     if (act_obs_names.size() == 0)
     {
-        int i = 0;
         Eigen::VectorXd wvec(oe_base.shape().second);
-        for (auto& n : oe_base.get_var_names())
+        for (int i = 0; i < (int)oe_base.get_var_names().size(); i++)
         {
             wvec[i] = 0.0;
-            i++;
         }
-        int num_reals = oe_base.shape().first;
         message(1, "setting weights ensemble to zeros - no non-zero weighted obs found");
         weights.reserve(oe_base.get_real_names(), oe_base.get_var_names());
         weights.get_eigen_ptr_4_mod()->setZero();
@@ -9448,7 +9428,6 @@ bool EnsembleMethod::initialize_weights()
     }
 
 	if (weight_csv.size() == 0) {
-        int num_reals = oe_base.shape().first;
         message(1, "setting weights ensemble from control file weights");
         weights.reserve(oe_base.get_real_names(), act_obs_names);
         weights.get_eigen_ptr_4_mod()->setZero();

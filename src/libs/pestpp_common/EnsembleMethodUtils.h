@@ -453,6 +453,15 @@ public:
 		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
 		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how, double _reg_factor);
 
+	// this class is held and deleted through an UpgradeThread* that actually points at a
+	// LocalAnalysisUpgradeThread, and deleting a derived object through a base pointer whose
+	// destructor is not virtual is undefined - the derived destructor simply never runs.
+	//
+	// nothing leaks today, because the one derived class adds no members of its own. that is
+	// luck rather than design: the first member added to it would leak on every solve, silently
+	// and with nothing pointing at the cause.
+	virtual ~UpgradeThread() = default;
+
 	virtual void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names) { ; }
 
 	//optional per-realization weights (aligned to the realization columns) for the localized
