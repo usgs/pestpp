@@ -2505,6 +2505,31 @@ void CmdLine::startup_report(std::ostream &s, string start_string) {
 #else
 	s << " (asserts ON - diagnostic build, slower than a release build)" << endl;
 #endif
+
+	// what the machine has to work with. worth recording because the two ways a long run dies
+	// without explaining itself are running out of memory and filling the disk, and afterwards
+	// there is nothing left to say which - the record file is what is left.
+	//
+	// available, not free, for both: see the comments on these in system_variables.h. and the
+	// disk figure is for the working directory, not the machine, because that is the one that
+	// fills up and it is often not on the same mount as /.
+	const double to_gb = 1073741824.0;
+	SysMemory mem = get_system_memory();
+	if (mem.valid)
+		s << "machine memory: " << fixed << setprecision(1) << (mem.total_bytes / to_gb)
+		  << " GB total, " << (mem.available_bytes / to_gb) << " GB available" << endl;
+	else
+		s << "machine memory: could not be read on this system" << endl;
+
+	SysStorage disk = get_system_storage(cwd);
+	if (disk.valid)
+		s << "storage in working directory: " << fixed << setprecision(1)
+		  << (disk.total_bytes / to_gb) << " GB total, "
+		  << (disk.available_bytes / to_gb) << " GB available" << endl;
+	else
+		s << "storage in working directory: could not be read" << endl;
+	s.unsetf(ios_base::floatfield);
+
 	if (start_string.size() > 0)
 		s << "started at " << start_string << endl << endl;
 }

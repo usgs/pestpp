@@ -2354,6 +2354,84 @@ def capi_host_quarantine_test():
     print("quarantined the failing host:", bad, "| healthy:", sorted(healthy), hf)
 
 
+def capi_agent_resources_test():
+    """An agent reports its machine's memory and disk at the linpack handshake, and pyemu reads it.
+
+    The master cannot see these - it is on a different machine - so the agent has to send them,
+    and the handshake is the first chance, before any run is handed out.
+
+    The point of the format is that pyemu's parse_rmr_file can read it without being taught
+    anything new: it keeps every whitespace-delimited token containing a colon and splits it on
+    the first one, so each figure has to be a single word, key:value, with no space and no second
+    colon. This test runs the real parser rather than a regex of its own, because a regex here
+    would happily pass a format pyemu cannot actually read.
+    """
+    wd = _setup("capi_agentres", noptmax=1, num_reals=4)
+    worker_root = os.path.join(_BENCH, "capi_agentres_workers")
+    if os.path.exists(worker_root):
+        shutil.rmtree(worker_root)
+    os.makedirs(worker_root)
+
+    agent_exe = _find_agent_exe()
+    res_port = port + 13
+    procs = []
+    keys = ["mem_total_mb", "mem_avail_mb", "disk_total_mb", "disk_avail_mb"]
+
+    try:
+        with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=res_port) as ies:
+            d = os.path.join(worker_root, "w0")
+            shutil.copytree(wd, d)
+            log = open(os.path.join(d, "worker.log"), "w")
+            procs.append(subprocess.Popen(
+                [agent_exe, "pest.pst", "/h", "localhost:{0}".format(res_port)],
+                cwd=d, stdout=log, stderr=subprocess.STDOUT))
+            ies.initialize_prepare()
+            ies.queue_runs()
+            ies.begin_batch()
+            for _ in range(600):
+                if ies.run_slice(0.1):
+                    break
+            ies.end_batch()
+            ies.process_runs()
+    finally:
+        for p_ in procs:
+            try:
+                p_.kill()
+            except Exception:
+                pass
+
+    rmr_file = os.path.join(wd, "pest.rmr")
+    with open(rmr_file, "r") as f:
+        ready = [ln for ln in f if "new agent ready:" in ln]
+    assert ready, "no agent handshake in the rmr at all"
+    print("handshake line:", ready[0].strip())
+
+    for k in keys:
+        assert k + ":" in ready[0], \
+            "{0} missing from the handshake line: {1}".format(k, ready[0].strip())
+
+    # the real gate: pyemu's own parser, on the real file
+    df = pyemu.utils.helpers.parse_rmr_file(rmr_file)
+    for k in keys:
+        assert k in df.columns, \
+            "pyemu did not pick up {0} - got columns {1}".format(k, list(df.columns))
+        vals = df[k].dropna()
+        assert len(vals) > 0, "{0} is a column but every value is missing".format(k)
+        # must survive as a number. a value with a stray space or a second colon would arrive
+        # truncated or split, and would fail here rather than silently reading as nonsense
+        for v in vals:
+            assert float(v) > 0, "{0} came back as {1!r}".format(k, v)
+
+    total = float(df["mem_total_mb"].dropna().iloc[0])
+    avail = float(df["mem_avail_mb"].dropna().iloc[0])
+    assert avail <= total, "available memory above total: {0} > {1}".format(avail, total)
+    dtotal = float(df["disk_total_mb"].dropna().iloc[0])
+    davail = float(df["disk_avail_mb"].dropna().iloc[0])
+    assert davail <= dtotal, "available disk above total: {0} > {1}".format(davail, dtotal)
+    print("pyemu read the handshake: mem {0:.0f}/{1:.0f} MB, disk {2:.0f}/{3:.0f} MB".format(
+        avail, total, davail, dtotal))
+
+
 def capi_host_quarantine_disabled_test():
     """delta of 0 turns the screening off, and the summary says so rather than going quiet."""
     wd = _setup("capi_quar_off", noptmax=1, num_reals=4)

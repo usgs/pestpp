@@ -58,6 +58,24 @@ struct SysMemory
  */
 SysMemory get_system_memory();
 
+/** Disk space on the filesystem holding a given path, in bytes.
+ *
+ * `available` is what this process could actually write. It is not the same as free: filesystems
+ * hold some back for root, so free is the larger and more optimistic number, and a non-privileged
+ * agent that believed it would run out early.
+ *
+ * Ask about the working directory rather than the machine. An agent's directory is often on a
+ * different mount from `/`, and it is the one that fills up.
+ */
+struct SysStorage
+{
+	bool valid;
+	long long total_bytes;
+	long long available_bytes;
+};
+
+SysStorage get_system_storage(const std::string& path);
+
 #ifdef OS_WIN
 #include <Windows.h>
 PROCESS_INFORMATION start(std::string &cmd_string);

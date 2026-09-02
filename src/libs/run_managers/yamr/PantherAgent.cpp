@@ -1128,8 +1128,31 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			// until it has FINISHED a run - so the master skipped it for the whole of the
 			// first run, which is exactly the run a user wants to interrupt. The text is
 			// free-form and an older master ignores it.
-			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,
-				NetPackage::PARTIAL_CAPABILITY_TAG);
+			// what this machine has to work with, sent along with the capability tag. only the
+			// agent can answer this - the master is on a different machine and cannot see it -
+			// and this handshake is the last quiet moment before runs start arriving.
+			//
+			// key:value tokens, one word each, no second colon: the master copies them into the
+			// rmr log and pyemu's parse_rmr_file turns each into a column. megabytes rather than
+			// bytes to keep the numbers short, and whole numbers so there is no decimal
+			// separator to vary by locale.
+			//
+			// left out entirely when it cannot be read, rather than sent as zero - zero would
+			// read as "no memory left" and is worse than saying nothing.
+			stringstream cap;
+			cap << NetPackage::PARTIAL_CAPABILITY_TAG;
+			const long long to_mb = 1048576;
+			SysMemory mem = get_system_memory();
+			if (mem.valid)
+				cap << " mem_total_mb:" << (mem.total_bytes / to_mb)
+				    << " mem_avail_mb:" << (mem.available_bytes / to_mb);
+			// "." on purpose: the agent has already moved into its own working directory, and
+			// that is the disk that fills up, not whichever one holds /
+			SysStorage disk = get_system_storage(".");
+			if (disk.valid)
+				cap << " disk_total_mb:" << (disk.total_bytes / to_mb)
+				    << " disk_avail_mb:" << (disk.available_bytes / to_mb);
+			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0, cap.str());
 			char data;
 			err = send_message(net_pack, &data, 0);
 			if (err.first != 1)

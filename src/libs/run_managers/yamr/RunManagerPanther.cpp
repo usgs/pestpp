@@ -49,6 +49,26 @@
 using namespace std;
 using namespace pest_utils;
 
+/** The value of a "key:value" token in an agent's free-form info text, or empty if it is absent.
+ *
+ * Empty is an ordinary answer, not an error: an agent built before these were added sends none
+ * of them, and it still has to connect and work.
+ */
+static string extract_info_token(const string& info_txt, const string& key)
+{
+	const string want = key + ":";
+	size_t pos = info_txt.find(want);
+	if (pos == string::npos)
+		return "";
+	// only a token START counts. without this, looking for "mem_total_mb" would also match the
+	// tail of some future "host_mem_total_mb" and read the wrong number
+	if ((pos != 0) && (info_txt[pos - 1] != ' ') && (info_txt[pos - 1] != '\t'))
+		return "";
+	const size_t beg = pos + want.size();
+	const size_t end = info_txt.find_first_of(" \t", beg);
+	return info_txt.substr(beg, (end == string::npos) ? string::npos : end - beg);
+}
+
 const int RunManagerPanther::BACKLOG = 1000;
 const int RunManagerPanther::MAX_FAILED_PINGS = 60;
 const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
@@ -2150,6 +2170,26 @@ void RunManagerPanther::process_message(int i_sock)
 			agent_info_iter->set_supports_partial(true);
 		stringstream ss;
 		ss << "new agent ready:" << agent_info_iter->get_hostname() << "$" << agent_info_iter->get_work_dir() << " socket:" << agent_info_iter->get_socket_name() ;
+		// what the agent says its own machine has. it has to come from the agent - the master
+		// cannot see the memory or the disk of a machine it is not on - and the linpack
+		// handshake is the first chance to ask, before the agent is given any work.
+		//
+		// written as key:value tokens, one word each, because that is what pyemu's
+		// parse_rmr_file reads: it takes every token containing a colon, splits on the first
+		// one, and turns the left side into a column. a space anywhere in a value would break
+		// the pair in two, and a second colon would truncate the value.
+		//
+		// an older agent sends none of this and simply leaves the fields out, which the parser
+		// reports as missing rather than as an error.
+		const string agent_info = net_pack.get_info_txt();
+		static const char* res_keys[] = {"mem_total_mb", "mem_avail_mb",
+		                                 "disk_total_mb", "disk_avail_mb"};
+		for (auto key : res_keys)
+		{
+			const string val = extract_info_token(agent_info, key);
+			if (!val.empty())
+				ss << " " << key << ":" << val;
+		}
 		report(ss.str(), false);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::READY)

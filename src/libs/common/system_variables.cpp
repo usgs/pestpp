@@ -30,6 +30,7 @@
 #include <cmath>
 #include <vector>
 #include <iostream>
+#include <filesystem>
 #include "system_variables.h"
 
 #ifdef OS_WIN
@@ -186,6 +187,36 @@ SysMemory get_system_memory()
 #endif
 
 	return m;
+}
+
+/**
+ * @brief Disk space on the filesystem holding a path, total and available, in bytes.
+ */
+SysStorage get_system_storage(const string& path)
+{
+	SysStorage s;
+	s.valid = false;
+	s.total_bytes = 0;
+	s.available_bytes = 0;
+
+	// the one part of this that needs no per-os code at all. the error_code form on purpose:
+	// the throwing one raises if the path has gone away, and a directory disappearing under a
+	// run is exactly the moment this gets asked
+	error_code ec;
+	filesystem::space_info si = filesystem::space(path, ec);
+	if (ec)
+		return s;
+
+	// static_cast because these come back as uintmax_t, and a filesystem that cannot answer
+	// reports -1 cast to unsigned - which would arrive as an enormous positive number
+	if ((si.capacity == static_cast<uintmax_t>(-1)) ||
+	    (si.available == static_cast<uintmax_t>(-1)))
+		return s;
+
+	s.total_bytes = (long long)si.capacity;
+	s.available_bytes = (long long)si.available;
+	s.valid = (s.total_bytes > 0);
+	return s;
 }
 
 /**
