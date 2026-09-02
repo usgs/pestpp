@@ -1419,10 +1419,15 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 			in.read((char*)&(j), sizeof(j));
 			in.read((char*)&(data), sizeof(data));
 
+			// i_rec, not n. this format reads i and j straight from the file and never touches
+			// n, so these two messages were printing whatever was on the stack as the record
+			// number. they only fire on an already corrupt file, which is exactly when the
+			// number has to be right. the old-format loop below is different - there n IS read
+			// from the file and is the real index, so it prints n on purpose.
 			if ((i >= n_obs_and_pi) || (i < 0))
-				cout << "invalid 'i':" << i << " at " << n << " data:" << data << " j: " << j << endl;
+				cout << "invalid 'i':" << i << " at " << i_rec << " data:" << data << " j: " << j << endl;
 			if ((j >= n_par) || (j < 0))
-				cout << "invalid 'j':" << j << " at " << n << " data:" << data << " i: " << i << endl;
+				cout << "invalid 'j':" << j << " at " << i_rec << " data:" << data << " i: " << i << endl;
 			triplet_list.push_back(Eigen::Triplet<double>(i, j, data));
 		}
 		matrix.resize(n_obs_and_pi, n_par);

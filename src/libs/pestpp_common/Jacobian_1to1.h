@@ -43,12 +43,22 @@ protected:
 	Parameters failed_to_increment_parmaeters;
 	OutputFileWriter* output_file_writer_ptr;
 
-	bool forward_diff(const string &par_name, double derivative_par_value,
+	// _1to1 on these three because they are NOT overrides of the versions in Jacobian, even
+	// though they used to carry the same names. these work one parameter at a time - taking
+	// that parameter's value and record - where the base takes the whole parameter set and an
+	// out-of-bounds accumulator. sharing the name hid the base versions, which is what
+	// -Woverloaded-virtual was reporting from every file that included this header.
+	//
+	// nothing called them through a base pointer, so this rename changes no behaviour: the two
+	// paths never met. build_runs IS a real override, and it routes 1to1 work through
+	// get_derivative_parameters to these, while the base routes through
+	// fill_derivative_parameters to its own.
+	bool forward_diff_1to1(const string &par_name, double derivative_par_value,
 		const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info, const ParamTransformSeq &par_trans, double &new_par_val);
-	bool central_diff(const string &par_name, double derivative_par_value,
+	bool central_diff_1to1(const string &par_name, double derivative_par_value,
 		const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info, const ParamTransformSeq &par_trans, vector<double> &new_par_vec,
 		vector<Parameters>  &numeric_dir_par_vec);
-	bool out_of_bounds(const Parameters &model_parameters, const ParameterRec *par_info_ptr) const;
+	bool out_of_bounds_1to1(const Parameters &model_parameters, const ParameterRec *par_info_ptr) const;
 	bool get_derivative_parameters(const string &par_name, double derivative_par_value, const ParamTransformSeq &par_trans, const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
 		vector<double> &delta_numeric_par_vec, bool phiredswh_flag);
 };

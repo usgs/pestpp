@@ -284,24 +284,10 @@ void OperSys::chdir(const char *str)
    #endif
 }
 
-/**
- * @brief Gets s.
- *
- * @param str Description.
- * @param len Description.
- *
- * @return Description.
- */
-char* OperSys::gets_s(char *str, size_t len)
-{
- #ifdef OS_WIN
-  return ::gets_s(str, len);
- #endif
- #ifdef OS_LINUX
-  return gets_s(str, len);
- #endif
-
-}
+// OperSys::gets_s() was removed here. On windows it forwarded to the CRT ::gets_s, but the
+// mac/linux branch called gets_s() unqualified, which resolves to this same member function -
+// so it called itself until the stack ran out. It had never worked off windows, and every call
+// site was already commented out, so nothing noticed. Anything needing this should use fgets.
 
 /**
  * @brief Double is invalid.

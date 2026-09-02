@@ -2020,8 +2020,8 @@ map<string,int> Ensemble::from_binary_old(string file_name, vector<string> &name
 	{
 		char col_name[200];
 		char row_name[200];
-		n_col = n_col;
-		n_row = n_row;
+		// there were two self-assignments here, n_col = n_col and n_row = n_row. they did
+		// nothing at all - both values are already what was read from the file just above
 		in.read((char*)&n_nonzero, sizeof(n_nonzero));
 
 		// record current position in file

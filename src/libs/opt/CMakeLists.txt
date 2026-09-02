@@ -141,6 +141,17 @@ endif()
 
 target_compile_options(opt PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 
+# -Wno-self-assign AFTER the shared flags, so it overrides them for this target only.
+#
+# This is vendored Coin-OR source. Clp has three deliberate self-assignments - the old trick for
+# silencing an unused-variable warning - and we are not going to edit upstream code to fix them.
+# Left reporting, they would be three permanent warnings in every build, and a warning that is
+# always there is one nobody reads: exactly how the real defects these flags now catch went
+# unnoticed for years. Our own code is clean for this, so the category stays meaningful.
+if(NOT MSVC)
+  target_compile_options(opt PRIVATE -Wno-self-assign)
+endif()
+
 # opt is vendored Coin-OR and uses nothing from pestpp_com; this edge only created a
 # dependency cycle, which blocks any shared-library build
 #target_link_libraries(opt pestpp_com)

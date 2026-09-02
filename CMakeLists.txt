@@ -231,6 +231,46 @@ endif()
 set(PESTPP_CXX_WARN_FLAGS "${PESTPP_CXX_WARN_FLAGS}"
   CACHE STRING "C++ flags used to compile PEST++ targets")
 
+# A small, deliberately narrow set of warnings that are on by default.
+#
+# Not -Wall: a build with -Wall -Wextra reports about 1100 warnings in our own code, nearly all
+# of them hygiene (signed/unsigned comparisons, unused variables, ignored qualifiers). At that
+# volume nobody reads any of them, which is how the three below went unnoticed for years:
+#
+#   OperSys::gets_s      called itself forever on mac and linux
+#   get_euclidean_fitness returned an uninitialised double
+#   two self-assignments in Ensemble::from_binary that did nothing
+#
+# Each of these is a defect with no plausible innocent reading, and each is caught by exactly
+# one of these three flags. The categories are now clean, so anything they report is new.
+#
+# Errors, not warnings. A warning in a build that is otherwise green does not get read, so as
+# warnings these would record the rule without enforcing it - and the whole reason the three
+# defects above survived so long is that nobody was reading build output. All three categories
+# are at zero, so this cannot fail on anything that exists today: it can only fail on something
+# newly written, which is the point.
+#
+# Checked in the -Werror= form because that is what has to be accepted. Neither Eigen nor the
+# vendored Coin-OR trips these - Eigen never fires any of the three, and Coin-OR's three
+# self-assignments are turned off at that target in src/libs/opt/CMakeLists.txt.
+#
+# To back out, configure with -DPESTPP_CXX_WARN_FLAGS= to clear it, or drop the offending entry
+# from the list below.
+#
+# Detected rather than assumed. -Wself-assign is clang-only, -Winfinite-recursion needs gcc 12
+# or newer, and gcc treats an unknown -W option as a hard error rather than ignoring it - so
+# hardcoding these would break the build on the very compilers we ship from. MSVC accepts none
+# of them and simply gets nothing added.
+include(CheckCXXCompilerFlag)
+foreach(_pestpp_warn_flag -Werror=uninitialized -Werror=infinite-recursion -Werror=self-assign)
+  string(MAKE_C_IDENTIFIER "PESTPP_HAS${_pestpp_warn_flag}" _pestpp_warn_ok)
+  check_cxx_compiler_flag("${_pestpp_warn_flag}" ${_pestpp_warn_ok})
+  if(${_pestpp_warn_ok})
+    list(APPEND PESTPP_CXX_WARN_FLAGS "${_pestpp_warn_flag}")
+  endif()
+endforeach()
+message(STATUS "PESTPP_CXX_WARN_FLAGS=${PESTPP_CXX_WARN_FLAGS}")
+
 # Global definitions
 if(WIN32)
   add_compile_definitions(_WIN32_WINNT=0x0600)

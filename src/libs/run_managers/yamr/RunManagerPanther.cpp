@@ -3282,7 +3282,7 @@ RunManagerPanther::~RunManagerPanther(void)
 		if (FD_ISSET(i, &master))
 		{
 			NetPackage netpack(NetPackage::PackType::TERMINATE, 0, 0,"");
-			char data;
+			char data = '\0';
 			netpack.send(i, &data, 0);
 			err = w_close(i);
 			FD_CLR(i, &master);
@@ -3722,7 +3722,7 @@ int RunManagerPanther::release_workers(const vector<int>& worker_idxs)
 		try
 		{
 			NetPackage netpack(NetPackage::PackType::TERMINATE, 0, 0, "");
-			char data;
+			char data = '\0';
 			netpack.send(i_sock, &data, 0);
 		}
 		catch (...)

@@ -909,7 +909,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			report(ss.str(), true);
 			//terminate = true;
 			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
-			char data;
+			char data = '\0';
 			err = send_message(net_pack, &data, 0);
 			//if (err != 1)
 			//{
@@ -981,7 +981,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "terminating execution ..." << endl << endl;
 				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "");
-				char data;
+				char data = '\0';
 				pair<int,string> np_err = send_message(net_pack, &data, 0);
 				terminate_or_restart(-1);
 			}
@@ -1055,7 +1055,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "received corrupt observation name packet from master" << endl;
 				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "");
-				char data;
+				char data = '\0';
 				pair<int,string> np_err = send_message(net_pack, &data, 0);
 				terminate_or_restart(-1);
 			}
@@ -1153,7 +1153,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				cap << " disk_total_mb:" << (disk.total_bytes / to_mb)
 				    << " disk_avail_mb:" << (disk.available_bytes / to_mb);
 			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0, cap.str());
-			char data;
+			char data = '\0';
 			err = send_message(net_pack, &data, 0);
 			if (err.first != 1)
 			{
@@ -1289,7 +1289,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 							frec << ss.str() << endl;
 							cout << ss.str() << endl;
 							net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
-							char data;
+							char data = '\0';
 							err = send_message(net_pack, &data, 0);
 							terminate = true;
 							continue;
@@ -1301,7 +1301,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 							frec << ss.str() << endl;
 							cout << ss.str() << endl;
 							net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
-							char data;
+							char data = '\0';
 							err = send_message(net_pack, &data, 0);
 							terminate = true;
 							continue;
@@ -1371,7 +1371,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				// agent says it can answer REQ_PARTIAL without changing the handshake
 				net_pack.reset(NetPackage::PackType::READY, 0, 0,
 					string("lets do it ") + NetPackage::PARTIAL_CAPABILITY_TAG);
-				char data;
+				char data = '\0';
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
 				{
@@ -1444,7 +1444,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "group_id:" << group_id << " run_id:" << run_id << " " << info_txt << " " << final_run_status.second;
 				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,ss.str());
-				char data;
+				char data = '\0';
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
 				{
@@ -1461,7 +1461,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					ss << "debug_panther_fail_freeze = true, entering frozen state...";
 					report(ss.str(), true);
 					net_pack.reset(NetPackage::PackType::DEBUG_FAIL_FREEZE, group_id, run_id, final_run_status.second);
-					char data;
+					char data = '\0';
 					err = send_message(net_pack, &data, 0);
 					if (err.first != 1)
 					{
@@ -1490,7 +1490,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "run_id:" << run_id << " " << info_txt << " killed";
 				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, final_run_status.second);
-				char data;
+				char data = '\0';
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
 				{
@@ -1507,7 +1507,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			{
 				ss << "corrupt/incorrect message received from master:" << final_run_status.second << " " << info_txt << " quitting for safety";
 				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, ss.str());
-				char data;
+				char data = '\0';
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
 				{
@@ -1536,7 +1536,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::READY, 0, 0,
 					final_run_status.second + " " + NetPackage::PARTIAL_CAPABILITY_TAG);
-				char data;
+				char data = '\0';
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
 				{

@@ -122,7 +122,6 @@ private:
 	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 
 	vector<double> get_euclidean_distance(map<string, double> first, map<string, double> second);
-	double get_euclidean_fitness(double E, double V);
 	map<string, double> get_cluster_crowding_fitness(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	map<string, map<string, double>> member_struct;

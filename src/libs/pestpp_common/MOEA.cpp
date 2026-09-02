@@ -1163,26 +1163,12 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 	return euclidean_dist;
 }
 
-/**
- * @brief Get euclidean fitness.
- *
- * @param E Description.
- * @param V Description.
- *
- * @return Description.
- */
-double ParetoObjectives::get_euclidean_fitness(double E, double V)
-{
-	//double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
-	double val;
-
-	/*if (beta < 0)
-		val = pow(E / exp(pow(V, 0.5)),0.5);
-	else
-		val = pow(E / (beta * pow(V, 0.5) + 1),0.5);*/
-	
-	return val;
-}
+// get_euclidean_fitness() was removed here. Its whole body was commented out, so it returned an
+// uninitialized double - whatever happened to be on the stack - and nothing called it. Left in
+// place it was a trap: wiring it up would have fed garbage fitness into the sort with nothing to
+// show where the numbers came from. The commented-out formula is in the history if it is wanted:
+//   beta < 0 : pow(E / exp(pow(V, 0.5)), 0.5)
+//   else     : pow(E / (beta * pow(V, 0.5) + 1), 0.5)
 
 /**
  * @brief Get cluster crowding fitness.
