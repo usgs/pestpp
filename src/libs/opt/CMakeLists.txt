@@ -139,18 +139,20 @@ if(WIN32)
   )
 endif()
 
-target_compile_options(opt PRIVATE ${PESTPP_CXX_WARN_FLAGS})
-
-# -Wno-self-assign AFTER the shared flags, so it overrides them for this target only.
+# PESTPP_CXX_WARN_FLAGS is deliberately NOT applied here.
 #
-# This is vendored Coin-OR source. Clp has three deliberate self-assignments - the old trick for
-# silencing an unused-variable warning - and we are not going to edit upstream code to fix them.
-# Left reporting, they would be three permanent warnings in every build, and a warning that is
-# always there is one nobody reads: exactly how the real defects these flags now catch went
-# unnoticed for years. Our own code is clean for this, so the category stays meaningful.
-if(NOT MSVC)
-  target_compile_options(opt PRIVATE -Wno-self-assign)
-endif()
+# This is vendored Coin-OR. Our warning policy exists to catch defects in code we write and can
+# fix, and none of that applies to a third-party library we take as-is: every warning it emits
+# is one nobody will ever act on, and with -Werror it stops being noise and starts breaking the
+# build outright.
+#
+# It did exactly that. Coin-OR tripped -Werror=self-assign (three deliberate self-assignments,
+# the old trick for silencing an unused-variable warning), and then CoinIndexedVector.cpp
+# tripped -Werror=uninitialized on the RelWithDebInfo build - which the Release build had not
+# hit, because gcc's analysis changes with the optimisation level. Silencing them one category
+# at a time was chasing symptoms; the cause is linting code we do not maintain.
+#
+# Our own targets keep the full set, which is where it does some good.
 
 # opt is vendored Coin-OR and uses nothing from pestpp_com; this edge only created a
 # dependency cycle, which blocks any shared-library build
