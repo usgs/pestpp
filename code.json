@@ -1,0 +1,47 @@
+[
+  {
+    "name": "pestpp",
+    "organization": "U.S. Geological Survey and Intera",
+    "description": "model-independent parameter estimation, uncertainty analysis, and optimization tools",
+    "version": "5.3",
+    "status": "Release",
+
+    "permissions": {
+      "usageType": "openSource",
+      "licenses": [
+        {
+          "name": "Public Domain, CC0-1.0",
+          "URL": "https://github.com/DOI-USGS/pestpp/blob/main/LICENSE.md"
+	}
+      ]
+    },
+
+    "homepageURL": "https://github.com/DOI-USGS/pestpp",
+    "downloadURL": "https://github.com/DOI-USGS/pestpp/archive/refs/heads/main.zip",
+    "disclaimerURL": "https://github.com/DOI-USGS/pestpp/raw/main/DISCLAIMER.md",
+    "repositoryURL": "https://github.com/DOI-USGS/pestpp.git",
+    "vcs": "git",
+
+    "laborHours": 10000,
+
+    "tags": [
+      "model-indepdendent",
+      "hydrology",
+      "parameter estimation",
+      "uncertainty analysis"
+    ],
+
+    "languages": [
+      "C++"
+    ],
+
+    "contact": {
+      "name": "Michael Fienen",
+      "email": "mnfienen@usgs.gov"
+    },
+
+    "date": {
+      "metadataLastUpdated": "2026-07-24"
+    }
+  }
+]
