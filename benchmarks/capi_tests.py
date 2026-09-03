@@ -2229,7 +2229,12 @@ def capi_host_failure_count_test():
     # a long run shows it.
     fail_lines = [ln for ln in open(rmr) if "failed on agent:" in ln]
     assert fail_lines, "no run-failure lines in the rmr"
-    keys = ["mem_total_mb", "mem_avail_mb", "disk_total_mb", "disk_avail_mb"]
+    # the last two are the AGENT PROCESS, not the machine. on a host running several
+    # agents the machine figures are shared between them and these are not, which is the
+    # whole reason both are sent. agent_peak_mem_mb is a high-water mark, so a run that
+    # ballooned and then freed still reports what it cost.
+    keys = ["mem_total_mb", "mem_avail_mb", "disk_total_mb", "disk_avail_mb",
+            "agent_mem_mb", "agent_peak_mem_mb"]
     for k in keys:
         assert k + ":" in fail_lines[0], \
             "{0} missing from the failure line: {1}".format(k, fail_lines[0].strip()[:200])
@@ -2401,7 +2406,12 @@ def capi_agent_resources_test():
     agent_exe = _find_agent_exe()
     res_port = port + 13
     procs = []
-    keys = ["mem_total_mb", "mem_avail_mb", "disk_total_mb", "disk_avail_mb"]
+    # the last two are the AGENT PROCESS, not the machine. on a host running several
+    # agents the machine figures are shared between them and these are not, which is the
+    # whole reason both are sent. agent_peak_mem_mb is a high-water mark, so a run that
+    # ballooned and then freed still reports what it cost.
+    keys = ["mem_total_mb", "mem_avail_mb", "disk_total_mb", "disk_avail_mb",
+            "agent_mem_mb", "agent_peak_mem_mb"]
 
     try:
         with PestppLib(_find_library(), TOOL_IES, "pest.pst", wd, port=res_port) as ies:

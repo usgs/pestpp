@@ -61,6 +61,10 @@ using namespace std;
 // is not there.
 #if defined(OS_WIN)
 // Windows.h arrives through system_variables.h
+#include <psapi.h>                    // GetProcessMemoryInfo
+#if defined(_MSC_VER)
+#pragma comment(lib, "psapi.lib")     // rather than a link entry in every CMakeLists
+#endif
 #elif defined(OS_MAC)
 #include <sys/sysctl.h>
 #include <mach/mach.h>
@@ -183,6 +187,65 @@ SysMemory get_system_memory()
 		if (usage >= 0)
 			m.available_bytes = (limit > usage) ? (limit - usage) : 0;
 		m.valid = true;
+	}
+#endif
+
+	return m;
+}
+
+/**
+ * @brief Memory this process is using, current and peak, in bytes.
+ */
+SysProcessMemory get_process_memory()
+{
+	SysProcessMemory m;
+	m.valid = false;
+	m.current_bytes = 0;
+	m.peak_bytes = 0;
+
+#if defined(OS_WIN)
+	PROCESS_MEMORY_COUNTERS pmc;
+	pmc.cb = sizeof(pmc);
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+	{
+		m.current_bytes = (long long)pmc.WorkingSetSize;
+		m.peak_bytes = (long long)pmc.PeakWorkingSetSize;
+		m.valid = true;
+	}
+
+#elif defined(OS_MAC)
+	// MACH_TASK_BASIC_INFO rather than the older TASK_BASIC_INFO: the old struct has no
+	// resident_size_max, so the peak - the number worth having - is not available from it
+	mach_task_basic_info_data_t info;
+	mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+	if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+	              (task_info_t)&info, &count) == KERN_SUCCESS)
+	{
+		m.current_bytes = (long long)info.resident_size;
+		m.peak_bytes = (long long)info.resident_size_max;
+		m.valid = true;
+	}
+
+#else
+	ifstream f("/proc/self/status");
+	if (f.good())
+	{
+		// whole lines rather than a field-by-field read, same reason as /proc/meminfo above:
+		// not every line carries a unit
+		string line;
+		while (getline(f, line))
+		{
+			istringstream ss(line);
+			string key;
+			long long value = 0;
+			if (!(ss >> key >> value))
+				continue;
+			if (key == "VmRSS:")
+				m.current_bytes = value * 1024;      // this file is in kB
+			else if (key == "VmHWM:")
+				m.peak_bytes = value * 1024;
+		}
+		m.valid = (m.current_bytes > 0);
 	}
 #endif
 

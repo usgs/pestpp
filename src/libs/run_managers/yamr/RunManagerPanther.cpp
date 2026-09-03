@@ -2181,14 +2181,17 @@ void RunManagerPanther::process_message(int i_sock)
 		//
 		// an older agent sends none of this and simply leaves the fields out, which the parser
 		// reports as missing rather than as an error.
+		// the agent's whole info text goes through, the same as the run outcome messages below
+		// do. this used to name the tokens it wanted in a fixed list, which meant a token added
+		// on the agent side was sent and then silently dropped here until someone remembered to
+		// add it in two places - which is exactly what happened to agent_mem_mb.
+		//
+		// nothing else needs to be filtered out: the capability tag carries no colon, so
+		// parse_rmr_file ignores it, and anything a future agent adds arrives for free.
 		const string agent_info = net_pack.get_info_txt();
-		static const char* res_keys[] = {"mem_total_mb", "mem_avail_mb",
-		                                 "disk_total_mb", "disk_avail_mb"};
-		for (auto key : res_keys)
+		if (agent_info.size() > 0)
 		{
-			const string val = extract_info_token(agent_info, key);
-			if (!val.empty())
-				ss << " " << key << ":" << val;
+			ss << " " << agent_info;
 		}
 		report(ss.str(), false);
 	}

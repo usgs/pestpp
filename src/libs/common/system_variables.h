@@ -75,6 +75,31 @@ struct SysStorage
 
 SysStorage get_system_storage(const std::string& path);
 
+/** What THIS PROCESS is using, in bytes. Not the machine - this process.
+ *
+ * `current_bytes` is the resident set size: physical memory held right now.
+ *
+ * `peak_bytes` is the high-water mark since the process started, and it is the one that matters
+ * here. pest++ peaks INSIDE the threaded upgrade solve, where every thread materialises dense
+ * matrices for its own case - not when the ensembles load. Sampling current usage between
+ * iterations therefore reports a comfortable number right up until the run dies. The kernel
+ * records the peak whether or not anyone was watching.
+ *
+ * Separate from SysMemory on purpose: on a host running eight agents the machine figures are
+ * shared between them and these are not.
+ *
+ * `valid` is false when nothing could be read. The numbers are zero then and mean nothing -
+ * check it rather than reading zero as "no memory in use".
+ */
+struct SysProcessMemory
+{
+	bool valid;
+	long long current_bytes;
+	long long peak_bytes;
+};
+
+SysProcessMemory get_process_memory();
+
 #ifdef OS_WIN
 #include <Windows.h>
 PROCESS_INFORMATION start(std::string &cmd_string);

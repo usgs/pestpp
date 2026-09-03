@@ -54,6 +54,17 @@ static string resource_info_txt()
 	if (disk.valid)
 		res << " disk_total_mb:" << (disk.total_bytes / to_mb)
 		    << " disk_avail_mb:" << (disk.available_bytes / to_mb);
+	// and what THIS AGENT is using, which the machine figures above cannot tell you: on a host
+	// running eight agents those are shared and these are not. agent_ prefix for the same
+	// reason.
+	//
+	// peak, not just current, because it is a high-water mark the kernel keeps - so a run that
+	// ballooned and then freed still reports what it cost, which is exactly the case where
+	// current on its own would look innocent.
+	SysProcessMemory pm = get_process_memory();
+	if (pm.valid)
+		res << " agent_mem_mb:" << (pm.current_bytes / to_mb)
+		    << " agent_peak_mem_mb:" << (pm.peak_bytes / to_mb);
 	return res.str();
 }
 
@@ -1431,7 +1442,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "run took: " << run_time << " seconds";
 				report(ss.str(), true);
 				ss.str("");
-				ss << " worker_time:" << run_time/60.0;
+				ss << " worker_time:" << run_time/60.0 << resource_info_txt();
 				string message = info_txt + " " + final_run_status.second + ss.str();
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
 				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, message);
@@ -1513,7 +1524,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "run_id:" << run_id << " " << info_txt << " killed";
 				report(ss.str(), true);
-				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, final_run_status.second);
+				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id,
+				               final_run_status.second + resource_info_txt());
 				char data = '\0';
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
