@@ -87,7 +87,7 @@ jobs:
     #     # environment-file: etc/environment.yml
     #     # use-only-tar-bz2: true
 
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: etc/environment.yml
           cache-environment: false
