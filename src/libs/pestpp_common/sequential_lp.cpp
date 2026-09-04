@@ -1352,9 +1352,16 @@ void sequentialLP::iter_presolve()
 			throw_sequentialLP_error("failed to calc derivatives for the following decision vars: ", failed);
 		}
 
+		// tracked so the failed-run check below knows whether the stack run ids are from THIS
+		// batch. Constraints keeps the map from the last time it added runs and does not clear
+		// it, and run ids start over with each batch - so an iteration that does not refresh
+		// the stack would otherwise subtract last iteration's ids, which this time round belong
+		// to response matrix runs, and swallow real failures.
+		bool added_stack_runs = false;
 		if ((constraints.should_update_chance(slp_iter-1)) && (!constraints.get_use_fosm()))
 		{
 			constraints.add_runs(slp_iter, current_pars, current_constraints_sim, run_mgr_ptr);
+			added_stack_runs = true;
 		}
 
 
@@ -1377,6 +1384,23 @@ void sequentialLP::iter_presolve()
 
 		//check for failed runs
 		//TODO: something better than just dying
+		//
+		// only the RESPONSE MATRIX runs count here. the chance-constraint stack runs were queued
+		// into this same batch above, so get_failed_run_ids() came back holding both kinds with
+		// nothing to tell them apart, and constraints.process_runs() has already dealt with its
+		// own: it drops a failed realization from the par and obs stacks and only gives up when
+		// every one of them fails.
+		//
+		// counting a stack failure here killed the whole optimisation over one dead realization,
+		// and said "failed runs when filling decision var response matrix" while doing it - which
+		// sent you looking at decision var derivatives that were fine. the response matrix in
+		// that case had already been built and saved a few lines above.
+		if (added_stack_runs)
+		{
+			for (auto stack_run_id : constraints.get_stack_run_ids())
+				failed.erase(stack_run_id);
+		}
+
 		if (failed.size() > 0)
 			throw_sequentialLP_error("failed runs when filling decision var response matrix...cannot continue ");
 

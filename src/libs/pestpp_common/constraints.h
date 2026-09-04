@@ -159,6 +159,17 @@ public:
 		return !((!get_std_weights()) && has_stacks);
 	}
 
+	/** The run manager ids belonging to the chance-constraint stack runs.
+	 *
+	 * The stack runs are queued into the SAME run manager batch as whatever the caller is
+	 * running - the response matrix, in pestpp-opt's case - so afterwards
+	 * get_failed_run_ids() hands back both kinds mixed together with no way to tell them
+	 * apart. A caller that wants to act on ITS OWN failures has to subtract these first.
+	 *
+	 * Empty when no stack runs were added, so subtracting it is always safe.
+	 */
+	set<int> get_stack_run_ids() const;
+
 	//get the dimensions
 	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
 	int num_pi_constraints() { return ctl_ord_pi_constraint_names.size(); }

@@ -909,6 +909,111 @@ def fosm_invest():
         print(jcb_file,sc.get_forecast_summary().loc[:,"prior_var"].apply(lambda x: np.sqrt(x)))
 
 
+def stack_run_fail_test():
+    """One stack run fails. pestpp-opt should drop that realization and carry on.
+
+    Chance constraints from a stack only need enough realizations to estimate a quantile, so a
+    single dead model run is not a reason to abandon the optimisation - Constraints already
+    drops the failed realization from both the par and obs stacks and only gives up when they
+    ALL fail.
+
+    The catch is that the response-matrix runs and the stack runs are queued into the SAME run
+    manager batch, so run_mgr_ptr->get_failed_run_ids() afterwards returns both kinds mixed
+    together. Anything that reads that set without separating them will blame a stack failure
+    on the response matrix.
+
+    Failure is forced by a wrapper standing in for the model: it counts invocations, and on the
+    chosen one it deletes the model output files and exits non-zero. Deleting them matters -
+    exiting non-zero on its own leaves the previous run's output in place, which pest++ would
+    happily read as a successful run.
+    """
+    d = os.path.join("opt_dewater_chance", "stack_run_fail_test")
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    shutil.copytree(os.path.join("opt_dewater_chance", "template"), d)
+
+    pst = pyemu.Pst(os.path.join(d, "dewater_pest.base.pst"))
+    # the stack is drawn from the UNCERTAIN parameters, which ship fixed in this template. the
+    # decision vars (group q) are separate and stay adjustable. without this there is nothing to
+    # draw a stack from and pestpp-opt refuses to start with a non-0.5 risk.
+    par = pst.parameter_data
+    par.loc[par.partrans == "fixed", "partrans"] = "log"
+    obs = pst.observation_data
+    obs.loc["q1", "obsval"] = 100
+    obs.loc["q1", "obgnme"] = "equal_to"
+    obs.loc["q1", "weight"] = 1.0
+    pst.pestpp_options.pop("opt_constraint_groups", None)
+    pst.pestpp_options.pop("base_jacobian", None)
+    pst.pestpp_options["opt_risk"] = 0.1
+    stack_size = 8
+    pst.pestpp_options["opt_stack_size"] = stack_size
+    # no retries. the run manager re-runs a failed run up to max_run_fail times, so a wrapper
+    # that fails a single INVOCATION gets quietly retried and the run succeeds - pest++ then
+    # sees no failure at all, which is exactly what happened on the first attempt at this test.
+    pst.pestpp_options["max_run_fail"] = 1
+    pst.control_data.noptmax = 1
+
+    # the response matrix is over the DECISION VARS only - not npar_adj, which now counts the
+    # 600-odd uncertain parameters too. the stack runs are queued after them, so failing a run
+    # a few past the decision-var count lands in the stack. the assertions below confirm it
+    # really was a stack run rather than assuming.
+    dv_groups = [g.strip() for g in str(pst.pestpp_options["opt_dec_var_groups"]).split(",")]
+    n_dv = pst.parameter_data.pargp.isin(dv_groups).sum()
+    fail_on = n_dv + 4
+
+    with open(os.path.join(d, "forced_fail.py"), "w") as f:
+        f.write("import os, sys, subprocess\n")
+        f.write("n = 0\n")
+        f.write("if os.path.exists('run_count.dat'):\n")
+        f.write("    n = int(open('run_count.dat').read().strip())\n")
+        f.write("n += 1\n")
+        f.write("open('run_count.dat','w').write(str(n))\n")
+        f.write("open('run_log.dat','a').write(str(n) + chr(10))\n")
+        f.write("if n == {0}:\n".format(fail_on))
+        f.write("    for o in ['dewater_pest.hds','WEL_0000.dat']:\n")
+        f.write("        if os.path.exists(o):\n")
+        f.write("            os.remove(o)\n")
+        f.write("    sys.exit(1)\n")
+        f.write("subprocess.check_call('mfnwt dewater_pest.nam', shell=True)\n")
+
+    pst.model_command = ["python forced_fail.py"]
+    pst_file = os.path.join(d, "test.pst")
+    pst.write(pst_file)
+
+    print("stack_size:", stack_size, "n_dec_vars:", n_dv, "failing model run #", fail_on)
+    died = None
+    try:
+        pyemu.os_utils.run("{0} {1}".format(exe_path, "test.pst"), cwd=d)
+    except Exception as e:
+        died = str(e)
+
+    rec = os.path.join(d, "test.rec")
+    assert os.path.exists(rec), "no rec file at all"
+    rec_txt = open(rec).read()
+
+    n_runs = 0
+    if os.path.exists(os.path.join(d, "run_count.dat")):
+        n_runs = int(open(os.path.join(d, "run_count.dat")).read().strip())
+    print("model runs made:", n_runs)
+    assert n_runs >= fail_on, \
+        "never reached the run we meant to fail ({0} of {1}) - the batch was smaller than expected".format(
+            n_runs, fail_on)
+
+    # the stack handler should have noticed and dropped it
+    assert "stack runs failed" in rec_txt, \
+        "rec has no record of a failed stack run - the wrapper may not have failed a STACK run:\n" \
+        + rec_txt[-2000:]
+
+    # and the run should not have been abandoned. a stack failure blamed on the response matrix
+    # is the specific wrong outcome this test exists to catch.
+    blamed_rsp = "failed runs when filling decision var response matrix" in rec_txt
+    assert not blamed_rsp, \
+        "a STACK run failure was reported as a response-matrix failure and pestpp-opt quit. " \
+        "the failed-run set from the shared batch is not being separated by kind."
+    assert died is None, "pestpp-opt did not finish: {0}".format(died)
+    print("pestpp-opt continued after a stack run failed")
+
+
 if __name__ == "__main__":
     #fosm_invest()
     #startworker()

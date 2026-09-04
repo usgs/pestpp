@@ -2983,6 +2983,22 @@ pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string rea
 }
 
 /**
+ * @brief The run manager ids of the chance-constraint stack runs.
+ */
+set<int> Constraints::get_stack_run_ids() const
+{
+	set<int> ids;
+	// the single-realization path (pestpp-opt)
+	for (const auto& kv : stack_pe_run_map)
+		ids.insert(kv.second);
+	// and the per-member path used by the population methods
+	for (const auto& real_map : population_stack_pe_run_map)
+		for (const auto& kv : real_map.second)
+			ids.insert(kv.second);
+	return ids;
+}
+
+/**
  * @brief Save oe stack.
  *
  * @param iter Description.
