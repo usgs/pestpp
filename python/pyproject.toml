@@ -26,7 +26,15 @@ classifiers = [
 #
 # The thin ctypes layer, pestpp.pestpp_lib, needs only numpy. Someone who wants just that still
 # pays for pandas and pyemu here, which is the price of shipping one distribution.
-dependencies = ["numpy", "pandas", "pyemu"]
+# pandas is held below 3 to match etc/environment.yml. pandas 3.0 removed and changed enough
+# that the benchmark harness went red across every module the day it landed, and pyemu - which
+# this package imports at module scope - has not been checked against it either.
+#
+# This is a firmer statement than the CI pin: it constrains every environment that installs
+# pestpp, not just our test runner. It is here because a wheel that fails on `import pestpp`
+# is worse than one with a conservative bound, and the bound costs users nothing today - pandas
+# 3 is days old. Lift it once pyemu and the harness are known good on 3.x.
+dependencies = ["numpy", "pandas<3", "pyemu"]
 
 # the version is read from src/libs/common/config_os.h by setup.py, the same single definition
 # cmake, cpack and the docs build use. Nothing here restates it.

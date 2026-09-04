@@ -6,7 +6,15 @@ dependencies:
   # required
   - python<=3.11
   - numpy>=1.15.0
-  - pandas
+  # pinned below 3. pandas 3.0 removed and changed things the benchmark harness relies on, and
+  # it arrived unannounced through this unpinned entry - 48 tests across every module went red
+  # at once on 2026-09-04, none of them for a pest++ reason:
+  #   read_csv(delim_whitespace=True)  removed          -> use sep='\s+'
+  #   df.fillna('') on a numeric column raises          LossySetitemError
+  #   frames returned read-only under copy-on-write     -> "assignment destination is read-only"
+  # none of that is hard to fix, but it is harness work, and it should not land as a surprise
+  # in the middle of a release candidate. lift this once the benchmarks are pandas 3 clean.
+  - pandas<3
   - scipy
   # optional
   - matplotlib>=1.4.0
