@@ -2901,6 +2901,172 @@ static void test_enif_woodbury_step()
     CHK(threw, "mismatched noise length throws");
 }
 
+static void test_enif_lowrank_step()
+{
+    cout << "[enif: low-rank woodbury step matches the dense step]" << endl;
+    int p = 9, n = 12, N = 4;
+    std::mt19937 gen(23);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    Eigen::MatrixXd A(p, N), B(n, N), e(p, N), r(n, N);
+    for (int i = 0; i < p; i++) for (int j = 0; j < N; j++) { A(i, j) = nd(gen); e(i, j) = 0.3 * nd(gen); }
+    for (int i = 0; i < n; i++) for (int j = 0; j < N; j++) { B(i, j) = nd(gen); r(i, j) = nd(gen); }
+    Eigen::VectorXd var(n);
+    for (int i = 0; i < n; i++) var[i] = 0.05 * (i + 1);
+    // a dense spd prior covariance and the ensemble covariance
+    Eigen::MatrixXd Z(p, p);
+    for (int i = 0; i < p; i++) for (int j = 0; j < p; j++) Z(i, j) = nd(gen);
+    Eigen::MatrixXd Cd = Z * Z.transpose() + Eigen::MatrixXd::Identity(p, p);
+    Eigen::MatrixXd Ccur = A * A.transpose();
+
+    // explicit sparse H with C = A A^T: U = H A, Q = I, L = A
+    Eigen::MatrixXd Hd = Eigen::MatrixXd::Zero(n, p);
+    for (int i = 0; i < n; i++) for (int j = 0; j < p; j++) if (((i + 2 * j) % 3) == 0) Hd(i, j) = nd(gen);
+    Eigen::SparseMatrix<double> H = Hd.sparseView();
+    Eigen::SparseMatrix<double> Ccur_s = Ccur.sparseView();
+    for (double lam : {0.0, 1.5, 40.0})
+    {
+        Eigen::MatrixXd dense = enif_woodbury_step(H, var, Ccur_s, e, r, lam);
+        Eigen::MatrixXd low = enif_lowrank_step(Hd * A, Eigen::MatrixXd::Identity(N, N), A, var, e, Hd * e, r, lam);
+        CHK((dense - low).cwiseAbs().maxCoeff() < 1e-9, "sparse H, ensemble covariance: low-rank == dense, lambda " + to_string(lam));
+    }
+
+    // implicit H = B M A^T: U = B, Q = M K M, L = C A M, against the formula with everything dense
+    Eigen::MatrixXd gram = A.transpose() * A;
+    double gamma = 1.0e-6 * gram.trace() / double(N);
+    gram.diagonal().array() += gamma;
+    Eigen::LDLT<Eigen::MatrixXd> gf(gram);
+    Eigen::MatrixXd Hi = B * gf.solve(A.transpose());
+    for (int which = 0; which < 2; which++)
+    {
+        const Eigen::MatrixXd& C = (which == 0) ? Cd : Ccur;
+        Eigen::MatrixXd V = C * A;
+        Eigen::MatrixXd K = A.transpose() * V;
+        Eigen::MatrixXd Q = gf.solve(gf.solve(K).transpose());
+        Eigen::MatrixXd L = gf.solve(V.transpose()).transpose();
+        for (double lam : {0.0, 2.0})
+        {
+            double sc = 1.0 / (1.0 + lam);
+            Eigen::MatrixXd CHt = sc * C * Hi.transpose();
+            Eigen::MatrixXd G = Hi * CHt;
+            G.diagonal() += var;
+            Eigen::MatrixXd He = Hi * e;
+            Eigen::MatrixXd want = -((sc * (e - (CHt * G.ldlt().solve(He)))) + (CHt * G.ldlt().solve(r)));
+            Eigen::MatrixXd got = enif_lowrank_step(B, Q, L, var, e, He, r, lam);
+            CHK((got - want).cwiseAbs().maxCoeff() < 1e-8,
+                string("implicit H, ") + (which == 0 ? "supplied" : "ensemble") + " covariance: low-rank == dense, lambda " + to_string(lam));
+        }
+    }
+    // a singular Q (rank 1) still gives the dense answer: the form never inverts Q
+    {
+        Eigen::MatrixXd q1 = Eigen::MatrixXd::Zero(N, 1);
+        q1(0, 0) = 1.0;
+        Eigen::MatrixXd Q1 = q1 * q1.transpose();
+        Eigen::MatrixXd L1 = A;
+        double lam = 0.5, sc = 1.0 / (1.0 + lam);
+        Eigen::MatrixXd G = sc * B * Q1 * B.transpose();
+        G.diagonal() += var;
+        Eigen::MatrixXd He = B * q1 * q1.transpose() * A.transpose() * e;
+        Eigen::MatrixXd want = -sc * (e + L1 * B.transpose() * G.ldlt().solve(r - sc * He));
+        Eigen::MatrixXd got = enif_lowrank_step(B, Q1, L1, var, e, He, r, lam);
+        CHK((got - want).cwiseAbs().maxCoeff() < 1e-9, "a singular Q is handled");
+    }
+    // one column at a time equals its column of the batch
+    Eigen::MatrixXd all = enif_lowrank_step(Hd * A, Eigen::MatrixXd::Identity(N, N), A, var, e, Hd * e, r, 1.5);
+    Eigen::MatrixXd one = enif_lowrank_step(Hd * A, Eigen::MatrixXd::Identity(N, N), A, var, e.col(2), Hd * e.col(2), r.col(2), 1.5);
+    CHK((all.col(2) - one.col(0)).cwiseAbs().maxCoeff() < 1e-12, "a single column matches the batch");
+    bool threw = false;
+    try { enif_lowrank_step(B, Eigen::MatrixXd::Identity(N + 1, N + 1), A, var, e, Hd * e, r, 1.0); } catch (...) { threw = true; }
+    CHK(threw, "a Q of the wrong size throws");
+    threw = false;
+    Eigen::VectorXd bad = var; bad[3] = 0.0;
+    try { enif_lowrank_step(B, Eigen::MatrixXd::Identity(N, N), A, bad, e, Hd * e, r, 1.0); } catch (...) { threw = true; }
+    CHK(threw, "a zero noise variance throws");
+}
+
+static void test_enif_supplied_prec_hybrid()
+{
+    cout << "[enif: supplied prior precision file and the hybrid damping step]" << endl;
+    PO o; o.set_defaults();
+    CHK(o.get_ies_enif_prec_file() == "", "ies_enif_prec_file defaults to empty");
+    CHK(!o.get_ies_enif_hybrid_damp(), "ies_enif_hybrid_damp defaults to false");
+    CHK(o.assign_value_by_key("IES_ENIF_PREC_FILE", "MyPrec.jcb") == PO::ARG_STATUS::ARG_ACCEPTED, "prec file parses");
+    CHK(o.get_ies_enif_prec_file() == "MyPrec.jcb", "and keeps its case");
+    CHK(o.assign_value_by_key("IES_ENIF_HYBRID_DAMP", "true") == PO::ARG_STATUS::ARG_ACCEPTED, "hybrid parses");
+    CHK(o.get_ies_enif_hybrid_damp(), "and is true after 'true'");
+
+    // a 4-node chain precision with values, in the pest ascii matrix format
+    Eigen::MatrixXd Q(4, 4);
+    Q << 2.0, -0.8, 0.0, 0.0,
+        -0.8, 2.5, -0.9, 0.0,
+         0.0, -0.9, 2.5, -0.7,
+         0.0, 0.0, -0.7, 2.0;
+    string pf = "selftest_chain_prec.mat";
+    {
+        ofstream f(pf);
+        f << " 4 4 1\n";
+        for (int i = 0; i < 4; i++) { for (int j = 0; j < 4; j++) f << " " << Q(i, j); f << "\n"; }
+        f << "* row and column names\nP1\nP2\nP3\nP4\n";
+    }
+    ofstream frec("selftest_enif_prec_hybrid.rec");
+    vector<string> names = {"P1", "P2", "P3", "P4"};
+    EnifGraph g;
+    g.from_file(pf, names, frec);
+    CHK(g.num_edges() == 3, "the precision file doubles as the graph: 3 edges");
+    g.load_precision(pf, frec);
+    CHK(g.has_precision(), "precision loaded");
+    CHK((Eigen::MatrixXd(g.precision()) - Q).cwiseAbs().maxCoeff() < 1e-12, "loaded values match the file");
+    // a non-symmetric file is refused
+    string bf = "selftest_chain_prec_bad.mat";
+    {
+        ofstream f(bf);
+        f << " 4 4 1\n";
+        Eigen::MatrixXd Qb = Q; Qb(0, 1) = -0.3;
+        for (int i = 0; i < 4; i++) { for (int j = 0; j < 4; j++) f << " " << Qb(i, j); f << "\n"; }
+        f << "* row and column names\nP1\nP2\nP3\nP4\n";
+    }
+    bool threw = false;
+    try { EnifGraph gb; gb.from_file(bf, names, frec); gb.load_precision(bf, frec); } catch (...) { threw = true; }
+    CHK(threw, "a non-symmetric precision file throws");
+
+    // hybrid step: Lam_post = Q + lam Qcur + H^T Rinv H against the dense formula
+    std::mt19937 gen(9);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    int N = 40;
+    Eigen::MatrixXd A(4, N);
+    for (int i = 0; i < 4; i++) for (int j = 0; j < N; j++) A(i, j) = 0.3 * nd(gen);
+    for (int j = 0; j < N; j++) { A(1, j) += 0.5 * A(0, j); A(2, j) += 0.5 * A(1, j); A(3, j) += 0.5 * A(2, j); }
+    A = (A.colwise() - A.rowwise().mean()) / sqrt(double(N - 1));
+    g.estimate_precision(A, 1.0e-3, frec, false, true);
+    CHK(g.has_current_precision(), "current-ensemble precision estimated into its own slot");
+    CHK((Eigen::MatrixXd(g.precision()) - Q).cwiseAbs().maxCoeff() < 1e-12, "the prior precision is untouched by it");
+    Eigen::MatrixXd Qcur = Eigen::MatrixXd(g.current_precision());
+    CHK(Qcur.diagonal().minCoeff() > Q.diagonal().maxCoeff(), "contracted ensemble -> current precision larger than the prior's");
+    Eigen::MatrixXd Hd(3, 4);
+    Hd << 1.0, 0.0, 0.5, 0.0,
+          0.0, 2.0, 0.0, 0.0,
+          0.0, 0.0, 0.0, 1.5;
+    Eigen::SparseMatrix<double> H = Hd.sparseView();
+    Eigen::VectorXd rinv(3); rinv << 4.0, 1.0, 2.0;
+    Eigen::MatrixXd e = Eigen::MatrixXd::Zero(4, 2), r(3, 2);
+    for (int i = 0; i < 3; i++) for (int j = 0; j < 2; j++) r(i, j) = nd(gen);
+    for (int i = 0; i < 4; i++) e(i, 1) = 0.2 * nd(gen);
+    double lam = 3.0;
+    g.set_hybrid_damp(false);
+    Eigen::MatrixXd plain = g.information_step(H, rinv, e, r, lam, frec);
+    Eigen::MatrixXd want_plain = -((1.0 + lam) * Q + Hd.transpose() * rinv.asDiagonal() * Hd).ldlt().solve(Q * e + Hd.transpose() * (rinv.asDiagonal() * r));
+    CHK((plain - want_plain).cwiseAbs().maxCoeff() < 1e-9, "plain step unchanged: (1+lam) on the prior precision");
+    g.set_hybrid_damp(true);
+    Eigen::MatrixXd hyb = g.information_step(H, rinv, e, r, lam, frec);
+    Eigen::MatrixXd want_hyb = -(Q + lam * Qcur + Hd.transpose() * rinv.asDiagonal() * Hd).ldlt().solve(Q * e + Hd.transpose() * (rinv.asDiagonal() * r));
+    CHK((hyb - want_hyb).cwiseAbs().maxCoeff() < 1e-9, "hybrid step: lam on the current precision, prior in the curvature and gradient");
+    CHK((hyb - plain).cwiseAbs().maxCoeff() > 1e-6, "and it differs from the plain step");
+    // without a current precision the hybrid step refuses
+    EnifGraph g2; g2.from_file(pf, names, frec); g2.load_precision(pf, frec); g2.set_hybrid_damp(true);
+    threw = false;
+    try { g2.information_step(H, rinv, e, r, lam, frec); } catch (...) { threw = true; }
+    CHK(threw, "hybrid damping without a current precision throws");
+}
+
 static void test_estimate_sparse_h_divisor()
 {
     cout << "[enif: unexplained variance divisor and stream parameter]" << endl;
@@ -3452,6 +3618,8 @@ int main()
     run_test(test_irls_max_dev, "test_irls_max_dev");
     run_test(test_enif_inflation_report, "test_enif_inflation_report");
     run_test(test_enif_woodbury_step, "test_enif_woodbury_step");
+    run_test(test_enif_lowrank_step, "test_enif_lowrank_step");
+    run_test(test_enif_supplied_prec_hybrid, "test_enif_supplied_prec_hybrid");
     run_test(test_estimate_sparse_h_divisor, "test_estimate_sparse_h_divisor");
     run_test(test_enif_mm_inflation_csv, "test_enif_mm_inflation_csv");
     run_test(test_enif_current_prec, "test_enif_current_prec");

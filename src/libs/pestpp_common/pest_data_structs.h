@@ -708,6 +708,10 @@ public:
     void set_ies_enif_current_prec(bool _f) { ies_enif_current_prec = _f; }
     bool get_ies_enif_direct_nbrs() const { return ies_enif_direct_nbrs; }
     void set_ies_enif_direct_nbrs(bool _f) { ies_enif_direct_nbrs = _f; }
+    string get_ies_enif_prec_file() const { return ies_enif_prec_file; }
+    void set_ies_enif_prec_file(string _s) { ies_enif_prec_file = _s; }
+    bool get_ies_enif_hybrid_damp() const { return ies_enif_hybrid_damp; }
+    void set_ies_enif_hybrid_damp(bool _f) { ies_enif_hybrid_damp = _f; }
     string get_ies_enif_order() const { return ies_enif_order; }
     void set_ies_enif_order(string _s) { ies_enif_order = _s; }
     bool get_ies_enif_save_h() const { return ies_enif_save_h; }
@@ -1121,6 +1125,11 @@ private:
 	//regress each node on its direct graph neighbours only when estimating the precision,
 	//ignoring the fill of the factorisation
 	bool ies_enif_direct_nbrs;
+	//a sparse prior precision read from file (values, not just the pattern) in place of
+	//one estimated from the prior ensemble; the file is also the graph
+	string ies_enif_prec_file;
+	//lambda on the current-ensemble precision instead of the prior one on the graph path
+	bool ies_enif_hybrid_damp;
 	string ies_enif_order;
 	bool ies_enif_save_h;
 	bool ies_use_prior_prec;

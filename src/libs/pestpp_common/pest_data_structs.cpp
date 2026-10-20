@@ -1226,6 +1226,17 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_enif_direct_nbrs = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
+    else if (key == "IES_ENIF_PREC_FILE")
+    {
+        //org_value: filenames are case sensitive
+        ies_enif_prec_file = org_value;
+        return true;
+    }
+    else if (key == "IES_ENIF_HYBRID_DAMP")
+    {
+        ies_enif_hybrid_damp = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
     else if (key == "IES_ENIF_SHRINK")
     {
         convert_ip(value,ies_enif_shrink);
@@ -2371,6 +2382,8 @@ os << endl << "...pestpp-swp options:" << endl;
 	os << "ies_enif_shrink: " << ies_enif_shrink << endl;
 	os << "ies_enif_current_prec: " << ies_enif_current_prec << endl;
 	os << "ies_enif_direct_nbrs: " << ies_enif_direct_nbrs << endl;
+	os << "ies_enif_prec_file: " << ies_enif_prec_file << endl;
+	os << "ies_enif_hybrid_damp: " << ies_enif_hybrid_damp << endl;
 	os << "ies_enif_order: " << ies_enif_order << endl;
 	os << "ies_enif_save_h: " << ies_enif_save_h << endl;
 	os << "ies_use_prior_prec: " << ies_use_prior_prec << endl;
@@ -2635,6 +2648,8 @@ void PestppOptions::set_defaults_legacy()
     set_ies_enif_shrink(-1.0);   //automatic: per-node ridge by cross-validation
     set_ies_enif_current_prec(false);
     set_ies_enif_direct_nbrs(false);
+    set_ies_enif_prec_file("");
+    set_ies_enif_hybrid_damp(false);
     set_ies_enif_order("amd");
     set_ies_enif_save_h(false);
     set_ies_use_prior_prec(false);

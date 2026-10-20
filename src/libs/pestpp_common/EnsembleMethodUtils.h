@@ -464,7 +464,7 @@ public:
         unordered_map<string, Eigen::VectorXd>& _real_weight_map,
         unordered_map<string, Eigen::SparseMatrix<double>>& _H_map,
         unordered_map<string, Eigen::VectorXd>& _unexp_map, bool _h_ready,
-        const EnifGraph* _graph, const Eigen::SparseMatrix<double>* _C,
+        const EnifGraph* _graph, const Eigen::SparseMatrix<double>* _C, const Eigen::MatrixXd* _Afac,
         double _lasso, int _cv_folds, bool _inflate, double _cur_lam, Eigen::MatrixXd& _upgrade);
     void work(int thread_id);
     //noise variance each realization ended up with, aligned with real_names, for the report
@@ -486,6 +486,8 @@ protected:
     bool h_ready;
     const EnifGraph* graph;
     const Eigen::SparseMatrix<double>* C;
+    //the current ensemble anomalies when the covariance is C = A A^T; null means use C
+    const Eigen::MatrixXd* Afac;
     double lasso;
     int cv_folds;
     bool inflate;

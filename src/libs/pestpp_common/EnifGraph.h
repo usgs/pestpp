@@ -58,7 +58,24 @@ public:
 	of the cholesky-like factor.  shrink is a stein-type pull toward the
 	diagonal, needed when a node's neighbourhood approaches the ensemble size. */
 	void estimate_precision(const Eigen::MatrixXd& anomalies, double shrink,
-		ofstream& frec, bool direct_only = false);
+		ofstream& frec, bool direct_only = false, bool into_current = false);
+	//into_current estimates from the CURRENT ensemble into a second matrix that only
+	//the hybrid damping below uses; the prior precision is left alone
+	/* read the prior precision itself from a file - values, not just the pattern.
+	the same file is the graph, so from_file() is called first with it.  a precision
+	that is model-based (from the variogram the prior was drawn from) rather than
+	estimated from the ensemble is the one thing the estimated graph path could not
+	supply at npar >> N.  the matrix must be symmetric and positive definite. */
+	void load_precision(const string& filename, ofstream& frec);
+	/* hybrid damping: lambda multiplies the CURRENT ensemble precision instead of
+	the prior one,  Lam_post = Lam_prior + lam Lam_cur + H^T Rinv H.  the curvature
+	keeps the prior's reach outside the ensemble span; the trust region shrinks with
+	the ensemble as it does in ies.  needs estimate_precision(..., into_current=true)
+	each iteration. */
+	void set_hybrid_damp(bool flag) { hybrid_damp = flag; }
+	bool get_hybrid_damp() const { return hybrid_damp; }
+	bool has_current_precision() const { return cur_ready; }
+	const Eigen::SparseMatrix<double>& current_precision() const { return prec_cur; }
 	//shrink < 0 (the default): ridge per node by 5-fold cross-validation over the
 	//realizations, k/(N-1) when there are fewer than 20.  direct_only regresses each
 	//node on its direct graph neighbours alone and ignores the fill the factorisation
@@ -110,6 +127,9 @@ private:
 	int fill_edges = 0;
 	Eigen::SparseMatrix<double> adj;
 	Eigen::SparseMatrix<double> prec;
+	Eigen::SparseMatrix<double> prec_cur;
+	bool cur_ready = false;
+	bool hybrid_damp = false;
 	mutable Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
 };
 
@@ -162,6 +182,29 @@ variance, already inflated if that is wanted. */
 Eigen::MatrixXd enif_woodbury_step(const Eigen::SparseMatrix<double>& H,
 	const Eigen::VectorXd& noise_var, const Eigen::SparseMatrix<double>& C,
 	const Eigen::MatrixXd& e, const Eigen::MatrixXd& resid, double lam);
+
+/* the same step when H C H^T has rank N (the ensemble size) and is given as a
+factor, so nothing sized n x n or p x n is ever formed:
+
+    H C H^T = U Q U^T       U is n x N, Q is N x N symmetric and at least psd
+    C H^T   = L U^T         L is p x N
+    G = diag(noise_var) + s U Q U^T,  s = 1 / (1 + lam)
+    delta = -s [ e + L U^T G^-1 (resid - s He) ]
+
+G^-1 is applied by woodbury a second time, in the form that needs no inverse
+of Q (Q may be singular):
+
+    G^-1 v = Rinv v - Rinv U (sQ) (I + U^T Rinv U sQ)^-1 U^T Rinv v
+
+the two cases that use it: the implicit ensemble H = B M A^T, where
+U = B, Q = M A^T C A M and L = C A M, for any C; and an explicit sparse H with
+the current ensemble covariance C = A A^T, where U = H A, Q = I and L = A.
+He = H e is passed in because only the caller knows how to apply H.  every
+matrix here is N columns wide apart from the n x N and p x N ones, so the
+cost is (n + p) N^2 and the memory is the anomalies themselves. */
+Eigen::MatrixXd enif_lowrank_step(const Eigen::MatrixXd& U, const Eigen::MatrixXd& Q,
+	const Eigen::MatrixXd& L, const Eigen::VectorXd& noise_var,
+	const Eigen::MatrixXd& e, const Eigen::MatrixXd& He, const Eigen::MatrixXd& resid, double lam);
 
 /* per observation group summary of the noise inflation */
 struct EnifInflateGroupStats

@@ -1193,6 +1193,10 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
 void EnsembleSolver::init_enif_graph(const vector<string>& pe_real_names, const Eigen::MatrixXd& e, double scale)
 {
     string gname = pest_scenario.get_pestpp_options().get_ies_enif_graph();
+    string pname = pest_scenario.get_pestpp_options().get_ies_enif_prec_file();
+    //a supplied precision is also the graph: its pattern is the conditional independence
+    if (pname.size() > 0)
+        gname = pname;
     if ((gname.size() == 0) || (enif_graph.is_initialized()))
         return;
     ofstream& frec = file_manager.rec_ofstream();
@@ -1202,14 +1206,37 @@ void EnsembleSolver::init_enif_graph(const vector<string>& pe_real_names, const 
 
     Eigen::MatrixXd X = pe.get_eigen(pe_real_names, act_par_names);
     X.transposeInPlace();
+    bool hybrid = pest_scenario.get_pestpp_options().get_ies_enif_hybrid_damp();
+    if ((hybrid) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
+        throw runtime_error("EnsembleSolver::init_enif_graph(): 'ies_enif_hybrid_damp' needs 'ies_use_approx' = true");
+    enif_graph.set_hybrid_damp(hybrid);
+    if (hybrid)
+    {
+        //the damping metric: the current ensemble on the graph, every iteration
+        Eigen::MatrixXd A = (X.colwise() - X.rowwise().mean()) * scale;
+        performance_log->log_event("enif: estimating current-ensemble precision for the hybrid damping");
+        frec << "...enif: hybrid damping, lambda multiplies the current-ensemble precision (ies_enif_hybrid_damp)" << endl;
+        enif_graph.estimate_precision(
+            A, pest_scenario.get_pestpp_options().get_ies_enif_shrink(), frec,
+            pest_scenario.get_pestpp_options().get_ies_enif_direct_nbrs(), true);
+    }
+    if (pname.size() > 0)
+    {
+        performance_log->log_event("enif: reading the prior precision");
+        enif_graph.load_precision(pname, frec);
+        frec << "...enif: prior precision read from file, not estimated (ies_enif_prec_file)" << endl;
+        return;
+    }
     //ies_enif_current_prec: the precision in the hessian comes from the ensemble as it is
     //now, not the prior.  with ies_use_approx the prior enters the step only through the
     //hessian, so this is the lm-enrml choice: as the ensemble contracts the precision grows
     //and the step shrinks in the directions already learned - the trust region ies gets from
     //its ensemble covariance.  without it the step size is set by the prior spread for the
     //whole run and lambda has to supply all the damping.  x0 = x - e is still the prior
-    if (pest_scenario.get_pestpp_options().get_ies_enif_current_prec())
+    if ((pest_scenario.get_pestpp_options().get_ies_enif_current_prec()) && (!hybrid))
     {
+        //with the hybrid damping the current ensemble is already in the step, so the
+        //curvature keeps the prior
         Eigen::MatrixXd A = (X.colwise() - X.rowwise().mean()) * scale;
         performance_log->log_event("enif: estimating sparse precision on the graph from the CURRENT ensemble");
         frec << "...enif: precision estimated from the current ensemble (ies_enif_current_prec)" << endl;
@@ -1307,8 +1334,8 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     if (gram_fact.info() != Eigen::Success)
         throw runtime_error("EnsembleSolver::solve_enif(): failed to factor the ensemble gram matrix");
 
-    //H^T = A M B^T  (gram is symmetric so M^T = M)
-    Eigen::MatrixXd Ht = A * gram_fact.solve(B.transpose());
+    //H = B M A^T is never formed, not even as a p x n product: every path below
+    //applies it through A, B and the N x N factor
 
     //--- graph path: sparse H and the information form -----------------------
     //when a conditional-independence graph is supplied, estimate a SPARSE H by
@@ -1427,14 +1454,19 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
         Eigen::MatrixXd upgrade_l;
         if (current_prec)
         {
-            //the current ensemble covariance in place of parcov - see init_enif_graph
-            Eigen::SparseMatrix<double> Ccur = (A * A.transpose()).sparseView();
+            //the current ensemble covariance C = A A^T in place of parcov - see init_enif_graph.
+            //H C H^T = (H A)(H A)^T has rank N, so the step stays ensemble-sized: U = H A, Q = I,
+            //L = A.  the p x p product is never formed
             if (!enif_inflate_reported)
                 frec << "...enif: hessian from the current ensemble covariance, not parcov (ies_enif_current_prec)" << endl;
-            upgrade_l = enif_woodbury_step(enif_H, var_l, Ccur, e, r, cur_lam);
+            Eigen::MatrixXd U = enif_H * A;
+            Eigen::MatrixXd He_l = enif_H * e;
+            upgrade_l = enif_lowrank_step(U, Eigen::MatrixXd::Identity(num_reals, num_reals), A, var_l, e, He_l, r, cur_lam);
         }
         else
         {
+            //a supplied parcov is dense p x p and H parcov H^T is full rank, so this one
+            //keeps the n x n innovation covariance - it is bounded by p, not n
             Covariance pcov_l = parcov.get(act_par_names);
             upgrade_l = enif_woodbury_step(enif_H, var_l, *pcov_l.e_ptr(), e, r, cur_lam);
         }
@@ -1447,25 +1479,29 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     }
 
     //--- covariance path: woodbury with the supplied parcov ------------------
-    //C_lam H^T = C H^T / (1 + lam); one multiply by the supplied prior covariance
-    performance_log->log_event("enif: applying the prior covariance");
-    double s = 1.0 / (1.0 + cur_lam);
-    Eigen::MatrixXd CHt;
+    //H C H^T = B M (A^T C A) M B^T has rank N, so with K = A^T C A (N x N) the whole
+    //step runs through enif_lowrank_step with U = B, Q = M K M and L = C A M.  the
+    //only product that touches C is C A, p x N.  this used to form H^T, C H^T (both
+    //p x n) and the n x n innovation covariance, which is 20 gb each at 50k x 50k
+    //and an n^3 factor; now the cost is (n + p) N^2 like ies
+    performance_log->log_event("enif: applying the prior covariance to the anomalies");
+    Eigen::MatrixXd V;
     if (current_prec)
     {
         //the current ensemble covariance in place of parcov - see init_enif_graph
         if (!enif_inflate_reported)
             file_manager.rec_ofstream() << "...enif: hessian from the current ensemble covariance, not parcov (ies_enif_current_prec)" << endl;
-        CHt = s * (A * (A.transpose() * Ht));
+        V = A * gram_raw;   // (A A^T) A
     }
     else
     {
         Covariance pcov = parcov.get(act_par_names);
-        CHt = s * (*pcov.e_ptr() * Ht);
+        V = *pcov.e_ptr() * A;
     }
-
-    //G = R + H C_lam H^T, with H C_lam H^T = B M (A^T C_lam H^T) so it stays N-sized
-    Eigen::MatrixXd Gm = B * gram_fact.solve(A.transpose() * CHt);
+    Eigen::MatrixXd Kmat = A.transpose() * V;
+    //M K M, using M = M^T; L = V M
+    Eigen::MatrixXd Q = gram_fact.solve(gram_fact.solve(Kmat).transpose());
+    Eigen::MatrixXd L = gram_fact.solve(V.transpose()).transpose();
 
     //the observation error used in the update is inflated by the variance H fails
     //to explain, var(y - Hx), per observation.  without this the update treats the
@@ -1480,14 +1516,14 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     Eigen::VectorXd unexplained = resid.array().square().rowwise().sum() / double(num_reals);
 
     ObservationInfo* oi_ptr = pest_scenario.get_observation_info_ptr();
-    Eigen::VectorXd wvec(n_obs);
+    Eigen::VectorXd wvec(n_obs), var(n_obs);
     for (int i = 0; i < n_obs; i++)
     {
         double w = oi_ptr->get_weight(act_obs_names[i]);
         if (w <= 0.0)
             throw runtime_error("EnsembleSolver::solve_enif(): zero weight on active observation " + act_obs_names[i]);
         wvec(i) = w;
-        Gm(i, i) += (1.0 / (w * w)) + (apply_inflate ? unexplained(i) : 0.0);
+        var(i) = (1.0 / (w * w)) + (apply_inflate ? unexplained(i) : 0.0);
     }
     if (!enif_inflate_reported)
     {
@@ -1500,15 +1536,11 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
             file_manager.rec_ofstream());
         enif_inflate_reported = true;
     }
-    Eigen::LDLT<Eigen::MatrixXd> g_fact(Gm);
-    if (g_fact.info() != Eigen::Success)
-        throw runtime_error("EnsembleSolver::solve_enif(): failed to factor the innovation covariance");
 
     //H e = B M A^T e
     performance_log->log_event("enif: forming the upgrade");
     Eigen::MatrixXd He = B * gram_fact.solve(A.transpose() * e);
-
-    Eigen::MatrixXd upgrade = -((s * (e - (CHt * g_fact.solve(He)))) + (CHt * g_fact.solve(r)));
+    Eigen::MatrixXd upgrade = enif_lowrank_step(B, Q, L, var, e, He, r, cur_lam);
     upgrade.transposeInPlace();
 
     ss.str("");
@@ -1530,12 +1562,12 @@ EnifMmThread::EnifMmThread(PerformanceLog* _performance_log, const vector<string
     unordered_map<string, Eigen::VectorXd>& _real_weight_map,
     unordered_map<string, Eigen::SparseMatrix<double>>& _H_map,
     unordered_map<string, Eigen::VectorXd>& _unexp_map, bool _h_ready,
-    const EnifGraph* _graph, const Eigen::SparseMatrix<double>* _C,
+    const EnifGraph* _graph, const Eigen::SparseMatrix<double>* _C, const Eigen::MatrixXd* _Afac,
     double _lasso, int _cv_folds, bool _inflate, double _cur_lam, Eigen::MatrixXd& _upgrade) :
     performance_log(_performance_log), real_names(_real_names), X(_X), Y(_Y), e(_e), r(_r),
     real_idx_map(_real_idx_map), real_name_map(_real_name_map), q_vec_map(_q_vec_map),
     real_weight_map(_real_weight_map), H_map(_H_map), unexp_map(_unexp_map), h_ready(_h_ready),
-    graph(_graph), C(_C), lasso(_lasso), cv_folds(_cv_folds), inflate(_inflate), cur_lam(_cur_lam),
+    graph(_graph), C(_C), Afac(_Afac), lasso(_lasso), cv_folds(_cv_folds), inflate(_inflate), cur_lam(_cur_lam),
     upgrade(_upgrade)
 {
     noise_var.resize(real_names.size());
@@ -1638,6 +1670,14 @@ void EnifMmThread::work(int thread_id)
             stringstream tss;
             dk = graph->information_step(Hk, rinv, ek, rk, cur_lam, tss);
         }
+        else if (Afac != nullptr)
+        {
+            //current ensemble covariance as its factor: U = Hk A, Q = I, L = A
+            Eigen::MatrixXd Uk = Hk * (*Afac);
+            Eigen::MatrixXd Hek = Hk * ek;
+            int nn = (int)Afac->cols();
+            dk = enif_lowrank_step(Uk, Eigen::MatrixXd::Identity(nn, nn), *Afac, var, ek, Hek, rk, cur_lam);
+        }
         else
             dk = enif_woodbury_step(Hk, var, *C, ek, rk, cur_lam);
         //column k belongs to this thread alone
@@ -1699,7 +1739,8 @@ void EnsembleSolver::solve_enif_multimodal(int num_threads, double cur_lam, Para
     init_enif_graph(pe_real_names, e_prior, scale);
     const EnifGraph* graph = enif_graph.is_initialized() ? &enif_graph : nullptr;
     Covariance pcov;
-    Eigen::SparseMatrix<double> Ccur;
+    Eigen::MatrixXd Afac;
+    const Eigen::MatrixXd* Afac_ptr = nullptr;
     const Eigen::SparseMatrix<double>* C = nullptr;
     bool current_prec = pest_scenario.get_pestpp_options().get_ies_enif_current_prec();
     if ((current_prec) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
@@ -1708,10 +1749,10 @@ void EnsembleSolver::solve_enif_multimodal(int num_threads, double cur_lam, Para
     {
         if (current_prec)
         {
-            //the current ensemble covariance in place of parcov - see init_enif_graph
-            Eigen::MatrixXd A = (X.colwise() - X.rowwise().mean()) * scale;
-            Ccur = (A * A.transpose()).sparseView();
-            C = &Ccur;
+            //the current ensemble covariance in place of parcov - see init_enif_graph.  kept as
+            //its p x N factor, never as the p x p product
+            Afac = (X.colwise() - X.rowwise().mean()) * scale;
+            Afac_ptr = &Afac;
             if (!enif_mm_h_ready)
                 frec << "...enif-mm: hessian from the current ensemble covariance, not parcov (ies_enif_current_prec)" << endl;
         }
@@ -1730,7 +1771,7 @@ void EnsembleSolver::solve_enif_multimodal(int num_threads, double cur_lam, Para
 
     Eigen::MatrixXd upgrade = Eigen::MatrixXd::Zero(n_par, num_reals);
     EnifMmThread worker(performance_log, pe_real_names, X, Y, e, r, mm_real_idx_map, mm_real_name_map,
-        mm_q_vec_map, mm_real_weight_map, enif_mm_H, enif_mm_unexp, h_was_ready, graph, C,
+        mm_q_vec_map, mm_real_weight_map, enif_mm_H, enif_mm_unexp, h_was_ready, graph, C, Afac_ptr,
         lasso, cv_folds, apply_inflate, cur_lam, upgrade);
     ss.str("");
     ss << "enif-mm: " << (h_was_ready ? "reusing" : "estimating") << " per-realization H and taking the "

@@ -203,7 +203,7 @@ void EnifGraph::report(ofstream& frec) const
 
 
 void EnifGraph::estimate_precision(const Eigen::MatrixXd& anomalies, double shrink,
-	ofstream& frec, bool direct_only)
+	ofstream& frec, bool direct_only, bool into_current)
 {
 	stringstream ss;
 	if (!initialized)
@@ -386,6 +386,17 @@ void EnifGraph::estimate_precision(const Eigen::MatrixXd& anomalies, double shri
 
 	Eigen::SparseMatrix<double> L(p, p);
 	L.setFromTriplets(ltrips.begin(), ltrips.end());
+	if (into_current)
+	{
+		//the damping metric for the hybrid step, re-estimated each iteration.  it is
+		//never factored on its own, only as part of the posterior precision
+		prec_cur = (Eigen::SparseMatrix<double>)(L.transpose() * L);
+		prec_cur.makeCompressed();
+		cur_ready = true;
+		frec << "...estimated current-ensemble precision on the graph for the hybrid damping: "
+			<< prec_cur.nonZeros() << " non-zeros" << endl;
+		return;
+	}
 	prec = (Eigen::SparseMatrix<double>)(L.transpose() * L);
 	prec.makeCompressed();
 
@@ -433,6 +444,43 @@ Eigen::MatrixXd EnifGraph::apply_cov(const Eigen::MatrixXd& M) const
 }
 
 
+void EnifGraph::load_precision(const string& filename, ofstream& frec)
+{
+	if (!initialized)
+		throw runtime_error("EnifGraph::load_precision(): call from_file() with the same file first");
+	int p = (int)names.size();
+	Mat m;
+	m.from_file(filename);
+	Mat sub = m.get(names, names);
+	Eigen::SparseMatrix<double> a = sub.get_matrix();
+	if ((a.rows() != p) || (a.cols() != p))
+		throw runtime_error("EnifGraph::load_precision(): precision file '" + filename + "' is not square over the adjustable parameters");
+	Eigen::SparseMatrix<double> at = a.transpose();
+	Eigen::SparseMatrix<double> diff = (a - at).eval();
+	double asym = 0.0, amax = 0.0;
+	for (int k = 0; k < diff.outerSize(); k++)
+		for (Eigen::SparseMatrix<double>::InnerIterator it(diff, k); it; ++it)
+			asym = max(asym, abs(it.value()));
+	for (int k = 0; k < a.outerSize(); k++)
+		for (Eigen::SparseMatrix<double>::InnerIterator it(a, k); it; ++it)
+			amax = max(amax, abs(it.value()));
+	if (asym > 1.0e-8 * max(amax, 1.0e-300))
+		throw runtime_error("EnifGraph::load_precision(): precision file '" + filename + "' is not symmetric");
+	prec = (0.5 * (a + at)).eval();
+	prec.makeCompressed();
+	for (int i = 0; i < p; i++)
+		if (!(prec.coeff(i, i) > 0.0))
+			throw runtime_error("EnifGraph::load_precision(): precision file '" + filename + "' has a non-positive diagonal at '" + names[i] + "'");
+	solver.compute(prec);
+	if (solver.info() != Eigen::Success)
+		throw runtime_error("EnifGraph::load_precision(): precision file '" + filename + "' is not positive definite");
+	prec_ready = true;
+	frec << "...prior precision read from '" << filename << "': " << prec.nonZeros()
+		<< " non-zeros, density " << setprecision(4)
+		<< (100.0 * (double)prec.nonZeros() / ((double)p * (double)p)) << " percent" << endl;
+}
+
+
 Eigen::MatrixXd EnifGraph::information_step(const Eigen::SparseMatrix<double>& H,
 	const Eigen::VectorXd& rinv, const Eigen::MatrixXd& e,
 	const Eigen::MatrixXd& resid, double lam, ostream& frec) const
@@ -454,7 +502,17 @@ Eigen::MatrixXd EnifGraph::information_step(const Eigen::SparseMatrix<double>& H
 	}
 	Eigen::SparseMatrix<double> HtRH = (H.transpose() * Rinv * H).eval();
 
-	Eigen::SparseMatrix<double> lam_post = ((1.0 + lam) * prec + HtRH).eval();
+	Eigen::SparseMatrix<double> lam_post;
+	if (hybrid_damp)
+	{
+		//lambda on the current-ensemble precision: the curvature keeps the prior, the
+		//trust region follows the ensemble
+		if (!cur_ready)
+			throw runtime_error("EnifGraph::information_step(): hybrid damping asked for but no current-ensemble precision estimated");
+		lam_post = (prec + (lam * prec_cur) + HtRH).eval();
+	}
+	else
+		lam_post = ((1.0 + lam) * prec + HtRH).eval();
 	lam_post.makeCompressed();
 
 	Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> post_solver;
@@ -811,6 +869,41 @@ Eigen::MatrixXd enif_woodbury_step(const Eigen::SparseMatrix<double>& H,
 		throw runtime_error("enif_woodbury_step(): failed to factor the innovation covariance");
 	Eigen::MatrixXd He = H * e;
 	return -((s * (e - (CHt * g_fact.solve(He)))) + (CHt * g_fact.solve(resid)));
+}
+
+
+Eigen::MatrixXd enif_lowrank_step(const Eigen::MatrixXd& U, const Eigen::MatrixXd& Q,
+	const Eigen::MatrixXd& L, const Eigen::VectorXd& noise_var,
+	const Eigen::MatrixXd& e, const Eigen::MatrixXd& He, const Eigen::MatrixXd& resid, double lam)
+{
+	int n = (int)U.rows();
+	int N = (int)U.cols();
+	int p = (int)L.rows();
+	if ((Q.rows() != N) || (Q.cols() != N) || (L.cols() != N))
+		throw runtime_error("enif_lowrank_step(): U, Q and L do not share the ensemble dimension");
+	if ((noise_var.size() != n) || (resid.rows() != n) || (He.rows() != n) || (e.rows() != p))
+		throw runtime_error("enif_lowrank_step(): U, L, noise, e, He and resid sizes disagree");
+	if ((e.cols() != resid.cols()) || (He.cols() != resid.cols()))
+		throw runtime_error("enif_lowrank_step(): e, He and resid must have the same number of columns");
+	for (int i = 0; i < n; i++)
+		if (!(noise_var[i] > 0.0))
+			throw runtime_error("enif_lowrank_step(): noise variance must be positive");
+	double s = 1.0 / (1.0 + lam);
+	Eigen::VectorXd rinv = noise_var.cwiseInverse();
+	//Rinv U once; then S = U^T Rinv U and the N x N system (I + S sQ)
+	Eigen::MatrixXd RU = rinv.asDiagonal() * U;
+	Eigen::MatrixXd S = U.transpose() * RU;
+	Eigen::MatrixXd Qs = s * Q;
+	Eigen::MatrixXd Kmat = Eigen::MatrixXd::Identity(N, N) + S * Qs;
+	Eigen::PartialPivLU<Eigen::MatrixXd> k_fact(Kmat);
+	//W = resid - s He: the prior term carries s once for the (1+lam) on it and once
+	//more inside C_lam, so the He part of the gain is s^2 against s for the residual
+	Eigen::MatrixXd W = resid - (s * He);
+	Eigen::MatrixXd UtRW = RU.transpose() * W;
+	Eigen::MatrixXd GinvW = (rinv.asDiagonal() * W) - (RU * (Qs * k_fact.solve(UtRW)));
+	if (!GinvW.allFinite())
+		throw runtime_error("enif_lowrank_step(): the innovation solve is not finite");
+	return -s * (e + (L * (U.transpose() * GinvW)));
 }
 
 
