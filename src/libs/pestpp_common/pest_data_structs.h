@@ -317,6 +317,8 @@ public:
 	void set_glm_irls_eps(double _eps) { glm_irls_eps = _eps; }
 	int get_glm_irls_start_iter() const { return glm_irls_start_iter; }
 	void set_glm_irls_start_iter(int _iter) { glm_irls_start_iter = _iter; }
+	int get_glm_irls_max_dev() const { return glm_irls_max_dev; }
+	void set_glm_irls_max_dev(int _n) { glm_irls_max_dev = _n; }
     bool get_glm_iter_mc() const { return glm_iter_mc; }
     void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
     bool get_glm_debug_high_2nd_iter_phi() const {return glm_debug_high_2nd_iter_phi;}
@@ -702,6 +704,14 @@ public:
     void set_ies_enif_h_cv_folds(int _n) { ies_enif_h_cv_folds = _n; }
     double get_ies_enif_shrink() const { return ies_enif_shrink; }
     void set_ies_enif_shrink(double _f) { ies_enif_shrink = _f; }
+    bool get_ies_enif_current_prec() const { return ies_enif_current_prec; }
+    void set_ies_enif_current_prec(bool _f) { ies_enif_current_prec = _f; }
+    bool get_ies_enif_direct_nbrs() const { return ies_enif_direct_nbrs; }
+    void set_ies_enif_direct_nbrs(bool _f) { ies_enif_direct_nbrs = _f; }
+    string get_ies_enif_prec_file() const { return ies_enif_prec_file; }
+    void set_ies_enif_prec_file(string _s) { ies_enif_prec_file = _s; }
+    bool get_ies_enif_hybrid_damp() const { return ies_enif_hybrid_damp; }
+    void set_ies_enif_hybrid_damp(bool _f) { ies_enif_hybrid_damp = _f; }
     string get_ies_enif_order() const { return ies_enif_order; }
     void set_ies_enif_order(string _s) { ies_enif_order = _s; }
     bool get_ies_enif_save_h() const { return ies_enif_save_h; }
@@ -891,9 +901,12 @@ private:
 	bool glm_debug_real_fail;
 	bool glm_accept_mc_phi;
 	//irls (l1) reweighting of the regularization prior info: eps > 0 turns it on and is the
-	//residual floor, start_iter is the first iteration whose end gets reweighted
+	//residual floor, start_iter is the first iteration whose end gets reweighted.  max_dev >= 0
+	//solves for the floor each reweight so at most that many equations sit above it, with eps
+	//as the minimum floor
 	double glm_irls_eps;
 	int glm_irls_start_iter;
+	int glm_irls_max_dev;
 	bool glm_iter_mc;
 	bool glm_debug_high_2nd_iter_phi;
 	bool glm_hp_lambdas;
@@ -1105,6 +1118,18 @@ private:
 	double ies_enif_h_lasso;
 	int ies_enif_h_cv_folds;
 	double ies_enif_shrink;
+	//hessian built from the CURRENT ensemble (precision re-estimated on the graph each
+	//iteration, or the ensemble covariance in place of parcov) instead of the prior.  only
+	//meaningful with ies_use_approx, where the prior enters the step through the hessian alone
+	bool ies_enif_current_prec;
+	//regress each node on its direct graph neighbours only when estimating the precision,
+	//ignoring the fill of the factorisation
+	bool ies_enif_direct_nbrs;
+	//a sparse prior precision read from file (values, not just the pattern) in place of
+	//one estimated from the prior ensemble; the file is also the graph
+	string ies_enif_prec_file;
+	//lambda on the current-ensemble precision instead of the prior one on the graph path
+	bool ies_enif_hybrid_damp;
 	string ies_enif_order;
 	bool ies_enif_save_h;
 	bool ies_use_prior_prec;

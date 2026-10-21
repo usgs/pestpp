@@ -14,7 +14,7 @@ class RestartController
 public:
 	enum class RestartOption {NONE, REUSE_JACOBIAN, RESUME_NEW_ITERATION, RESUME_JACOBIAN_RUNS, RESUME_UPGRADE_RUNS};
 	enum class IterationType{BASE, SUPER};
-	RestartController(void);
+	RestartController();
 	static void write_start_failed_super(std::ostream &fout);
 	static void write_start_iteration(std::ostream &fout, const std::string &solver_type, int _iter_num, int _global_iter_num);
 	static void write_start_parameters_updated(std::ostream &fout, const std::string &parameter_filename);
@@ -28,7 +28,7 @@ public:
 	void process_rst_file(std::ifstream &fin);
 	void update_termination_ctl(TerminationController &term_ctl);
 	Parameters get_restart_parameters(const std::string &restart_par_file, const std::string &prev_par_file);
-	~RestartController(void);
+	~RestartController();
 private:
 	enum class PARAMETER_STATE {INIT_PAR, RESTART_PAR, PREV_PAR};
 	PARAMETER_STATE parameter_state;

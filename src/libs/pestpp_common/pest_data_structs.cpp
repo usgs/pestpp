@@ -526,6 +526,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 	{
 		convert_ip(value, glm_irls_start_iter);
 	}
+	else if (key == "GLM_IRLS_MAX_DEV")
+	{
+		convert_ip(value, glm_irls_max_dev);
+	}
 	else if (key == "GLM_REBASE_SUPER")
 	{
 		cout << "++GLM_REBASE_SUPER is deprecated and no longer supported (svd-assist has been "
@@ -1210,6 +1214,27 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
     else if (key == "IES_ENIF_H_CV_FOLDS")
     {
         convert_ip(value,ies_enif_h_cv_folds);
+        return true;
+    }
+    else if (key == "IES_ENIF_CURRENT_PREC")
+    {
+        ies_enif_current_prec = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+    else if (key == "IES_ENIF_DIRECT_NBRS")
+    {
+        ies_enif_direct_nbrs = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+    else if (key == "IES_ENIF_PREC_FILE")
+    {
+        //org_value: filenames are case sensitive
+        ies_enif_prec_file = org_value;
+        return true;
+    }
+    else if (key == "IES_ENIF_HYBRID_DAMP")
+    {
+        ies_enif_hybrid_damp = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
     else if (key == "IES_ENIF_SHRINK")
@@ -2155,6 +2180,7 @@ void PestppOptions::summary_legacy(ostream& os) const
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
 	os << "glm_irls_eps: " << glm_irls_eps << endl;
 	os << "glm_irls_start_iter: " << glm_irls_start_iter << endl;
+	os << "glm_irls_max_dev: " << glm_irls_max_dev << endl;
 	os << "glm_iter_mc: " << glm_iter_mc << endl;
 	os << "glm_high_2nd_iter_phi: " << glm_debug_high_2nd_iter_phi << endl;
 
@@ -2354,6 +2380,10 @@ os << endl << "...pestpp-swp options:" << endl;
 	os << "ies_enif_h_lasso: " << ies_enif_h_lasso << endl;
 	os << "ies_enif_h_cv_folds: " << ies_enif_h_cv_folds << endl;
 	os << "ies_enif_shrink: " << ies_enif_shrink << endl;
+	os << "ies_enif_current_prec: " << ies_enif_current_prec << endl;
+	os << "ies_enif_direct_nbrs: " << ies_enif_direct_nbrs << endl;
+	os << "ies_enif_prec_file: " << ies_enif_prec_file << endl;
+	os << "ies_enif_hybrid_damp: " << ies_enif_hybrid_damp << endl;
 	os << "ies_enif_order: " << ies_enif_order << endl;
 	os << "ies_enif_save_h: " << ies_enif_save_h << endl;
 	os << "ies_use_prior_prec: " << ies_use_prior_prec << endl;
@@ -2434,6 +2464,7 @@ void PestppOptions::set_defaults_legacy()
 	set_glm_accept_mc_phi(false);
 	set_glm_irls_eps(-1.0);
 	set_glm_irls_start_iter(1);
+	set_glm_irls_max_dev(-1);
 	set_glm_iter_mc(false);
     set_glm_debug_high_2nd_iter_phi(false);
 	set_glm_hp_lambdas(false);
@@ -2614,7 +2645,11 @@ void PestppOptions::set_defaults_legacy()
     set_ies_enif_graph("");
     set_ies_enif_h_lasso(0.0);
     set_ies_enif_h_cv_folds(0);
-    set_ies_enif_shrink(1.0e-3);
+    set_ies_enif_shrink(-1.0);   //automatic: per-node ridge by cross-validation
+    set_ies_enif_current_prec(false);
+    set_ies_enif_direct_nbrs(false);
+    set_ies_enif_prec_file("");
+    set_ies_enif_hybrid_damp(false);
     set_ies_enif_order("amd");
     set_ies_enif_save_h(false);
     set_ies_use_prior_prec(false);
@@ -3051,8 +3086,8 @@ void ControlInfo::set_defaults()
 		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
 		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
 
-	facparmax = 1.1;
-	relparmax = 1.0;
+	facparmax = 10.0;
+	relparmax = 10.0;
 	facorig = 0.001;
 	phiredswh = 0.1;
 	noptmax = 0;

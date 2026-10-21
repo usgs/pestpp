@@ -18,7 +18,7 @@ using namespace::pest_utils;
  *
  * @return Description.
  */
-RestartController::RestartController(void)
+RestartController::RestartController()
 	: global_iter_no(0), local_iter_no(0), restart_option(RestartOption::NONE),
 	iteration_type(IterationType::BASE), nopt_count(0), nphinored_count(0),
 	nrelpar_count(), parameter_state(PARAMETER_STATE::INIT_PAR), best_par_file("")
@@ -233,6 +233,6 @@ void RestartController::update_termination_ctl(TerminationController &term_ctl)
 /**
  * @brief Destructor for .
  */
-RestartController::~RestartController(void)
+RestartController::~RestartController()
 {
 }

@@ -2852,6 +2852,427 @@ static void test_ies_prior_prec_reduces_to_am()
     }
 }
 
+static void test_enif_woodbury_step()
+{
+    cout << "[enif: woodbury step with an explicit sparse H matches the dense normal equations]" << endl;
+    // small enough to check against the dense form
+    //   delta = -[(1+lam) C^-1 + H^T R^-1 H]^-1 [C^-1 e + H^T R^-1 r]
+    int p = 6, n = 4, N = 3;
+    std::mt19937 gen(11);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    Eigen::MatrixXd Hd = Eigen::MatrixXd::Zero(n, p);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < p; j++)
+            if (((i + j) % 2) == 0)
+                Hd(i, j) = nd(gen);
+    Eigen::SparseMatrix<double> H = Hd.sparseView();
+    Eigen::VectorXd cdiag(p), var(n);
+    for (int j = 0; j < p; j++) cdiag[j] = 0.5 + j;
+    for (int i = 0; i < n; i++) var[i] = 0.1 * (i + 1);
+    Eigen::SparseMatrix<double> C(p, p);
+    {
+        vector<Eigen::Triplet<double>> t;
+        for (int j = 0; j < p; j++) t.push_back(Eigen::Triplet<double>(j, j, cdiag[j]));
+        C.setFromTriplets(t.begin(), t.end());
+    }
+    Eigen::MatrixXd e(p, N), r(n, N);
+    for (int j = 0; j < N; j++) { for (int i = 0; i < p; i++) e(i, j) = nd(gen); for (int i = 0; i < n; i++) r(i, j) = nd(gen); }
+    for (double lam : {0.0, 0.7, 25.0})
+    {
+        Eigen::MatrixXd got = enif_woodbury_step(H, var, C, e, r, lam);
+        Eigen::MatrixXd Cinv = cdiag.cwiseInverse().asDiagonal();
+        Eigen::MatrixXd Rinv = var.cwiseInverse().asDiagonal();
+        Eigen::MatrixXd lam_post = (1.0 + lam) * Cinv + Hd.transpose() * Rinv * Hd;
+        Eigen::MatrixXd g = Cinv * e + Hd.transpose() * Rinv * r;
+        Eigen::MatrixXd want = -lam_post.ldlt().solve(g);
+        CHK((got - want).cwiseAbs().maxCoeff() < 1e-9, "woodbury step == dense normal equations, lambda " + to_string(lam));
+    }
+    // one column at a time gives the same answer as all at once
+    Eigen::MatrixXd all = enif_woodbury_step(H, var, C, e, r, 0.7);
+    Eigen::MatrixXd one = enif_woodbury_step(H, var, C, e.col(1), r.col(1), 0.7);
+    CHK((all.col(1) - one.col(0)).cwiseAbs().maxCoeff() < 1e-12, "a single column solve matches its column of the batch solve");
+    // an empty H row (observation carries nothing) must not break the step
+    Eigen::MatrixXd Hz = Hd; Hz.row(2).setZero();
+    Eigen::SparseMatrix<double> Hzs = Hz.sparseView();
+    Eigen::MatrixXd got = enif_woodbury_step(Hzs, var, C, e, r, 0.7);
+    CHK(got.allFinite(), "an empty H row still gives a finite step");
+    bool threw = false;
+    try { enif_woodbury_step(H, var.head(2), C, e, r, 0.7); } catch (...) { threw = true; }
+    CHK(threw, "mismatched noise length throws");
+}
+
+static void test_enif_lowrank_step()
+{
+    cout << "[enif: low-rank woodbury step matches the dense step]" << endl;
+    int p = 9, n = 12, N = 4;
+    std::mt19937 gen(23);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    Eigen::MatrixXd A(p, N), B(n, N), e(p, N), r(n, N);
+    for (int i = 0; i < p; i++) for (int j = 0; j < N; j++) { A(i, j) = nd(gen); e(i, j) = 0.3 * nd(gen); }
+    for (int i = 0; i < n; i++) for (int j = 0; j < N; j++) { B(i, j) = nd(gen); r(i, j) = nd(gen); }
+    Eigen::VectorXd var(n);
+    for (int i = 0; i < n; i++) var[i] = 0.05 * (i + 1);
+    // a dense spd prior covariance and the ensemble covariance
+    Eigen::MatrixXd Z(p, p);
+    for (int i = 0; i < p; i++) for (int j = 0; j < p; j++) Z(i, j) = nd(gen);
+    Eigen::MatrixXd Cd = Z * Z.transpose() + Eigen::MatrixXd::Identity(p, p);
+    Eigen::MatrixXd Ccur = A * A.transpose();
+
+    // explicit sparse H with C = A A^T: U = H A, Q = I, L = A
+    Eigen::MatrixXd Hd = Eigen::MatrixXd::Zero(n, p);
+    for (int i = 0; i < n; i++) for (int j = 0; j < p; j++) if (((i + 2 * j) % 3) == 0) Hd(i, j) = nd(gen);
+    Eigen::SparseMatrix<double> H = Hd.sparseView();
+    Eigen::SparseMatrix<double> Ccur_s = Ccur.sparseView();
+    for (double lam : {0.0, 1.5, 40.0})
+    {
+        Eigen::MatrixXd dense = enif_woodbury_step(H, var, Ccur_s, e, r, lam);
+        Eigen::MatrixXd low = enif_lowrank_step(Hd * A, Eigen::MatrixXd::Identity(N, N), A, var, e, Hd * e, r, lam);
+        CHK((dense - low).cwiseAbs().maxCoeff() < 1e-9, "sparse H, ensemble covariance: low-rank == dense, lambda " + to_string(lam));
+    }
+
+    // implicit H = B M A^T: U = B, Q = M K M, L = C A M, against the formula with everything dense
+    Eigen::MatrixXd gram = A.transpose() * A;
+    double gamma = 1.0e-6 * gram.trace() / double(N);
+    gram.diagonal().array() += gamma;
+    Eigen::LDLT<Eigen::MatrixXd> gf(gram);
+    Eigen::MatrixXd Hi = B * gf.solve(A.transpose());
+    for (int which = 0; which < 2; which++)
+    {
+        const Eigen::MatrixXd& C = (which == 0) ? Cd : Ccur;
+        Eigen::MatrixXd V = C * A;
+        Eigen::MatrixXd K = A.transpose() * V;
+        Eigen::MatrixXd Q = gf.solve(gf.solve(K).transpose());
+        Eigen::MatrixXd L = gf.solve(V.transpose()).transpose();
+        for (double lam : {0.0, 2.0})
+        {
+            double sc = 1.0 / (1.0 + lam);
+            Eigen::MatrixXd CHt = sc * C * Hi.transpose();
+            Eigen::MatrixXd G = Hi * CHt;
+            G.diagonal() += var;
+            Eigen::MatrixXd He = Hi * e;
+            Eigen::MatrixXd want = -((sc * (e - (CHt * G.ldlt().solve(He)))) + (CHt * G.ldlt().solve(r)));
+            Eigen::MatrixXd got = enif_lowrank_step(B, Q, L, var, e, He, r, lam);
+            CHK((got - want).cwiseAbs().maxCoeff() < 1e-8,
+                string("implicit H, ") + (which == 0 ? "supplied" : "ensemble") + " covariance: low-rank == dense, lambda " + to_string(lam));
+        }
+    }
+    // a singular Q (rank 1) still gives the dense answer: the form never inverts Q
+    {
+        Eigen::MatrixXd q1 = Eigen::MatrixXd::Zero(N, 1);
+        q1(0, 0) = 1.0;
+        Eigen::MatrixXd Q1 = q1 * q1.transpose();
+        Eigen::MatrixXd L1 = A;
+        double lam = 0.5, sc = 1.0 / (1.0 + lam);
+        Eigen::MatrixXd G = sc * B * Q1 * B.transpose();
+        G.diagonal() += var;
+        Eigen::MatrixXd He = B * q1 * q1.transpose() * A.transpose() * e;
+        Eigen::MatrixXd want = -sc * (e + L1 * B.transpose() * G.ldlt().solve(r - sc * He));
+        Eigen::MatrixXd got = enif_lowrank_step(B, Q1, L1, var, e, He, r, lam);
+        CHK((got - want).cwiseAbs().maxCoeff() < 1e-9, "a singular Q is handled");
+    }
+    // one column at a time equals its column of the batch
+    Eigen::MatrixXd all = enif_lowrank_step(Hd * A, Eigen::MatrixXd::Identity(N, N), A, var, e, Hd * e, r, 1.5);
+    Eigen::MatrixXd one = enif_lowrank_step(Hd * A, Eigen::MatrixXd::Identity(N, N), A, var, e.col(2), Hd * e.col(2), r.col(2), 1.5);
+    CHK((all.col(2) - one.col(0)).cwiseAbs().maxCoeff() < 1e-12, "a single column matches the batch");
+    bool threw = false;
+    try { enif_lowrank_step(B, Eigen::MatrixXd::Identity(N + 1, N + 1), A, var, e, Hd * e, r, 1.0); } catch (...) { threw = true; }
+    CHK(threw, "a Q of the wrong size throws");
+    threw = false;
+    Eigen::VectorXd bad = var; bad[3] = 0.0;
+    try { enif_lowrank_step(B, Eigen::MatrixXd::Identity(N, N), A, bad, e, Hd * e, r, 1.0); } catch (...) { threw = true; }
+    CHK(threw, "a zero noise variance throws");
+}
+
+static void test_enif_supplied_prec_hybrid()
+{
+    cout << "[enif: supplied prior precision file and the hybrid damping step]" << endl;
+    PO o; o.set_defaults();
+    CHK(o.get_ies_enif_prec_file() == "", "ies_enif_prec_file defaults to empty");
+    CHK(!o.get_ies_enif_hybrid_damp(), "ies_enif_hybrid_damp defaults to false");
+    CHK(o.assign_value_by_key("IES_ENIF_PREC_FILE", "MyPrec.jcb") == PO::ARG_STATUS::ARG_ACCEPTED, "prec file parses");
+    CHK(o.get_ies_enif_prec_file() == "MyPrec.jcb", "and keeps its case");
+    CHK(o.assign_value_by_key("IES_ENIF_HYBRID_DAMP", "true") == PO::ARG_STATUS::ARG_ACCEPTED, "hybrid parses");
+    CHK(o.get_ies_enif_hybrid_damp(), "and is true after 'true'");
+
+    // a 4-node chain precision with values, in the pest ascii matrix format
+    Eigen::MatrixXd Q(4, 4);
+    Q << 2.0, -0.8, 0.0, 0.0,
+        -0.8, 2.5, -0.9, 0.0,
+         0.0, -0.9, 2.5, -0.7,
+         0.0, 0.0, -0.7, 2.0;
+    string pf = "selftest_chain_prec.mat";
+    {
+        ofstream f(pf);
+        f << " 4 4 1\n";
+        for (int i = 0; i < 4; i++) { for (int j = 0; j < 4; j++) f << " " << Q(i, j); f << "\n"; }
+        f << "* row and column names\nP1\nP2\nP3\nP4\n";
+    }
+    ofstream frec("selftest_enif_prec_hybrid.rec");
+    vector<string> names = {"P1", "P2", "P3", "P4"};
+    EnifGraph g;
+    g.from_file(pf, names, frec);
+    CHK(g.num_edges() == 3, "the precision file doubles as the graph: 3 edges");
+    g.load_precision(pf, frec);
+    CHK(g.has_precision(), "precision loaded");
+    CHK((Eigen::MatrixXd(g.precision()) - Q).cwiseAbs().maxCoeff() < 1e-12, "loaded values match the file");
+    // a non-symmetric file is refused
+    string bf = "selftest_chain_prec_bad.mat";
+    {
+        ofstream f(bf);
+        f << " 4 4 1\n";
+        Eigen::MatrixXd Qb = Q; Qb(0, 1) = -0.3;
+        for (int i = 0; i < 4; i++) { for (int j = 0; j < 4; j++) f << " " << Qb(i, j); f << "\n"; }
+        f << "* row and column names\nP1\nP2\nP3\nP4\n";
+    }
+    bool threw = false;
+    try { EnifGraph gb; gb.from_file(bf, names, frec); gb.load_precision(bf, frec); } catch (...) { threw = true; }
+    CHK(threw, "a non-symmetric precision file throws");
+
+    // hybrid step: Lam_post = Q + lam Qcur + H^T Rinv H against the dense formula
+    std::mt19937 gen(9);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    int N = 40;
+    Eigen::MatrixXd A(4, N);
+    for (int i = 0; i < 4; i++) for (int j = 0; j < N; j++) A(i, j) = 0.3 * nd(gen);
+    for (int j = 0; j < N; j++) { A(1, j) += 0.5 * A(0, j); A(2, j) += 0.5 * A(1, j); A(3, j) += 0.5 * A(2, j); }
+    A = (A.colwise() - A.rowwise().mean()) / sqrt(double(N - 1));
+    g.estimate_precision(A, 1.0e-3, frec, false, true);
+    CHK(g.has_current_precision(), "current-ensemble precision estimated into its own slot");
+    CHK((Eigen::MatrixXd(g.precision()) - Q).cwiseAbs().maxCoeff() < 1e-12, "the prior precision is untouched by it");
+    Eigen::MatrixXd Qcur = Eigen::MatrixXd(g.current_precision());
+    CHK(Qcur.diagonal().minCoeff() > Q.diagonal().maxCoeff(), "contracted ensemble -> current precision larger than the prior's");
+    Eigen::MatrixXd Hd(3, 4);
+    Hd << 1.0, 0.0, 0.5, 0.0,
+          0.0, 2.0, 0.0, 0.0,
+          0.0, 0.0, 0.0, 1.5;
+    Eigen::SparseMatrix<double> H = Hd.sparseView();
+    Eigen::VectorXd rinv(3); rinv << 4.0, 1.0, 2.0;
+    Eigen::MatrixXd e = Eigen::MatrixXd::Zero(4, 2), r(3, 2);
+    for (int i = 0; i < 3; i++) for (int j = 0; j < 2; j++) r(i, j) = nd(gen);
+    for (int i = 0; i < 4; i++) e(i, 1) = 0.2 * nd(gen);
+    double lam = 3.0;
+    g.set_hybrid_damp(false);
+    Eigen::MatrixXd plain = g.information_step(H, rinv, e, r, lam, frec);
+    Eigen::MatrixXd want_plain = -((1.0 + lam) * Q + Hd.transpose() * rinv.asDiagonal() * Hd).ldlt().solve(Q * e + Hd.transpose() * (rinv.asDiagonal() * r));
+    CHK((plain - want_plain).cwiseAbs().maxCoeff() < 1e-9, "plain step unchanged: (1+lam) on the prior precision");
+    g.set_hybrid_damp(true);
+    Eigen::MatrixXd hyb = g.information_step(H, rinv, e, r, lam, frec);
+    Eigen::MatrixXd want_hyb = -(Q + lam * Qcur + Hd.transpose() * rinv.asDiagonal() * Hd).ldlt().solve(Q * e + Hd.transpose() * (rinv.asDiagonal() * r));
+    CHK((hyb - want_hyb).cwiseAbs().maxCoeff() < 1e-9, "hybrid step: lam on the current precision, prior in the curvature and gradient");
+    CHK((hyb - plain).cwiseAbs().maxCoeff() > 1e-6, "and it differs from the plain step");
+    // without a current precision the hybrid step refuses
+    EnifGraph g2; g2.from_file(pf, names, frec); g2.load_precision(pf, frec); g2.set_hybrid_damp(true);
+    threw = false;
+    try { g2.information_step(H, rinv, e, r, lam, frec); } catch (...) { threw = true; }
+    CHK(threw, "hybrid damping without a current precision throws");
+}
+
+static void test_estimate_sparse_h_divisor()
+{
+    cout << "[enif: unexplained variance divisor and stream parameter]" << endl;
+    int p = 5, n = 3, N = 8;
+    std::mt19937 gen(3);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    Eigen::MatrixXd A(p, N), B(n, N);
+    for (int i = 0; i < p; i++) for (int j = 0; j < N; j++) A(i, j) = nd(gen);
+    Eigen::MatrixXd Htrue = Eigen::MatrixXd::Zero(n, p);
+    Htrue(0, 0) = 1.0; Htrue(1, 2) = -2.0; Htrue(2, 4) = 0.5;
+    B = Htrue * A;
+    for (int i = 0; i < n; i++) for (int j = 0; j < N; j++) B(i, j) += 0.05 * nd(gen);
+    stringstream s1, s2, s3;
+    Eigen::VectorXd u1, u2, u3;
+    Eigen::SparseMatrix<double> H1 = estimate_sparse_H(A, B, 0.05, 1, u1, s1);
+    Eigen::SparseMatrix<double> H2 = estimate_sparse_H(A, B, 0.05, 1, u2, s2, 0, double(N));
+    Eigen::SparseMatrix<double> H3 = estimate_sparse_H(A, B, 0.05, 2, u3, s3, 0, 2.0 * double(N));
+    CHK((Eigen::MatrixXd(H1) - Eigen::MatrixXd(H2)).cwiseAbs().maxCoeff() == 0.0, "divisor N is the default");
+    CHK((u1 - u2).cwiseAbs().maxCoeff() < 1e-14, "and gives the same unexplained variance");
+    CHK((Eigen::MatrixXd(H1) - Eigen::MatrixXd(H3)).cwiseAbs().maxCoeff() == 0.0, "the divisor does not touch H (two threads either)");
+    CHK((u3 * 2.0 - u1).cwiseAbs().maxCoeff() < 1e-12, "doubling the divisor halves the unexplained variance");
+    CHK(s1.str().find("sparse H") != string::npos, "the summary went to the stringstream, not a file");
+    // residual energy can never exceed the row's own energy, so an empty row reports the full variance
+    Eigen::VectorXd u4; stringstream s4;
+    Eigen::SparseMatrix<double> H4 = estimate_sparse_H(A, B, 1.0, 1, u4, s4);
+    CHK(H4.nonZeros() == 0, "lasso fraction 1 zeroes every row");
+    Eigen::VectorXd full = B.array().square().rowwise().sum() * double(N - 1) / double(N);
+    CHK((u4 - full).cwiseAbs().maxCoeff() < 1e-12, "empty rows report the full output variance as unexplained");
+}
+
+static void test_enif_mm_inflation_csv()
+{
+    cout << "[enif-mm: per-realization inflation csv]" << endl;
+    vector<string> reals = {"R0", "R1"}, obs = {"o1", "o2", "o3"}, groups = {"g", "g", "h"};
+    Eigen::VectorXd w0(3), w1(3), u0(3), u1(3);
+    w0 << 1.0, 2.0, 0.5;  w1 << 1.0, 1.0, 1.0;
+    u0 << 0.0, 0.25, 4.0; u1 << 1.0, 1.0, -0.5;   // a negative one is clamped to zero
+    Eigen::SparseMatrix<double> H0(3, 2), H1(3, 2);
+    {
+        vector<Eigen::Triplet<double>> t = {{0, 0, 1.0}, {0, 1, 2.0}, {2, 1, 3.0}};
+        H0.setFromTriplets(t.begin(), t.end());
+        vector<Eigen::Triplet<double>> t1 = {{1, 0, 1.0}};
+        H1.setFromTriplets(t1.begin(), t1.end());
+    }
+    auto split = [](const string& line) {
+        vector<string> out; string cur; stringstream in(line);
+        while (getline(in, cur, ',')) out.push_back(cur);
+        return out;
+    };
+    string fname = "selftest_enif_mm_inflate.csv";
+    map<string, double> mr = enif_mm_inflation_csv(reals, obs, groups, {w0, w1}, {u0, u1}, {&H0, &H1}, true, fname);
+    // R0: noise 1, 0.25, 4 ; inflated 1, 0.5, 8 ; ratios 1, 2, 2 -> mean 5/3
+    CHK(abs(mr.at("R0") - 5.0 / 3.0) < 1e-12, "mean ratio for R0");
+    // R1: noise 1,1,1 ; unexplained 1,1,0 ; ratios 2,2,1 -> mean 5/3
+    CHK(abs(mr.at("R1") - 5.0 / 3.0) < 1e-12, "mean ratio for R1 with the negative clamped");
+    ifstream f(fname);
+    string line; vector<string> lines;
+    while (getline(f, line)) lines.push_back(line);
+    CHK(lines.size() == 7, "header plus one row per (realization, observation)");
+    CHK(lines[0] == "real_name,obs_name,group,weight,noise_var,unexplained_var,inflated_var,inflate_ratio,effective_weight,h_row_nnz", "header");
+    // R0 o3: weight 0.5 -> noise 4, +4 -> 8, ratio 2, eff 1/sqrt(8), H row 2 has one entry
+    vector<string> tok = split(lines[3]);
+    CHK(tok[0] == "R0" && tok[1] == "o3" && tok[2] == "h", "row order is realization-major, observation-minor");
+    CHK(abs(stod(tok[6]) - 8.0) < 1e-9 && abs(stod(tok[7]) - 2.0) < 1e-9, "inflated variance and ratio");
+    CHK(abs(stod(tok[8]) - 1.0 / sqrt(8.0)) < 1e-9, "effective weight when applied");
+    CHK(tok[9] == "1", "h_row_nnz counts that realization's H row");
+    tok = split(lines[5]);
+    CHK(tok[0] == "R1" && tok[1] == "o2" && tok[9] == "1", "R1 o2 has the single H entry");
+    tok = split(lines[4]);
+    CHK(tok[9] == "0", "R1 o1: empty H row reported as 0");
+    // not applied: effective weight is the weight itself
+    enif_mm_inflation_csv(reals, obs, groups, {w0, w1}, {u0, u1}, {&H0, &H1}, false, fname);
+    ifstream f2(fname); lines.clear();
+    while (getline(f2, line)) lines.push_back(line);
+    tok = split(lines[3]);
+    CHK(abs(stod(tok[8]) - 0.5) < 1e-12, "effective weight is the weight when inflation is not applied");
+    remove(fname.c_str());
+    bool threw = false;
+    try { enif_mm_inflation_csv(reals, obs, groups, {w0}, {u0, u1}, {&H0, &H1}, true, fname); } catch (...) { threw = true; }
+    CHK(threw, "misaligned per-realization vectors throw");
+}
+
+static void test_enif_current_prec()
+{
+    cout << "[enif: ies_enif_current_prec option, and the precision tracking the ensemble spread]" << endl;
+    // the option parses, defaults to off, and the registry agrees with the legacy chain (self_verify
+    // runs elsewhere; here just the two ends)
+    PO o; o.set_defaults();
+    CHK(!o.get_ies_enif_current_prec(), "ies_enif_current_prec defaults to false");
+    CHK(o.assign_value_by_key("IES_ENIF_CURRENT_PREC", "true") == PO::ARG_STATUS::ARG_ACCEPTED, "parses");
+    CHK(o.get_ies_enif_current_prec(), "and is true after parsing 'true'");
+    // a 4-node chain graph in the pest ascii matrix format
+    string gf = "selftest_chain_graph.mat";
+    {
+        ofstream f(gf);
+        f << " 4 4 1\n";
+        f << " 0 1 0 0\n 1 0 1 0\n 0 1 0 1\n 0 0 1 0\n";
+        f << "* row and column names\nP1\nP2\nP3\nP4\n";
+    }
+    ofstream frec("selftest_enif_current_prec.rec");
+    vector<string> names = {"P1", "P2", "P3", "P4"};
+    EnifGraph g;
+    g.from_file(gf, names, frec);
+    CHK(g.is_initialized() && g.num_nodes() == 4 && g.num_edges() == 3, "chain graph read: 4 nodes, 3 edges");
+    // anomalies with unit spread, then the same anomalies shrunk tenfold: the precision must grow
+    // a hundredfold, which is the shrinking trust region the current-ensemble hessian relies on
+    std::mt19937 gen(5);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    int N = 60;
+    Eigen::MatrixXd A(4, N);
+    for (int i = 0; i < 4; i++) for (int j = 0; j < N; j++) A(i, j) = nd(gen);
+    // give the chain some correlation so the off-diagonals are not pure noise
+    for (int j = 0; j < N; j++) { A(1, j) += 0.7 * A(0, j); A(2, j) += 0.7 * A(1, j); A(3, j) += 0.7 * A(2, j); }
+    A = (A.colwise() - A.rowwise().mean()) / sqrt(double(N - 1));
+    g.estimate_precision(A, 1.0e-3, frec);
+    Eigen::MatrixXd P1 = Eigen::MatrixXd(g.precision());
+    g.estimate_precision(0.1 * A, 1.0e-3, frec);
+    Eigen::MatrixXd P2 = Eigen::MatrixXd(g.precision());
+    CHK(P1.allFinite() && P2.allFinite(), "both precisions finite");
+    double ratio = P2.diagonal().mean() / P1.diagonal().mean();
+    CHK(abs(ratio - 100.0) / 100.0 < 0.05, "tenfold smaller spread -> hundredfold larger precision (got x" + to_string(ratio) + ")");
+    // the implied covariance of the unit-spread estimate reproduces the sample covariance on the chain
+    // the last fit was on 0.1 * A, whose covariance is 0.01 * (A A^T), so scale back up by 100
+    Eigen::MatrixXd Cimp = g.apply_cov(Eigen::MatrixXd::Identity(4, 4)) * 100.0;
+    Eigen::MatrixXd Cs = A * A.transpose();
+    // the neighbourhood regression with a stein pull is not the sample covariance, so this is a
+    // same-ballpark check, not an identity; the exact agreement is covered by the reference comparison
+    double vdev = (Cimp.diagonal() - Cs.diagonal()).cwiseAbs().maxCoeff() / Cs.diagonal().maxCoeff();
+    CHK(vdev < 0.5, "implied variances in the ballpark of the sample variances (max rel dev " + to_string(vdev) + ")");
+    // re-estimating with the same anomalies is deterministic
+    g.estimate_precision(0.1 * A, 1.0e-3, frec);
+    CHK((Eigen::MatrixXd(g.precision()) - P2).cwiseAbs().maxCoeff() == 0.0, "same anomalies, same precision");
+    // the automatic ridge (shrink < 0): finite, still scales with the spread, and a little
+    // weaker than a fixed heavy ridge, since k/(N-1) on this chain is well under 0.5
+    g.estimate_precision(A, -1.0, frec);
+    Eigen::MatrixXd Pa = Eigen::MatrixXd(g.precision());
+    g.estimate_precision(0.1 * A, -1.0, frec);
+    Eigen::MatrixXd Pa2 = Eigen::MatrixXd(g.precision());
+    CHK(Pa.allFinite() && Pa2.allFinite(), "automatic ridge: finite precisions");
+    double ratio_a = Pa2.diagonal().mean() / Pa.diagonal().mean();
+    CHK(abs(ratio_a - 100.0) / 100.0 < 0.05, "automatic ridge: tenfold smaller spread -> hundredfold precision (got x" + to_string(ratio_a) + ")");
+    PO od; od.set_defaults();
+    CHK(od.get_ies_enif_shrink() < 0.0, "ies_enif_shrink defaults to automatic");
+    // cross-validation: with 60 realizations on a 4-node chain the regressions are well
+    // determined, so the chosen ridge should be small and the precision close to the 1e-3 one
+    CHK((Pa - P1).cwiseAbs().maxCoeff() / P1.cwiseAbs().maxCoeff() < 0.25, "cv ridge on a well-determined chain stays close to the light fixed ridge");
+    // a noisy case: the same chain but only 24 realizations, where held-out error should
+    // call for more ridge than the clean case did.  read the chosen ridges off the rec
+    frec.close();
+    {
+        ofstream f2("selftest_enif_cv.rec");
+        Eigen::MatrixXd A24 = A.leftCols(24);
+        A24 = (A24.colwise() - A24.rowwise().mean()) / sqrt(23.0);
+        g.estimate_precision(A24, -1.0, f2);
+        g.estimate_precision(A, -1.0, f2);
+        f2.close();
+        ifstream r("selftest_enif_cv.rec"); string line; vector<double> medians;
+        while (getline(r, line))
+        {
+            size_t k = line.find("over nodes: ");
+            if (k == string::npos) continue;
+            // "min / median / max"
+            string rest = line.substr(k + 12);
+            double mn, md, mx; char s1, s2;
+            stringstream ss(rest); ss >> mn >> s1 >> md >> s2 >> mx;
+            medians.push_back(md);
+        }
+        CHK(medians.size() == 2, "two cv ridge report lines");
+        CHK(medians[0] >= medians[1], "fewer realizations -> cross-validation asks for at least as much ridge (24 reals " + to_string(medians[0]) + " vs 60 reals " + to_string(medians[1]) + ")");
+        remove("selftest_enif_cv.rec");
+    }
+    ofstream frec_tail("selftest_enif_current_prec.rec", ios::app);
+    // fewer than 20 realizations falls back to k/(N-1) and still gives a finite precision
+    Eigen::MatrixXd A12 = A.leftCols(12);
+    A12 = (A12.colwise() - A12.rowwise().mean()) / sqrt(11.0);
+    g.estimate_precision(A12, -1.0, frec_tail);
+    CHK(Eigen::MatrixXd(g.precision()).allFinite(), "12 realizations: k/(N-1) fallback gives a finite precision");
+    // direct neighbours only: a chain has no fill, so it must reproduce the fill-inclusive result
+    g.estimate_precision(A, 1.0e-3, frec_tail);
+    Eigen::MatrixXd Pf = Eigen::MatrixXd(g.precision());
+    g.estimate_precision(A, 1.0e-3, frec_tail, true);
+    Eigen::MatrixXd Pd = Eigen::MatrixXd(g.precision());
+    CHK((Pf - Pd).cwiseAbs().maxCoeff() == 0.0, "direct-only on a chain (no fill) matches the fill-inclusive estimate");
+    // a 4-cycle has fill (eliminating one node links its two neighbours), so direct-only
+    // uses smaller regressions and gives a different, still finite, precision
+    {
+        ofstream f(gf);
+        f << " 4 4 1\n 0 1 0 1\n 1 0 1 0\n 0 1 0 1\n 1 0 1 0\n* row and column names\nP1\nP2\nP3\nP4\n";
+    }
+    EnifGraph gc;
+    gc.from_file(gf, names, frec_tail);
+    CHK(gc.num_edges() == 4, "4-cycle read: 4 edges");
+    gc.estimate_precision(A, 1.0e-3, frec_tail);
+    Eigen::MatrixXd Pcf = Eigen::MatrixXd(gc.precision());
+    gc.estimate_precision(A, 1.0e-3, frec_tail, true);
+    Eigen::MatrixXd Pcd = Eigen::MatrixXd(gc.precision());
+    CHK(Pcf.allFinite() && Pcd.allFinite(), "4-cycle: both estimates finite");
+    CHK((Pcf - Pcd).cwiseAbs().maxCoeff() > 1e-8, "4-cycle: ignoring the fill changes the estimate");
+    frec_tail.close();
+    PO o2; o2.set_defaults();
+    CHK(!o2.get_ies_enif_direct_nbrs(), "ies_enif_direct_nbrs defaults to false");
+    CHK(o2.assign_value_by_key("IES_ENIF_DIRECT_NBRS", "true") == PO::ARG_STATUS::ARG_ACCEPTED && o2.get_ies_enif_direct_nbrs(), "and parses");
+    frec.close();
+    remove(gf.c_str()); remove("selftest_enif_current_prec.rec");
+}
+
 static void test_enif_inflation_report()
 {
     cout << "[enif inflation report: per-obs csv and per-group rec summary]" << endl;
@@ -2971,6 +3392,114 @@ static void test_irls_reweight()
     CHK(w0.size() == 5 && w0.at("ZO1") == 2.0, "irls: w0 holds the control file weights");
 }
 
+static void test_irls_max_dev()
+{
+    cout << "[irls: solving the floor for a cap on deviations]" << endl;
+    // six regul equations with distinct residuals 0, 0.1 .. 0.5, plus a tie pair, a zero weight
+    // one and a non-regul one that must never count
+    auto build = [](PriorInformation& pi, Parameters& pars)
+    {
+        pi.clear();
+        pi.AddRecord("e0 1.0 * p0 = 0.0 1.0 regul");
+        pi.AddRecord("e1 1.0 * p1 = 0.0 1.0 regul");
+        pi.AddRecord("e2 1.0 * p2 = 0.0 2.0 regul");
+        pi.AddRecord("e3 1.0 * p3 = 0.0 1.0 regul");
+        pi.AddRecord("e4 1.0 * p4 = 0.0 1.0 regul");
+        pi.AddRecord("e5 1.0 * p5 = 0.0 1.0 regul");
+        pi.AddRecord("ez 1.0 * p5 = 0.0 0.0 regul");
+        pi.AddRecord("ob 1.0 * p5 = 0.0 3.0 obsgrp");
+        pars.clear();
+        for (int i = 0; i < 6; i++)
+            pars.insert("P" + to_string(i), 0.1 * i);
+    };
+    PriorInformation pi;
+    Parameters pars;
+    map<string, double> w0;
+    double eps_min = 0.01;
+
+    // cap 2: floor rises to the third largest |r| = 0.3, so 0.4 and 0.5 are active
+    build(pi, pars); w0.clear();
+    PriorInformation::IrlsStats st = pi.irls_reweight(pars, eps_min, w0, 2);
+    CHK(abs(st.eps - 0.3) < 1e-12, "cap 2: floor is the 3rd largest residual");
+    CHK(st.n_active == 2, "cap 2: two equations active");
+    CHK(st.n_floor == 3, "cap 2: three strictly below the floor (0, 0.1, 0.2)");
+    CHK(st.n == 6, "cap 2: six eligible equations, zero weight and non-regul excluded");
+    CHK(abs(pi.get_pi_rec("E5").get_weight() - 1.0 / sqrt(0.5)) < 1e-12, "cap 2: active equation keeps w0/sqrt(|r|)");
+    CHK(abs(pi.get_pi_rec("E3").get_weight() - 1.0 / sqrt(0.3)) < 1e-12, "cap 2: the equation at the floor gets w0/sqrt(eps)");
+    CHK(abs(pi.get_pi_rec("E0").get_weight() - 1.0 / sqrt(0.3)) < 1e-12, "cap 2: zero residual shares the floor weight");
+    CHK(abs(pi.get_pi_rec("E2").get_weight() - 2.0 / sqrt(0.3)) < 1e-12, "cap 2: floor weight scales with w0");
+    CHK(pi.get_pi_rec("EZ").get_weight() == 0.0 && pi.get_pi_rec("OB").get_weight() == 3.0, "cap 2: zero weight and non-regul untouched");
+    // weights are monotone: bigger residual never gets a bigger weight
+    bool mono = true;
+    for (int i = 0; i < 5; i++)
+        if (pi.get_pi_rec("E" + to_string(i)).get_weight() / w0.at("E" + to_string(i)) <
+            pi.get_pi_rec("E" + to_string(i + 1)).get_weight() / w0.at("E" + to_string(i + 1)) - 1e-12)
+            mono = false;
+    CHK(mono, "cap 2: reweight factor never increases with |r|");
+
+    // cap 0: everything at the floor, floor = largest residual, all factors equal -> plain l2
+    build(pi, pars); w0.clear();
+    st = pi.irls_reweight(pars, eps_min, w0, 0);
+    CHK(abs(st.eps - 0.5) < 1e-12 && st.n_active == 0, "cap 0: floor is the largest residual, nothing active");
+    CHK(abs(st.fmin - st.fmax) < 1e-12, "cap 0: one common factor, the penalty is quadratic again");
+
+    // cap >= n: the floor stays at the minimum, same as no cap
+    build(pi, pars); w0.clear();
+    st = pi.irls_reweight(pars, eps_min, w0, 6);
+    CHK(abs(st.eps - eps_min) < 1e-12 && st.n_active == 5, "cap 6 of 6: floor stays at eps, five above it");
+    build(pi, pars); w0.clear();
+    PriorInformation::IrlsStats st_off = pi.irls_reweight(pars, eps_min, w0, -1);
+    CHK(abs(st_off.eps - st.eps) < 1e-12 && st_off.n_active == st.n_active && st_off.n_floor == st.n_floor, "cap off (-1) matches a cap the equations never reach");
+    build(pi, pars); w0.clear();
+    st = pi.irls_reweight(pars, eps_min, w0, 60);
+    CHK(abs(st.eps - eps_min) < 1e-12, "cap far above n: floor stays at eps");
+
+    // the minimum floor wins when the cap would set a smaller one
+    build(pi, pars); w0.clear();
+    st = pi.irls_reweight(pars, 0.35, w0, 2);
+    CHK(abs(st.eps - 0.35) < 1e-12 && st.n_active == 2, "cap 2 with eps 0.35: minimum floor above the order statistic wins");
+    build(pi, pars); w0.clear();
+    st = pi.irls_reweight(pars, 0.45, w0, 2);
+    CHK(abs(st.eps - 0.45) < 1e-12 && st.n_active == 1, "cap 2 with eps 0.45: fewer than the cap active, never more");
+
+    // ties at the cut: equal residuals all land at the floor, so active stays under the cap
+    build(pi, pars); w0.clear();
+    pars.update_rec("P3", 0.4);  // now 0.4 twice
+    st = pi.irls_reweight(pars, eps_min, w0, 2);
+    CHK(abs(st.eps - 0.4) < 1e-12 && st.n_active == 1, "tie at the cut: floor is the tied value, one active");
+    st = pi.irls_reweight(pars, eps_min, w0, 1);
+    CHK(abs(st.eps - 0.4) < 1e-12 && st.n_active == 1, "cap 1 with a tie just below: one active");
+
+    // all residuals zero (the zeroth order start): floor stays at eps, nothing active, all equal
+    build(pi, pars); w0.clear();
+    for (int i = 0; i < 6; i++)
+        pars.update_rec("P" + to_string(i), 0.0);
+    st = pi.irls_reweight(pars, eps_min, w0, 2);
+    CHK(abs(st.eps - eps_min) < 1e-12 && st.n_active == 0 && st.n_floor == 6, "all zero residuals: floor at eps, all six at floor");
+    CHK(abs(pi.get_pi_rec("E1").get_weight() - 1.0 / sqrt(eps_min)) < 1e-12, "all zero residuals: every weight is w0/sqrt(eps)");
+
+    // a second pass at new parameters solves a new floor from w0, not from the last weights
+    build(pi, pars); w0.clear();
+    pi.irls_reweight(pars, eps_min, w0, 2);
+    for (int i = 0; i < 6; i++)
+        pars.update_rec("P" + to_string(i), 0.2 * i);
+    st = pi.irls_reweight(pars, eps_min, w0, 2);
+    CHK(abs(st.eps - 0.6) < 1e-12, "second pass: floor re-solved from the new residuals");
+    CHK(abs(pi.get_pi_rec("E5").get_weight() - 1.0 / sqrt(1.0)) < 1e-12, "second pass: weight from w0, no compounding");
+    // and the same parameters twice give the same weights
+    st = pi.irls_reweight(pars, eps_min, w0, 2);
+    CHK(abs(st.eps - 0.6) < 1e-12 && abs(pi.get_pi_rec("E5").get_weight() - 1.0) < 1e-12, "repeat at the same parameters: identical");
+
+    // huge residual spread and a non-finite one: the bad one is skipped, the rest still solve
+    build(pi, pars); w0.clear();
+    pars.update_rec("P5", 1e12);
+    pars.update_rec("P4", numeric_limits<double>::quiet_NaN());
+    st = pi.irls_reweight(pars, eps_min, w0, 1);
+    CHK(st.n == 5, "nan residual: that equation is skipped");
+    CHK(abs(st.eps - 0.3) < 1e-12 && st.n_active == 1, "nan residual: cap solved over the finite ones (floor 0.3, 1e12 active)");
+    CHK(std::isfinite(pi.get_pi_rec("E5").get_weight()) && pi.get_pi_rec("E5").get_weight() > 0.0, "huge residual: finite positive weight");
+}
+
 static void test_cmdline_version_only()
 {
     cout << "[command line: -v / --version answers with the version alone]" << endl;
@@ -3086,7 +3615,14 @@ int main()
     run_test(test_registry_equivalence, "test_registry_equivalence");
     run_test(test_cmdline_version_only, "test_cmdline_version_only");
     run_test(test_irls_reweight, "test_irls_reweight");
+    run_test(test_irls_max_dev, "test_irls_max_dev");
     run_test(test_enif_inflation_report, "test_enif_inflation_report");
+    run_test(test_enif_woodbury_step, "test_enif_woodbury_step");
+    run_test(test_enif_lowrank_step, "test_enif_lowrank_step");
+    run_test(test_enif_supplied_prec_hybrid, "test_enif_supplied_prec_hybrid");
+    run_test(test_estimate_sparse_h_divisor, "test_estimate_sparse_h_divisor");
+    run_test(test_enif_mm_inflation_csv, "test_enif_mm_inflation_csv");
+    run_test(test_enif_current_prec, "test_enif_current_prec");
     run_test(test_generic_access, "test_generic_access");
     run_test(test_mutability, "test_mutability");
     run_test(test_control_info, "test_control_info");

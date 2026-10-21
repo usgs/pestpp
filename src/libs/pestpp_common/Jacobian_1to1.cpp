@@ -307,15 +307,30 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	list<JacobianRun> run_list;
     int nfailed = 0;
 	
+	const string run_tag_prefix = "par_name:";
 	for (const auto& par_run : par_run_map)
     {
+		//every run id queued for this parameter is read once, and checked.  this loop
+		//used to read par_run.second[0] each time round, so with forcen always_3 the
+		//first perturbation went into the run list twice and the second was never
+		//read: every "central" difference was a one sided one, and a failure of the
+		//second run went unseen
+		cur_par_name = par_run.first;
+		int n_queued = (int)par_run.second.size();
+		int n_failed_runs = 0;
 		for (auto rid : par_run.second)
 		{
+			string run_tag;
+			run_manager.get_info(rid, r_status, run_tag, cur_numeric_par_value);
+			//the tag is "par_name:<name>", written when the run was queued.  a run that
+			//names another parameter would land in the wrong column without a word
+			if ((run_tag.compare(0, run_tag_prefix.size(), run_tag_prefix) != 0) ||
+				(run_tag.substr(run_tag_prefix.size()) != cur_par_name))
+				throw runtime_error("Jacobian_1to1::process_runs(): run " + to_string(rid) + " is tagged '" + run_tag +
+					"' but was queued for parameter '" + cur_par_name + "'");
 			run_list.push_back(JacobianRun());
-			run_manager.get_info(par_run.second[0], r_status, cur_par_name, cur_numeric_par_value);
-			cur_par_name = cur_par_name.substr(9,cur_par_name.size());
-			run_manager.get_model_parameters(par_run.second[0], run_list.back().ctl_pars);
-			bool success = run_manager.get_observations_vec(par_run.second[0], run_list.back().obs_vec);
+			run_manager.get_model_parameters(rid, run_list.back().ctl_pars);
+			bool success = run_manager.get_observations_vec(rid, run_list.back().obs_vec);
 			run_list.back().numeric_derivative_par = cur_numeric_par_value;
 			if ((debug_fail) && (nfailed < 3))
 			{
@@ -337,10 +352,18 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 			else
 			{
 				run_list.pop_back();
+				n_failed_runs++;
 			}
 		}
 
-		
+		if ((!run_list.empty()) && (n_failed_runs > 0))
+		{
+			//the derivative still gets made from whatever survived, but a central or
+			//parabolic difference asked for has quietly become a one sided one
+			file_manager.rec_ofstream() << "WARNING: parameter '" << cur_par_name << "': " << n_failed_runs
+				<< " of " << n_queued << " perturbation runs failed, derivative taken from the "
+				<< run_list.size() << " that succeeded (one sided)" << endl;
+		}
 		if (!run_list.empty())
 		{
 			base_numeric_par_names.push_back(cur_par_name);

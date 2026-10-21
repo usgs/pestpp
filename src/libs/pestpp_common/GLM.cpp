@@ -115,7 +115,18 @@ void GLM::check_scenario()
 		if (n_reg_pi == 0)
 			throw_glm_error("'GLM_IRLS_EPS' > 0 requires at least one non-zero weighted "
 				"prior info equation in a regularization group");
+		int max_dev = pest_scenario.get_pestpp_options().get_glm_irls_max_dev();
+		if ((max_dev >= 0) && (max_dev >= n_reg_pi))
+		{
+			stringstream ss;
+			ss << "Note: 'GLM_IRLS_MAX_DEV' (" << max_dev << ") is not less than the number of reweighted "
+				<< "prior info equations (" << n_reg_pi << "), so it never raises the floor" << endl;
+			cout << ss.str();
+			file_manager.rec_ofstream() << ss.str();
+		}
 	}
+	else if (pest_scenario.get_pestpp_options().get_glm_irls_max_dev() >= 0)
+		throw_glm_error("'GLM_IRLS_MAX_DEV' >= 0 requires 'GLM_IRLS_EPS' > 0 (it is the minimum floor)");
 }
 
 int GLM::initialize_prepare()

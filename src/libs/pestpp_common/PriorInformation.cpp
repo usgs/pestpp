@@ -373,7 +373,7 @@ int PriorInformation::get_nnz_pi() const
 	return nnz;
 }
 
-PriorInformation::IrlsStats PriorInformation::irls_reweight(const Parameters &pars, double eps, map<string, double> &w0)
+PriorInformation::IrlsStats PriorInformation::irls_reweight(const Parameters &pars, double eps, map<string, double> &w0, int max_dev)
 {
 	//the l1 penalty by reweighting.  pest applies weights as (w*r)^2 in phi, so to make the
 	//penalty behave like |r| we need w^2 * r^2 = w0^2 * |r|, which means w = w0/sqrt(|r|).
@@ -384,6 +384,13 @@ PriorInformation::IrlsStats PriorInformation::irls_reweight(const Parameters &pa
 	//compound from iteration to iteration.  only regularization group equations are touched
 	//and zero-weight ones stay zero.  the residual is whatever calc_residual gives, so for
 	//log transformed pars it is in log10 units and eps has to be too.
+	//
+	//max_dev >= 0 turns eps into a lower bound and solves for the floor instead: the floor is
+	//raised to the (max_dev+1)-th largest |residual|, so at most max_dev equations sit above it
+	//and get the l1 treatment while the rest share one quadratic weight.  that is the whole
+	//"solve for eps" - with the residuals fixed at the accepted parameters the floor that leaves
+	//n equations active is just an order statistic, no search needed.  eps passed in still
+	//applies as the minimum so the floor can never chase shrinking residuals down to zero.
 	IrlsStats stats;
 	vector<double> facs;
 	if (w0.empty())
@@ -391,6 +398,8 @@ PriorInformation::IrlsStats PriorInformation::irls_reweight(const Parameters &pa
 		for (auto &pi : prior_info_map)
 			w0[pi.first] = pi.second.get_weight();
 	}
+	struct Eq { PriorInformationRec* rec; double r; double w0; };
+	vector<Eq> eligible;
 	for (auto &pi : prior_info_map)
 	{
 		if (!pi.second.is_regularization())
@@ -399,10 +408,29 @@ PriorInformation::IrlsStats PriorInformation::irls_reweight(const Parameters &pa
 		if ((it == w0.end()) || (it->second <= 0.0))
 			continue;
 		double r = abs(pi.second.calc_residual(pars));
-		if (r < eps)
+		if (!std::isfinite(r))
+			continue;
+		eligible.push_back(Eq{&pi.second, r, it->second});
+	}
+	if ((max_dev >= 0) && (max_dev < (int)eligible.size()))
+	{
+		vector<double> rs;
+		for (auto &e : eligible)
+			rs.push_back(e.r);
+		sort(rs.begin(), rs.end(), greater<double>());
+		//rs[max_dev] is the (max_dev+1)-th largest.  "active" below means strictly above the
+		//floor, so this equation and everything tied with it land at the floor
+		eps = max(eps, rs[max_dev]);
+	}
+	stats.eps = eps;
+	for (auto &e : eligible)
+	{
+		if (e.r < eps)
 			stats.n_floor++;
-		double fac = 1.0 / sqrt(max(r, eps));
-		pi.second.set_weight(it->second * fac);
+		if (e.r > eps)
+			stats.n_active++;
+		double fac = 1.0 / sqrt(max(e.r, eps));
+		e.rec->set_weight(e.w0 * fac);
 		facs.push_back(fac);
 	}
 	stats.n = facs.size();

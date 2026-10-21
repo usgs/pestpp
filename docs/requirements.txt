@@ -1,4 +1,6 @@
 sphinx>=7.0
 sphinx-rtd-theme>=2.0
-breathe>=4.35
+# breathe 5 renders a constructor declared `Foo(void)` as a bare name that sphinx's
+# C++ parser rejects, and the docs workflow's exempt-warning list was measured against 4.36
+breathe>=4.35,<5
 myst-parser>=3.0

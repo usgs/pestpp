@@ -373,6 +373,10 @@ public:
     //covariance and an ensemble-regressed observation operator, instead of from
     //sample cross-covariances.  cur_lam damps the PRIOR precision.
     void solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade);
+    //enif one realization at a time: H regressed on deviations centred on that realization
+    //over its multimodal neighbourhood, then the enif step for that realization alone.
+    //needs update_multimodal_components() to have run.  threaded over realizations
+    void solve_enif_multimodal(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
     void update_multimodal_components(const double mm_alpha);
     //ies_use_prior_prec: the p x p prior precision the glm solve should use in place of
@@ -400,6 +404,15 @@ private:
 	bool enif_h_ready = false;
 	Eigen::SparseMatrix<double> enif_H;
 	Eigen::VectorXd enif_unexp;
+	//the per-realization H and unexplained variance of the multimodal enif solve.  this
+	//object lives one iteration, so "ready" means estimated for this iteration and good
+	//for every lambda and backtrack factor that follows
+	bool enif_mm_h_ready = false;
+	unordered_map<string, Eigen::SparseMatrix<double>> enif_mm_H;
+	unordered_map<string, Eigen::VectorXd> enif_mm_unexp;
+	//read the graph and estimate the prior precision on it, once, if ies_enif_graph is set.
+	//e is the par residual (x - x0) so the prior ensemble can be recovered as x - e
+	void init_enif_graph(const vector<string>& pe_real_names, const Eigen::MatrixXd& e, double scale);
 	//the noise inflation report is the same for every lambda too, so once per iteration
 	bool enif_inflate_reported = false;
 	Eigen::MatrixXd& Am;
@@ -433,6 +446,59 @@ private:
                          string center_on=string(), vector<int> real_idxs=vector<int>(),Eigen::VectorXd q_vec=Eigen::VectorXd());
 
 };
+
+/* one thread of the multimodal enif solve.  each realization is a job: build the
+deviations centred on it over its neighbourhood, lasso its own sparse H (once per
+iteration, cached in the maps), then take the enif step for that one column,
+information form when a graph is present and woodbury with the prior covariance
+when not.  threads own disjoint columns of the upgrade, so the only locks are the
+job counter and the H cache. */
+class EnifMmThread
+{
+public:
+    EnifMmThread(PerformanceLog* _performance_log, const vector<string>& _real_names,
+        const Eigen::MatrixXd& _X, const Eigen::MatrixXd& _Y, const Eigen::MatrixXd& _e, const Eigen::MatrixXd& _r,
+        unordered_map<string, vector<int>>& _real_idx_map,
+        unordered_map<string, pair<vector<string>, vector<string>>>& _real_name_map,
+        unordered_map<string, Eigen::VectorXd>& _q_vec_map,
+        unordered_map<string, Eigen::VectorXd>& _real_weight_map,
+        unordered_map<string, Eigen::SparseMatrix<double>>& _H_map,
+        unordered_map<string, Eigen::VectorXd>& _unexp_map, bool _h_ready,
+        const EnifGraph* _graph, const Eigen::SparseMatrix<double>* _C, const Eigen::MatrixXd* _Afac,
+        double _lasso, int _cv_folds, bool _inflate, double _cur_lam, Eigen::MatrixXd& _upgrade);
+    void work(int thread_id);
+    //noise variance each realization ended up with, aligned with real_names, for the report
+    vector<Eigen::VectorXd> noise_var;
+
+protected:
+    PerformanceLog* performance_log;
+    const vector<string>& real_names;
+    const Eigen::MatrixXd& X;
+    const Eigen::MatrixXd& Y;
+    const Eigen::MatrixXd& e;
+    const Eigen::MatrixXd& r;
+    unordered_map<string, vector<int>>& real_idx_map;
+    unordered_map<string, pair<vector<string>, vector<string>>>& real_name_map;
+    unordered_map<string, Eigen::VectorXd>& q_vec_map;
+    unordered_map<string, Eigen::VectorXd>& real_weight_map;
+    unordered_map<string, Eigen::SparseMatrix<double>>& H_map;
+    unordered_map<string, Eigen::VectorXd>& unexp_map;
+    bool h_ready;
+    const EnifGraph* graph;
+    const Eigen::SparseMatrix<double>* C;
+    //the current ensemble anomalies when the covariance is C = A A^T; null means use C
+    const Eigen::MatrixXd* Afac;
+    double lasso;
+    int cv_folds;
+    bool inflate;
+    double cur_lam;
+    Eigen::MatrixXd& upgrade;
+    int next = 0;
+    mutex next_lock, results_lock;
+};
+
+void enif_mm_thread_function(int id, EnifMmThread& worker, exception_ptr& eptr);
+
 
 class MmUpgradeThread
 {

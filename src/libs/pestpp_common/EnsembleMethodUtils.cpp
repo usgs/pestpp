@@ -1190,6 +1190,72 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
 
 }
 
+void EnsembleSolver::init_enif_graph(const vector<string>& pe_real_names, const Eigen::MatrixXd& e, double scale)
+{
+    string gname = pest_scenario.get_pestpp_options().get_ies_enif_graph();
+    string pname = pest_scenario.get_pestpp_options().get_ies_enif_prec_file();
+    //a supplied precision is also the graph: its pattern is the conditional independence
+    if (pname.size() > 0)
+        gname = pname;
+    if ((gname.size() == 0) || (enif_graph.is_initialized()))
+        return;
+    ofstream& frec = file_manager.rec_ofstream();
+    performance_log->log_event("enif: reading conditional-independence graph");
+    enif_graph.from_file(gname, act_par_names, frec,
+        pest_scenario.get_pestpp_options().get_ies_enif_order());
+
+    Eigen::MatrixXd X = pe.get_eigen(pe_real_names, act_par_names);
+    X.transposeInPlace();
+    bool hybrid = pest_scenario.get_pestpp_options().get_ies_enif_hybrid_damp();
+    if ((hybrid) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
+        throw runtime_error("EnsembleSolver::init_enif_graph(): 'ies_enif_hybrid_damp' needs 'ies_use_approx' = true");
+    enif_graph.set_hybrid_damp(hybrid);
+    if (hybrid)
+    {
+        //the damping metric: the current ensemble on the graph, every iteration
+        Eigen::MatrixXd A = (X.colwise() - X.rowwise().mean()) * scale;
+        performance_log->log_event("enif: estimating current-ensemble precision for the hybrid damping");
+        frec << "...enif: hybrid damping, lambda multiplies the current-ensemble precision (ies_enif_hybrid_damp)" << endl;
+        enif_graph.estimate_precision(
+            A, pest_scenario.get_pestpp_options().get_ies_enif_shrink(), frec,
+            pest_scenario.get_pestpp_options().get_ies_enif_direct_nbrs(), true);
+    }
+    if (pname.size() > 0)
+    {
+        performance_log->log_event("enif: reading the prior precision");
+        enif_graph.load_precision(pname, frec);
+        frec << "...enif: prior precision read from file, not estimated (ies_enif_prec_file)" << endl;
+        return;
+    }
+    //ies_enif_current_prec: the precision in the hessian comes from the ensemble as it is
+    //now, not the prior.  with ies_use_approx the prior enters the step only through the
+    //hessian, so this is the lm-enrml choice: as the ensemble contracts the precision grows
+    //and the step shrinks in the directions already learned - the trust region ies gets from
+    //its ensemble covariance.  without it the step size is set by the prior spread for the
+    //whole run and lambda has to supply all the damping.  x0 = x - e is still the prior
+    if ((pest_scenario.get_pestpp_options().get_ies_enif_current_prec()) && (!hybrid))
+    {
+        //with the hybrid damping the current ensemble is already in the step, so the
+        //curvature keeps the prior
+        Eigen::MatrixXd A = (X.colwise() - X.rowwise().mean()) * scale;
+        performance_log->log_event("enif: estimating sparse precision on the graph from the CURRENT ensemble");
+        frec << "...enif: precision estimated from the current ensemble (ies_enif_current_prec)" << endl;
+        enif_graph.estimate_precision(
+            A, pest_scenario.get_pestpp_options().get_ies_enif_shrink(), frec,
+            pest_scenario.get_pestpp_options().get_ies_enif_direct_nbrs());
+    }
+    else
+    {
+        Eigen::MatrixXd X0 = X - e;
+        Eigen::MatrixXd A0 = (X0.colwise() - X0.rowwise().mean()) * scale;
+        performance_log->log_event("enif: estimating sparse prior precision on the graph");
+        enif_graph.estimate_precision(
+            A0, pest_scenario.get_pestpp_options().get_ies_enif_shrink(), frec,
+            pest_scenario.get_pestpp_options().get_ies_enif_direct_nbrs());
+    }
+}
+
+
 void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
 {
     //ensemble information filter.  the standard ies upgrade builds the kalman gain from
@@ -1218,11 +1284,19 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     int n_obs = (int)act_obs_names.size();
     if (num_reals < 2)
         throw runtime_error("EnsembleSolver::solve_enif(): need at least 2 realizations");
+    bool current_prec = pest_scenario.get_pestpp_options().get_ies_enif_current_prec();
+    if ((current_prec) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
+        throw runtime_error("EnsembleSolver::solve_enif(): 'ies_enif_current_prec' needs 'ies_use_approx' = true: "
+            "the full solution keeps the prior term in the gradient, and that term must use the prior precision");
 
     performance_log->log_event("enif: forming anomalies and residuals");
     //e = x - x0 and r = y - d, both returned as reals x vars, so transpose to vars x reals
     Eigen::MatrixXd e = ph.get_par_resid_subset(pe, pe_real_names);
     e.transposeInPlace();
+    //x - x0 before the approx form zeroes it: the graph init needs it to recover the
+    //PRIOR ensemble.  passing the zeroed e there (as this used to) made the prior precision
+    //silently come from the current ensemble whenever ies_use_approx was on
+    Eigen::MatrixXd e_prior = e;
     //the approximate solution drops the prior pull from the gradient, same as ies does
     //with ies_use_approx (which defaults to true).  the full solution keeps each
     //realization anchored on its own prior draw; the approximate one only ever moves
@@ -1245,22 +1319,7 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     //is anchored on the prior, and re-estimating from a partially collapsed
     //ensemble each iteration would shrink the prior term as the run proceeds.
     //x0 is recovered as x - e, which is already to hand.
-    string gname = pest_scenario.get_pestpp_options().get_ies_enif_graph();
-    if ((gname.size() > 0) && (!enif_graph.is_initialized()))
-    {
-        ofstream& frec = file_manager.rec_ofstream();
-        performance_log->log_event("enif: reading conditional-independence graph");
-        enif_graph.from_file(gname, act_par_names, frec,
-            pest_scenario.get_pestpp_options().get_ies_enif_order());
-
-        Eigen::MatrixXd X = pe.get_eigen(pe_real_names, act_par_names);
-        X.transposeInPlace();
-        Eigen::MatrixXd X0 = X - e;
-        Eigen::MatrixXd A0 = (X0.colwise() - X0.rowwise().mean()) * scale;
-        performance_log->log_event("enif: estimating sparse prior precision on the graph");
-        enif_graph.estimate_precision(
-            A0, pest_scenario.get_pestpp_options().get_ies_enif_shrink(), frec);
-    }
+    init_enif_graph(pe_real_names, e_prior, scale);
 
     //M = (A^T A + gamma I)^-1, the ridge-regularised ensemble-subspace gram matrix
     performance_log->log_event("enif: factoring the ensemble gram matrix");
@@ -1275,8 +1334,8 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     if (gram_fact.info() != Eigen::Success)
         throw runtime_error("EnsembleSolver::solve_enif(): failed to factor the ensemble gram matrix");
 
-    //H^T = A M B^T  (gram is symmetric so M^T = M)
-    Eigen::MatrixXd Ht = A * gram_fact.solve(B.transpose());
+    //H = B M A^T is never formed, not even as a p x n product: every path below
+    //applies it through A, B and the N x N factor
 
     //--- graph path: sparse H and the information form -----------------------
     //when a conditional-independence graph is supplied, estimate a SPARSE H by
@@ -1344,15 +1403,105 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
         return;
     }
 
-    //--- covariance path: woodbury with the supplied parcov ------------------
-    //C_lam H^T = C H^T / (1 + lam); one multiply by the supplied prior covariance
-    performance_log->log_event("enif: applying the prior covariance");
-    double s = 1.0 / (1.0 + cur_lam);
-    Covariance pcov = parcov.get(act_par_names);
-    Eigen::MatrixXd CHt = s * (*pcov.e_ptr() * Ht);
+    //--- covariance path with an explicit lasso H ----------------------------
+    //a lasso penalty given without a graph means: estimate the sparse H the graph
+    //path would use, but take the woodbury step with parcov.  this is the control
+    //between the implicit-H solve below and the realization-centred multimodal one:
+    //same H estimator and same inflation, mean-centred.
+    double lasso_opt = pest_scenario.get_pestpp_options().get_ies_enif_h_lasso();
+    if (lasso_opt > 0.0)
+    {
+        ofstream& frec = file_manager.rec_ofstream();
+        if (!enif_h_ready)
+        {
+            performance_log->log_event("enif: estimating sparse H for the covariance path");
+            frec << "...enif: lasso H on the covariance path (ies_enif_h_lasso given, no graph)" << endl;
+            enif_H = estimate_sparse_H(
+                A, B, lasso_opt, pest_scenario.get_pestpp_options().get_ies_num_threads(),
+                enif_unexp, frec, pest_scenario.get_pestpp_options().get_ies_enif_h_cv_folds());
+            enif_h_ready = true;
+        }
+        if (pest_scenario.get_pestpp_options().get_ies_enif_save_h())
+        {
+            stringstream hs;
+            hs << file_manager.get_base_filename() << "." << iter << ".enif_H.jcb";
+            Mat hmat(act_obs_names, act_par_names, enif_H);
+            hmat.to_binary_new(hs.str());
+            frec << "...saved enif H to " << hs.str() << endl;
+        }
+        bool apply_inflate_l = pest_scenario.get_pestpp_options().get_ies_enif_resid_inflate();
+        ObservationInfo* oi_l = pest_scenario.get_observation_info_ptr();
+        Eigen::VectorXd var_l(n_obs), wvec_l(n_obs);
+        for (int i = 0; i < n_obs; i++)
+        {
+            double w = oi_l->get_weight(act_obs_names[i]);
+            if (w <= 0.0)
+                throw runtime_error("EnsembleSolver::solve_enif(): zero weight on active observation " + act_obs_names[i]);
+            wvec_l(i) = w;
+            var_l(i) = (1.0 / (w * w)) + (apply_inflate_l ? enif_unexp(i) : 0.0);
+        }
+        if (!enif_inflate_reported)
+        {
+            vector<string> groups;
+            for (auto& name : act_obs_names)
+                groups.push_back(oi_l->get_group(name));
+            stringstream cs;
+            cs << file_manager.get_base_filename() << "." << iter << ".enif_obs_inflate.csv";
+            enif_inflation_report(act_obs_names, groups, wvec_l, enif_unexp, apply_inflate_l, iter, cs.str(), frec);
+            enif_inflate_reported = true;
+        }
+        performance_log->log_event("enif: woodbury step with the lasso H");
+        Eigen::MatrixXd upgrade_l;
+        if (current_prec)
+        {
+            //the current ensemble covariance C = A A^T in place of parcov - see init_enif_graph.
+            //H C H^T = (H A)(H A)^T has rank N, so the step stays ensemble-sized: U = H A, Q = I,
+            //L = A.  the p x p product is never formed
+            if (!enif_inflate_reported)
+                frec << "...enif: hessian from the current ensemble covariance, not parcov (ies_enif_current_prec)" << endl;
+            Eigen::MatrixXd U = enif_H * A;
+            Eigen::MatrixXd He_l = enif_H * e;
+            upgrade_l = enif_lowrank_step(U, Eigen::MatrixXd::Identity(num_reals, num_reals), A, var_l, e, He_l, r, cur_lam);
+        }
+        else
+        {
+            //a supplied parcov is dense p x p and H parcov H^T is full rank, so this one
+            //keeps the n x n innovation covariance - it is bounded by p, not n
+            Covariance pcov_l = parcov.get(act_par_names);
+            upgrade_l = enif_woodbury_step(enif_H, var_l, *pcov_l.e_ptr(), e, r, cur_lam);
+        }
+        upgrade_l.transposeInPlace();
+        ss.str("");
+        ss << "enif (lasso H, covariance path): lambda " << cur_lam << ", max abs upgrade " << upgrade_l.cwiseAbs().maxCoeff();
+        performance_log->log_event(ss.str());
+        pe_upgrade.add_2_cols_ip(act_par_names, upgrade_l);
+        return;
+    }
 
-    //G = R + H C_lam H^T, with H C_lam H^T = B M (A^T C_lam H^T) so it stays N-sized
-    Eigen::MatrixXd Gm = B * gram_fact.solve(A.transpose() * CHt);
+    //--- covariance path: woodbury with the supplied parcov ------------------
+    //H C H^T = B M (A^T C A) M B^T has rank N, so with K = A^T C A (N x N) the whole
+    //step runs through enif_lowrank_step with U = B, Q = M K M and L = C A M.  the
+    //only product that touches C is C A, p x N.  this used to form H^T, C H^T (both
+    //p x n) and the n x n innovation covariance, which is 20 gb each at 50k x 50k
+    //and an n^3 factor; now the cost is (n + p) N^2 like ies
+    performance_log->log_event("enif: applying the prior covariance to the anomalies");
+    Eigen::MatrixXd V;
+    if (current_prec)
+    {
+        //the current ensemble covariance in place of parcov - see init_enif_graph
+        if (!enif_inflate_reported)
+            file_manager.rec_ofstream() << "...enif: hessian from the current ensemble covariance, not parcov (ies_enif_current_prec)" << endl;
+        V = A * gram_raw;   // (A A^T) A
+    }
+    else
+    {
+        Covariance pcov = parcov.get(act_par_names);
+        V = *pcov.e_ptr() * A;
+    }
+    Eigen::MatrixXd Kmat = A.transpose() * V;
+    //M K M, using M = M^T; L = V M
+    Eigen::MatrixXd Q = gram_fact.solve(gram_fact.solve(Kmat).transpose());
+    Eigen::MatrixXd L = gram_fact.solve(V.transpose()).transpose();
 
     //the observation error used in the update is inflated by the variance H fails
     //to explain, var(y - Hx), per observation.  without this the update treats the
@@ -1367,14 +1516,14 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
     Eigen::VectorXd unexplained = resid.array().square().rowwise().sum() / double(num_reals);
 
     ObservationInfo* oi_ptr = pest_scenario.get_observation_info_ptr();
-    Eigen::VectorXd wvec(n_obs);
+    Eigen::VectorXd wvec(n_obs), var(n_obs);
     for (int i = 0; i < n_obs; i++)
     {
         double w = oi_ptr->get_weight(act_obs_names[i]);
         if (w <= 0.0)
             throw runtime_error("EnsembleSolver::solve_enif(): zero weight on active observation " + act_obs_names[i]);
         wvec(i) = w;
-        Gm(i, i) += (1.0 / (w * w)) + (apply_inflate ? unexplained(i) : 0.0);
+        var(i) = (1.0 / (w * w)) + (apply_inflate ? unexplained(i) : 0.0);
     }
     if (!enif_inflate_reported)
     {
@@ -1387,15 +1536,11 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
             file_manager.rec_ofstream());
         enif_inflate_reported = true;
     }
-    Eigen::LDLT<Eigen::MatrixXd> g_fact(Gm);
-    if (g_fact.info() != Eigen::Success)
-        throw runtime_error("EnsembleSolver::solve_enif(): failed to factor the innovation covariance");
 
     //H e = B M A^T e
     performance_log->log_event("enif: forming the upgrade");
     Eigen::MatrixXd He = B * gram_fact.solve(A.transpose() * e);
-
-    Eigen::MatrixXd upgrade = -((s * (e - (CHt * g_fact.solve(He)))) + (CHt * g_fact.solve(r)));
+    Eigen::MatrixXd upgrade = enif_lowrank_step(B, Q, L, var, e, He, r, cur_lam);
     upgrade.transposeInPlace();
 
     ss.str("");
@@ -1406,6 +1551,330 @@ void EnsembleSolver::solve_enif(double cur_lam, ParameterEnsemble& pe_upgrade)
         message(1, ss.str());
 
     pe_upgrade.add_2_cols_ip(act_par_names, upgrade);
+}
+
+
+EnifMmThread::EnifMmThread(PerformanceLog* _performance_log, const vector<string>& _real_names,
+    const Eigen::MatrixXd& _X, const Eigen::MatrixXd& _Y, const Eigen::MatrixXd& _e, const Eigen::MatrixXd& _r,
+    unordered_map<string, vector<int>>& _real_idx_map,
+    unordered_map<string, pair<vector<string>, vector<string>>>& _real_name_map,
+    unordered_map<string, Eigen::VectorXd>& _q_vec_map,
+    unordered_map<string, Eigen::VectorXd>& _real_weight_map,
+    unordered_map<string, Eigen::SparseMatrix<double>>& _H_map,
+    unordered_map<string, Eigen::VectorXd>& _unexp_map, bool _h_ready,
+    const EnifGraph* _graph, const Eigen::SparseMatrix<double>* _C, const Eigen::MatrixXd* _Afac,
+    double _lasso, int _cv_folds, bool _inflate, double _cur_lam, Eigen::MatrixXd& _upgrade) :
+    performance_log(_performance_log), real_names(_real_names), X(_X), Y(_Y), e(_e), r(_r),
+    real_idx_map(_real_idx_map), real_name_map(_real_name_map), q_vec_map(_q_vec_map),
+    real_weight_map(_real_weight_map), H_map(_H_map), unexp_map(_unexp_map), h_ready(_h_ready),
+    graph(_graph), C(_C), Afac(_Afac), lasso(_lasso), cv_folds(_cv_folds), inflate(_inflate), cur_lam(_cur_lam),
+    upgrade(_upgrade)
+{
+    noise_var.resize(real_names.size());
+}
+
+
+void EnifMmThread::work(int thread_id)
+{
+    int p = (int)X.rows();
+    int nobs = (int)Y.rows();
+    while (true)
+    {
+        int k;
+        {
+            lock_guard<mutex> guard(next_lock);
+            k = next++;
+        }
+        if (k >= (int)real_names.size())
+            break;
+        const string& rname = real_names[k];
+        const vector<int>& idx = real_idx_map.at(rname);
+        int nk = (int)idx.size();
+        //the multimodal maps list the realization itself first; everything below leans on that
+        const vector<string>& pnames = real_name_map.at(rname).first;
+        if ((pnames.size() == 0) || (pnames[0] != rname) || (idx[0] != k))
+            throw runtime_error("solve_enif_multimodal(): neighbourhood of realization '" + rname +
+                "' does not start with itself");
+        if (nk < 3)
+            throw runtime_error("solve_enif_multimodal(): realization '" + rname + "' has a neighbourhood of " +
+                to_string(nk) + " realizations, need at least 3");
+
+        Eigen::SparseMatrix<double> Hk;
+        Eigen::VectorXd uk;
+        bool have = false;
+        if (h_ready)
+        {
+            lock_guard<mutex> guard(results_lock);
+            auto it = H_map.find(rname);
+            if (it != H_map.end())
+            {
+                Hk = it->second;
+                uk = unexp_map.at(rname);
+                have = true;
+            }
+        }
+        if (!have)
+        {
+            //deviations centred on this realization: its own column is zero, so nk-1 columns
+            //carry information and that is the divisor for the unexplained variance
+            double scale = 1.0 / sqrt(double(nk - 1));
+            Eigen::MatrixXd Ak(p, nk), Bk(nobs, nk);
+            for (int j = 0; j < nk; j++)
+            {
+                Ak.col(j) = (X.col(idx[j]) - X.col(idx[0])) * scale;
+                Bk.col(j) = (Y.col(idx[j]) - Y.col(idx[0])) * scale;
+            }
+            double divisor = double(nk - 1);
+            auto wit = real_weight_map.find(rname);
+            if ((wit != real_weight_map.end()) && (wit->second.size() == nk))
+            {
+                //neighbourhood-ranking weights, applied as sqrt weights on the columns the way
+                //nonlocalized_solve does; the residual is then a weighted sum of squares and the
+                //centre's weight carries no residual
+                Eigen::VectorXd sw = wit->second.cwiseSqrt();
+                for (int j = 0; j < nk; j++)
+                {
+                    Ak.col(j) *= sw[j];
+                    Bk.col(j) *= sw[j];
+                }
+                double wsum = wit->second.sum() - wit->second[0];
+                if (wsum > 0.0)
+                    divisor = wsum;
+            }
+            stringstream tss;
+            Hk = estimate_sparse_H(Ak, Bk, lasso, 1, uk, tss, cv_folds, divisor);
+            lock_guard<mutex> guard(results_lock);
+            H_map[rname] = Hk;
+            unexp_map[rname] = uk;
+        }
+
+        //this realization's noise: its own weight vector, inflated by what its H leaves unexplained
+        const Eigen::VectorXd& q = q_vec_map.at(rname);
+        if (q.size() != nobs)
+            throw runtime_error("solve_enif_multimodal(): weight vector for realization '" + rname + "' is the wrong length");
+        Eigen::VectorXd var(nobs), rinv(nobs);
+        for (int i = 0; i < nobs; i++)
+        {
+            if (q[i] <= 0.0)
+                throw runtime_error("solve_enif_multimodal(): zero weight on an active observation for realization '" + rname + "'");
+            var[i] = (1.0 / (q[i] * q[i])) + (inflate ? max(0.0, uk[i]) : 0.0);
+            rinv[i] = 1.0 / var[i];
+        }
+        noise_var[k] = var;
+
+        Eigen::MatrixXd ek = e.col(k);
+        Eigen::MatrixXd rk = r.col(k);
+        Eigen::MatrixXd dk;
+        if (graph != nullptr)
+        {
+            stringstream tss;
+            dk = graph->information_step(Hk, rinv, ek, rk, cur_lam, tss);
+        }
+        else if (Afac != nullptr)
+        {
+            //current ensemble covariance as its factor: U = Hk A, Q = I, L = A
+            Eigen::MatrixXd Uk = Hk * (*Afac);
+            Eigen::MatrixXd Hek = Hk * ek;
+            int nn = (int)Afac->cols();
+            dk = enif_lowrank_step(Uk, Eigen::MatrixXd::Identity(nn, nn), *Afac, var, ek, Hek, rk, cur_lam);
+        }
+        else
+            dk = enif_woodbury_step(Hk, var, *C, ek, rk, cur_lam);
+        //column k belongs to this thread alone
+        upgrade.col(k) = dk.col(0);
+    }
+}
+
+
+void enif_mm_thread_function(int id, EnifMmThread& worker, exception_ptr& eptr)
+{
+    try
+    {
+        worker.work(id);
+    }
+    catch (...)
+    {
+        eptr = current_exception();
+    }
+}
+
+
+void EnsembleSolver::solve_enif_multimodal(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade)
+{
+    //enif, one realization at a time.  the mean-centred solve regresses one H from the
+    //whole ensemble and applies it to every realization.  here each realization gets an
+    //H regressed on deviations centred on itself over its multimodal neighbourhood (the
+    //same neighbourhoods, weights and per-realization observation weights the ies
+    //multimodal solve uses), its own unexplained-variance inflation, and its own step.
+    //the prior precision (graph path) or prior covariance (no graph) is shared: the rml
+    //objective is anchored on the prior, so there is nothing per-realization about it.
+    pe_upgrade.set_zeros();
+    stringstream ss;
+    vector<string> pe_real_names = pe.get_real_names();
+    vector<string> oe_real_names = oe.get_real_names();
+    if (pe_upgrade.get_real_names() != pe_real_names)
+        throw runtime_error("EnsembleSolver::solve_enif_multimodal(): upgrade ensemble realizations do not match");
+    int num_reals = (int)pe_real_names.size();
+    int n_obs = (int)act_obs_names.size();
+    int n_par = (int)act_par_names.size();
+    if (num_reals < 3)
+        throw runtime_error("EnsembleSolver::solve_enif_multimodal(): need at least 3 realizations");
+    if ((int)mm_real_idx_map.size() != num_reals)
+        throw runtime_error("EnsembleSolver::solve_enif_multimodal(): multimodal components not initialized");
+    ofstream& frec = file_manager.rec_ofstream();
+
+    performance_log->log_event("enif-mm: forming ensembles, anomaly bases and residuals");
+    Eigen::MatrixXd e = ph.get_par_resid_subset(pe, pe_real_names);
+    e.transposeInPlace();
+    Eigen::MatrixXd e_prior = e;   //see solve_enif: the graph init wants x - x0 un-zeroed
+    if (pest_scenario.get_pestpp_options().get_ies_use_approx())
+        e.setZero();
+    Eigen::MatrixXd r = ph.get_obs_resid_subset(oe, true, oe_real_names);
+    r.transposeInPlace();
+    Eigen::MatrixXd X = pe.get_eigen(pe_real_names, act_par_names);
+    X.transposeInPlace();
+    Eigen::MatrixXd Y = oe.get_eigen(oe_real_names, act_obs_names);
+    Y.transposeInPlace();
+    double scale = 1.0 / sqrt(double(num_reals - 1));
+    init_enif_graph(pe_real_names, e_prior, scale);
+    const EnifGraph* graph = enif_graph.is_initialized() ? &enif_graph : nullptr;
+    Covariance pcov;
+    Eigen::MatrixXd Afac;
+    const Eigen::MatrixXd* Afac_ptr = nullptr;
+    const Eigen::SparseMatrix<double>* C = nullptr;
+    bool current_prec = pest_scenario.get_pestpp_options().get_ies_enif_current_prec();
+    if ((current_prec) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
+        throw runtime_error("EnsembleSolver::solve_enif_multimodal(): 'ies_enif_current_prec' needs 'ies_use_approx' = true");
+    if (graph == nullptr)
+    {
+        if (current_prec)
+        {
+            //the current ensemble covariance in place of parcov - see init_enif_graph.  kept as
+            //its p x N factor, never as the p x p product
+            Afac = (X.colwise() - X.rowwise().mean()) * scale;
+            Afac_ptr = &Afac;
+            if (!enif_mm_h_ready)
+                frec << "...enif-mm: hessian from the current ensemble covariance, not parcov (ies_enif_current_prec)" << endl;
+        }
+        else
+        {
+            pcov = parcov.get(act_par_names);
+            C = pcov.e_ptr();
+        }
+    }
+    double lasso = pest_scenario.get_pestpp_options().get_ies_enif_h_lasso();
+    if (lasso <= 0.0)
+        lasso = 1.0e-2;
+    int cv_folds = pest_scenario.get_pestpp_options().get_ies_enif_h_cv_folds();
+    bool apply_inflate = pest_scenario.get_pestpp_options().get_ies_enif_resid_inflate();
+    bool h_was_ready = enif_mm_h_ready;
+
+    Eigen::MatrixXd upgrade = Eigen::MatrixXd::Zero(n_par, num_reals);
+    EnifMmThread worker(performance_log, pe_real_names, X, Y, e, r, mm_real_idx_map, mm_real_name_map,
+        mm_q_vec_map, mm_real_weight_map, enif_mm_H, enif_mm_unexp, h_was_ready, graph, C, Afac_ptr,
+        lasso, cv_folds, apply_inflate, cur_lam, upgrade);
+    ss.str("");
+    ss << "enif-mm: " << (h_was_ready ? "reusing" : "estimating") << " per-realization H and taking the "
+       << (graph != nullptr ? "information" : "woodbury") << " step for " << num_reals << " realizations";
+    performance_log->log_event(ss.str());
+    if (num_threads < 2)
+        worker.work(0);
+    else
+    {
+        Eigen::setNbThreads(1);
+        vector<thread> threads;
+        vector<exception_ptr> exception_ptrs(num_threads);
+        for (int i = 0; i < num_threads; i++)
+            threads.push_back(thread(enif_mm_thread_function, i, std::ref(worker), std::ref(exception_ptrs[i])));
+        ss.str("");
+        int num_exp = 0;
+        for (int i = 0; i < num_threads; i++)
+        {
+            threads[i].join();
+            if (exception_ptrs[i])
+            {
+                num_exp++;
+                try
+                {
+                    rethrow_exception(exception_ptrs[i]);
+                }
+                catch (const std::exception& ex)
+                {
+                    ss << " thread " << i << " raised an exception: " << ex.what();
+                }
+                catch (...)
+                {
+                    ss << " thread " << i << " raised an exception";
+                }
+            }
+        }
+        if (num_exp > 0)
+            throw runtime_error("EnsembleSolver::solve_enif_multimodal():" + ss.str());
+    }
+    enif_mm_h_ready = true;
+
+    ss.str("");
+    ss << "enif-mm: lambda " << cur_lam << ", max abs upgrade " << upgrade.cwiseAbs().maxCoeff();
+    performance_log->log_event(ss.str());
+    if (verbose_level > 1)
+        message(1, ss.str());
+    upgrade.transposeInPlace();
+    pe_upgrade.add_2_cols_ip(act_par_names, upgrade);
+
+    //once per iteration: what the per-realization H and inflation looked like
+    if (!h_was_ready)
+    {
+        ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+        vector<string> groups;
+        for (auto& name : act_obs_names)
+            groups.push_back(oi->get_group(name));
+        vector<Eigen::VectorXd> wts(num_reals), unex(num_reals);
+        vector<const Eigen::SparseMatrix<double>*> hs(num_reals);
+        vector<double> dens;
+        Eigen::VectorXd unexp_mean = Eigen::VectorXd::Zero(n_obs);
+        for (int k = 0; k < num_reals; k++)
+        {
+            const string& rname = pe_real_names[k];
+            wts[k] = mm_q_vec_map.at(rname);
+            unex[k] = enif_mm_unexp.at(rname);
+            hs[k] = &enif_mm_H.at(rname);
+            dens.push_back(100.0 * (double)hs[k]->nonZeros() / ((double)n_obs * (double)n_par));
+            unexp_mean += unex[k];
+        }
+        unexp_mean /= double(num_reals);
+        stringstream cs;
+        cs << file_manager.get_base_filename() << "." << iter << ".enif_mm_inflate.csv";
+        map<string, double> mean_ratio = enif_mm_inflation_csv(pe_real_names, act_obs_names, groups, wts, unex, hs,
+            apply_inflate, cs.str());
+        vector<double> ratios;
+        for (auto& mr : mean_ratio)
+            ratios.push_back(mr.second);
+        sort(dens.begin(), dens.end());
+        sort(ratios.begin(), ratios.end());
+        frec << "...enif-mm: per-realization sparse H by lasso on realization-centred deviations, "
+             << (graph != nullptr ? "information form on the graph" : "woodbury with parcov")
+             << ", lasso fraction " << lasso << (cv_folds > 0 ? " (cv)" : "") << endl;
+        frec << "...enif-mm: H density percent min / median / max over realizations: " << setprecision(3)
+             << dens.front() << " / " << dens[dens.size() / 2] << " / " << dens.back() << endl;
+        frec << "...enif-mm: mean noise inflation ratio per realization min / median / max: "
+             << ratios.front() << " / " << ratios[ratios.size() / 2] << " / " << ratios.back()
+             << (apply_inflate ? "" : "  (not applied: ies_enif_resid_inflate is false)") << endl;
+        frec << "...enif-mm: per-realization inflation written to " << cs.str() << endl;
+        if (!enif_inflate_reported)
+        {
+            //the per-observation report, on the mean unexplained variance over realizations
+            //and the control file weights, so it reads like the mean-centred one
+            Eigen::VectorXd wvec(n_obs);
+            for (int i = 0; i < n_obs; i++)
+                wvec(i) = oi->get_weight(act_obs_names[i]);
+            stringstream cs2;
+            cs2 << file_manager.get_base_filename() << "." << iter << ".enif_obs_inflate.csv";
+            enif_inflation_report(act_obs_names, groups, wvec, unexp_mean, apply_inflate, iter, cs2.str(), frec);
+            enif_inflate_reported = true;
+        }
+        if (pest_scenario.get_pestpp_options().get_ies_enif_save_h())
+            frec << "...enif-mm: ies_enif_save_h is not applied per realization; H is in memory only" << endl;
+    }
 }
 
 
@@ -8302,7 +8771,12 @@ void EnsembleMethod::generate_upgrades(UpgradeContext& ctx, bool use_mda,
         pe_upgrade.set_zeros();
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 
-		if (mm_alpha > 0.0)
+		if ((mm_alpha > 0.0) && (use_enif_solve()))
+        {
+            message(1,"multimodal ensemble information filter solve for inflation factor ",cur_lam);
+            es.solve_enif_multimodal(get_num_threads(), cur_lam, pe_upgrade);
+        }
+		else if (mm_alpha > 0.0)
         {
             message(1,"multimodal solve for inflation factor ",cur_lam);
             es.solve_multimodal(get_num_threads(), cur_lam, !use_mda, pe_upgrade, ctx.loc_map, mm_alpha);

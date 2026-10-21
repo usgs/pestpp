@@ -2186,18 +2186,26 @@ void SVDSolver::irls_reweight(ostream &os, const ModelRun &run, int global_iter_
 	if (global_iter_num < pest_scenario.get_pestpp_options().get_glm_irls_start_iter())
 		return;
 	PhiComponets phi_before = obj_func->get_phi_comp(run.get_obs(), run.get_ctl_pars(), *regul_scheme_ptr);
-	PriorInformation::IrlsStats stats = pest_scenario.get_prior_info_ptr()->irls_reweight(run.get_ctl_pars(), eps, irls_w0);
+	int max_dev = pest_scenario.get_pestpp_options().get_glm_irls_max_dev();
+	PriorInformation::IrlsStats stats = pest_scenario.get_prior_info_ptr()->irls_reweight(run.get_ctl_pars(), eps, irls_w0, max_dev);
 	PhiComponets phi_after = obj_func->get_phi_comp(run.get_obs(), run.get_ctl_pars(), *regul_scheme_ptr);
 	//the rec stream is left at 2 digits by the jacobian stats above, which turns the factors into "2e+01"
 	streamsize n_prec = os.precision(6);
 	os << endl << "  ---  IRLS (L1) prior information reweighting after iteration " << global_iter_num << "  ---" << endl;
-	os << "    residual floor eps                             : " << eps << endl;
+	if (max_dev >= 0)
+	{
+		os << "    deviations allowed (glm_irls_max_dev)          : " << max_dev << endl;
+		os << "    residual floor eps solved for that cap         : " << stats.eps << "  (minimum " << eps << ")" << endl;
+	}
+	else
+		os << "    residual floor eps                             : " << eps << endl;
 	os << "    prior information equations reweighted         : " << stats.n << endl;
+	os << "    equations with |residual| above eps (active)   : " << stats.n_active << endl;
 	os << "    equations with |residual| below eps (at floor) : " << stats.n_floor << endl;
 	os << "    reweight factor w/w0 min / median / max        : " << stats.fmin << " / " << stats.fmed << " / " << stats.fmax << endl;
 	os << "    regularization phi before / after reweighting  : " << phi_before.regul << " / " << phi_after.regul << endl << endl;
 	os.precision(n_prec);
-	cout << "  irls reweighting: " << stats.n << " prior info equations, " << stats.n_floor << " at floor, regul phi "
+	cout << "  irls reweighting: " << stats.n << " prior info equations, " << stats.n_active << " active, " << stats.n_floor << " at floor, eps " << stats.eps << ", regul phi "
 		<< phi_before.regul << " -> " << phi_after.regul << endl;
 }
 

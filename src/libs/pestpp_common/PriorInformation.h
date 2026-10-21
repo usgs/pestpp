@@ -89,11 +89,14 @@ public:
 	{
 		int n = 0;
 		int n_floor = 0;
+		int n_active = 0;   //equations with |residual| above the floor - the deviations let through
+		double eps = 0.0;   //the floor actually used, raised above the one passed in when max_dev asks
 		double fmin = 0.0;
 		double fmed = 0.0;
 		double fmax = 0.0;
 	};
-	IrlsStats irls_reweight(const Parameters &pars, double eps, std::map<std::string, double> &w0);
+	//max_dev >= 0 raises the floor to the value that leaves at most max_dev equations above it
+	IrlsStats irls_reweight(const Parameters &pars, double eps, std::map<std::string, double> &w0, int max_dev = -1);
 private:
 	std::map<std::string, PriorInformationRec> prior_info_map;
 };
