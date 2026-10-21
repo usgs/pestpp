@@ -74,7 +74,7 @@ def forward_run(ws="."):
             f.write("{0} {1:25.16E}\n".format(n, v))
 
 
-def setup(template_d, derinc=0.02):
+def write_problem(template_d, derinc=0.02):
     """write the control file and model into template_d"""
     if os.path.exists(template_d):
         shutil.rmtree(template_d)
@@ -153,7 +153,7 @@ def glm_central_difference_test(derinc=0.02, tol=1.0e-8):
     model_d = "glm_jacobian"
     template_d = os.path.join(model_d, "template")
     os.makedirs(model_d, exist_ok=True)
-    setup(template_d, derinc)
+    write_problem(template_d, derinc)
     results = {}
     for forcen, dermthd in (("always_2", "outside_pts"), ("always_3", "outside_pts"),
                             ("always_3", "parabolic"), ("always_3", "best_fit")):
@@ -203,7 +203,7 @@ def glm_failed_perturbation_test(derinc=0.02, tol=1.0e-8):
     model_d = "glm_jacobian"
     template_d = os.path.join(model_d, "template")
     os.makedirs(model_d, exist_ok=True)
-    setup(template_d, derinc)
+    write_problem(template_d, derinc)
     m_d = os.path.join(model_d, "master_always_3_fail_p1")
     jco, runs = run_jacobian(template_d, m_d, "always_3", "outside_pts", derinc, fail_below=(1, 1.0))
     print("\nalways_3 with the negative perturbation of p1 failing")
