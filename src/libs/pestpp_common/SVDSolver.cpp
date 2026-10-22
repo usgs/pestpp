@@ -507,16 +507,80 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	Eigen::VectorXd upgrade_vec;
 	stringstream info_str;
 	//PestppOptions::GLMNormalForm mar_mat = pest_scenario.get_pestpp_options().get_glm_normal_form();
-	if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::DIAG)
+	if ((pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::DIAG) ||
+		(pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::JACOBI))
 	{
 		
 		Eigen::SparseMatrix<double> S;
+		VectorXd S_diag;
+		if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::DIAG)
 		//Compute Scaling Matrix Sii
-		performance_log->log_event("commencing to scale JtQJ matrix- first SVD...");
-		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
-		VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
-		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
-		VectorXd S_diag = S.diagonal();
+		{
+			performance_log->log_event("commencing to scale JtQJ matrix- first SVD...");
+			svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
+			VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
+			S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
+			S_diag = S.diagonal();
+		}
+		else
+		{
+			//Jacobi column scaling: S = diag(1/sqrt(diag(JtQJ))) computed directly.
+			//works with severe ill-conditioning; dead columns (zero diagonal) get S=1.
+			performance_log->log_event("computing Jacobi scaling directly from diag(JtQJ)");
+			VectorXd jtqj_diag = JtQJ.diagonal();
+			S_diag = VectorXd::Ones(jtqj_diag.size());
+			for (int i = 0; i < jtqj_diag.size(); i++)
+				if (jtqj_diag(i) > 0.0)
+					S_diag(i) = 1.0 / sqrt(jtqj_diag(i));
+
+			//freeze (S=0) parameters whose relative sensitivity is negligible this iteration, otherwise
+			//their huge S produces steps that overflow on back-transformation. relative sensitivity is
+			//diag(JtQJ)_i * p_i^2 for untransformed pars and diag(JtQJ)_i for log pars (already unitless),
+			//so parameters that are only small in absolute terms because of their units are kept.
+			//the threshold is relative to the 90th percentile of the nonzero relative sensitivities, not
+			//the maximum: a few dominant parameters can exceed the rest by orders of magnitude and would
+			//otherwise freeze most of a large parameter set.
+			const double rel_sen_thresh = 1.0e-6;
+			const double rel_sen_ref_quantile = 0.9;
+			const ParameterInfo &pi = pest_scenario.get_ctl_parameter_info();
+			VectorXd rel_sen(jtqj_diag.size());
+			for (int i = 0; i < jtqj_diag.size(); i++)
+			{
+				double w = 1.0;
+				const ParameterRec *prec = pi.get_parameter_rec_ptr(numeric_par_names[i]);
+				if ((prec != nullptr) && (prec->tranform_type != ParameterRec::TRAN_TYPE::LOG))
+				{
+					double p = abs(pars_nf.get_rec(numeric_par_names[i]));
+					if (p > 0.0)
+						w = p * p;
+				}
+				rel_sen(i) = jtqj_diag(i) * w;
+			}
+			vector<double> pos_rel_sen;
+			for (int i = 0; i < rel_sen.size(); i++)
+				if (rel_sen(i) > 0.0)
+					pos_rel_sen.push_back(rel_sen(i));
+			double ref_rel_sen = 0.0;
+			if (!pos_rel_sen.empty())
+			{
+				size_t k = (size_t)(rel_sen_ref_quantile * (pos_rel_sen.size() - 1));
+				nth_element(pos_rel_sen.begin(), pos_rel_sen.begin() + k, pos_rel_sen.end());
+				ref_rel_sen = pos_rel_sen[k];
+			}
+			int num_frozen = 0;
+			for (int i = 0; i < jtqj_diag.size(); i++)
+				if ((jtqj_diag(i) > 0.0) && (rel_sen(i) < rel_sen_thresh * ref_rel_sen))
+				{
+					S_diag(i) = 0.0;
+					num_frozen++;
+				}
+			if (num_frozen > 0)
+			{
+				stringstream ss;
+				ss << "JACOBI: " << num_frozen << " parameters with relative sensitivity below " << rel_sen_thresh << " x its 90th percentile held fixed for this upgrade";
+				performance_log->log_event(ss.str());
+			}
+		}
 		MatrixXd S_tmp = S_diag.asDiagonal();
 		S = S_tmp.sparseView();
 		
@@ -526,9 +590,19 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event("JS");
 		
 		Eigen::SparseMatrix<double> JS = jac * S;
-		performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
-		
-		JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
+		if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::JACOBI)
+		{
+			//scaled Marquardt: the scaled matrix has a unit diagonal, so damp it with lambda * I.
+			performance_log->log_event("JS.transpose() * q_mat * JS + lambda * I");
+			Eigen::SparseMatrix<double> I(JS.cols(), JS.cols());
+			I.setIdentity();
+			JtQJ = JS.transpose() * q_mat * JS + lambda * I;
+		}
+		else
+		{
+			performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
+			JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
+		}
 		
 		info_str.str("");
 		info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
@@ -554,6 +628,29 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event(info_str.str());
 		
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
+		if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::JACOBI)
+		{
+			//weakly sensitive log-transformed pars can get scaled steps of hundreds of decades, which
+			//overflow when back-transformed before the change limits are applied. shrink the whole
+			//vector (direction preserved) so no log par moves more than max_log_step decades; the
+			//usual change limits then act as for the other normal forms.
+			const double max_log_step = 10.0;
+			const ParameterInfo &pi = pest_scenario.get_ctl_parameter_info();
+			double max_abs_log_step = 0.0;
+			for (int i = 0; i < upgrade_vec.size(); i++)
+			{
+				const ParameterRec *prec = pi.get_parameter_rec_ptr(numeric_par_names[i]);
+				if ((prec != nullptr) && (prec->tranform_type == ParameterRec::TRAN_TYPE::LOG))
+					max_abs_log_step = max(max_abs_log_step, abs(upgrade_vec(i)));
+			}
+			if (max_abs_log_step > max_log_step)
+			{
+				stringstream ss;
+				ss << "JACOBI: largest log-parameter step " << max_abs_log_step << " decades, scaling upgrade vector by " << max_log_step / max_abs_log_step;
+				performance_log->log_event(ss.str());
+				upgrade_vec *= max_log_step / max_abs_log_step;
+			}
+		}
 		
 	}
 	else if ((pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::IDENT) ||

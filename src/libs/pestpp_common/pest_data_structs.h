@@ -216,7 +216,7 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum class ToolType { GLM, IES, DA, MOU, SQP, OPT, SWEEP, GSA };
-	enum GLMNormalForm { IDENT,DIAG, PRIOR, HP };
+	enum GLMNormalForm { IDENT,DIAG, PRIOR, HP, JACOBI };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	PestppOptions() { use_da_args=false; }
 

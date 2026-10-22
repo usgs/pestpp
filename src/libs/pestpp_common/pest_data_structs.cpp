@@ -611,6 +611,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key_legacy(string key, 
 			glm_normal_form = GLMNormalForm::PRIOR;
 		else if (value == "HP")
 			glm_normal_form = GLMNormalForm::HP;
+		else if (value == "JACOBI")
+			glm_normal_form = GLMNormalForm::JACOBI;
 	}
 
 	else if (key == "GLM_DEBUG_DER_FAIL")
@@ -2171,6 +2173,8 @@ void PestppOptions::summary_legacy(ostream& os) const
 		norm_str = "PRIOR";
 	else if (glm_normal_form == GLMNormalForm::HP)
 		norm_str = "HP";
+	else if (glm_normal_form == GLMNormalForm::JACOBI)
+		norm_str = "JACOBI";
 	os << "glm_normal_form: " << norm_str << endl;
 	os << "glm_hp_lambdas:" << glm_hp_lambdas << endl;
 	os << "glm_panther_lambdas" << glm_panther_lambdas << endl;

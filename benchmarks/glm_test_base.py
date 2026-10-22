@@ -421,6 +421,12 @@ def tenpar_normalform_test():
                                  master_dir=test_d, verbose=True, worker_root=model_d,
                                  port=port)
 
+    pst.pestpp_options["glm_normal_form"] = "jacobi"
+    pst.write(os.path.join(template_d, "pest_jacobi.pst"))
+    pyemu.os_utils.start_workers(template_d, exe_path, "pest_jacobi.pst", num_workers=10,
+                                 master_dir=test_d, verbose=True, worker_root=model_d,
+                                 port=port)
+
 
 def freyberg_stress_test():
     model_d = "glm_freyberg"
